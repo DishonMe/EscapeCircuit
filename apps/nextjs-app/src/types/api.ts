@@ -53,9 +53,14 @@ export type Puzzle = Entity<{
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   timeLimit: number; // in seconds
   budgetLimit: number;
+  tightBudgetLimit?: number;
   inputs: string[];
   outputs: string[];
   creator: User;
+  creatorComment?: string;
+  filteredBasicComponents?: string[];
+  allowArsenal?: boolean;
+  specialComponents?: CircuitComponent[];
   rating: number;
   solvedCount: number;
   isPublic: boolean;
