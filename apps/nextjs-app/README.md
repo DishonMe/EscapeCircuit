@@ -1,4 +1,6 @@
-# Next.js App Application
+# EscapeCircuit - Next.js App
+
+The main application for EscapeCircuit, built with Next.js App Router.
 
 ## Get Started
 
@@ -7,11 +9,9 @@ Prerequisites:
 - Node 20+
 - Yarn 1.22+
 
-To set up the app execute the following commands.
+To set up the app:
 
 ```bash
-git clone https://github.com/alan2207/bulletproof-react.git
-cd bulletproof-react
 cd apps/nextjs-app
 cp .env.example .env
 yarn install
@@ -19,10 +19,31 @@ yarn install
 
 #### `yarn run-mock-server`
 
-Make sure to start the mock server before running the app.
-The mock server runs on [http://localhost:8080/api](http://localhost:8080/api).
+Start the mock API server on [http://localhost:8080/api](http://localhost:8080/api).
 
-##### `yarn dev`
+#### `yarn dev`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Start the development server on [http://localhost:3000](http://localhost:3000).
+
+## Features
+
+- Modern Next.js 14 with App Router
+- TypeScript for type safety
+- Tailwind CSS for styling
+- Zustand for state management
+- React Query for API calls
+- Comprehensive testing with Vitest
+- ESLint and Prettier for code quality
+
+## Project Structure
+
+```
+src/
+  app/          # Next.js app router pages
+  components/   # Reusable UI components
+  features/     # Feature-specific modules
+  hooks/        # Custom React hooks
+  lib/          # Utility libraries
+  types/        # TypeScript type definitions
+  utils/        # Helper functions
+```

@@ -21,6 +21,12 @@ export const paths = {
     dashboard: {
       getHref: () => '/app',
     },
+    puzzles: {
+      getHref: () => '/app/puzzles',
+    },
+    puzzle: {
+      getHref: (id: string) => `/app/puzzles/${id}`,
+    },
     discussions: {
       getHref: () => '/app/discussions',
     },
