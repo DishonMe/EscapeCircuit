@@ -379,3 +379,66 @@ class TestEnsureGateSet:
         with pytest.raises(ValidationError) as exc_info:
             ensure_gate_set("Circuit.gates", ["AND"])  # type: ignore
         assert "Circuit.gates must be a set" in str(exc_info.value)
+
+class TestUtilsFunctionBranches:
+    """Test conditional branches in utility validation functions"""
+    
+    def test_ensure_non_empty_empty_string(self):
+        """Test ensure_non_empty with empty string"""
+        with pytest.raises(ValidationError):
+            ensure_non_empty("test", "")
+    
+    def test_ensure_non_empty_whitespace_only(self):
+        """Test ensure_non_empty with whitespace-only string"""
+        with pytest.raises(ValidationError):
+            ensure_non_empty("test", "   ")
+    
+    def test_ensure_non_empty_valid(self):
+        """Test ensure_non_empty with valid string"""
+        result = ensure_non_empty("test", "valid")
+        assert result == "valid"
+    
+    def test_clamp_int_not_int_type(self):
+        """Test clamp_int with non-int type"""
+        with pytest.raises(ValidationError):
+            clamp_int("test", "3", 1, 5)
+    
+    def test_clamp_int_below_range(self):
+        """Test clamp_int with value below range"""
+        with pytest.raises(ValidationError):
+            clamp_int("test", 0, 1, 5)
+    
+    def test_clamp_int_above_range(self):
+        """Test clamp_int with value above range"""
+        with pytest.raises(ValidationError):
+            clamp_int("test", 6, 1, 5)
+    
+    def test_clamp_int_valid(self):
+        """Test clamp_int with valid value"""
+        result = clamp_int("test", 3, 1, 5)
+        assert result == 3
+    
+    def test_ensure_optional_positive_int_none(self):
+        """Test ensure_optional_positive_int with None"""
+        result = ensure_optional_positive_int("test", None)
+        assert result is None
+    
+    def test_ensure_optional_positive_int_positive(self):
+        """Test ensure_optional_positive_int with positive int"""
+        result = ensure_optional_positive_int("test", 5)
+        assert result == 5
+    
+    def test_ensure_optional_positive_int_zero(self):
+        """Test ensure_optional_positive_int with zero"""
+        with pytest.raises(ValidationError):
+            ensure_optional_positive_int("test", 0)
+    
+    def test_ensure_optional_positive_int_negative(self):
+        """Test ensure_optional_positive_int with negative"""
+        with pytest.raises(ValidationError):
+            ensure_optional_positive_int("test", -5)
+    
+    def test_ensure_optional_positive_int_not_int(self):
+        """Test ensure_optional_positive_int with non-int"""
+        with pytest.raises(ValidationError):
+            ensure_optional_positive_int("test", "5")
