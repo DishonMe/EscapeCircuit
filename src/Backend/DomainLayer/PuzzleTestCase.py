@@ -10,21 +10,18 @@ from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty, ensure_bit
 @dataclass(slots=True)
 class PuzzleTestCase:
     id: int
-    puzzle_id: str
+    puzzle_id: int
     kind: TestCaseKind
     inputs: Dict[str, int]
     expected_outputs: Dict[str, int]
     created_at: datetime = field(default_factory=utcnow)
 
-    def set_puzzle_id(self, value: str) -> None:
-        if not value or not value.strip():
-            raise ValidationError("PuzzleTestCase.puzzle_id is required")
-        self.puzzle_id = value
+    def set_puzzle_id(self, value: int) -> None:
+        self.puzzle_id = ensure_non_negative_int("PuzzleTestCase.puzzle_id", value)
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("PuzzleTestCase.id", self.id)
-        if not self.puzzle_id:
-            raise ValidationError("PuzzleTestCase.puzzle_id is required")
+        self.puzzle_id = ensure_non_negative_int("PuzzleTestCase.puzzle_id", self.puzzle_id)
         if not self.inputs:
             raise ValidationError("PuzzleTestCase.inputs cannot be empty")
         if not self.expected_outputs:
@@ -40,7 +37,7 @@ class PuzzleTestCase:
     def to_dict(self) -> dict:
         return {
             "id": int(self.id),
-            "puzzle_id": self.puzzle_id,
+            "puzzle_id": int(self.puzzle_id),
             "kind": self.kind.value,
             "inputs": dict(self.inputs),
             "expected_outputs": dict(self.expected_outputs),
@@ -52,7 +49,7 @@ class PuzzleTestCase:
         from datetime import datetime
         return PuzzleTestCase(
             id=int(d.get("id", 0)),
-            puzzle_id=d["puzzle_id"],
+            puzzle_id=int(d["puzzle_id"]),
             kind=TestCaseKind(d["kind"]),
             inputs=dict(d["inputs"]),
             expected_outputs=dict(d["expected_outputs"]),
@@ -61,7 +58,7 @@ class PuzzleTestCase:
 
     # --- getters ---
     def get_id(self) -> int: return self.id
-    def get_puzzle_id(self) -> str: return self.puzzle_id
+    def get_puzzle_id(self) -> int: return self.puzzle_id
     def get_kind(self) -> TestCaseKind: return self.kind
     def get_inputs(self) -> dict: return self.inputs
     def get_expected_outputs(self) -> dict: return self.expected_outputs

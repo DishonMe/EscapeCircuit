@@ -10,7 +10,7 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_opt
 class Puzzle:
     id: int 
     name: str
-    creator_user_id: str
+    creator_user_id: int
     description: str = ""
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
@@ -33,8 +33,7 @@ class Puzzle:
         self.id = ensure_non_negative_int("Puzzle.id", self.id)
         if not self.name or not self.name.strip():
             raise ValidationError("Puzzle.name is required")
-        if not self.creator_user_id:
-            raise ValidationError("Puzzle.creator_user_id is required")
+        self.creator_user_id = ensure_non_negative_int("Puzzle.creator_user_id", self.creator_user_id)
         if self.budget < 0:
             raise ValidationError("Puzzle.budget cannot be negative")
         if self.time_limit_seconds is not None and self.time_limit_seconds <= 0:
@@ -56,7 +55,7 @@ class Puzzle:
         return {
             "id": int(self.id),
             "name": self.name,
-            "creator_user_id": self.creator_user_id,
+            "creator_user_id": int(self.creator_user_id),
             "description": self.description,
             "status": self.status.value,
             "budget": self.budget,
@@ -75,7 +74,7 @@ class Puzzle:
         return Puzzle(
             id=int(d.get("id", 0)),
             name=d["name"],
-            creator_user_id=d["creator_user_id"],
+            creator_user_id=int(d["creator_user_id"]),
             description=d.get("description", ""),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
@@ -92,7 +91,7 @@ class Puzzle:
     # --- getters ---
     def get_id(self) -> int: return self.id
     def get_name(self) -> str: return self.name
-    def get_creator_user_id(self) -> str: return self.creator_user_id
+    def get_creator_user_id(self) -> int: return self.creator_user_id
     def get_description(self) -> str: return self.description
     def get_status(self) -> PuzzleStatus: return self.status
     def get_budget(self) -> int: return self.budget
@@ -108,8 +107,8 @@ class Puzzle:
     def set_name(self, value: str) -> None:
         self.name = ensure_non_empty("Puzzle.name", value)
 
-    def set_creator_user_id(self, value: str) -> None:
-        self.creator_user_id = ensure_non_empty("Puzzle.creator_user_id", value)
+    def set_creator_user_id(self, value: int) -> None:
+        self.creator_user_id = ensure_non_negative_int("Puzzle.creator_user_id", value)
 
     def set_description(self, value: str) -> None:
         self.description = value or ""
