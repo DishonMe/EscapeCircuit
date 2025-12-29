@@ -58,9 +58,8 @@ class TestPuzzleCreation:
         assert "Puzzle.name is required" in str(exc_info.value)
 
     def test_create_puzzle_missing_creator(self):
-        with pytest.raises(ValidationError) as exc_info:
-            Puzzle(id=1, name="Test", creator_user_id=0)
-        assert "Puzzle.creator_user_id is required" in str(exc_info.value)
+        with pytest.raises(TypeError):
+            Puzzle(id=1, name="Test")
 
     def test_create_puzzle_negative_budget(self):
         with pytest.raises(ValidationError) as exc_info:
@@ -380,102 +379,102 @@ class TestPuzzleSetters:
     """Comprehensive tests for all Puzzle setter methods"""
 
     def test_set_name(self):
-        puzzle = Puzzle(id=1, name="Original", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Original", creator_user_id=1)
         puzzle.set_name("NewName")
         assert puzzle.name == "NewName"
 
     def test_set_name_empty(self):
-        puzzle = Puzzle(id=1, name="Original", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Original", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_name("")
 
     def test_set_creator_user_id(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
-        puzzle.set_creator_user_id("u2")
-        assert puzzle.creator_user_id == "u2"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
+        puzzle.set_creator_user_id(2)
+        assert puzzle.creator_user_id == 2
 
     def test_set_creator_user_id_empty(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_creator_user_id("")
 
     def test_set_description(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_description("New description")
         assert puzzle.description == "New description"
 
     def test_set_description_empty(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_description("")
         assert puzzle.description == ""
 
     def test_set_status_published(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_status(PuzzleStatus.PUBLISHED)
         assert puzzle.status == PuzzleStatus.PUBLISHED
 
     def test_set_status_unpublished(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_status(PuzzleStatus.UNPUBLISHED)
         assert puzzle.status == PuzzleStatus.UNPUBLISHED
 
     def test_set_status_invalid(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_status("invalid")
 
     def test_set_budget(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_budget(250)
         assert puzzle.budget == 250
 
     def test_set_budget_negative(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_budget(-10)
 
     def test_set_time_limit_seconds(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_time_limit_seconds(300)
         assert puzzle.time_limit_seconds == 300
 
     def test_set_time_limit_seconds_none(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_time_limit_seconds(None)
         assert puzzle.time_limit_seconds is None
 
     def test_set_time_limit_seconds_zero(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_time_limit_seconds(0)
 
     def test_set_default_gate_set(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         gates = {GateType.AND, GateType.OR}
         puzzle.set_default_gate_set(gates)
         assert puzzle.default_gate_set == gates
 
     def test_set_rating_count(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_rating_count(20)
         assert puzzle.rating_count == 20
 
     def test_set_rating_count_negative(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_rating_count(-5)
 
     def test_set_avg_difficulty(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_avg_difficulty(4.5)
         assert puzzle.avg_difficulty == 4.5
 
     def test_set_avg_fun(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_avg_fun(3.8)
         assert puzzle.avg_fun == 3.8
 
     def test_set_avg_clearness(self):
-        puzzle = Puzzle(id=1, name="Test", creator_user_id="u1")
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_avg_clearness(4.2)
         assert puzzle.avg_clearness == 4.2

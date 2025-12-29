@@ -16,10 +16,8 @@ class PuzzleTestCase:
     expected_outputs: Dict[str, int]
     created_at: datetime = field(default_factory=utcnow)
 
-    def set_puzzle_id(self, value: str) -> None:
-        if not value or not value.strip():
-            raise ValidationError("PuzzleTestCase.puzzle_id is required")
-        self.puzzle_id = value
+    def set_puzzle_id(self, value: int) -> None:
+        self.puzzle_id = ensure_non_negative_int("PuzzleTestCase.puzzle_id", value)
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("PuzzleTestCase.id", self.id)

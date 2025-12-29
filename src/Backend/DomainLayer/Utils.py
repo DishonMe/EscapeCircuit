@@ -9,8 +9,8 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# def new_id() -> str:
-#     return str(uuid4())
+def new_id() -> str:
+    return str(uuid4())
 
 
 def clamp_int(name: str, value: int, lo: int, hi: int) -> int:

@@ -43,14 +43,12 @@ class TestRatingCreation:
         assert rating.id == 0
 
     def test_create_rating_missing_puzzle_id(self):
-        with pytest.raises(ValidationError) as exc_info:
-            Rating(id=1, puzzle_id=0, user_id=1, difficulty=3, fun=3, clearness=3)
-        assert "Rating.puzzle_id is required" in str(exc_info.value)
+        with pytest.raises(TypeError):
+            Rating(id=1, user_id=1, difficulty=3, fun=3, clearness=3)
 
     def test_create_rating_missing_user_id(self):
-        with pytest.raises(ValidationError) as exc_info:
-            Rating(id=1, puzzle_id=1, user_id=0, difficulty=3, fun=3, clearness=3)
-        assert "Rating.user_id is required" in str(exc_info.value)
+        with pytest.raises(TypeError):
+            Rating(id=1, puzzle_id=1, difficulty=3, fun=3, clearness=3)
 
 
 class TestRatingValidation:
@@ -366,12 +364,12 @@ class TestRatingSetters:
     """Comprehensive tests for all Rating setter methods"""
 
     def test_set_user_id(self):
-        rating = Rating(id=1, puzzle_id="p1", user_id="u1", difficulty=3, fun=3, clearness=3)
-        rating.set_user_id("u2")
-        assert rating.user_id == "u2"
+        rating = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=3, clearness=3)
+        rating.set_user_id(2)
+        assert rating.user_id == 2
 
     def test_set_user_id_empty(self):
-        rating = Rating(id=1, puzzle_id="p1", user_id="u1", difficulty=3, fun=3, clearness=3)
+        rating = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=3, clearness=3)
         with pytest.raises(ValidationError):
             rating.set_user_id("")
 

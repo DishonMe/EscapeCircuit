@@ -108,7 +108,7 @@ class Puzzle:
         self.name = ensure_non_empty("Puzzle.name", value)
 
     def set_creator_user_id(self, value: int) -> None:
-        self.creator_user_id = ensure_non_empty("Puzzle.creator_user_id", value)
+        self.creator_user_id = ensure_non_negative_int("Puzzle.creator_user_id", value)
 
     def set_description(self, value: str) -> None:
         self.description = value or ""
