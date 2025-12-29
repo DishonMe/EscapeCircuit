@@ -494,3 +494,14 @@ class TestPuzzleTestCaseEdgeCases:
         inputs = test_case.get_inputs()
         inputs["b"] = 1  # Modify returned dict
         assert test_case.get_inputs() == {"a": 0, "b": 1}  # Internal state is modified (shallow copy)
+
+    def test_set_puzzle_id(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": 1}
+        )
+        test_case.set_puzzle_id(42)
+        assert test_case.get_puzzle_id() == 42
