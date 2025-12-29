@@ -4,12 +4,12 @@ from typing import Dict
 
 from .Enums import TestCaseKind
 from .Exceptions import ValidationError
-from .Utils import utcnow, ensure_non_empty, ensure_bit_dict
+from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty, ensure_bit_dict
 
 
 @dataclass(slots=True)
 class PuzzleTestCase:
-    id: str
+    id: int = 0
     puzzle_id: str
     kind: TestCaseKind
     inputs: Dict[str, int]
@@ -17,8 +17,7 @@ class PuzzleTestCase:
     created_at: datetime = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
-        if not self.id:
-            raise ValidationError("PuzzleTestCase.id is required")
+        self.id = ensure_non_negative_int("PuzzleTestCase.id", self.id)
         if not self.puzzle_id:
             raise ValidationError("PuzzleTestCase.puzzle_id is required")
         if not self.inputs:
@@ -35,7 +34,7 @@ class PuzzleTestCase:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "puzzle_id": self.puzzle_id,
             "kind": self.kind.value,
             "inputs": dict(self.inputs),
@@ -47,7 +46,7 @@ class PuzzleTestCase:
     def from_dict(d: dict) -> "PuzzleTestCase":
         from datetime import datetime
         return PuzzleTestCase(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             puzzle_id=d["puzzle_id"],
             kind=TestCaseKind(d["kind"]),
             inputs=dict(d["inputs"]),
@@ -56,17 +55,14 @@ class PuzzleTestCase:
         )
 
     # --- getters ---
-    def get_id(self) -> str: return self.id
+    def get_id(self) -> int: return self.id
     def get_puzzle_id(self) -> str: return self.puzzle_id
     def get_kind(self) -> TestCaseKind: return self.kind
     def get_inputs(self) -> dict: return self.inputs
     def get_expected_outputs(self) -> dict: return self.expected_outputs
-    def get_created_at(self): return self.created_at
+    def get_created_at(self) -> datetime: return self.created_at
 
     # --- setters ---
-    def set_puzzle_id(self, value: str) -> None:
-        self.puzzle_id = ensure_non_empty("PuzzleTestCase.puzzle_id", value)
-
     def set_kind(self, value: TestCaseKind) -> None:
         if not isinstance(value, TestCaseKind):
             raise ValidationError("PuzzleTestCase.kind must be TestCaseKind")

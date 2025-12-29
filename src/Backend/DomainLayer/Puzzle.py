@@ -8,7 +8,7 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_opt
 
 @dataclass(slots=True)
 class Puzzle:
-    id: str
+    id: int = 0
     name: str
     creator_user_id: str
     description: str = ""
@@ -30,8 +30,7 @@ class Puzzle:
     # special_gates: Set[str] = field(default_factory=set, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if not self.id:
-            raise ValidationError("Puzzle.id is required")
+        self.id = ensure_non_negative_int("Puzzle.id", self.id)
         if not self.name or not self.name.strip():
             raise ValidationError("Puzzle.name is required")
         if not self.creator_user_id:
@@ -55,7 +54,7 @@ class Puzzle:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "name": self.name,
             "creator_user_id": self.creator_user_id,
             "description": self.description,
@@ -74,7 +73,7 @@ class Puzzle:
     def from_dict(d: dict) -> "Puzzle":
         from datetime import datetime
         return Puzzle(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             name=d["name"],
             creator_user_id=d["creator_user_id"],
             description=d.get("description", ""),
@@ -91,7 +90,7 @@ class Puzzle:
     
 
     # --- getters ---
-    def get_id(self) -> str: return self.id
+    def get_id(self) -> int: return self.id
     def get_name(self) -> str: return self.name
     def get_creator_user_id(self) -> str: return self.creator_user_id
     def get_description(self) -> str: return self.description

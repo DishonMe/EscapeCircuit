@@ -8,15 +8,14 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int
 
 @dataclass(slots=True)
 class User:
-    id: str
+    id: int = 0
     username: str
     role: UserRole = UserRole.SOLVER
     xp: int = 0
     created_at: datetime = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
-        if not self.id:
-            raise ValidationError("User.id is required")
+        self.id = ensure_non_negative_int("User.id", self.id)
         if not self.username or not self.username.strip():
             raise ValidationError("User.username is required")
         if self.xp < 0:
@@ -38,7 +37,7 @@ class User:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "username": self.username,
             "role": self.role.value,
             "xp": self.xp,
@@ -49,7 +48,7 @@ class User:
     def from_dict(d: dict) -> "User":
         from datetime import datetime
         return User(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             username=d["username"],
             role=UserRole(d.get("role", UserRole.SOLVER.value)),
             xp=int(d.get("xp", 0)),
@@ -57,7 +56,7 @@ class User:
         )
 
     # --- getters ---
-    def get_id(self) -> str: return self.id
+    def get_id(self) -> int: return self.id
     def get_username(self) -> str: return self.username
     def get_role(self) -> UserRole: return self.role
     def get_xp(self) -> int: return self.xp

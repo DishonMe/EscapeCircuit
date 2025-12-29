@@ -3,12 +3,12 @@ from datetime import datetime
 from typing import Optional
 
 from .Exceptions import ValidationError
-from .Utils import clamp_int, utcnow, ensure_non_empty
+from .Utils import utcnow, clamp_int, ensure_non_negative_int, ensure_non_empty
 
 
 @dataclass(slots=True)
 class Rating:
-    id: str
+    id: int = 0
     puzzle_id: str
     user_id: str
 
@@ -20,8 +20,7 @@ class Rating:
     is_experienced_at_rating: bool = False # never changes later when user becomes an expert 
 
     def __post_init__(self) -> None:
-        if not self.id:
-            raise ValidationError("Rating.id is required")
+        self.id = ensure_non_negative_int("Rating.id", self.id)
         if not self.puzzle_id:
             raise ValidationError("Rating.puzzle_id is required")
         if not self.user_id:
@@ -40,7 +39,7 @@ class Rating:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "puzzle_id": self.puzzle_id,
             "user_id": self.user_id,
             "difficulty": self.difficulty,
@@ -54,7 +53,7 @@ class Rating:
     def from_dict(d: dict) -> "Rating":
         from datetime import datetime
         return Rating(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             puzzle_id=d["puzzle_id"],
             user_id=d["user_id"],
             difficulty=int(d["difficulty"]),
@@ -65,7 +64,7 @@ class Rating:
         )
 
     # --- getters ---
-    def get_id(self) -> str: return self.id
+    def get_id(self) -> int: return self.id
     def get_puzzle_id(self) -> str: return self.puzzle_id
     def get_user_id(self) -> str: return self.user_id
     def get_difficulty(self) -> int: return self.difficulty
@@ -75,9 +74,6 @@ class Rating:
     def get_is_experienced_at_rating(self) -> bool: return self.is_experienced_at_rating
 
     # --- setters ---
-    def set_puzzle_id(self, value: str) -> None:
-        self.puzzle_id = ensure_non_empty("Rating.puzzle_id", value)
-
     def set_user_id(self, value: str) -> None:
         self.user_id = ensure_non_empty("Rating.user_id", value)
 

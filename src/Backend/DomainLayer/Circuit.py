@@ -8,7 +8,7 @@ from .Enums import GateType
 
 @dataclass(slots=True)
 class Circuit:
-    id: int
+    id: int = 0
     user_id: int
     name: str
     cost: int
@@ -67,7 +67,7 @@ class Circuit:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "user_id": self.user_id,
             "name": self.name,
             "cost": self.cost,
@@ -77,7 +77,7 @@ class Circuit:
     @staticmethod
     def from_dict(d: dict) -> "Circuit":
         return Circuit(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             user_id=d["user_id"],
             name=d["name"],
             cost=d["cost"],

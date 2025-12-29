@@ -3,12 +3,12 @@ from datetime import datetime
 from typing import Optional
 
 from .Exceptions import ValidationError
-from .Utils import utcnow, ensure_non_empty
+from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty
 
 
 @dataclass(slots=True)
 class SolveAttempt:
-    id: str
+    id: int = 0
     puzzle_id: str
     user_id: str
     circuit_id: Optional[str] = None
@@ -20,8 +20,7 @@ class SolveAttempt:
     fail_reason: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if not self.id:
-            raise ValidationError("SolveAttempt.id is required")
+        self.id = ensure_non_negative_int("SolveAttempt.id", self.id)
         if not self.puzzle_id:
             raise ValidationError("SolveAttempt.puzzle_id is required")
         if not self.user_id:
@@ -47,7 +46,7 @@ class SolveAttempt:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": int(self.id),
             "puzzle_id": self.puzzle_id,
             "user_id": self.user_id,
             "circuit_id": self.circuit_id,
@@ -61,7 +60,7 @@ class SolveAttempt:
     def from_dict(d: dict) -> "SolveAttempt":
         from datetime import datetime
         return SolveAttempt(
-            id=d["id"],
+            id=int(d.get("id", 0)),
             puzzle_id=d["puzzle_id"],
             user_id=d["user_id"],
             circuit_id=d.get("circuit_id"),
@@ -72,7 +71,7 @@ class SolveAttempt:
         )
 
     # --- getters ---
-    def get_id(self) -> str: return self.id
+    def get_id(self) -> int: return self.id
     def get_puzzle_id(self) -> str: return self.puzzle_id
     def get_user_id(self) -> str: return self.user_id
     def get_circuit_id(self): return self.circuit_id
@@ -82,9 +81,6 @@ class SolveAttempt:
     def get_fail_reason(self): return self.fail_reason
 
     # --- setters ---
-    def set_id(self, value: str) -> None:
-        self.id = ensure_non_empty("SolveAttempt.id", value)
-
     def set_puzzle_id(self, value: str) -> None:
         self.puzzle_id = ensure_non_empty("SolveAttempt.puzzle_id", value)
 
