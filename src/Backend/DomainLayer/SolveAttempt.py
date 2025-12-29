@@ -9,8 +9,8 @@ from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty
 @dataclass(slots=True)
 class SolveAttempt:
     id: int 
-    puzzle_id: str
-    user_id: str
+    puzzle_id: int
+    user_id: int
     circuit_id: Optional[str] = None
 
     started_at: datetime = field(default_factory=utcnow)
@@ -21,10 +21,8 @@ class SolveAttempt:
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("SolveAttempt.id", self.id)
-        if not self.puzzle_id:
-            raise ValidationError("SolveAttempt.puzzle_id is required")
-        if not self.user_id:
-            raise ValidationError("SolveAttempt.user_id is required")
+        self.puzzle_id = ensure_non_negative_int("SolveAttempt.puzzle_id", self.puzzle_id)
+        self.user_id = ensure_non_negative_int("SolveAttempt.user_id", self.user_id)
 
     def mark_submitted(self, passed: bool, circuit_id: Optional[str] = None, fail_reason: Optional[str] = None) -> None:
         self.submitted_at = utcnow()
@@ -47,8 +45,8 @@ class SolveAttempt:
     def to_dict(self) -> dict:
         return {
             "id": int(self.id),
-            "puzzle_id": self.puzzle_id,
-            "user_id": self.user_id,
+            "puzzle_id": int(self.puzzle_id),
+            "user_id": int(self.user_id),
             "circuit_id": self.circuit_id,
             "started_at": self.started_at.isoformat(),
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
@@ -61,8 +59,8 @@ class SolveAttempt:
         from datetime import datetime
         return SolveAttempt(
             id=int(d.get("id", 0)),
-            puzzle_id=d["puzzle_id"],
-            user_id=d["user_id"],
+            puzzle_id=int(d["puzzle_id"]),
+            user_id=int(d["user_id"]),
             circuit_id=d.get("circuit_id"),
             started_at=datetime.fromisoformat(d["started_at"]) if "started_at" in d else utcnow(),
             submitted_at=datetime.fromisoformat(d["submitted_at"]) if d.get("submitted_at") else None,
@@ -72,8 +70,8 @@ class SolveAttempt:
 
     # --- getters ---
     def get_id(self) -> int: return self.id
-    def get_puzzle_id(self) -> str: return self.puzzle_id
-    def get_user_id(self) -> str: return self.user_id
+    def get_puzzle_id(self) -> int: return self.puzzle_id
+    def get_user_id(self) -> int: return self.user_id
     def get_circuit_id(self): return self.circuit_id
     def get_started_at(self): return self.started_at
     def get_submitted_at(self): return self.submitted_at
@@ -81,11 +79,11 @@ class SolveAttempt:
     def get_fail_reason(self): return self.fail_reason
 
     # --- setters ---
-    def set_puzzle_id(self, value: str) -> None:
-        self.puzzle_id = ensure_non_empty("SolveAttempt.puzzle_id", value)
+    def set_puzzle_id(self, value: int) -> None:
+        self.puzzle_id = ensure_non_negative_int("SolveAttempt.puzzle_id", value)
 
-    def set_user_id(self, value: str) -> None:
-        self.user_id = ensure_non_empty("SolveAttempt.user_id", value)
+    def set_user_id(self, value: int) -> None:
+        self.user_id = ensure_non_negative_int("SolveAttempt.user_id", value)
 
     def set_circuit_id(self, value) -> None:
         if value is not None and (not isinstance(value, str) or not value.strip()):
