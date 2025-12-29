@@ -54,10 +54,10 @@ class Circuit:
         if GateType.DFF.value in gates:
             raise ValidationError("Circuit contains action 'DFF'circuit cannot have an action gate")
         
-        num_basic_gates = len([gate for gate in gates if gate in GateType])
+        num_basic_gates = len([gate for gate in gates if gate in [g.value for g in GateType]])
         cost = num_basic_gates
         
-        special = [gate for gate in gates if gate not in GateType]
+        special = [gate for gate in gates if gate not in [g.value for g in GateType]]
         for gate in special:
             if gate not in special_gates:
                 raise ValidationError(f"Special gate '{gate}' not found in special_gates dictionary")
