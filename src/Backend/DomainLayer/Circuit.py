@@ -85,10 +85,10 @@ class Circuit:
         )
 
     # --- getters ---
-    def get_id(self) -> int:
+    def get_id(self) -> str:
         return self.id
 
-    def get_user_id(self) -> int:
+    def get_user_id(self) -> str:
         return self.user_id
 
     def get_name(self) -> str:
