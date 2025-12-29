@@ -8,7 +8,7 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int
 
 @dataclass(slots=True)
 class User:
-    id: int = 0
+    id: int 
     username: str
     role: UserRole = UserRole.SOLVER
     xp: int = 0

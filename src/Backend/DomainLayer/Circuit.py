@@ -8,7 +8,7 @@ from .Enums import GateType
 
 @dataclass(slots=True)
 class Circuit:
-    id: int = 0
+    id: int 
     user_id: int
     name: str
     cost: int

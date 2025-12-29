@@ -9,13 +9,13 @@ from Backend.DomainLayer.Exceptions import ValidationError
 class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_valid_blackbox(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0, "b": 1},
             expected_outputs={"result": 1}
         )
-        assert test_case.id == "tc1"
+        assert test_case.id == 1
         assert test_case.puzzle_id == "p1"
         assert test_case.kind == TestCaseKind.BLACKBOX
         assert test_case.inputs == {"a": 0, "b": 1}
@@ -23,7 +23,7 @@ class TestPuzzleTestCaseCreation:
 
     def test_create_puzzle_test_case_valid_whitebox(self):
         test_case = PuzzleTestCase(
-            id="tc2",
+            id=2,
             puzzle_id="p2",
             kind=TestCaseKind.WHITEBOX,
             inputs={"x": 1},
@@ -40,12 +40,12 @@ class TestPuzzleTestCaseCreation:
                 inputs={"a": 0},
                 expected_outputs={"r": 1}
             )
-        assert "PuzzleTestCase.id is required" in str(exc_info.value)
+        assert "PuzzleTestCase.id must be int" in str(exc_info.value)
 
     def test_create_puzzle_test_case_empty_puzzle_id(self):
         with pytest.raises(ValidationError) as exc_info:
             PuzzleTestCase(
-                id="tc1",
+                id=1,
                 puzzle_id="",
                 kind=TestCaseKind.BLACKBOX,
                 inputs={"a": 0},
@@ -56,7 +56,7 @@ class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_empty_inputs(self):
         with pytest.raises(ValidationError) as exc_info:
             PuzzleTestCase(
-                id="tc1",
+                id=1,
                 puzzle_id="p1",
                 kind=TestCaseKind.BLACKBOX,
                 inputs={},
@@ -67,7 +67,7 @@ class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_empty_outputs(self):
         with pytest.raises(ValidationError) as exc_info:
             PuzzleTestCase(
-                id="tc1",
+                id=1,
                 puzzle_id="p1",
                 kind=TestCaseKind.BLACKBOX,
                 inputs={"a": 0},
@@ -78,7 +78,7 @@ class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_invalid_input_value(self):
         with pytest.raises(ValidationError) as exc_info:
             PuzzleTestCase(
-                id="tc1",
+                id=1,
                 puzzle_id="p1",
                 kind=TestCaseKind.BLACKBOX,
                 inputs={"a": 2},  # Invalid: must be 0 or 1
@@ -89,7 +89,7 @@ class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_invalid_output_value(self):
         with pytest.raises(ValidationError) as exc_info:
             PuzzleTestCase(
-                id="tc1",
+                id=1,
                 puzzle_id="p1",
                 kind=TestCaseKind.BLACKBOX,
                 inputs={"a": 0},
@@ -100,7 +100,7 @@ class TestPuzzleTestCaseCreation:
     def test_create_puzzle_test_case_with_custom_created_at(self):
         custom_time = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -111,7 +111,7 @@ class TestPuzzleTestCaseCreation:
 
     def test_create_puzzle_test_case_default_created_at(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -124,17 +124,17 @@ class TestPuzzleTestCaseCreation:
 class TestPuzzleTestCaseGetters:
     def test_get_id(self):
         test_case = PuzzleTestCase(
-            id="my_tc_id",
+            id=123,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
             expected_outputs={"r": 1}
         )
-        assert test_case.get_id() == "my_tc_id"
+        assert test_case.get_id() == 123
 
     def test_get_puzzle_id(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="puzzle_123",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -144,7 +144,7 @@ class TestPuzzleTestCaseGetters:
 
     def test_get_kind(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.WHITEBOX,
             inputs={"a": 0},
@@ -155,7 +155,7 @@ class TestPuzzleTestCaseGetters:
     def test_get_inputs(self):
         inputs = {"a": 0, "b": 1, "c": 0}
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs=inputs,
@@ -166,7 +166,7 @@ class TestPuzzleTestCaseGetters:
     def test_get_expected_outputs(self):
         outputs = {"out1": 0, "out2": 1}
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -177,7 +177,7 @@ class TestPuzzleTestCaseGetters:
     def test_get_created_at(self):
         custom_time = datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -190,7 +190,7 @@ class TestPuzzleTestCaseGetters:
 class TestPuzzleTestCaseSetters:
     def test_set_puzzle_id(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -201,7 +201,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_puzzle_id_empty(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -212,7 +212,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_puzzle_id_whitespace(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -223,7 +223,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_kind_blackbox(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.WHITEBOX,
             inputs={"a": 0},
@@ -234,7 +234,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_kind_whitebox(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -245,7 +245,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_kind_invalid_type(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -257,7 +257,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_inputs_valid(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -269,7 +269,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_inputs_empty(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -280,7 +280,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_inputs_invalid_value(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -292,7 +292,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_expected_outputs_valid(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -304,7 +304,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_expected_outputs_empty(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -315,7 +315,7 @@ class TestPuzzleTestCaseSetters:
 
     def test_set_expected_outputs_invalid_value(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -329,14 +329,14 @@ class TestPuzzleTestCaseSetters:
 class TestPuzzleTestCaseSerialization:
     def test_to_dict(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0, "b": 1},
             expected_outputs={"result": 1}
         )
         d = test_case.to_dict()
-        assert d["id"] == "tc1"
+        assert d["id"] == 1
         assert d["puzzle_id"] == "p1"
         assert d["kind"] == "blackbox"
         assert d["inputs"] == {"a": 0, "b": 1}
@@ -345,7 +345,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_to_dict_whitebox(self):
         test_case = PuzzleTestCase(
-            id="tc2",
+            id=2,
             puzzle_id="p2",
             kind=TestCaseKind.WHITEBOX,
             inputs={"x": 1},
@@ -357,7 +357,7 @@ class TestPuzzleTestCaseSerialization:
     def test_to_dict_created_at_iso_format(self):
         custom_time = datetime(2025, 3, 15, 14, 30, 45, tzinfo=timezone.utc)
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -369,7 +369,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_from_dict(self):
         d = {
-            "id": "tc1",
+            "id": 1,
             "puzzle_id": "p1",
             "kind": "blackbox",
             "inputs": {"a": 0, "b": 1},
@@ -377,7 +377,7 @@ class TestPuzzleTestCaseSerialization:
             "created_at": "2025-03-15T14:30:45+00:00"
         }
         test_case = PuzzleTestCase.from_dict(d)
-        assert test_case.id == "tc1"
+        assert test_case.id == 1
         assert test_case.puzzle_id == "p1"
         assert test_case.kind == TestCaseKind.BLACKBOX
         assert test_case.inputs == {"a": 0, "b": 1}
@@ -385,7 +385,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_from_dict_whitebox(self):
         d = {
-            "id": "tc2",
+            "id": 2,
             "puzzle_id": "p2",
             "kind": "whitebox",
             "inputs": {"x": 1},
@@ -397,7 +397,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_from_dict_without_created_at(self):
         d = {
-            "id": "tc1",
+            "id": 1,
             "puzzle_id": "p1",
             "kind": "blackbox",
             "inputs": {"a": 0},
@@ -408,7 +408,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_roundtrip(self):
         original = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0, "b": 1},
@@ -424,7 +424,7 @@ class TestPuzzleTestCaseSerialization:
 
     def test_to_dict_includes_all_fields(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -439,7 +439,7 @@ class TestPuzzleTestCaseEdgeCases:
         inputs = {"a": 0, "b": 1, "c": 0, "d": 1, "e": 0}
         outputs = {"x": 1, "y": 0, "z": 1}
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs=inputs,
@@ -450,7 +450,7 @@ class TestPuzzleTestCaseEdgeCases:
 
     def test_single_input_single_output(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 1},
@@ -461,7 +461,7 @@ class TestPuzzleTestCaseEdgeCases:
 
     def test_all_inputs_zero(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0, "b": 0, "c": 0},
@@ -471,7 +471,7 @@ class TestPuzzleTestCaseEdgeCases:
 
     def test_all_inputs_one(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 1, "b": 1, "c": 1},
@@ -481,17 +481,17 @@ class TestPuzzleTestCaseEdgeCases:
 
     def test_id_with_special_characters(self):
         test_case = PuzzleTestCase(
-            id="tc_123-special.id",
+            id=123456,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
             expected_outputs={"r": 1}
         )
-        assert test_case.get_id() == "tc_123-special.id"
+        assert test_case.get_id() == 123456
 
     def test_puzzle_id_with_uuid_format(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="550e8400-e29b-41d4-a716-446655440000",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -501,7 +501,7 @@ class TestPuzzleTestCaseEdgeCases:
 
     def test_input_output_names_with_numbers(self):
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"input0": 0, "input1": 1, "input2": 0},
@@ -513,7 +513,7 @@ class TestPuzzleTestCaseEdgeCases:
     def test_inputs_outputs_are_independent(self):
         """Ensure setting inputs doesn't affect outputs"""
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},
@@ -525,7 +525,7 @@ class TestPuzzleTestCaseEdgeCases:
     def test_input_dict_copy_independence(self):
         """Ensure modifications to returned dict don't affect internal state"""
         test_case = PuzzleTestCase(
-            id="tc1",
+            id=1,
             puzzle_id="p1",
             kind=TestCaseKind.BLACKBOX,
             inputs={"a": 0},

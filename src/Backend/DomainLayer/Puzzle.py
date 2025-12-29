@@ -8,7 +8,7 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_opt
 
 @dataclass(slots=True)
 class Puzzle:
-    id: int = 0
+    id: int 
     name: str
     creator_user_id: str
     description: str = ""

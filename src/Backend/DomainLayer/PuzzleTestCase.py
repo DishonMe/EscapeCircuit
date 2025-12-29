@@ -9,12 +9,17 @@ from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty, ensure_bit
 
 @dataclass(slots=True)
 class PuzzleTestCase:
-    id: int = 0
+    id: int
     puzzle_id: str
     kind: TestCaseKind
     inputs: Dict[str, int]
     expected_outputs: Dict[str, int]
     created_at: datetime = field(default_factory=utcnow)
+
+    def set_puzzle_id(self, value: str) -> None:
+        if not value or not value.strip():
+            raise ValidationError("PuzzleTestCase.puzzle_id is required")
+        self.puzzle_id = value
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("PuzzleTestCase.id", self.id)

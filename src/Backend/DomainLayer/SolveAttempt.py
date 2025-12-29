@@ -8,7 +8,7 @@ from .Utils import utcnow, ensure_non_negative_int, ensure_non_empty
 
 @dataclass(slots=True)
 class SolveAttempt:
-    id: int = 0
+    id: int 
     puzzle_id: str
     user_id: str
     circuit_id: Optional[str] = None

@@ -8,7 +8,7 @@ from .Utils import utcnow, clamp_int, ensure_non_negative_int, ensure_non_empty
 
 @dataclass(slots=True)
 class Rating:
-    id: int = 0
+    id: int 
     puzzle_id: str
     user_id: str
 
