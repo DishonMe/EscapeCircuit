@@ -38,9 +38,10 @@ class TestRatingCreation:
         assert rating.is_experienced_at_rating == True
 
     def test_create_rating_zero_id(self):
-        # ID=0 is valid (ensure_non_negative_int allows 0)
-        rating = Rating(id=0, puzzle_id=1, user_id=1, difficulty=3, fun=3, clearness=3)
-        assert rating.id == 0
+        # ID=0 is not valid (ensure_non_negative_int rejects value <= 0)
+        with pytest.raises(ValidationError) as exc_info:
+            Rating(id=0, puzzle_id=1, user_id=1, difficulty=3, fun=3, clearness=3)
+        assert "cannot be negative" in str(exc_info.value)
 
     def test_create_rating_missing_puzzle_id(self):
         with pytest.raises(TypeError):

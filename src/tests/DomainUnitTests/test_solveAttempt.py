@@ -31,9 +31,10 @@ class TestSolveAttemptCreation:
         assert attempt.circuit_id == 1
 
     def test_create_solve_attempt_zero_id(self):
-        # ID=0 is valid (ensure_non_negative_int allows 0)
-        attempt = SolveAttempt(id=0, puzzle_id=1, user_id=1)
-        assert attempt.id == 0
+        # ID=0 is not valid (ensure_non_negative_int rejects value <= 0)
+        with pytest.raises(ValidationError) as exc_info:
+            SolveAttempt(id=0, puzzle_id=1, user_id=1)
+        assert "cannot be negative" in str(exc_info.value)
 
     def test_create_solve_attempt_missing_puzzle_id(self):
         with pytest.raises(TypeError):
