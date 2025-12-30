@@ -5,17 +5,20 @@ from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
+from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.ServiceLayer.AuthService import AuthService
+from Backend.DomainLayer.Utils import utcnow
 
 
 class PuzzleService:
     """
     All actions must call AuthService.
     """
-    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService):
+    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService, solve_repo: SolveRepo | None = None):
         self.repo = puzzle_repo
         self.user_repo = user_repo
         self.auth = auth_service
+        self.solve_repo = solve_repo
 
     def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> List[dict]:
         _ = self.auth.require_user_id(session_token)
@@ -53,7 +56,7 @@ class PuzzleService:
         gate_set = {GateType(x) for x in default_gate_set_raw}
 
         p = Puzzle(
-            id=0,
+            id="0",
             name=name,
             creator_user_id=user_id,
             description=payload.get("description", "") or "",
@@ -77,6 +80,20 @@ class PuzzleService:
 
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
+
+        # Publish preconditions (ADD/ARD):
+        # 1) at least one test case
+        if not self.repo.list_test_cases(puzzle_id):
+            raise ValidationError("cannot publish without test cases")
+
+        # 2) creator must have solved (self-solve). If SolveRepo isn't wired yet,
+        #    we skip this check to avoid breaking dependency injection.
+        if self.solve_repo is not None and user.role != UserRole.ADMIN:
+            if not self.solve_repo.has_passed(user_id, puzzle_id):
+                raise ValidationError("creator must solve the puzzle before publishing")
+
+        # treat created_at as upload datetime
+        p.created_at = utcnow()
 
         p.publish()
         self.repo.update(p)

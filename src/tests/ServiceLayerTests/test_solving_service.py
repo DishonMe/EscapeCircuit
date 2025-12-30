@@ -28,6 +28,7 @@ class TestSolvingServiceCreation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -58,6 +59,7 @@ class TestSolvingServiceStartAttempt:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -118,6 +120,8 @@ class TestSolvingServiceSubmitSolution:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -282,6 +286,8 @@ class TestSolvingServiceCreateAttemptBranches:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -454,6 +460,7 @@ class TestSolvingServiceCreateAttemptBranches:
     def test_submit_solution_difficulty_hard(self):
         """Test submit_solution categorizes puzzle as hard difficulty"""
         self.mock_auth.require_user_id.return_value = 1
+        self.mock_xp.award_solve_xp = Mock(side_effect=lambda *args, **kwargs: kwargs.get("difficulty_tier", None))
         self.mock_conn.execute = Mock()
 
         structure_json = json.dumps({"gates": []})
@@ -480,6 +487,7 @@ class TestSolvingServiceCreateAttemptBranches:
         self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
 
         self.mock_engine.evaluate.return_value = {"Q": 1}
+        self.mock_xp.tier_from_avg_difficulty = lambda x: "hard"
 
         attempt = Mock(spec=SolveAttempt)
         attempt.id = 1
@@ -506,6 +514,7 @@ class TestSolvingServiceCreateAttemptBranches:
     def test_submit_solution_difficulty_medium(self):
         """Test submit_solution categorizes puzzle as medium difficulty"""
         self.mock_auth.require_user_id.return_value = 1
+        self.mock_xp.award_solve_xp = Mock(side_effect=lambda *args, **kwargs: kwargs.get("difficulty_tier", None))
         self.mock_conn.execute = Mock()
 
         structure_json = json.dumps({"gates": []})
@@ -532,6 +541,7 @@ class TestSolvingServiceCreateAttemptBranches:
         self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
 
         self.mock_engine.evaluate.return_value = {"Q": 1}
+        self.mock_xp.tier_from_avg_difficulty = lambda x: "medium"
 
         attempt = Mock(spec=SolveAttempt)
         attempt.id = 1
@@ -612,6 +622,8 @@ class TestSolvingServiceEdgeCases:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -729,6 +741,7 @@ class TestSolvingServiceEdgeCases:
     def test_submit_solution_puzzle_difficulty_calc_error(self):
         """Test submit_solution when getting avg_difficulty raises error"""
         self.mock_auth.require_user_id.return_value = 1
+        self.mock_xp.award_solve_xp = Mock(side_effect=lambda *args, **kwargs: kwargs.get("difficulty_tier", None))
         self.mock_conn.execute = Mock()
 
         structure_json = json.dumps({"gates": []})
@@ -753,6 +766,7 @@ class TestSolvingServiceEdgeCases:
         self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
 
         self.mock_engine.evaluate.return_value = {"Q": 1}
+        self.mock_xp.tier_from_avg_difficulty = lambda x: "easy"
 
         attempt = Mock(spec=SolveAttempt)
         attempt.id = 1
@@ -778,6 +792,7 @@ class TestSolvingServiceEdgeCases:
     def test_submit_solution_difficulty_easy(self):
         """Test submit_solution categorizes puzzle as easy difficulty"""
         self.mock_auth.require_user_id.return_value = 1
+        self.mock_xp.award_solve_xp = Mock(side_effect=lambda *args, **kwargs: kwargs.get("difficulty_tier", None))
         self.mock_conn.execute = Mock()
 
         structure_json = json.dumps({"gates": []})
@@ -804,6 +819,7 @@ class TestSolvingServiceEdgeCases:
         self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
 
         self.mock_engine.evaluate.return_value = {"Q": 1}
+        self.mock_xp.tier_from_avg_difficulty = lambda x: "easy"
 
         attempt = Mock(spec=SolveAttempt)
         attempt.id = 1

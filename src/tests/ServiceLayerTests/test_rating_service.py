@@ -355,7 +355,7 @@ class TestRatingServiceEmptyRatings:
         try:
             result = self.service.submit_rating("valid_token", 1, payload)
             # Verify first_time_rating=False was passed
-            self.mock_xp.award_rating_xp.assert_called_once_with(1, first_time_rating=False)
+            self.mock_xp.award_rating_xp.assert_called_once_with(rater_user_id=1, creator_user_id=2, first_time_rating=False)
         except ValidationError:
             pass
 
@@ -406,7 +406,7 @@ class TestRatingServiceSubmitRating:
             result = self.service.submit_rating("valid_token", 1, payload)
             assert result["puzzle_id"] == 1
             assert result["user_id"] == 1
-            self.mock_xp.award_rating_xp.assert_called_once_with(1, first_time_rating=True)
+            self.mock_xp.award_rating_xp.assert_called_once_with(rater_user_id=1, creator_user_id=2, first_time_rating=True)
         except ValidationError:
             # If Rating creation fails with id=0, the test still passes
             # since we're testing the service logic, not domain validation
@@ -538,7 +538,7 @@ class TestRatingServiceMultipleRatings:
             result = self.service.submit_rating("valid_token", 1, payload)
             # Verify weighted average: (3*2 + 2*1) / (2+1) = 8/3
             assert puzzle.rating_count == 2
-            self.mock_xp.award_rating_xp.assert_called_once_with(2, first_time_rating=True)
+            self.mock_xp.award_rating_xp.assert_called_once_with(rater_user_id=2, creator_user_id=3, first_time_rating=True)
         except ValidationError:
             pass
 

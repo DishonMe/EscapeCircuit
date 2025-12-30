@@ -24,7 +24,9 @@ class XPService:
     time_bonus: int = 25
 
     repeat_solve_xp: int = 10  # if user already solved puzzle before
-    rating_xp: int = 10        # small XP reward for rating (first rating only)
+    # Rating XP (ADD): rater gets 5 XP, puzzle creator gets 1 XP.
+    rating_rater_xp: int = 5
+    rating_creator_xp: int = 1
 
     # Level thresholds (index = level, value = min XP)
     # Level 1 starts at 0, Level 5 at 2000 -> matches ARD "Level 5 experienced"
@@ -42,6 +44,36 @@ class XPService:
 
     def is_experienced(self, xp_total: int) -> bool:
         return self.calculate_level(xp_total) >= 5
+
+    def tier_from_avg_difficulty(self, avg_difficulty: float) -> str:
+        """Map a numeric difficulty rating (1..5) to a tier string."""
+        try:
+            d = float(avg_difficulty)
+        except Exception:
+            d = 1.0
+        if d >= 4.0:
+            return "hard"
+        if d >= 2.5:
+            return "medium"
+        return "easy"
+
+    def get_arsenal_limit(self, xp_total: int) -> int:
+        """Arsenal capacity based on level.
+
+        This is intentionally simple and can be tuned later, but ensures:
+        - early users have a small limit
+        - progressing levels increases capacity
+        """
+        lvl = self.calculate_level(int(xp_total))
+        if lvl <= 2:
+            return 5
+        if lvl <= 4:
+            return 10
+        if lvl <= 6:
+            return 20
+        if lvl <= 8:
+            return 35
+        return 50
 
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:
@@ -85,7 +117,17 @@ class XPService:
 
         return self._apply_xp(user_id, base + bonus)
 
-    def award_rating_xp(self, user_id: int, first_time_rating: bool) -> int:
+    def award_rating_xp(self, rater_user_id: int, creator_user_id: int, first_time_rating: bool) -> int:
+        """Award rating XP.
+
+        Only the first rating per (puzzle,user) grants XP.
+        Returns total XP applied (rater + creator).
+        """
         if not first_time_rating:
             return 0
-        return self._apply_xp(user_id, self.rating_xp)
+        total = 0
+        total += self._apply_xp(rater_user_id, self.rating_rater_xp)
+        # creator also gets 1 XP (even if it's the same user, don't double-award)
+        if int(creator_user_id) != int(rater_user_id):
+            total += self._apply_xp(creator_user_id, self.rating_creator_xp)
+        return total
