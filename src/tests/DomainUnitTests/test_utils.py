@@ -176,8 +176,10 @@ class TestEnsureNonEmpty:
 
 class TestEnsureNonNegativeInt:
     def test_ensure_non_negative_int_zero(self):
-        result = ensure_non_negative_int("test", 0)
-        assert result == 0
+        # Zero is rejected (validation uses value <= 0)
+        with pytest.raises(ValidationError) as exc_info:
+            ensure_non_negative_int("test", 0)
+        assert "cannot be negative" in str(exc_info.value)
 
     def test_ensure_non_negative_int_positive(self):
         result = ensure_non_negative_int("test", 10)
