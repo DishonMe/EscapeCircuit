@@ -55,7 +55,7 @@ class SolvingService:
             raise ValidationError("puzzle not found")
 
         from Backend.DomainLayer.SolveAttempt import SolveAttempt
-        attempt = SolveAttempt(id=0, puzzle_id=puzzle_id, user_id=user_id)
+        attempt = SolveAttempt(id="0", puzzle_id=puzzle_id, user_id=user_id)
         created = self.solve_repo.create_attempt(attempt)
         return created.to_dict()
 
@@ -75,9 +75,19 @@ class SolvingService:
         if circuit.user_id != user_id:
             raise ValidationError("forbidden")
 
+        # Server-side budget enforcement: compute cost from structure_json.
+        cost = self.engine.compute_cost(circuit.structure_json)
+        if cost > int(puzzle.budget):
+            raise ValidationError("budget exceeded")
+
         testcases = self.puzzle_repo.list_test_cases(puzzle_id)
         if not testcases:
             raise ValidationError("puzzle has no test cases")
+
+        # Essential-condition check: ensure we can evaluate on all official inputs.
+        for tc in testcases:
+            if not self.engine.has_entry_for_inputs(circuit, tc.inputs):
+                raise ValidationError("essential conditions not met")
 
         # Evaluate
         passed = True
@@ -93,7 +103,7 @@ class SolvingService:
         attempt = self.solve_repo.get_open_attempt(user_id, puzzle_id)
         if attempt is None:
             from Backend.DomainLayer.SolveAttempt import SolveAttempt
-            attempt = SolveAttempt(id=0, puzzle_id=puzzle_id, user_id=user_id)
+            attempt = SolveAttempt(id="0", puzzle_id=puzzle_id, user_id=user_id)
             attempt = self.solve_repo.create_attempt(attempt)
 
         # finalize attempt + XP atomically
@@ -109,17 +119,7 @@ class SolvingService:
                 if puzzle.time_limit_seconds is not None and attempt.elapsed_seconds is not None:
                     timer_beaten = attempt.elapsed_seconds <= puzzle.time_limit_seconds
 
-                # difficulty tier fallback:
-                # If you later add explicit tier, replace this.
-                # For now: use avg_difficulty if exists.
-                tier = "easy"
-                try:
-                    if getattr(puzzle, "avg_difficulty", 0) >= 7:
-                        tier = "hard"
-                    elif getattr(puzzle, "avg_difficulty", 0) >= 4:
-                        tier = "medium"
-                except Exception:
-                    pass
+                tier = self.xp.tier_from_avg_difficulty(getattr(puzzle, "avg_difficulty", 1.0))
 
                 self.xp.award_solve_xp(
                     user_id=user_id,

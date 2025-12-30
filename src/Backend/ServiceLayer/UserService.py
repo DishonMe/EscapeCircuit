@@ -28,7 +28,8 @@ class UserService:
         if self.user_repo.get_by_username(username):
             raise ValidationError("username already exists")
 
-        user = User(id=0, username=username, role=UserRole.SOLVER, xp=0)
+        # Domain objects require a truthy id; repo will replace it on insert.
+        user = User(id="0", username=username, role=UserRole.SOLVER, xp=0)
         created = self.user_repo.create(user, password=password)
         d = created.to_dict()
         d["level"] = self.xp.calculate_level(created.xp)

@@ -74,13 +74,14 @@ class RatingService:
         # is_experienced snapshot:
         # We compute from current XP, but store snapshot in rating.
         # (Your domain already uses boolean snapshot.)
-        from Backend.PersistantLayer.UserRepo import UserRepo  # local import to avoid circulars
-        # NOTE: authService already verifies user exists in userRepo;
-        # but XPService is the official source for level calc.
-        is_exp = self.xp.is_experienced(self.xp.user_repo.get_by_id(user_id).xp)
+        u = self.xp.user_repo.get_by_id(user_id)
+        if not u:
+            raise ValidationError("user not found")
+        is_exp = self.xp.is_experienced(u.xp)
 
+        # Use id=1 for new ratings to satisfy domain validation
         rating = Rating(
-            id=0,
+            id=1,
             puzzle_id=puzzle_id,
             user_id=user_id,
             difficulty=int(payload.get("difficulty", 0)),
@@ -104,7 +105,8 @@ class RatingService:
 
         self.puzzle_repo.update(puzzle)
 
-        # small XP reward (ADD) only for first-time rating
-        self.xp.award_rating_xp(user_id, first_time_rating=first_time)
+        # small XP reward (ADD) only for first-time rating:
+        # rater gets 5 XP, puzzle creator gets 1 XP
+        self.xp.award_rating_xp(rater_user_id=user_id, creator_user_id=puzzle.creator_user_id, first_time_rating=first_time)
 
         return saved.to_dict()
