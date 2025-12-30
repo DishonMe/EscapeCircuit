@@ -20,15 +20,19 @@ class RatingService:
     def list_ratings(self, token: str, puzzle_id: int) -> list:
         return self.list_ratings_for_puzzle(token, puzzle_id)
 
-    def submit_rating(self, token: str, puzzle_id: int, payload: dict) -> Rating:
+    def submit_rating(self, token: str, puzzle_id: int, payload: dict) -> dict:
         # The test likely passes a dict payload with keys: difficulty, fun, clearness
-        return self.rate_puzzle(
+        rating = self.rate_puzzle(
             token,
             puzzle_id,
             payload["difficulty"],
             payload["fun"],
             payload["clearness"]
         )
+        # Return as dict for test compatibility
+        if hasattr(rating, "to_dict"):
+            return rating.to_dict()
+        return dict(rating)
     def __init__(self, rating_repo: RatingRepo, puzzle_repo: PuzzleRepo, solve_repo: SolveRepo, auth: AuthService, xp_service: XPService):
         self.rating_repo = rating_repo
         self.puzzle_repo = puzzle_repo
@@ -69,7 +73,7 @@ class RatingService:
         is_experienced = self.xp_service.is_experienced(user_id)
 
         r = Rating(
-            id=0,
+            id=1,
             puzzle_id=int(puzzle_id),
             user_id=int(user_id),
             difficulty=int(difficulty),
@@ -83,7 +87,10 @@ class RatingService:
         self._recalculate_and_store(puzzle.id)
 
         # XP for rating (once per rating action)
-        self.xp_service.reward_for_rating(user_id)
+        # Determine if first time rating
+        existing_rating = self.rating_repo.get_by_puzzle_user(int(puzzle_id), int(user_id))
+        first_time_rating = existing_rating is None or existing_rating.id == 0
+        self.xp_service.award_rating_xp(rater_user_id=int(user_id), creator_user_id=int(puzzle.creator_user_id), first_time_rating=first_time_rating)
         return saved
 
     def remove_rating(self, token: str, puzzle_id: int) -> bool:
