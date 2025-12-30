@@ -12,6 +12,8 @@ class SolveAttempt:
     puzzle_id: int
     user_id: int
     circuit_id: Optional[int] = None
+    time_used_seconds: Optional[int] = None
+    cost_used: Optional[int] = None
 
     started_at: datetime = field(default_factory=utcnow)
     submitted_at: Optional[datetime] = None
