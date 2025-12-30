@@ -13,8 +13,18 @@ from Backend.ServiceLayer.AuthService import AuthService
 class TestCircuitServiceCreation:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []
+        self.mock_user_repo = Mock()  # UserRepo
         self.mock_auth = Mock(spec=AuthService)
-        self.service = CircuitService(self.mock_repo, self.mock_auth)
+        self.mock_engine = Mock()  # Fix: add missing mock_engine
+        self.mock_xp = Mock()
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
 
     def test_circuit_service_initialization(self):
         assert self.service.repo == self.mock_repo
@@ -24,9 +34,19 @@ class TestCircuitServiceCreation:
 class TestCircuitServiceSaveCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []  # Always return a real list for list_by_user
+        self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
-        self.service = CircuitService(self.mock_repo, self.mock_auth)
-
+        self.mock_engine = Mock()
+        self.mock_engine.compute_cost.return_value = 0  # Ensure compute_cost returns int
+        self.mock_xp = Mock()
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
     def test_save_circuit_success(self):
         self.mock_auth.require_user_id.return_value = 1
         structure_json = json.dumps({"gates": ["AND"]})
@@ -44,6 +64,15 @@ class TestCircuitServiceSaveCircuit:
             structure_json=structure_json,
         )
         self.mock_repo.create.return_value = saved_circuit
+
+        # Mock user object with xp attribute for arsenal limit logic
+        mock_user = Mock()
+        mock_user.xp = 0
+        self.mock_user_repo.get_by_id.return_value = mock_user
+        # Ensure list_by_user returns a real list of Circuit objects
+        self.mock_repo.list_by_user.return_value = [saved_circuit]
+        # Ensure get_arsenal_limit returns an int
+        self.mock_xp.get_arsenal_limit.return_value = 5
 
         result = self.service.save_circuit("valid_token", payload)
 
@@ -69,6 +98,77 @@ class TestCircuitServiceSaveCircuit:
             structure_json=structure_json,
         )
         self.mock_repo.create.return_value = saved_circuit
+        # Mock user object with xp attribute for arsenal limit logic
+        mock_user = Mock()
+        mock_user.xp = 0
+        self.mock_user_repo.get_by_id.return_value = mock_user
+        # Ensure list_by_user returns a real list of Circuit objects
+        self.mock_repo.list_by_user.return_value = [saved_circuit]
+        # Ensure get_arsenal_limit returns an int
+        self.mock_xp.get_arsenal_limit.return_value = 5
+
+        result = self.service.save_circuit("valid_token", payload)
+        assert result["id"] == 1
+
+    def test_save_circuit_success(self):
+        self.mock_auth.require_user_id.return_value = 1
+        structure_json = json.dumps({"gates": ["AND"]})
+        payload = {
+            "name": "TestCircuit",
+            "cost": 10,
+            "structure_json": structure_json,
+        }
+
+        saved_circuit = Circuit(
+            id=1,
+            user_id=1,
+            name="TestCircuit",
+            cost=10,
+            structure_json=structure_json,
+        )
+        self.mock_repo.create.return_value = saved_circuit
+
+        # Mock user object with xp attribute for arsenal limit logic
+        mock_user = Mock()
+        mock_user.xp = 0
+        self.mock_user_repo.get_by_id.return_value = mock_user
+        # Ensure list_by_user returns a real list of Circuit objects
+        self.mock_repo.list_by_user.return_value = [saved_circuit]
+        # Ensure get_arsenal_limit returns an int
+        self.mock_xp.get_arsenal_limit.return_value = 5
+
+        result = self.service.save_circuit("valid_token", payload)
+
+        assert result["id"] == 1
+        assert result["name"] == "TestCircuit"
+        assert result["cost"] == 10
+        self.mock_auth.require_user_id.assert_called_once_with("valid_token")
+        self.mock_repo.create.assert_called_once()
+
+    def test_save_circuit_with_defaults(self):
+        self.mock_auth.require_user_id.return_value = 1
+        structure_json = json.dumps({"gates": []})
+        payload = {
+            "name": "DefaultCircuit",
+            "structure_json": structure_json,
+        }
+
+        saved_circuit = Circuit(
+            id=1,
+            user_id=1,
+            name="DefaultCircuit",
+            cost=0,
+            structure_json=structure_json,
+        )
+        self.mock_repo.create.return_value = saved_circuit
+        # Mock user object with xp attribute for arsenal limit logic
+        mock_user = Mock()
+        mock_user.xp = 0
+        self.mock_user_repo.get_by_id.return_value = mock_user
+        # Ensure list_by_user returns a real list of Circuit objects
+        self.mock_repo.list_by_user.return_value = [saved_circuit]
+        # Ensure get_arsenal_limit returns an int
+        self.mock_xp.get_arsenal_limit.return_value = 5
 
         result = self.service.save_circuit("valid_token", payload)
         assert result["id"] == 1
@@ -84,8 +184,18 @@ class TestCircuitServiceSaveCircuit:
 class TestCircuitServiceListMyCircuits:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []
+        self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
-        self.service = CircuitService(self.mock_repo, self.mock_auth)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
 
     def test_list_my_circuits_success(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -122,8 +232,18 @@ class TestCircuitServiceListMyCircuits:
 class TestCircuitServiceGetCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []
+        self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
-        self.service = CircuitService(self.mock_repo, self.mock_auth)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
 
     def test_get_circuit_success(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -169,8 +289,18 @@ class TestCircuitServiceGetCircuit:
 class TestCircuitServiceDeleteCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []
+        self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
-        self.service = CircuitService(self.mock_repo, self.mock_auth)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
 
     def test_delete_circuit_success(self):
         self.mock_auth.require_user_id.return_value = 1

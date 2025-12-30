@@ -248,22 +248,38 @@ class TestXPServiceAwardRatingXP:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_award_rating_xp_first_time(self):
-        user = User(id=1, username="user", xp=0)
-        self.mock_user_repo.get_by_id.return_value = user
+        rater = User(id=1, username="user", xp=0)
+        creator = User(id=2, username="creator", xp=0)
+        def get_by_id_side_effect(uid):
+            if uid == 1:
+                return rater
+            elif uid == 2:
+                return creator
+            return None
+        self.mock_user_repo.get_by_id.side_effect = get_by_id_side_effect
 
-        xp_awarded = self.service.award_rating_xp(user_id=1, first_time_rating=True)
+        xp_awarded = self.service.award_rating_xp(rater_user_id=1, creator_user_id=2, first_time_rating=True)
 
-        assert xp_awarded == 10  # rating_xp
-        assert user.xp == 10
+        assert xp_awarded == 6  # 5 for rater, 1 for creator
+        assert rater.xp == 5
+        assert creator.xp == 1
 
     def test_award_rating_xp_not_first_time(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
+        rater = User(id=1, username="user", xp=100)
+        creator = User(id=2, username="creator", xp=50)
+        def get_by_id_side_effect(uid):
+            if uid == 1:
+                return rater
+            elif uid == 2:
+                return creator
+            return None
+        self.mock_user_repo.get_by_id.side_effect = get_by_id_side_effect
 
-        xp_awarded = self.service.award_rating_xp(user_id=1, first_time_rating=False)
+        xp_awarded = self.service.award_rating_xp(rater_user_id=1, creator_user_id=2, first_time_rating=False)
 
         assert xp_awarded == 0
-        assert user.xp == 100  # No change
+        assert rater.xp == 100  # No change
+        assert creator.xp == 50  # No change
         self.mock_user_repo.update_xp.assert_not_called()
 
 
