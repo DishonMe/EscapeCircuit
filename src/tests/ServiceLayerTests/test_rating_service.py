@@ -8,6 +8,117 @@ from Backend.DomainLayer.Rating import Rating
 from Backend.DomainLayer.Puzzle import Puzzle
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.User import User
+
+# Additional targeted tests for RatingService
+import itertools
+
+@pytest.mark.parametrize(
+    "payload,expected_exc",
+    [
+        ({}, ValidationError),  # All fields default to 0, which is invalid
+        ({"difficulty": -1, "fun": 4, "clearness": 3}, ValidationError),
+        ({"difficulty": 3, "fun": 6, "clearness": 3}, ValidationError),
+        ({"difficulty": 3, "fun": 4, "clearness": -2}, ValidationError),
+        ({"difficulty": "bad", "fun": 4, "clearness": 3}, ValidationError),
+    ],
+)
+def test_submit_rating_input_validation(payload, expected_exc):
+    service = RatingService(
+        Mock(spec=RatingRepo),
+        Mock(spec=PuzzleRepo),
+        Mock(spec=SolveRepo),
+        Mock(spec=AuthService),
+        Mock(spec=XPService),
+    )
+    service.auth.require_user_id.return_value = 1
+    puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+    service.puzzle_repo.get_by_id.return_value = puzzle
+    service.solve_repo.has_passed.return_value = True
+    service.rating_repo.get_by_puzzle_user.return_value = None
+    user = User(id=1, username="user", xp=100)
+    service.xp.user_repo = Mock()
+    service.xp.user_repo.get_by_id.return_value = user
+    service.xp.is_experienced.return_value = False
+    service.rating_repo.upsert.return_value = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+    service.rating_repo.list_by_puzzle.return_value = [service.rating_repo.upsert.return_value]
+    service.xp.award_rating_xp.return_value = 10
+    if expected_exc:
+        with pytest.raises(Exception):
+            service.submit_rating("valid_token", 1, payload)
+    else:
+        result = service.submit_rating("valid_token", 1, payload)
+        assert result["puzzle_id"] == 1
+
+def test_xp_award_first_and_repeat():
+    service = RatingService(
+        Mock(spec=RatingRepo),
+        Mock(spec=PuzzleRepo),
+        Mock(spec=SolveRepo),
+        Mock(spec=AuthService),
+        Mock(spec=XPService),
+    )
+    service.auth.require_user_id.return_value = 1
+    puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+    service.puzzle_repo.get_by_id.return_value = puzzle
+    service.solve_repo.has_passed.return_value = True
+    user = User(id=1, username="user", xp=100)
+    service.xp.user_repo = Mock()
+    service.xp.user_repo.get_by_id.return_value = user
+    service.xp.is_experienced.return_value = False
+    service.rating_repo.upsert.return_value = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+    service.rating_repo.list_by_puzzle.return_value = [service.rating_repo.upsert.return_value]
+    service.rating_repo.get_by_puzzle_user.return_value = None
+    service.xp.award_rating_xp.return_value = 10
+    payload = {"difficulty": 3, "fun": 4, "clearness": 3}
+    service.submit_rating("valid_token", 1, payload)
+    service.xp.award_rating_xp.assert_called_with(1, first_time_rating=True)
+    # Repeat rating
+    service.rating_repo.get_by_puzzle_user.return_value = service.rating_repo.upsert.return_value
+    service.submit_rating("valid_token", 1, payload)
+    service.xp.award_rating_xp.assert_called_with(1, first_time_rating=False)
+
+def test_aggregate_calculation_multiple_ratings():
+    service = RatingService(
+        Mock(spec=RatingRepo),
+        Mock(spec=PuzzleRepo),
+        Mock(spec=SolveRepo),
+        Mock(spec=AuthService),
+        Mock(spec=XPService),
+    )
+    service.auth.require_user_id.return_value = 1
+    puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+    service.puzzle_repo.get_by_id.return_value = puzzle
+    service.solve_repo.has_passed.return_value = True
+    user = User(id=1, username="user", xp=100)
+    service.xp.user_repo = Mock()
+    service.xp.user_repo.get_by_id.return_value = user
+    service.xp.is_experienced.return_value = False
+    experienced_rating = Rating(id=1, puzzle_id=1, user_id=2, difficulty=5, fun=5, clearness=5, is_experienced_at_rating=True)
+    normal_rating = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3, is_experienced_at_rating=False)
+    service.rating_repo.list_by_puzzle.return_value = [experienced_rating, normal_rating]
+    service.rating_repo.upsert.return_value = normal_rating
+    payload = {"difficulty": 3, "fun": 4, "clearness": 3}
+    service.submit_rating("valid_token", 1, payload)
+    # Weighted average: (5*2 + 3*1) / 3 = 13/3
+    assert abs(puzzle.avg_difficulty - (5*2+3*1)/3) < 1e-6
+    assert puzzle.rating_count == 2
+
+def test_exception_propagation_from_dependencies():
+    service = RatingService(
+        Mock(spec=RatingRepo),
+        Mock(spec=PuzzleRepo),
+        Mock(spec=SolveRepo),
+        Mock(spec=AuthService),
+        Mock(spec=XPService),
+    )
+    service.auth.require_user_id.side_effect = ValidationError("unauthorized")
+    with pytest.raises(ValidationError):
+        service.submit_rating("invalid_token", 1, {"difficulty": 3, "fun": 4, "clearness": 3})
+    service.puzzle_repo.get_by_id.side_effect = Exception("db error")
+    service.auth.require_user_id.side_effect = None
+    service.auth.require_user_id.return_value = 1
+    with pytest.raises(Exception):
+        service.submit_rating("valid_token", 1, {"difficulty": 3, "fun": 4, "clearness": 3})
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo

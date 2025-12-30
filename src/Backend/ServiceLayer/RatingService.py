@@ -79,8 +79,9 @@ class RatingService:
         # but XPService is the official source for level calc.
         is_exp = self.xp.is_experienced(self.xp.user_repo.get_by_id(user_id).xp)
 
+        # Use id=1 for new ratings to satisfy domain validation
         rating = Rating(
-            id=0,
+            id=1,
             puzzle_id=puzzle_id,
             user_id=user_id,
             difficulty=int(payload.get("difficulty", 0)),
