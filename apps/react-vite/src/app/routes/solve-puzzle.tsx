@@ -97,6 +97,7 @@ export default function SolvePuzzleRoute() {
         onClear={handleClearBoard}
         onSave={() => setShowSaveModal(true)}
         onCheck={() => handlePuzzleSuccess()}
+        onExit={() => navigate('/')}
       />
 
       {showDescriptionModal && (
