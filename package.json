@@ -1,11 +1,11 @@
 {
-  "name": "bulletproof-react",
+  "name": "escapecircuit",
   "private": true,
   "version": "1.0.0",
-  "description": "A simple, scalable, and powerful architecture for building production ready React applications.",
+  "description": "EscapeCircuit - Wire your way out. An interactive puzzle game for creating and solving logic circuits.",
   "scripts": {
-    "prepare": "cd ./apps/nextjs-app && yarn && cd ../nextjs-pages && yarn && cd ../react-vite && yarn"
+    "prepare": "cd ./apps/react-vite && yarn"
   },
-  "author": "alan2207",
+  "author": "Dor Steinlauf, Noam Yosef, Mendy Dishon, Yuval Zarmi",
   "license": "MIT"
 }

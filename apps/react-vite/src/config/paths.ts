@@ -4,6 +4,36 @@ export const paths = {
     getHref: () => '/',
   },
 
+  puzzle: {
+    browser: {
+      path: '/puzzles',
+      getHref: () => '/puzzles',
+    },
+    solve: {
+      path: '/puzzles/:puzzleId/solve',
+      getHref: (id: string) => `/puzzles/${id}/solve`,
+    },
+  },
+
+  profile: {
+    path: '/profile',
+    getHref: () => '/profile',
+  },
+
+  creator: {
+    dashboard: {
+      path: '/creator',
+      getHref: () => '/creator',
+    },
+  },
+
+  admin: {
+    panel: {
+      path: '/admin',
+      getHref: () => '/admin',
+    },
+  },
+
   auth: {
     register: {
       path: '/auth/register',

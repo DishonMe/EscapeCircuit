@@ -1,7 +1,251 @@
-# dependencies
-/node_modules
+# ============================================================================
+# Python Backend
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+*.py,cover
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytype/
+.pyre/
+
+# Python type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# Node.js / npm / yarn / pnpm
+# ============================================================================
+
+# Dependencies
+node_modules/
 /.pnp
 .pnp.js
+.yarn/install-state.gz
 
-# misc
+# Production builds
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Testing
+.nyc_output/
+*.lcov
+
+# Package manager lock files (optional - uncomment if you want version control)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================================================
+# IDEs & Editors
+# ============================================================================
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# PyCharm
+.idea/
+*.iml
+
+# Other IDEs
+.project
+.pydevproject
+.settings/
+*.launch
+.c9/
+
+# ============================================================================
+# Operating System Files
+# ============================================================================
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# ============================================================================
+# Environment & Configuration Files
+# ============================================================================
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.test
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS specific
+.DS_Store
+.DS_Store?
+
+# ============================================================================
+# Temporary & Log Files
+# ============================================================================
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+temp/
+tmp/
+
+# Backups
+*.backup
+*.swp
+*.swo
+
+# ============================================================================
+# Build & Distribution
+# ============================================================================
+
+# Next.js
+.next/
+out/
+
+# Vite
+dist/
+
+# General build outputs
+build/
+*.tsbuildinfo
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+
+.nyc_output/
+coverage/
+.test-cache/
+
+# ============================================================================
+# Package Manager Artifacts
+# ============================================================================
+
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+
+# pnpm
+pnpm-lock.yaml
+
+# ============================================================================
+# Misc
+# ============================================================================
+
+# Local development files
+local/
+.cache/
+
+# SSL/TLS Certificates (if any)
+*.pem
+*.key
+*.cert
+
+# Mock service worker
+# (keep node_modules but ignore cache)
+.msw/
