@@ -1,6 +1,8 @@
 import { factory, primaryKey } from '@mswjs/data';
 import { nanoid } from 'nanoid';
 
+import { hash } from './utils';
+
 const models = {
   user: {
     id: primaryKey(nanoid),
@@ -122,23 +124,34 @@ export const initializeDb = async () => {
     const dataEntres = database[key];
     if (dataEntres) {
       dataEntres?.forEach((entry: Record<string, any>) => {
-        model.create(entry);
+        try {
+          model.create(entry);
+        } catch (error) {
+          // Ignore duplicate key errors
+        }
       });
     }
   });
 
   // Seed some initial data if database is empty
   if (db.puzzle.count() === 0) {
-    // Create a sample user first
+    // Create a sample team and users (passwords are hashed)
+    const defaultTeam = db.team.create({
+      name: 'Default Team',
+      description: 'Default seeded team',
+    });
+
     const creator = db.user.create({
       firstName: 'Circuit',
       lastName: 'Master',
       email: 'circuitmaster@example.com',
-      password: 'password',
-      teamId: '',
+      password: hash('password'),
+      teamId: defaultTeam.id,
       role: 'PLAYER',
       bio: 'Professional circuit designer',
     });
+
+
 
     // Create sample puzzles
     db.puzzle.create({
@@ -171,7 +184,8 @@ export const initializeDb = async () => {
       tightBudgetLimit: 65,
       inputs: JSON.stringify(['A', 'B']),
       outputs: JSON.stringify(['OUT']),
-      creatorComment: 'Try a minimal-cost design to earn the tight budget medal.',
+      creatorComment:
+        'Try a minimal-cost design to earn the tight budget medal.',
       filteredBasicComponents: JSON.stringify([]),
       allowArsenal: false,
       specialComponents: JSON.stringify([]),
@@ -198,6 +212,53 @@ export const initializeDb = async () => {
       rating: 4.9,
       solvedCount: 12,
       isPublic: true,
+    });
+
+    // Persist seeded data
+    await storeDb(
+      JSON.stringify(
+        {
+          user: db.user.getAll(),
+          team: db.team.getAll(),
+          puzzle: db.puzzle.getAll(),
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  // Ensure default admin always exists
+  const adminEmail = 'admin@mail.com';
+  const existingAdmin = db.user.findFirst({
+    where: {
+      email: {
+        equals: adminEmail,
+      },
+    },
+  });
+
+  if (!existingAdmin) {
+    const defaultTeam =
+      db.team.findFirst({
+        where: {
+          name: {
+            equals: 'Default Team',
+          },
+        },
+      }) ||
+      db.team.create({
+        name: 'Default Team',
+        description: 'Default seeded team',
+      });
+
+    db.user.create({
+      firstName: 'Admin',
+      lastName: 'User',
+      email: adminEmail,
+      password: hash('admin'),
+      teamId: defaultTeam.id,
+      role: 'ADMIN',
+      bio: 'Default admin account',
     });
   }
 };

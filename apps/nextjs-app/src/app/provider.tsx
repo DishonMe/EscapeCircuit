@@ -8,6 +8,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { MainErrorFallback } from '@/components/errors/main';
 import { Notifications } from '@/components/ui/notifications';
 import { queryConfig } from '@/lib/react-query';
+import { enableMocking } from '@/testing/mocks';
 
 type AppProviderProps = {
   children: React.ReactNode;
@@ -20,6 +21,24 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         defaultOptions: queryConfig,
       }),
   );
+
+  const [mswReady, setMswReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const init = async () => {
+      await enableMocking();
+      setMswReady(true);
+    };
+    init();
+  }, []);
+
+  if (!mswReady) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <div className="size-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary FallbackComponent={MainErrorFallback}>

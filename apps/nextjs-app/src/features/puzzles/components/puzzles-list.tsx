@@ -49,9 +49,9 @@ export const PuzzlesList = () => {
       stars.push(
         <Star
           key={i}
-          className={`w-3.5 h-3.5 ${
+          className={`size-3.5 ${
             i <= Math.floor(rating)
-              ? 'text-yellow-500 fill-yellow-500'
+              ? 'fill-yellow-500 text-yellow-500'
               : 'text-gray-300'
           }`}
         />,
@@ -63,15 +63,15 @@ export const PuzzlesList = () => {
   return (
     <div className="space-y-6">
       {/* Puzzle Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {puzzles.map((puzzle) => (
           <div
             key={puzzle.id}
-            className="bg-white border border-gray-300 rounded-lg p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer relative"
+            className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
           >
             {/* Title & Creator */}
             <div className="mb-3">
-              <h3 className="text-gray-900 font-medium mb-1">{puzzle.title}</h3>
+              <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
               <p className="text-sm text-gray-500">
                 by{' '}
                 {puzzle.creator
@@ -81,9 +81,9 @@ export const PuzzlesList = () => {
             </div>
 
             {/* Difficulty & Time Limit */}
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <span
-                className={`px-2 py-1 border rounded text-xs ${getDifficultyColor(
+                className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
                   puzzle.difficulty,
                 )}`}
               >
@@ -91,14 +91,14 @@ export const PuzzlesList = () => {
                   puzzle.difficulty.slice(1).toLowerCase()}
               </span>
               <div className="flex items-center gap-1 text-gray-600">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="size-3.5" />
                 <span className="text-xs">
                   {Math.floor(puzzle.timeLimit / 60)}:
                   {(puzzle.timeLimit % 60).toString().padStart(2, '0')}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-gray-600">
-                <Users className="w-3.5 h-3.5" />
+                <Users className="size-3.5" />
                 <span className="text-xs">
                   {puzzle.solvedCount || 0} solved
                 </span>
@@ -106,18 +106,18 @@ export const PuzzlesList = () => {
             </div>
 
             {/* Rating & Solved Status */}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+            <div className="flex items-center justify-between border-t border-gray-200 pt-3">
               {/* Rating */}
               <div className="flex items-center gap-1">
                 {renderStars(puzzle.rating || 0)}
-                <span className="text-xs text-gray-600 ml-1">
+                <span className="ml-1 text-xs text-gray-600">
                   {(puzzle.rating || 0).toFixed(1)}
                 </span>
               </div>
 
               {/* Solved Status */}
-              <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-50 text-gray-500">
-                <Circle className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-500">
+                <Circle className="size-3.5" />
                 <span>Unsolved</span>
               </div>
             </div>
@@ -126,7 +126,7 @@ export const PuzzlesList = () => {
             <div className="mt-4">
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded text-sm font-medium transition-colors"
+                className="w-full rounded bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
                 Solve Puzzle
               </Link>
@@ -137,16 +137,16 @@ export const PuzzlesList = () => {
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-8">
+        <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map(
             (pageNum) => (
               <Link
                 key={pageNum}
                 href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
-                className={`px-3 py-2 border rounded text-sm ${
+                className={`rounded border px-3 py-2 text-sm ${
                   pageNum === meta.page
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 {pageNum}

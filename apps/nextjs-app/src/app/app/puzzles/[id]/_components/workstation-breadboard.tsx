@@ -4,9 +4,8 @@ import { useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
-import { cn } from '@/utils/cn';
-
 import { Wire } from '@/types/api';
+import { cn } from '@/utils/cn';
 
 export type PinAddress = {
   row: number;
@@ -76,14 +75,29 @@ export const Breadboard = ({
 
   const ioPins = useMemo(() => {
     // Reserve left-most column pins for IO labels.
-    const io: Array<{ row: number; col: number; label: string; ownerId: string }> = [];
+    const io: Array<{
+      row: number;
+      col: number;
+      label: string;
+      ownerId: string;
+    }> = [];
 
     for (let i = 0; i < inputs.length && i < ROWS; i++) {
-      io.push({ row: i, col: 0, label: inputs[i], ownerId: `IO:IN:${inputs[i]}` });
+      io.push({
+        row: i,
+        col: 0,
+        label: inputs[i],
+        ownerId: `IO:IN:${inputs[i]}`,
+      });
     }
 
     for (let i = 0; i < outputs.length && i < ROWS; i++) {
-      io.push({ row: ROWS - 1 - i, col: 0, label: outputs[i], ownerId: `IO:OUT:${outputs[i]}` });
+      io.push({
+        row: ROWS - 1 - i,
+        col: 0,
+        label: outputs[i],
+        ownerId: `IO:OUT:${outputs[i]}`,
+      });
     }
 
     return io;
@@ -91,7 +105,8 @@ export const Breadboard = ({
 
   const ioByPin = useMemo(() => {
     const map = new Map<string, { label: string; ownerId: string }>();
-    for (const p of ioPins) map.set(pinId(p.row, p.col), { label: p.label, ownerId: p.ownerId });
+    for (const p of ioPins)
+      map.set(pinId(p.row, p.col), { label: p.label, ownerId: p.ownerId });
     return map;
   }, [ioPins]);
 
@@ -106,14 +121,18 @@ export const Breadboard = ({
     return true;
   };
 
-  const [hoverDrop, setHoverDrop] = useState<{ row: number; col: number } | null>(null);
+  const [hoverDrop, setHoverDrop] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
 
   return (
     <div className="flex flex-col gap-2">
       <div className="rounded-md border border-gray-300 bg-white p-3">
         <div className="mb-1 text-sm font-medium text-gray-900">Breadboard</div>
         <div className="text-xs text-gray-600">
-          Pins in the same row are inherently connected. Click two pins to add a wire.
+          Pins in the same row are inherently connected. Click two pins to add a
+          wire.
         </div>
       </div>
 
@@ -138,7 +157,8 @@ export const Breadboard = ({
               const isOccupied = Boolean(occ);
               const io = ioByPin.get(id);
 
-              const ownerId = io?.ownerId ?? (isOccupied ? occ!.placedId : `PIN:${id}`);
+              const ownerId =
+                io?.ownerId ?? (isOccupied ? occ!.placedId : `PIN:${id}`);
               const pinIndex = io ? 0 : isOccupied ? occ!.pinIndex : 0;
               const isSelected =
                 selectedPin?.row === r && selectedPin?.col === c;
@@ -252,13 +272,16 @@ export const Breadboard = ({
         <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-600">
           <div className="font-medium text-gray-700">Wire instructions</div>
           <div className="mt-1">
-            Click one pin (it becomes selected), then click another pin to connect them.
+            Click one pin (it becomes selected), then click another pin to
+            connect them.
           </div>
         </div>
       </div>
 
       <div className="rounded-md border border-gray-300 bg-white p-3">
-        <div className="mb-2 text-sm font-medium text-gray-900">Connections</div>
+        <div className="mb-2 text-sm font-medium text-gray-900">
+          Connections
+        </div>
         {wires.length === 0 ? (
           <div className="text-xs text-gray-500">No wires yet.</div>
         ) : (
