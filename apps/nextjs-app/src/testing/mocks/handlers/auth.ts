@@ -4,13 +4,8 @@ import { HttpResponse, http } from 'msw';
 import { env } from '@/config/env';
 
 import { db, persistDb } from '../db';
-import {
-  authenticate,
-  hash,
-  requireAuth,
-  AUTH_COOKIE,
-  networkDelay,
-} from '../utils';
+import { hash } from '../hash';
+import { AUTH_COOKIE, authenticate, networkDelay, requireAuth } from '../utils';
 
 type RegisterBody = {
   firstName: string;

@@ -2,6 +2,7 @@ import Cookies from 'js-cookie';
 import { delay } from 'msw';
 
 import { db } from './db';
+import { hash } from './hash';
 
 export const encode = (obj: any) => {
   const btoa =
@@ -17,16 +18,6 @@ export const decode = (str: string) => {
       ? (str: string) => Buffer.from(str, 'base64').toString('binary')
       : window.atob;
   return JSON.parse(atob(str));
-};
-
-export const hash = (str: string) => {
-  let hash = 5381,
-    i = str.length;
-
-  while (i) {
-    hash = (hash * 33) ^ str.charCodeAt(--i);
-  }
-  return String(hash >>> 0);
 };
 
 export const networkDelay = () => {

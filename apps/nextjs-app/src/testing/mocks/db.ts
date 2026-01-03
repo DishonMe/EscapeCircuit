@@ -1,7 +1,7 @@
 import { factory, primaryKey } from '@mswjs/data';
 import { nanoid } from 'nanoid';
 
-import { hash } from './utils';
+import { hash } from './hash';
 
 const models = {
   user: {
@@ -150,8 +150,6 @@ export const initializeDb = async () => {
       role: 'PLAYER',
       bio: 'Professional circuit designer',
     });
-
-
 
     // Create sample puzzles
     db.puzzle.create({
