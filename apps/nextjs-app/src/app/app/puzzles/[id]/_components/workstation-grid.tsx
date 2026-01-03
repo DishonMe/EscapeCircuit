@@ -976,7 +976,7 @@ export const WorkstationGrid = ({
               <div
                 key={p.id}
                 className={cn(
-                  'absolute rounded border bg-gray-50 text-[10px] text-gray-800',
+                  'group absolute rounded border bg-gray-50 text-[10px] text-gray-800',
                   isSelected
                     ? 'border-blue-400 ring-2 ring-blue-200'
                     : 'border-gray-300',
@@ -996,6 +996,32 @@ export const WorkstationGrid = ({
                   if (isOverTrash(e.clientX, e.clientY)) removeComponent(p.id);
                 }}
               >
+                {/* Center Garbage Icon (Hover) */}
+                <div className="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center group-hover:flex">
+                  <button
+                    type="button"
+                    className="pointer-events-auto flex size-5 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-sm ring-1 ring-gray-200 hover:bg-red-50"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeComponent(p.id);
+                    }}
+                    title="Delete component"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M6 6l1 16h10l1-16" />
+                    </svg>
+                  </button>
+                </div>
+
                 <div className="flex size-full items-start justify-between p-1">
                   <div className="truncate font-medium">{def.label}</div>
                   {isSelected ? (
