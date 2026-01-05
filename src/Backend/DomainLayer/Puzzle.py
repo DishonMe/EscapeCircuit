@@ -22,8 +22,16 @@ class Puzzle:
     avg_difficulty: float = 0.0
     avg_fun: float = 0.0
     avg_clearness: float = 0.0
+    avg_difficulty_exp: float = 0.0
+    avg_fun_exp: float = 0.0
+    avg_clearness_exp: float = 0.0
 
     created_at: datetime = field(default_factory=utcnow)
+    fun_decided: bool = False
+    fun_decided_exp: bool = False
+    clearness_decided: bool = False
+    clearness_decided_exp: bool = False
+    rating_count_exp: int = 0
 
     #### will implement later - not in alpha ###
     # for special gates that the user created for this puzzle

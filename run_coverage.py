@@ -36,6 +36,7 @@ def run_coverage():
                 "pytest",
                 "tests/DomainUnitTests",
                 "tests/ServiceLayerTests",
+                "tests/PersistantLayerTests",
                 "-v",
             ],
             cwd=project_root / "src",

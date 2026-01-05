@@ -1,13 +1,12 @@
 from fastapi import Header
 from Backend.DomainLayer.Exceptions import ValidationError
 
-from Backend.ServiceLayer.AuthService import AuthService
-
-
-def require_user(auth: AuthService):
-    async def _dep(authorization: str = Header(default="")):
+def require_session_token():
+    async def _dep(authorization: str = Header(default="")) -> str:
         if not authorization.startswith("Bearer "):
             raise ValidationError("unauthorized")
         token = authorization.removeprefix("Bearer ").strip()
-        return auth.require_user(token)
+        if not token:
+            raise ValidationError("unauthorized")
+        return token
     return _dep
