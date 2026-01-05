@@ -307,12 +307,35 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       if (!raw) return;
       const parsed = JSON.parse(raw) as any;
       if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
-      if (Array.isArray(parsed?.wires)) setWires(parsed.wires);
+      if (Array.isArray(parsed?.wires)) {
+        const migratedWires = parsed.wires.map((w: any) => {
+          const migrateEndpoint = (ep: any) => {
+            if (ep.portId) return ep;
+            if (ep.componentId.startsWith('IO:')) {
+              return { ...ep, portId: 'P0' };
+            }
+            const placedInst = parsed.placed.find(
+              (p: any) => p.id === ep.componentId,
+            );
+            if (!placedInst) return ep;
+            const def = uiCatalog[placedInst.componentId];
+            if (!def) return ep;
+            const port = def.ports[ep.pinIndex];
+            return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
+          };
+          return {
+            ...w,
+            from: migrateEndpoint(w.from),
+            to: migrateEndpoint(w.to),
+          };
+        });
+        setWires(migratedWires);
+      }
     } catch {
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STATE_KEY]);
+  }, [STATE_KEY, uiCatalog]);
 
   useEffect(() => {
     try {
@@ -647,7 +670,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       className="group flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1"
                     >
                       <span className="truncate text-xs text-gray-700">
-                        {w.from.componentId} → {w.to.componentId}
+                        {w.from.componentId} ({w.from.portId}) →{' '}
+                        {w.to.componentId} ({w.to.portId})
                       </span>
                       <button
                         type="button"

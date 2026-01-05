@@ -292,7 +292,8 @@ export const Breadboard = ({
                 className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1"
               >
                 <div className="truncate text-xs text-gray-700">
-                  {w.from.componentId} → {w.to.componentId}
+                  {w.from.componentId} ({w.from.portId}) → {w.to.componentId} (
+                  {w.to.portId})
                 </div>
               </div>
             ))}

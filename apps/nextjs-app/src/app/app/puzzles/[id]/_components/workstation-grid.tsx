@@ -138,6 +138,13 @@ export const WorkstationGrid = ({
     current: { x: number; y: number };
   }>(null);
 
+  const [draggedComponent, setDraggedComponent] = useState<{
+    placedId: string;
+    startHole: HoleCoord;
+    currentHole: HoleCoord;
+    offset: { x: number; y: number };
+  } | null>(null);
+
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
 
   // Load/save view state.
@@ -329,6 +336,7 @@ export const WorkstationGrid = ({
     componentId: string,
     origin: HoleCoord,
     rotation: 0 | 90,
+    excludePlacedId?: string,
   ) => {
     const def = catalog[componentId];
     if (!def) return false;
@@ -340,6 +348,7 @@ export const WorkstationGrid = ({
 
     // no component overlap
     for (const rect of componentRects) {
+      if (rect.placedId === excludePlacedId) continue;
       for (let r = 0; r < size.h; r++) {
         for (let c = 0; c < size.w; c++) {
           const hole = { row: origin.row + r, col: origin.col + c };
@@ -356,7 +365,8 @@ export const WorkstationGrid = ({
         col: origin.col + rotOff.col,
       };
       const key = `r${hole.row}c${hole.col}`;
-      if (occupiedPortHoles.has(key)) return false;
+      const occ = occupiedPortHoles.get(key);
+      if (occ && occ.ownerId !== excludePlacedId) return false;
     }
 
     return true;
@@ -472,8 +482,16 @@ export const WorkstationGrid = ({
     onWiresChange(
       wires.concat({
         id: `wire:${Date.now()}`,
-        from: { componentId: from.ownerId, pinIndex: fromPinIndex },
-        to: { componentId: to.ownerId, pinIndex: toPinIndex },
+        from: {
+          componentId: from.ownerId,
+          pinIndex: fromPinIndex,
+          portId: from.portId,
+        },
+        to: {
+          componentId: to.ownerId,
+          pinIndex: toPinIndex,
+          portId: to.portId,
+        },
       }),
     );
   };
@@ -966,8 +984,13 @@ export const WorkstationGrid = ({
           {placed.map((p) => {
             const def = catalog[p.componentId];
             const size = rotatedSize(def.size, p.rotation);
-            const left = p.origin.col * CELL_PX;
-            const top = p.origin.row * CELL_PX;
+
+            const isDragging = draggedComponent?.placedId === p.id;
+            const origin = isDragging ? draggedComponent.currentHole : p.origin;
+
+            const left = origin.col * CELL_PX;
+            const top = origin.row * CELL_PX;
+
             const isSelected =
               selectedEntity.type === 'component' &&
               selectedEntity.placedId === p.id;
@@ -980,27 +1003,107 @@ export const WorkstationGrid = ({
                   isSelected
                     ? 'border-blue-400 ring-2 ring-blue-200'
                     : 'border-gray-300',
+                  isDragging ? 'z-50 opacity-80 shadow-xl' : 'z-10',
                 )}
                 style={{
                   left,
                   top,
                   width: size.w * CELL_PX - 2,
                   height: size.h * CELL_PX - 2,
+                  cursor: isDragging ? 'grabbing' : 'grab',
                 }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
+                  e.currentTarget.setPointerCapture(e.pointerId);
                   setSelectedEntity({ type: 'component', placedId: p.id });
+
+                  const el = containerRef.current;
+                  if (!el) return;
+                  const rect = el.getBoundingClientRect();
+                  const cursor = {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                  };
+                  const worldPos = screenToWorld(cursor);
+
+                  setDraggedComponent({
+                    placedId: p.id,
+                    startHole: p.origin,
+                    currentHole: p.origin,
+                    offset: {
+                      x: worldPos.col - p.origin.col,
+                      y: worldPos.row - p.origin.row,
+                    },
+                  });
+                }}
+                onPointerMove={(e) => {
+                  if (draggedComponent?.placedId === p.id) {
+                    e.stopPropagation();
+                    const el = containerRef.current;
+                    if (!el) return;
+                    const rect = el.getBoundingClientRect();
+                    const cursor = {
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                    };
+                    const worldPos = screenToWorld(cursor);
+
+                    const newCol = Math.round(
+                      worldPos.col - draggedComponent.offset.x,
+                    );
+                    const newRow = Math.round(
+                      worldPos.row - draggedComponent.offset.y,
+                    );
+
+                    if (
+                      newCol !== draggedComponent.currentHole.col ||
+                      newRow !== draggedComponent.currentHole.row
+                    ) {
+                      setDraggedComponent({
+                        ...draggedComponent,
+                        currentHole: { row: newRow, col: newCol },
+                      });
+                    }
+                  }
                 }}
                 onPointerUp={(e) => {
                   e.stopPropagation();
-                  if (isOverTrash(e.clientX, e.clientY)) removeComponent(p.id);
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+
+                  if (draggedComponent?.placedId === p.id) {
+                    if (isOverTrash(e.clientX, e.clientY)) {
+                      removeComponent(p.id);
+                    } else {
+                      // Commit move
+                      if (
+                        canPlaceComponentAt(
+                          p.componentId,
+                          draggedComponent.currentHole,
+                          p.rotation,
+                          p.id,
+                        )
+                      ) {
+                        const next = placed.map((x) =>
+                          x.id === p.id
+                            ? { ...x, origin: draggedComponent.currentHole }
+                            : x,
+                        );
+                        onPlacedChange(next);
+                      }
+                    }
+                    setDraggedComponent(null);
+                  }
                 }}
               >
-                {/* Center Garbage Icon (Hover) */}
-                <div className="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center group-hover:flex">
+                <div className="flex size-full items-start justify-between p-1">
+                  <div className="truncate font-medium">{def.label}</div>
+                </div>
+
+                {/* Selected Delete Button (Outside) */}
+                {isSelected && !isDragging && (
                   <button
                     type="button"
-                    className="pointer-events-auto flex size-5 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-sm ring-1 ring-gray-200 hover:bg-red-50"
+                    className="absolute -top-2 left-1/2 z-50 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 hover:bg-red-50"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1020,25 +1123,7 @@ export const WorkstationGrid = ({
                       <path d="M6 6l1 16h10l1-16" />
                     </svg>
                   </button>
-                </div>
-
-                <div className="flex size-full items-start justify-between p-1">
-                  <div className="truncate font-medium">{def.label}</div>
-                  {isSelected ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeComponent(p.id);
-                      }}
-                      title="Remove"
-                    >
-                      X
-                    </Button>
-                  ) : null}
-                </div>
+                )}
 
                 {/* Port markers */}
                 {def.ports.map((port) => {
@@ -1051,8 +1136,8 @@ export const WorkstationGrid = ({
                     portId: port.id,
                     kind: port.kind,
                     hole: {
-                      row: p.origin.row + rot.row,
-                      col: p.origin.col + rot.col,
+                      row: origin.row + rot.row,
+                      col: origin.col + rot.col,
                     },
                   };
 

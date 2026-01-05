@@ -83,8 +83,8 @@ export type PlacedComponent = {
 
 export type Wire = {
   id: string;
-  from: { componentId: string; pinIndex: number };
-  to: { componentId: string; pinIndex: number };
+  from: { componentId: string; pinIndex: number; portId: string };
+  to: { componentId: string; pinIndex: number; portId: string };
 };
 
 export type CircuitSolution = {
