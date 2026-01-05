@@ -1,0 +1,835 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useNotifications } from '@/components/ui/notifications';
+import { paths } from '@/config/paths';
+import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
+import { validateSolution } from '@/features/puzzles/api/validate-solution';
+import { useUser } from '@/lib/auth';
+import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';
+import { cn } from '@/utils/cn';
+
+import {
+  WorkstationGrid,
+  type ComponentDef,
+  type PlacedGridComponent,
+  type SelectedComponentState,
+} from './workstation-grid';
+import { WorkstationMenu } from './workstation-menu';
+import { WorkstationTimer } from './workstation-timer';
+
+const BASIC_COMPONENTS: CircuitComponent[] = [
+  { id: 'AND', type: 'AND', cost: 10, pins: 3 },
+  { id: 'OR', type: 'OR', cost: 10, pins: 3 },
+  { id: 'NOT', type: 'NOT', cost: 5, pins: 2 },
+  { id: 'XOR', type: 'XOR', cost: 15, pins: 3 },
+  { id: 'NAND', type: 'NAND', cost: 12, pins: 3 },
+];
+
+const EMPTY_STRINGS: string[] = [];
+const EMPTY_COMPONENTS: CircuitComponent[] = [];
+
+type PostCheckState =
+  | { open: false }
+  | { open: true; solved: boolean; message: string };
+
+export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
+  const router = useRouter();
+  const user = useUser();
+
+  const puzzleQuery = usePuzzle({ id: puzzleId });
+  const puzzle = puzzleQuery.data?.data;
+
+  const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
+  const [wires, setWires] = useState<Wire[]>([]);
+  const [selectedComponent, setSelectedComponent] =
+    useState<SelectedComponentState>({ mode: 'none' });
+
+  const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
+  const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
+  const [isChecking, setIsChecking] = useState(false);
+  const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
+    null,
+  );
+
+  const notifications = useNotifications();
+
+  const inputs = puzzle?.inputs ?? EMPTY_STRINGS;
+  const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
+
+  const budgetLimit = puzzle?.budgetLimit ?? 0;
+  const tightBudget =
+    puzzle?.tightBudgetLimit ?? Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
+
+  const filteredBasics = useMemo(() => {
+    return new Set(puzzle?.filteredBasicComponents ?? EMPTY_STRINGS);
+  }, [puzzle?.filteredBasicComponents]);
+  const allowArsenal = puzzle?.allowArsenal ?? true;
+
+  const specialComponents = useMemo(() => {
+    return puzzle?.specialComponents ?? EMPTY_COMPONENTS;
+  }, [puzzle?.specialComponents]);
+
+  const basicComponents = useMemo(() => {
+    return BASIC_COMPONENTS.filter((c) => !filteredBasics.has(c.type));
+  }, [filteredBasics]);
+
+  const componentCatalog = useMemo(() => {
+    const byId = new Map<string, CircuitComponent>();
+    for (const c of basicComponents) byId.set(c.id, c);
+    for (const c of specialComponents) byId.set(c.id, c);
+    return byId;
+  }, [basicComponents, specialComponents]);
+
+  const uiCatalog = useMemo(() => {
+    const toDefaultPorts = (pins: number, size: { w: number; h: number }) => {
+      // Default: 1 output, remaining are inputs.
+      const outputsCount = 1;
+      const inputsCount = Math.max(1, pins - outputsCount);
+
+      const ports: Array<{
+        id: string;
+        kind: 'input' | 'output';
+        offset: { row: number; col: number };
+      }> = [];
+
+      // inputs along left edge
+      for (let i = 0; i < inputsCount; i++) {
+        ports.push({
+          id: `IN${i}`,
+          kind: 'input',
+          offset: { row: Math.min(i, size.h - 1), col: 0 },
+        });
+      }
+
+      // outputs along right edge
+      for (let i = 0; i < outputsCount; i++) {
+        ports.push({
+          id: `OUT${i}`,
+          kind: 'output',
+          offset: { row: 0, col: Math.max(0, size.w - 1) },
+        });
+      }
+
+      // Ensure unique hole offsets.
+      const seen = new Set<string>();
+      return ports.filter((p) => {
+        const k = `${p.offset.row}:${p.offset.col}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    const hardcoded: Record<
+      string,
+      { size: { w: number; h: number }; ports: ComponentDef['ports'] }
+    > = {
+      AND: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      OR: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      XOR: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      NAND: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      NOT: {
+        size: { w: 3, h: 1 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+    };
+
+    const ui = new Map<string, ComponentDef>();
+    for (const [id, def] of componentCatalog.entries()) {
+      const hc = hardcoded[def.type];
+      const size = hc?.size ?? {
+        w: 4,
+        h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
+      };
+      const ports = hc?.ports ?? toDefaultPorts(def.pins, size);
+      ui.set(id, {
+        id,
+        label: def.type,
+        cost: def.cost,
+        size,
+        ports,
+      });
+    }
+    return Object.fromEntries(Array.from(ui.entries())) as Record<
+      string,
+      ComponentDef
+    >;
+  }, [componentCatalog]);
+
+  const currentCost = useMemo(() => {
+    return placed.reduce((acc, p) => {
+      const def = componentCatalog.get(p.componentId);
+      return acc + (def?.cost ?? 0);
+    }, 0);
+  }, [componentCatalog, placed]);
+
+  const canAddCost = (extraCost: number) => {
+    return currentCost + extraCost <= budgetLimit;
+  };
+
+  const ioUsage = useMemo(() => {
+    const usedInputs = new Set<string>();
+    const usedOutputs = new Set<string>();
+
+    for (const w of wires) {
+      if (w.from.componentId.startsWith('IO:IN:')) {
+        usedInputs.add(w.from.componentId.replace('IO:IN:', ''));
+      }
+      if (w.to.componentId.startsWith('IO:IN:')) {
+        usedInputs.add(w.to.componentId.replace('IO:IN:', ''));
+      }
+      if (w.from.componentId.startsWith('IO:OUT:')) {
+        usedOutputs.add(w.from.componentId.replace('IO:OUT:', ''));
+      }
+      if (w.to.componentId.startsWith('IO:OUT:')) {
+        usedOutputs.add(w.to.componentId.replace('IO:OUT:', ''));
+      }
+    }
+
+    const missingInputs = inputs.filter((i) => !usedInputs.has(i));
+    const missingOutputs = outputs.filter((o) => !usedOutputs.has(o));
+
+    return {
+      usedInputs,
+      usedOutputs,
+      missingInputs,
+      missingOutputs,
+    };
+  }, [inputs, outputs, wires]);
+
+  const STATE_KEY = `escapecircuit.workstation.state.v2:${puzzleId}`;
+
+  const buildHoleState = useCallback(() => {
+    const holes: Record<
+      string,
+      | { kind: 'empty' }
+      | { kind: 'component'; placedId: string; componentId: string }
+      | {
+          kind: 'port';
+          placedId: string;
+          componentId: string;
+          portIndex: number;
+          portKind: 'input' | 'output';
+        }
+    > = {};
+
+    const rotateOffset = (
+      offset: { row: number; col: number },
+      size: { w: number; h: number },
+      rotation: 0 | 90,
+    ) => {
+      if (rotation === 0) return offset;
+      return { row: offset.col, col: size.h - 1 - offset.row };
+    };
+
+    const rotatedSize = (size: { w: number; h: number }, rotation: 0 | 90) =>
+      rotation === 0 ? size : { w: size.h, h: size.w };
+
+    for (const inst of placed) {
+      const def = uiCatalog[inst.componentId];
+      if (!def) continue;
+
+      const size = rotatedSize(def.size, inst.rotation);
+      for (let r = 0; r < size.h; r++) {
+        for (let c = 0; c < size.w; c++) {
+          const key = `r${inst.origin.row + r}c${inst.origin.col + c}`;
+          holes[key] = {
+            kind: 'component',
+            placedId: inst.id,
+            componentId: inst.componentId,
+          };
+        }
+      }
+
+      def.ports.forEach((p, idx) => {
+        const rot = rotateOffset(p.offset, def.size, inst.rotation);
+        const key = `r${inst.origin.row + rot.row}c${inst.origin.col + rot.col}`;
+        holes[key] = {
+          kind: 'port',
+          placedId: inst.id,
+          componentId: inst.componentId,
+          portIndex: idx,
+          portKind: p.kind,
+        };
+      });
+    }
+
+    return holes;
+  }, [placed, uiCatalog]);
+
+  // Load state
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as any;
+      if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
+      if (Array.isArray(parsed?.wires)) {
+        const migratedWires = parsed.wires.map((w: any) => {
+          const migrateEndpoint = (ep: any) => {
+            if (ep.portId) return ep;
+            if (ep.componentId.startsWith('IO:')) {
+              return { ...ep, portId: 'P0' };
+            }
+            const placedInst = parsed.placed.find(
+              (p: any) => p.id === ep.componentId,
+            );
+            if (!placedInst) return ep;
+            const def = uiCatalog[placedInst.componentId];
+            if (!def) return ep;
+            const port = def.ports[ep.pinIndex];
+            return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
+          };
+          return {
+            ...w,
+            from: migrateEndpoint(w.from),
+            to: migrateEndpoint(w.to),
+          };
+        });
+        setWires(migratedWires);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [STATE_KEY, uiCatalog]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({
+          grid: { rows: 10, cols: 14 },
+          placed,
+          wires,
+          holes: buildHoleState(),
+        }),
+      );
+    } catch {
+      // ignore
+    }
+  }, [STATE_KEY, placed, wires, buildHoleState]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (selectedComponent.mode !== 'placing') return;
+      if (e.key.toLowerCase() !== 'r') return;
+      setSelectedComponent((prev) => {
+        if (prev.mode !== 'placing') return prev;
+        return { ...prev, rotation: prev.rotation === 0 ? 90 : 0 };
+      });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedComponent.mode]);
+
+  if (puzzleQuery.isLoading) {
+    return <div className="text-sm text-gray-600">Loading…</div>;
+  }
+
+  if (!puzzle) {
+    return (
+      <div className="flex w-full flex-col gap-3">
+        <div className="text-sm text-gray-600">Puzzle not found.</div>
+        <Button
+          variant="outline"
+          onClick={() => router.push(paths.app.puzzles.getHref())}
+        >
+          Back to puzzles
+        </Button>
+      </div>
+    );
+  }
+
+  const onPlacedChange = (next: PlacedGridComponent[]) => {
+    // Budget guard: detect a new placement.
+    if (next.length > placed.length) {
+      const added = next[next.length - 1];
+      const def = componentCatalog.get(added.componentId);
+      if (def && !canAddCost(def.cost)) {
+        notifications.addNotification({
+          type: 'warning',
+          title: 'Budget exceeded',
+          message: 'You cannot add components beyond the Budget limit.',
+        });
+        return;
+      }
+    }
+    setPlaced(next);
+  };
+
+  const buildSolution = (): CircuitSolution => {
+    return {
+      placedComponents: placed.map((p) => ({
+        id: p.id,
+        componentId: p.componentId,
+        x: p.origin.col,
+        y: p.origin.row,
+      })),
+      wires,
+      totalCost: currentCost,
+    };
+  };
+
+  const validateConnectivity = () => {
+    const issues: string[] = [];
+
+    const resolveKind = (
+      ownerId: string,
+      pinIndex: number,
+    ): 'input' | 'output' | null => {
+      if (ownerId.startsWith('IO:IN:')) return 'output';
+      if (ownerId.startsWith('IO:OUT:')) return 'input';
+      const inst = placed.find((p) => p.id === ownerId);
+      if (!inst) return null;
+      const def = uiCatalog[inst.componentId];
+      const port = def?.ports?.[pinIndex];
+      return port?.kind ?? null;
+    };
+
+    const portKey = (ownerId: string, pinIndex: number) =>
+      `${ownerId}::${pinIndex}`;
+    const counts = new Map<string, number>();
+
+    for (const w of wires) {
+      // owner existence check
+      const fromKind = resolveKind(w.from.componentId, w.from.pinIndex);
+      const toKind = resolveKind(w.to.componentId, w.to.pinIndex);
+      if (!fromKind)
+        issues.push(
+          `Extra/invalid wire endpoint: ${w.from.componentId}#${w.from.pinIndex}`,
+        );
+      if (!toKind)
+        issues.push(
+          `Extra/invalid wire endpoint: ${w.to.componentId}#${w.to.pinIndex}`,
+        );
+      if (fromKind && toKind && (fromKind !== 'output' || toKind !== 'input')) {
+        issues.push(
+          `Invalid wire direction: ${w.from.componentId} → ${w.to.componentId}`,
+        );
+      }
+
+      counts.set(
+        portKey(w.from.componentId, w.from.pinIndex),
+        (counts.get(portKey(w.from.componentId, w.from.pinIndex)) ?? 0) + 1,
+      );
+      counts.set(
+        portKey(w.to.componentId, w.to.pinIndex),
+        (counts.get(portKey(w.to.componentId, w.to.pinIndex)) ?? 0) + 1,
+      );
+    }
+
+    for (const label of inputs) {
+      const id = `IO:IN:${label}`;
+      if ((counts.get(portKey(id, 0)) ?? 0) === 0)
+        issues.push(`Missing puzzle input connection: ${label}`);
+    }
+    for (const label of outputs) {
+      const id = `IO:OUT:${label}`;
+      if ((counts.get(portKey(id, 0)) ?? 0) === 0)
+        issues.push(`Missing puzzle output connection: ${label}`);
+    }
+
+    for (const inst of placed) {
+      const def = uiCatalog[inst.componentId];
+      const portCount = def?.ports?.length ?? 0;
+      for (let idx = 0; idx < portCount; idx++) {
+        if ((counts.get(portKey(inst.id, idx)) ?? 0) === 0) {
+          issues.push(
+            `Missing component port connection: ${inst.id} port #${idx}`,
+          );
+        }
+      }
+    }
+
+    return issues;
+  };
+
+  const exportWorkingAreaJson = () => {
+    const payload = {
+      version: 1,
+      grid: { rows: 10, cols: 14 },
+      puzzle: { id: puzzle.id, inputs, outputs },
+      placed,
+      wires,
+      holes: buildHoleState(),
+      totalCost: currentCost,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `puzzle-${puzzle.id}-circuit.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const checkSolution = async () => {
+    const issues = validateConnectivity();
+    if (issues.length) {
+      setConnectivityIssues(issues);
+      return;
+    }
+
+    setIsChecking(true);
+    try {
+      const res = await validateSolution({
+        puzzleId: puzzle.id,
+        solution: buildSolution(),
+      });
+      setPostCheck({ open: true, solved: res.solved, message: res.message });
+
+      if (res.solved) {
+        exportWorkingAreaJson();
+      }
+    } catch (e: any) {
+      notifications.addNotification({
+        type: 'error',
+        title: 'Validation failed',
+        message: e?.message ?? 'Something went wrong',
+      });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const onExitWithoutSaving = () => {
+    router.push(paths.app.puzzles.getHref());
+  };
+
+  const onSubmitAndExit = () => {
+    router.push(paths.app.puzzles.getHref());
+  };
+
+  const visibleBasics = basicComponents;
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {puzzle.title}
+            </h1>
+            <div className="text-sm text-gray-600">
+              by {puzzle.creator?.firstName ?? ''}{' '}
+              {puzzle.creator?.lastName ?? ''}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <WorkstationTimer timeLimitSeconds={puzzle.timeLimit} />
+            <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
+              Puzzle Info
+            </Button>
+            <Button onClick={checkSolution} isLoading={isChecking}>
+              Check Solution
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-700">
+          <div>
+            <span className="font-medium">Budget:</span> {budgetLimit}
+          </div>
+          <div>
+            <span className="font-medium">Tight Budget:</span> {tightBudget}
+          </div>
+          <div>
+            <span className="font-medium">Current Cost:</span> {currentCost}
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Inputs:</span>
+              {inputs.map((i) => (
+                <span
+                  key={i}
+                  className={
+                    ioUsage.usedInputs.has(i)
+                      ? 'rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs text-green-700'
+                      : 'rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600'
+                  }
+                >
+                  {i}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Outputs:</span>
+              {outputs.map((o) => (
+                <span
+                  key={o}
+                  className={
+                    ioUsage.usedOutputs.has(o)
+                      ? 'rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs text-green-700'
+                      : 'rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600'
+                  }
+                >
+                  {o}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_320px]">
+        <WorkstationMenu
+          basic={visibleBasics}
+          special={specialComponents}
+          allowArsenal={allowArsenal}
+          filteredBasicTypes={Array.from(filteredBasics)}
+          selectedComponentId={
+            selectedComponent.mode === 'placing'
+              ? selectedComponent.componentId
+              : undefined
+          }
+          onSelectComponent={(componentId) =>
+            setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
+          }
+        />
+
+        <WorkstationGrid
+          puzzleId={puzzle.id}
+          inputs={inputs}
+          outputs={outputs}
+          catalog={uiCatalog}
+          placed={placed}
+          wires={wires}
+          selectedComponent={selectedComponent}
+          onSelectedComponentChange={setSelectedComponent}
+          onPlacedChange={onPlacedChange}
+          onWiresChange={setWires}
+        />
+
+        <div className="flex flex-col gap-3">
+          <div className="rounded-md border border-gray-300 bg-white p-3">
+            <div className="mb-2 text-sm font-medium text-gray-900">
+              Debugger
+            </div>
+            <div className="text-xs text-gray-600">
+              This debugger shows wiring and IO usage. Backend validation runs
+              creator test-cases.
+            </div>
+            <div className="mt-3">
+              <div className="mb-2 text-xs font-medium text-gray-700">
+                Wires
+              </div>
+              {wires.length === 0 ? (
+                <div className="text-xs text-gray-500">No wires yet.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {wires.map((w) => (
+                    <li
+                      key={w.id}
+                      className="group flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1"
+                    >
+                      <span className="truncate text-xs text-gray-700">
+                        {w.from.componentId} ({w.from.portId}) →{' '}
+                        {w.to.componentId} ({w.to.portId})
+                      </span>
+                      <button
+                        type="button"
+                        className="hidden text-gray-400 hover:text-red-600 group-hover:block"
+                        onClick={() =>
+                          setWires((prev) => prev.filter((x) => x.id !== w.id))
+                        }
+                        title="Delete wire"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="size-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M6 6l1 16h10l1-16" />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-gray-300 bg-white p-3">
+            <div className="mb-2 text-sm font-medium text-gray-900">
+              Session
+            </div>
+            <div className="text-xs text-gray-600">
+              Signed in as {user.data?.email ?? 'Unknown'}
+            </div>
+            <Button
+              variant="outline"
+              className="mt-3 w-full"
+              onClick={onExitWithoutSaving}
+            >
+              Exit Puzzle
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{puzzle.title}</DialogTitle>
+            <DialogDescription>
+              Puzzle description and creator comment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-gray-700">
+            <div>
+              <div className="font-medium text-gray-900">Description</div>
+              <div className="mt-1 whitespace-pre-wrap">
+                {puzzle.description}
+              </div>
+            </div>
+            {puzzle.creatorComment ? (
+              <div>
+                <div className="font-medium text-gray-900">Creator comment</div>
+                <div className="mt-1 whitespace-pre-wrap">
+                  {puzzle.creatorComment}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPuzzleInfo(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(connectivityIssues?.length)}
+        onOpenChange={(open) => (open ? null : setConnectivityIssues(null))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cannot check circuit</DialogTitle>
+            <DialogDescription>
+              Some inputs/outputs are missing or extra. Fix these before
+              checking.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className={cn('max-h-[50vh] overflow-auto text-sm text-gray-700')}
+          >
+            <ul className="list-disc space-y-1 pl-5">
+              {(connectivityIssues ?? []).map((m, idx) => (
+                <li key={`${idx}:${m}`}>{m}</li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConnectivityIssues(null)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={postCheck.open}
+        onOpenChange={(open) =>
+          setPostCheck(open ? postCheck : ({ open: false } as PostCheckState))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {postCheck.open && postCheck.solved
+                ? 'Puzzle solved'
+                : 'Failed to solve'}
+            </DialogTitle>
+            <DialogDescription>
+              {postCheck.open ? postCheck.message : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-gray-700">
+            {postCheck.open && postCheck.solved ? (
+              <div>
+                Congrats! Time, cost, and other stats can be shown here.
+              </div>
+            ) : (
+              <div>
+                Your circuit did not pass the test cases. Try adjusting your
+                wiring/components.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPostCheck({ open: false })}
+            >
+              Return to puzzle
+            </Button>
+            <Button
+              onClick={onSubmitAndExit}
+              disabled={!postCheck.open || !postCheck.solved}
+            >
+              Submit solution and exit
+            </Button>
+            <Button variant="ghost" onClick={onExitWithoutSaving}>
+              Exit without saving
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
