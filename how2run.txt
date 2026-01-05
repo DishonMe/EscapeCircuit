@@ -1,0 +1,27 @@
+# How to Run the EscapeCircuit Next.js App (frontend)
+
+1. **Navigate to the project root:**
+   Open your terminal and ensure you are in the root directory of the workspace.
+
+2. **Install Dependencies (if not already installed):**
+   Run the following command to install all necessary packages:
+   ```bash
+   npm install
+   # or if using yarn
+   yarn install
+   ```
+
+3. **Navigate to the Next.js App Directory:**
+   ```bash
+   cd apps/nextjs-app
+   ```
+
+4. **Start the Development Server:**
+   Run the development server. We explicitly set the port to 3001 to avoid conflicts.
+   ```bash
+   PORT=3001 npm run dev
+   ```
+
+5. **Access the Application:**
+   Open your web browser and go to:
+   http://localhost:3001

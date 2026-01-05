@@ -1,0 +1,52 @@
+Mock DB initialized
+Mock API server started at http://localhost:8080
+[13:29:04.278] [32mINFO[39m (4022): [36mrequest completed[39m
+    req: {
+      "id": 1,
+      "method": "GET",
+      "url": "/api/auth/me",
+      "query": {},
+      "params": {},
+      "headers": "[Redacted]",
+      "remoteAddress": "::1",
+      "remotePort": 51151
+    }
+    res: {
+      "statusCode": 200,
+      "headers": "[Redacted]"
+    }
+    responseTime: 786
+[13:29:07.567] [32mINFO[39m (4022): [36mrequest completed[39m
+    req: {
+      "id": 2,
+      "method": "GET",
+      "url": "/api/puzzles?page=1",
+      "query": {
+        "page": "1"
+      },
+      "params": {},
+      "headers": "[Redacted]",
+      "remoteAddress": "::1",
+      "remotePort": 51151
+    }
+    res: {
+      "statusCode": 200,
+      "headers": "[Redacted]"
+    }
+    responseTime: 740
+[13:29:10.705] [32mINFO[39m (4022): [36mrequest completed[39m
+    req: {
+      "id": 3,
+      "method": "GET",
+      "url": "/api/puzzles/4m9Bx-cp9sgZPEyeqDNaH",
+      "query": {},
+      "params": {},
+      "headers": "[Redacted]",
+      "remoteAddress": "::1",
+      "remotePort": 51151
+    }
+    res: {
+      "statusCode": 200,
+      "headers": "[Redacted]"
+    }
+    responseTime: 477
