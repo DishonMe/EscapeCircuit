@@ -100,15 +100,21 @@ export const PuzzlesList = () => {
             key={puzzle.id}
             className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
           >
-            {/* Title & Creator */}
-            <div className="mb-3">
-              <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
-              <p className="text-sm text-gray-500">
-                by{' '}
-                {puzzle.creator
-                  ? `${puzzle.creator.username}`
-                  : 'Anonymous'}
-              </p>
+          {/* Title & Creator with status badge */}
+            <div className="mb-3 flex flex-wrap items-start gap-2">
+              <div className="flex-1">
+                <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
+                <p className="text-sm text-gray-500">
+                  by{' '}
+                  {puzzle.creator
+                    ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
+                    : 'Anonymous'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                <Medal className="size-3.5" />
+                <span>Unsolved</span>
+              </div>
             </div>
 
             {/* Difficulty, plays, and details */}
