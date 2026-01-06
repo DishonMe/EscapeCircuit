@@ -1,10 +1,11 @@
+from datetime import datetime, timezone
+from typing import List
+
 def _parse_iso(iso_str: str) -> datetime:
     dt = datetime.fromisoformat(iso_str)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
-from datetime import datetime, timezone
-from typing import List
 
 from Backend.DomainLayer.Rating import Rating
 from Backend.DomainLayer.Exceptions import ValidationError
