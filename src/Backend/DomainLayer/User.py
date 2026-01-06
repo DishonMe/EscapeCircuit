@@ -10,7 +10,9 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int
 class User:
     id: int 
     username: str
+    email: str = ""
     role: UserRole = UserRole.SOLVER
+    bio: str = ""
     xp: int = 0
     created_at: datetime = field(default_factory=utcnow)
 
@@ -37,11 +39,15 @@ class User:
 
     def to_dict(self) -> dict:
         return {
-            "id": int(self.id),
+            "id": str(self.id),
             "username": self.username,
+            "email": self.email,
             "role": self.role.value,
+            "bio": self.bio,
             "xp": self.xp,
+            "level": self.level,
             "created_at": self.created_at.isoformat(),
+            "createdAt": int(self.created_at.timestamp() * 1000),
         }
 
     @staticmethod
@@ -50,7 +56,9 @@ class User:
         return User(
             id=int(d.get("id", 0)),
             username=d["username"],
+            email=d.get("email", ""),
             role=UserRole(d.get("role", UserRole.SOLVER.value)),
+            bio=d.get("bio", ""),
             xp=int(d.get("xp", 0)),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
         )

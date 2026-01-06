@@ -60,20 +60,38 @@ class Puzzle:
             self.status = PuzzleStatus.UNPUBLISHED
 
     def to_dict(self) -> dict:
+        # Helper to map avg_difficulty (float 0-10 or similar) to Enum strings
+        # Assuming: <3 EASY, <7 MEDIUM, >=7 HARD. Adjust logic as needed.
+        diff_str = "EASY"
+        if self.avg_difficulty >= 7:
+            diff_str = "HARD"
+        elif self.avg_difficulty >= 4:
+            diff_str = "MEDIUM"
+        
         return {
-            "id": int(self.id),
+            "id": str(self.id), # Frontend often expects string IDs or handles both
             "name": self.name,
+            "title": self.name, # Alias for frontend
             "creator_user_id": int(self.creator_user_id),
             "description": self.description,
             "status": self.status.value,
+            "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
+            "budgetLimit": self.budget,
             "time_limit_seconds": self.time_limit_seconds,
+            "timeLimit": self.time_limit_seconds, # Alias for frontend
+            "difficulty": diff_str, # Mapped for frontend
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
+            "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
+            "solvedCount": 0, # Placeholder
+            "inputs": [],     # Placeholder
+            "outputs": [],    # Placeholder
             "avg_difficulty": self.avg_difficulty,
             "avg_fun": self.avg_fun,
             "avg_clearness": self.avg_clearness,
             "created_at": self.created_at.isoformat(),
+            "createdAt": int(self.created_at.timestamp() * 1000), # Frontend expects timestamp (ms)
         }
 
     @staticmethod

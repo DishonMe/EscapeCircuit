@@ -49,11 +49,10 @@ export const PuzzlesList = () => {
       stars.push(
         <Star
           key={i}
-          className={`size-3.5 ${
-            i <= Math.floor(rating)
+          className={`size-3.5 ${i <= Math.floor(rating)
               ? 'fill-yellow-500 text-yellow-500'
               : 'text-gray-300'
-          }`}
+            }`}
         />,
       );
     }
@@ -75,7 +74,7 @@ export const PuzzlesList = () => {
               <p className="text-sm text-gray-500">
                 by{' '}
                 {puzzle.creator
-                  ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
+                  ? `${puzzle.creator.username}`
                   : 'Anonymous'}
               </p>
             </div>
@@ -143,11 +142,10 @@ export const PuzzlesList = () => {
               <Link
                 key={pageNum}
                 href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
-                className={`rounded border px-3 py-2 text-sm ${
-                  pageNum === meta.page
+                className={`rounded border px-3 py-2 text-sm ${pageNum === meta.page
                     ? 'border-blue-600 bg-blue-600 text-white'
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 {pageNum}
               </Link>

@@ -20,7 +20,9 @@ class UserRepo:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL DEFAULT '',
             role TEXT NOT NULL,
+            bio TEXT NOT NULL DEFAULT '',
             xp INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             pw_salt BLOB,
@@ -40,18 +42,20 @@ class UserRepo:
             pw_hash = self._hash_password(password, salt)
 
         cur = self.conn.execute(
-            "INSERT INTO users(username, role, xp, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?)",
-            (user.username, user.role.value, user.xp, user.created_at.isoformat(), salt, pw_hash),
+            "INSERT INTO users(username, email, role, bio, xp, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?,?,?)",
+            (user.username, user.email, user.role.value, user.bio, user.xp, user.created_at.isoformat(), salt, pw_hash),
         )
         new_id = int(cur.lastrowid)
-        return User(id=new_id, username=user.username, role=user.role, xp=user.xp, created_at=user.created_at)
+        return User(id=new_id, username=user.username, email=user.email, role=user.role, bio=user.bio, xp=user.xp, created_at=user.created_at)
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
+            "email": row["email"],
             "role": row["role"],
+            "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
         }) if row else None
@@ -61,7 +65,9 @@ class UserRepo:
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
+            "email": row["email"],
             "role": row["role"],
+            "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
         }) if row else None
@@ -76,7 +82,9 @@ class UserRepo:
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
+            "email": row["email"],
             "role": row["role"],
+            "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
         })
@@ -98,7 +106,9 @@ class UserRepo:
             User.from_dict({
                 "id": int(r["id"]),
                 "username": r["username"],
+                "email": r["email"],
                 "role": r["role"],
+                "bio": r["bio"],
                 "xp": int(r["xp"]),
                 "created_at": r["created_at"],
             })

@@ -11,11 +11,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
 
 class CreatePuzzleReq(BaseModel):
-    name: str
+    name: str = "" # maps to title
+    title: str = "" # also accept title directly
     description: str = ""
     budget: int = 0
     time_limit_seconds: Optional[int] = None
+    timeLimit: Optional[int] = None # alias
     default_gate_set: list[str] = []
+
+    def to_backend_dict(self):
+        return {
+            "name": self.title if self.title else self.name,
+            "description": self.description,
+            "budget": self.budget,
+            "time_limit_seconds": self.timeLimit if self.timeLimit is not None else self.time_limit_seconds,
+            "default_gate_set": self.default_gate_set
+        }
 
 
 class AddTestCaseReq(BaseModel):
@@ -55,7 +66,9 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     @router.post("")
     def create(req: CreatePuzzleReq, token: str = Depends(oauth2_scheme)):
         try:
-            return puzzle_service.create_puzzle(token, req.model_dump())
+            # Transform req
+            data = req.to_backend_dict()
+            return puzzle_service.create_puzzle(token, data)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
