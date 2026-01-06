@@ -41,16 +41,19 @@ class TestPuzzleServiceBrowse:
             Puzzle(id=2, name="Puzzle2", creator_user_id=3, status=PuzzleStatus.PUBLISHED),
         ]
         self.mock_puzzle_repo.list_published.return_value = puzzles
+        self.mock_puzzle_repo.count_published.return_value = 2
 
         result = self.service.browse("valid_token")
 
         assert len(result["data"]) == 2
         assert result["data"][0]["name"] == "Puzzle1"
         self.mock_puzzle_repo.list_published.assert_called_once_with(limit=50, offset=0)
+        self.mock_puzzle_repo.count_published.assert_called_once()
 
     def test_browse_with_pagination(self):
         self.mock_auth.require_user_id.return_value = 1
         self.mock_puzzle_repo.list_published.return_value = []
+        self.mock_puzzle_repo.count_published.return_value = 0
 
         self.service.browse("valid_token", limit=100, offset=50)
 
@@ -107,6 +110,8 @@ class TestPuzzleServiceGet:
         self.mock_auth.require_user_id.return_value = 1
         puzzle = Puzzle(id=1, name="TestPuzzle", creator_user_id=2)
         self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        # Mock test cases list to return empty list or mock list, ensuring it is subscriptable if checked
+        self.mock_puzzle_repo.list_test_cases.return_value = []
 
         result = self.service.get("valid_token", 1)
 
