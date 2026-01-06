@@ -7,103 +7,105 @@ from datetime import datetime, timezone
 # Set encoding for Windows console
 sys.stdout.reconfigure(encoding='utf-8')
 
-# Database path
-DB_PATH = 'escape_circuit.db'
+# Robust path setup
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+RIDDLES_DIR = os.path.join(PROJECT_ROOT, 'riddles')
+DB_PATH = os.path.join(PROJECT_ROOT, 'escape_circuit.db')
 
 def utcnow():
     return datetime.now(timezone.utc)
 
-def insert_riddle(config_path, instructions_path):
-    print(f"Processing {config_path}...")
+def clean_database(conn):
+    """
+    Removes ALL puzzles and related data (test cases, attempts, ratings).
+    This ensures a clean slate for the riddle import.
+    """
+    print("Cleaning database...")
+    c = conn.cursor()
     
-    with open(config_path, 'r') as f:
+    # Tables dependent on puzzles
+    tables_to_clear = [
+        "rating",
+        "puzzle_test_cases",
+        "solve_attempts",
+        "puzzles"
+    ]
+    
+    for table in tables_to_clear:
+        try:
+            c.execute(f"DELETE FROM {table}")
+            print(f"  - Cleared table: {table}")
+        except sqlite3.OperationalError as e:
+            print(f"  - Warning: Could not clear {table} (maybe doesn't exist): {e}")
+            
+    conn.commit()
+    print("Database cleaned.")
+
+def get_or_create_admin(conn):
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", ('admin',))
+    row = c.fetchone()
+    if row:
+        return row[0]
+    
+    print("Creating admin user...")
+    c.execute("INSERT INTO users (username, role, xp, created_at) VALUES (?, ?, ?, ?)",
+              ('admin', 'admin', 0, utcnow()))
+    conn.commit()
+    return c.lastrowid
+
+def insert_riddle(conn, config_path, instructions_path, creator_id):
+    with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
     
     instruction_text = ""
     if os.path.exists(instructions_path):
-        with open(instructions_path, 'r') as f:
+        with open(instructions_path, 'r', encoding='utf-8') as f:
             instruction_text = f.read()
 
     puzzle_data = config['puzzle']
     test_cases = config.get('test_cases', [])
-
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # 1. Get or Create Admin User (to be the creator)
-    c.execute("SELECT id FROM users WHERE username = ?", ('admin',))
-    row = c.fetchone()
-    if row:
-        creator_id = row[0]
-    else:
-        print("Admin user not found, creating...")
-        c.execute("INSERT INTO users (username, role, xp, created_at) VALUES (?, ?, ?, ?)",
-                  ('admin', 'admin', 0, utcnow()))
-        creator_id = c.lastrowid
-
-    # 2. Insert Puzzle
-    # Note: Puzzle table columns based on model: 
-    # id, name, creator_user_id, description, status, budget, time_limit_seconds, 
-    # default_gate_set, rating_count...
     
-    # Map gates to string 
+    # Determine gates JSON
     gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
     
-    # Inputs/Outputs are not seemingly in the main schema based on previous checks, 
-    # but let's check if we can store them in description or if I should assume schema lacks them.
-    # For now, I will append the requested inputs/outputs to the description if they aren't there.
-    full_description = instruction_text
+    c = conn.cursor()
     
-    # We might want to store inputs/outputs in the description for now as a workaround 
-    # if the DB schema doesn't support them, but for now I'll just use the instruction text.
-
-    try:
-        c.execute("""
-            INSERT INTO puzzles (
-                name, creator_user_id, description, status, budget, 
-                time_limit_seconds, default_gate_set, rating_count, 
-                avg_difficulty, avg_fun, avg_clearness,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            puzzle_data['name'],
-            creator_id,
-            full_description,
-            'published', # Set to published so it shows up
-            puzzle_data.get('budget', 0),
-            puzzle_data.get('time_limit_seconds'), # Can be None
-            gates_json, # Store as JSON string? Or comma separated?
-                        # PuzzleRepo typically handles this. 
-                        # Let's check how PuzzleRepo stores it. 
-                        # In SQL, usually it's a string.
-            0, 0.0, 0.0, 0.0, 
-            utcnow()
-        ))
-        puzzle_id = c.lastrowid
-        print(f"Inserted Puzzle '{puzzle_data['name']}' with ID {puzzle_id}")
-    except sqlite3.IntegrityError:
-        c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],))
-        puzzle_id = c.fetchone()[0]
-        c.execute("""
-            UPDATE puzzles SET 
-                creator_user_id = ?, description = ?, status = ?, budget = ?, 
-                time_limit_seconds = ?, default_gate_set = ?
-            WHERE id = ?
-        """, (
-            creator_id, full_description, 'published', 
-            puzzle_data.get('budget', 0), puzzle_data.get('time_limit_seconds'), 
-            gates_json, puzzle_id
-        ))
-        print(f"Updated Puzzle '{puzzle_data['name']}' with ID {puzzle_id}")
-
-    # 3. Handle Test Cases
-    # Clear old test cases to avoid duplicates on update
-    c.execute("DELETE FROM puzzle_test_cases WHERE puzzle_id = ?", (puzzle_id,))
-
-    # 3. Insert Test Cases
+    # INSERT Puzzle
+    c.execute("""
+        INSERT INTO puzzles (
+            name, creator_user_id, description, status, budget, 
+            time_limit_seconds, default_gate_set, rating_count, 
+            avg_difficulty, avg_fun, avg_clearness,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        puzzle_data['name'],
+        creator_id,
+        instruction_text, # Description
+        'published',
+        puzzle_data.get('budget', 0),
+        puzzle_data.get('time_limit_seconds'),
+        gates_json,
+        0, 0.0, 0.0, 0.0,
+        utcnow()
+    ))
+    puzzle_id = c.lastrowid
+    
+    # INSERT Test Cases
     for tc in test_cases:
-        inputs_json = json.dumps(tc['inputs'])
-        outputs_json = json.dumps(tc['expected_outputs'])
+        # Handle sequential variation
+        inputs = tc.get('inputs')
+        if inputs is None:
+            inputs = tc.get('input_stream')
+            
+        outputs = tc.get('expected_outputs')
+        if outputs is None:
+            outputs = tc.get('expected_output_stream')
+            
+        inputs_json = json.dumps(inputs or {})
+        outputs_json = json.dumps(outputs or {})
         
         c.execute("""
             INSERT INTO puzzle_test_cases (
@@ -111,35 +113,51 @@ def insert_riddle(config_path, instructions_path):
             ) VALUES (?, ?, ?, ?, ?)
         """, (
             puzzle_id,
-            'blackbox', # Assuming blackbox for the riddle config
+            'blackbox',
             inputs_json,
             outputs_json,
             utcnow()
         ))
         
     conn.commit()
-    conn.close()
-    print("Done.")
+    print(f"Inserted: {puzzle_data['name']}")
+
+def main():
+    print(f"Using Riddles Directory: {RIDDLES_DIR}")
+    print(f"Using Database: {DB_PATH}")
+    
+    if not os.path.exists(RIDDLES_DIR):
+        print("Riddles directory not found!")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    
+    try:
+        # 1. Wipe old data
+        clean_database(conn)
+        
+        # 2. Get Admin
+        admin_id = get_or_create_admin(conn)
+        
+        # 3. Iterate and Insertion
+        print("Importing riddles...")
+        count = 0
+        for filename in os.listdir(RIDDLES_DIR):
+            if filename.endswith('_config.json'):
+                config_path = os.path.join(RIDDLES_DIR, filename)
+                base_name = filename.replace('_config.json', '')
+                instr_path = os.path.join(RIDDLES_DIR, f"{base_name}_instructions.md")
+                
+                try:
+                    insert_riddle(conn, config_path, instr_path, admin_id)
+                    count += 1
+                except Exception as e:
+                    print(f"Error inserting {filename}: {e}")
+                    
+        print(f"Done. Imported {count} riddles.")
+        
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
-    # Locate all riddles using absolute path
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    riddles_dir = os.path.join(project_root, 'riddles')
-    
-    # Update DB_PATH to be absolute as well
-    DB_PATH = os.path.join(project_root, 'escape_circuit.db')
-    print(f"Project Root: {project_root}")
-    print(f"Riddles Dir: {riddles_dir}")
-    print(f"DB Path: {DB_PATH}")
-
-    if not os.path.exists(riddles_dir):
-        print(f"Directory '{riddles_dir}' not found.")
-        exit(1)
-
-    for filename in os.listdir(riddles_dir):
-        if filename.endswith('_config.json'):
-            config_path = os.path.join(riddles_dir, filename)
-            base_name = filename.replace('_config.json', '')
-            instr_path = os.path.join(riddles_dir, f"{base_name}_instructions.md")
-            insert_riddle(config_path, instr_path)
+    main()
