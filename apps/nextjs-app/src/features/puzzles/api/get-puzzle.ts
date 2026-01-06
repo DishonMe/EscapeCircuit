@@ -8,7 +8,7 @@ export const getPuzzle = ({
   id,
 }: {
   id: string;
-}): Promise<{ data: Puzzle }> => {
+}): Promise<Puzzle> => {
   return api.get(`/puzzles/${id}`);
 };
 

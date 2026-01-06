@@ -53,7 +53,19 @@ class PuzzleService:
         p = self.repo.get_by_id(puzzle_id)
         if not p:
             raise ValidationError("puzzle not found")
-        return self._enrich_puzzle(p.to_dict())
+        
+        d = self._enrich_puzzle(p.to_dict())
+        
+        # Populate inputs/outputs from test cases if not present
+        # This is needed because Puzzle model doesn't store them, but Frontend needs them.
+        tcs = self.repo.list_test_cases(puzzle_id)
+        if tcs:
+            # Assume all test cases have same inputs/outputs keys. Take the first one.
+            first_tc = tcs[0]
+            d["inputs"] = list(first_tc.inputs.keys())
+            d["outputs"] = list(first_tc.expected_outputs.keys())
+        
+        return d
 
     def create_puzzle(self, session_token: str, payload: Dict[str, Any]) -> dict:
         user_id = self.auth.require_user_id(session_token)

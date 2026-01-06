@@ -1,6 +1,7 @@
 from typing import Dict, Any
 
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.DomainLayer.Circuit import Circuit
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
@@ -268,3 +269,74 @@ class SolvingService:
             "first_time_solve": first_time_solve,
             "xp": xp_gain.__dict__ if xp_gain else {},
         }
+    # ---------- New Validation Logic (Stateless) ----------
+    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Stateless validation of a solution attempt.
+        Does NOT save the circuit to DB yet (unless needed, but usually ephemeral).
+        payload matches CircuitSolution from frontend: { placedComponents: [], wires: [], totalCost: ... }
+        """
+        _ = self.auth.require_user_id(token)
+        
+        # 1. Get Puzzle & Test Cases
+        p = self.puzzle_repo.get_by_id(puzzle_id)
+        if not p:
+            raise ValidationError("puzzle not found")
+            
+        test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
+        if not test_cases:
+            raise ValidationError("puzzle has no test cases")
+            
+        # 2. Reconstruct "Structure JSON"
+        # We wrap the payload in a structure suitable for logic engine
+        # The logicEngine.simulate expects a dict with 'placedComponents' and 'wires'.
+        # We can just use the payload dict directly as structure data.
+        structure_data = solution_payload
+        
+        # 3. Create Ephemeral Circuit Object (for interface compatibility)
+        # We dump to json string as Circuit expects it
+        import json
+        tcircuit = Circuit(
+            id=0,
+            user_id=0, # Ephemeral
+            name="Validation Check",
+            cost=solution_payload.get("totalCost", 0),
+            structure_json=json.dumps(structure_data)
+        )
+        
+        # 4. Run Test Cases
+        failed_tests = []
+        passed = True
+        
+        for tc in test_cases:
+            try:
+                # inputs is dict matching frontend/backend expectations (e.g. {"A": 0, "B": 1})
+                output = self.logic_engine.evaluate(tcircuit, tc.inputs)
+                
+                if output != tc.expected_outputs:
+                    passed = False
+                    failed_tests.append({
+                        "inputs": tc.inputs,
+                        "expected": tc.expected_outputs,
+                        "actual": output,
+                        "message": f"Output mismatch for inputs {tc.inputs}"
+                    })
+                    # We can stop at first failure or collect all.
+                    # Workstation usually shows "Passed X/Y" or first error.
+                    # Returning first error is simpler for message.
+                    break
+            except Exception as e:
+                passed = False
+                failed_tests.append({
+                    "inputs": tc.inputs,
+                    "error": str(e),
+                    "message": f"Simulation runtime error: {str(e)}"
+                })
+                break
+                
+        if passed:
+            return {"solved": True, "message": "All test cases passed!"}
+        else:
+            first = failed_tests[0]
+            msg = first.get("message", "Validation failed")
+            return {"solved": False, "message": msg, "details": failed_tests}

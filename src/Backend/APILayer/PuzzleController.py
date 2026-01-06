@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.PuzzleService import PuzzleService
@@ -37,6 +37,10 @@ class AddTestCaseReq(BaseModel):
 
 class SolveReq(BaseModel):
     circuit_id: int
+
+
+class ValidateSolutionReq(BaseModel):
+    solution: Dict[str, Any]
 
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService) -> APIRouter:
@@ -111,6 +115,13 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     def solve(puzzle_id: int, req: SolveReq, token: str = Depends(oauth2_scheme)):
         try:
             return solving_service.submit_solution(token, puzzle_id, req.model_dump())
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @router.post("/{puzzle_id}/validate")
+    def validate(puzzle_id: int, req: ValidateSolutionReq, token: str = Depends(oauth2_scheme)):
+        try:
+            return solving_service.validate_solution(token, puzzle_id, req.solution)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
