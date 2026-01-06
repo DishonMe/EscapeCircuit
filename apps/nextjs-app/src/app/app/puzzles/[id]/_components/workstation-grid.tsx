@@ -151,15 +151,29 @@ export const WorkstationGrid = ({
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as any;
-      if (typeof parsed?.zoom === 'number') setZoom(parsed.zoom);
-      if (
-        typeof parsed?.pan?.x === 'number' &&
-        typeof parsed?.pan?.y === 'number'
-      ) {
-        setPan({ x: parsed.pan.x, y: parsed.pan.y });
+      let hasSavedZoom = false;
+      if (raw) {
+        const parsed = JSON.parse(raw) as any;
+        if (typeof parsed?.zoom === 'number') {
+          setZoom(parsed.zoom);
+          hasSavedZoom = true;
+        }
+        // Don't load pan, always reset to show inputs
       }
+
+      if (!hasSavedZoom) {
+        // Set default zoom if no saved
+        const el = containerRef.current;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const fit = Math.min(
+            rect.width / ((GRID_COLS + 4) * CELL_PX),
+            rect.height / ((GRID_ROWS + 4) * CELL_PX),
+          );
+          setZoom(fit);
+        }
+      }
+      // Pan is set in the other useEffect
     } catch {
       // ignore
     }
@@ -168,11 +182,11 @@ export const WorkstationGrid = ({
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ zoom, pan }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ zoom }));
     } catch {
       // ignore
     }
-  }, [STORAGE_KEY, zoom, pan]);
+  }, [STORAGE_KEY, zoom]);
 
   // Compute minZoom so the entire grid fits; set as default if no saved state.
   useEffect(() => {
@@ -195,16 +209,22 @@ export const WorkstationGrid = ({
     if (!raw) {
       const fit = updateFit();
       setZoom(fit);
-      // Center the grid with padding for IOs
-      setPan({ x: 2 * CELL_PX * fit, y: 2 * CELL_PX * fit });
+      // Position view so inputs (at col -1) are visible on the left
+      // Center vertically, but pan right to show inputs
+      const inputVisiblePanX = 3 * CELL_PX * fit; // Show column -1 with some margin
+      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
     } else {
       const fit = updateFit();
       setZoom((prev) => Math.max(prev, fit));
+      const inputVisiblePanX = 3 * CELL_PX * fit;
+      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
     }
 
     const ro = new ResizeObserver(() => {
       const fit = updateFit();
       setZoom((prev) => Math.max(prev, fit));
+      const inputVisiblePanX = 3 * CELL_PX * fit;
+      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
     });
     ro.observe(el);
 
