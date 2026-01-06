@@ -15,6 +15,7 @@ import {
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
+import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
@@ -59,6 +60,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     useState<SelectedComponentState>({ mode: 'none' });
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
+  const [showCreatorComment, setShowCreatorComment] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
@@ -574,6 +576,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
+            <Button
+              variant="outline"
+              disabled={!puzzle.creatorComment}
+              onClick={() => setShowCreatorComment(true)}
+            >
+              Creator Comment
+            </Button>
             <Button onClick={checkSolution} isLoading={isChecking}>
               Check Solution
             </Button>
@@ -729,6 +738,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         puzzle={puzzle}
         open={showPuzzleInfo}
         onOpenChange={setShowPuzzleInfo}
+        showLink={false}
+      />
+
+      <CreatorCommentDialog
+        puzzle={puzzle}
+        open={showCreatorComment}
+        onOpenChange={setShowCreatorComment}
         showLink={false}
       />
 

@@ -27,6 +27,7 @@ import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 
 import { usePuzzles } from '../api/get-puzzles';
+import { CreatorCommentDialog } from './creator-comment-dialog';
 import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 
 export const PuzzlesList = () => {
@@ -190,42 +191,14 @@ export const PuzzlesList = () => {
         showLink={true}
       />
 
-      <Dialog
+      <CreatorCommentDialog
+        puzzle={selectedCommentPuzzle}
         open={Boolean(selectedCommentPuzzle)}
         onOpenChange={(open) => {
           if (!open) setCommentPuzzleId(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedCommentPuzzle?.title ?? 'Creator comment'}
-            </DialogTitle>
-            <DialogDescription>Notes from the puzzle creator.</DialogDescription>
-          </DialogHeader>
-
-          <div className="max-h-[60vh] overflow-y-auto text-sm text-gray-700">
-            <div className="font-medium text-gray-900">Creator comment</div>
-            <div className="mt-1 whitespace-pre-wrap">
-              {selectedCommentPuzzle?.creatorComment}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCommentPuzzleId(null)}>
-              Close
-            </Button>
-            {selectedCommentPuzzle ? (
-              <Link
-                href={paths.app.puzzle.getHref(selectedCommentPuzzle.id)}
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Go to puzzle
-              </Link>
-            ) : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        showLink={true}
+      />
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (
