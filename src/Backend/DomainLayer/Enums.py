@@ -27,6 +27,6 @@ class GateType(str, Enum):
     NOR = "NOR"
     XNOR = "XNOR"
 
-    # Special gate types - filp flop
+    # Special gate types - flip flop
     DFF = "DFF"
     
