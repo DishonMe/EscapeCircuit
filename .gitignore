@@ -249,3 +249,9 @@ local/
 # Mock service worker
 # (keep node_modules but ignore cache)
 .msw/
+
+# Yarn stuff
+yarn.lock
+
+# mock server
+mockServiceWorker.js
