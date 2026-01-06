@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Star, Circle, Users, Info } from 'lucide-react';
+import { Clock, Star, Circle, Users, Info, MessageSquare } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -25,6 +25,7 @@ export const PuzzlesList = () => {
   const page = searchParams?.get('page') ? Number(searchParams.get('page')) : 1;
 
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
+  const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
 
   const puzzlesQuery = usePuzzles({
     page: page,
@@ -45,6 +46,11 @@ export const PuzzlesList = () => {
     if (!detailsPuzzleId || !puzzles) return undefined;
     return puzzles.find((p) => p.id === detailsPuzzleId);
   }, [detailsPuzzleId, puzzles]);
+
+  const selectedCommentPuzzle: Puzzle | undefined = useMemo(() => {
+    if (!commentPuzzleId || !puzzles) return undefined;
+    return puzzles.find((p) => p.id === commentPuzzleId);
+  }, [commentPuzzleId, puzzles]);
 
   if (!puzzles) return null;
 
@@ -141,15 +147,29 @@ export const PuzzlesList = () => {
             </div>
 
             {/* Actions */}
-            <div className="mt-4 flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setDetailsPuzzleId(puzzle.id)}
-              >
-                <Info className="mr-2 size-4" /> Puzzle details
-              </Button>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setDetailsPuzzleId(puzzle.id)}
+                >
+                  <Info className="mr-2 size-4" /> Puzzle details
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  disabled={!puzzle.creatorComment}
+                  onClick={() => {
+                    if (puzzle.creatorComment) setCommentPuzzleId(puzzle.id);
+                  }}
+                >
+                  <MessageSquare className="mr-2 size-4" />
+                  {puzzle.creatorComment ? 'Creator comment' : 'No creator comment'}
+                </Button>
+              </div>
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
                 className="flex-1 rounded bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-blue-700"
@@ -231,6 +251,43 @@ export const PuzzlesList = () => {
             {selectedPuzzle ? (
               <Link
                 href={paths.app.puzzle.getHref(selectedPuzzle.id)}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Go to puzzle
+              </Link>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(selectedCommentPuzzle)}
+        onOpenChange={(open) => {
+          if (!open) setCommentPuzzleId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedCommentPuzzle?.title ?? 'Creator comment'}
+            </DialogTitle>
+            <DialogDescription>Notes from the puzzle creator.</DialogDescription>
+          </DialogHeader>
+
+          <div className="text-sm text-gray-700">
+            <div className="font-medium text-gray-900">Creator comment</div>
+            <div className="mt-1 whitespace-pre-wrap">
+              {selectedCommentPuzzle?.creatorComment}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentPuzzleId(null)}>
+              Close
+            </Button>
+            {selectedCommentPuzzle ? (
+              <Link
+                href={paths.app.puzzle.getHref(selectedCommentPuzzle.id)}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
                 Go to puzzle
