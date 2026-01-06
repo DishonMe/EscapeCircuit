@@ -73,6 +73,14 @@ const TRUTH_TABLES: Record<
       ['1', '1', '0'],
     ],
   },
+  DELAY: {
+    inputs: ['IN'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0'],
+      ['1', '1'],
+    ],
+  },
 };
 
 const loadArsenal = (): ArsenalCircuit[] => {
