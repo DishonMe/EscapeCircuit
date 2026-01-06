@@ -14,7 +14,7 @@ const createEnv = () => {
   });
 
   const envVars = {
-    API_URL: process.env.NEXT_PUBLIC_API_URL,
+    API_URL: (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/api\/?$/, ''),
     ENABLE_API_MOCKING: process.env.NEXT_PUBLIC_ENABLE_API_MOCKING,
     APP_URL: process.env.NEXT_PUBLIC_URL,
     APP_MOCK_API_PORT: process.env.NEXT_PUBLIC_MOCK_API_PORT,
@@ -27,8 +27,8 @@ const createEnv = () => {
       `Invalid env provided.
   The following variables are missing or invalid:
   ${Object.entries(parsedEnv.error.flatten().fieldErrors)
-    .map(([k, v]) => `- ${k}: ${v}`)
-    .join('\n')}
+        .map(([k, v]) => `- ${k}: ${v}`)
+        .join('\n')}
   `,
     );
   }

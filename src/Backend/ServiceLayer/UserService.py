@@ -31,16 +31,26 @@ class UserService:
         # Domain objects require a truthy id; repo will replace it on insert.
         user = User(id="0", username=username, role=UserRole.SOLVER, xp=0)
         created = self.user_repo.create(user, password=password)
+        
+        # Auto login
+        token = self.auth.login(username, password)
+
         d = created.to_dict()
         d["level"] = self.xp.calculate_level(created.xp)
         d["is_experienced"] = self.xp.is_experienced(created.xp)
-        return d
+        return {"token": token, "user": d}
 
     def login(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
         token = self.auth.login(username, password)
-        return {"token": token}
+        user = self.user_repo.get_by_username(username)
+        
+        d = user.to_dict()
+        d["level"] = self.xp.calculate_level(user.xp)
+        d["is_experienced"] = self.xp.is_experienced(user.xp)
+        
+        return {"token": token, "user": d}
 
     def logout(self, session_token: str) -> dict:
         # auth called for every service action:

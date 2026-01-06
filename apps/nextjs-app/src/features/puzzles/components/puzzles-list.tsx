@@ -81,11 +81,10 @@ export const PuzzlesList = () => {
       stars.push(
         <Star
           key={i}
-          className={`size-3.5 ${
-            i <= Math.floor(rating)
+          className={`size-3.5 ${i <= Math.floor(rating)
               ? 'fill-yellow-500 text-yellow-500'
               : 'text-gray-300'
-          }`}
+            }`}
         />,
       );
     }
@@ -101,7 +100,7 @@ export const PuzzlesList = () => {
             key={puzzle.id}
             className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
           >
-            {/* Title & Creator with status badge */}
+          {/* Title & Creator with status badge */}
             <div className="mb-3 flex flex-wrap items-start gap-2">
               <div className="flex-1">
                 <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
@@ -305,11 +304,10 @@ export const PuzzlesList = () => {
               <Link
                 key={pageNum}
                 href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
-                className={`rounded border px-3 py-2 text-sm ${
-                  pageNum === meta.page
+                className={`rounded border px-3 py-2 text-sm ${pageNum === meta.page
                     ? 'border-blue-600 bg-blue-600 text-white'
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 {pageNum}
               </Link>

@@ -20,22 +20,40 @@ class PuzzleService:
         self.auth = auth_service
         self.solve_repo = solve_repo
 
-    def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> List[dict]:
+    def _enrich_puzzle(self, p_dict: dict) -> dict:
+        # Helper to attach creator object
+        creator_id = p_dict.get("creator_user_id")
+        if creator_id is not None:
+            user = self.user_repo.get_by_id(int(creator_id))
+            if user:
+                p_dict["creator"] = user.to_dict()
+        return p_dict
+
+    def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> dict:
         _ = self.auth.require_user_id(session_token)
         puzzles = self.repo.list_published(limit=limit, offset=offset)
-        return [p.to_dict() for p in puzzles]
+        # Mock meta for now
+        total = 100 
+        return {
+            "data": [self._enrich_puzzle(p.to_dict()) for p in puzzles],
+            "meta": {
+                "page": (offset // limit) + 1,
+                "total": total,
+                "totalPages": (total // limit) + 1
+            }
+        }
 
     def search(self, session_token: str, q: str, only_published: bool = True) -> List[dict]:
         _ = self.auth.require_user_id(session_token)
         puzzles = self.repo.search_by_name(q, only_published=only_published)
-        return [p.to_dict() for p in puzzles]
+        return [self._enrich_puzzle(p.to_dict()) for p in puzzles]
 
     def get(self, session_token: str, puzzle_id: int) -> dict:
         _ = self.auth.require_user_id(session_token)
         p = self.repo.get_by_id(puzzle_id)
         if not p:
             raise ValidationError("puzzle not found")
-        return p.to_dict()
+        return self._enrich_puzzle(p.to_dict())
 
     def create_puzzle(self, session_token: str, payload: Dict[str, Any]) -> dict:
         user_id = self.auth.require_user_id(session_token)
@@ -56,7 +74,7 @@ class PuzzleService:
         gate_set = {GateType(x) for x in default_gate_set_raw}
 
         p = Puzzle(
-            id="0",
+            id=0,
             name=name,
             creator_user_id=user_id,
             description=payload.get("description", "") or "",
@@ -66,7 +84,7 @@ class PuzzleService:
             default_gate_set=gate_set,
         )
         created = self.repo.create(p)
-        return created.to_dict()
+        return self._enrich_puzzle(created.to_dict())
 
     def publish(self, session_token: str, puzzle_id: int) -> dict:
         user_id = self.auth.require_user_id(session_token)
@@ -97,7 +115,7 @@ class PuzzleService:
 
         p.publish()
         self.repo.update(p)
-        return p.to_dict()
+        return self._enrich_puzzle(p.to_dict())
 
     def unpublish(self, session_token: str, puzzle_id: int) -> dict:
         user_id = self.auth.require_user_id(session_token)
@@ -114,7 +132,7 @@ class PuzzleService:
 
         p.unpublish()
         self.repo.update(p)
-        return p.to_dict()
+        return self._enrich_puzzle(p.to_dict())
 
     def add_test_case(self, session_token: str, puzzle_id: int, payload: Dict[str, Any]) -> dict:
         user_id = self.auth.require_user_id(session_token)

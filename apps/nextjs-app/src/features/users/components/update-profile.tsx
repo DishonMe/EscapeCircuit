@@ -53,8 +53,7 @@ export const UpdateProfile = () => {
         }}
         options={{
           defaultValues: {
-            firstName: user.data?.firstName ?? '',
-            lastName: user.data?.lastName ?? '',
+            username: user.data?.username ?? '',
             email: user.data?.email ?? '',
             bio: user.data?.bio ?? '',
           },
@@ -64,14 +63,9 @@ export const UpdateProfile = () => {
         {({ register, formState }) => (
           <>
             <Input
-              label="First Name"
-              error={formState.errors['firstName']}
-              registration={register('firstName')}
-            />
-            <Input
-              label="Last Name"
-              error={formState.errors['lastName']}
-              registration={register('lastName')}
+              label="Username"
+              error={formState.errors['username']}
+              registration={register('username')}
             />
             <Input
               label="Email Address"

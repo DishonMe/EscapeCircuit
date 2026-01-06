@@ -137,11 +137,11 @@ class TestUserSerialization:
             created_at=now
         )
         d = user.to_dict()
-        assert d["id"] == 1
+        assert d["id"] == "1"
         assert d["username"] == "testuser"
         assert d["role"] == "creator"
         assert d["xp"] == 250
-        assert d["created_at"] == now.isoformat()
+        assert d["createdAt"] == int(now.timestamp() * 1000)
 
     def test_from_dict(self):
         now = datetime.now(timezone.utc)

@@ -16,15 +16,16 @@ export type Meta = {
 };
 
 export type User = Entity<{
-  firstName: string;
-  lastName: string;
+  username: string;
   email: string;
-  role: 'ADMIN' | 'USER' | 'GAME_MASTER' | 'PLAYER';
+  role: 'admin' | 'creator' | 'solver' | 'ADMIN' | 'USER' | 'GAME_MASTER' | 'PLAYER'; // Support both for safety
   bio: string;
+  xp: number;
+  level: number;
 }>;
 
 export type AuthResponse = {
-  jwt: string;
+  token: string;
   user: User;
 };
 
@@ -49,16 +50,17 @@ export type Comment = Entity<{
 
 export type Puzzle = Entity<{
   title: string;
+  name?: string; // Backend compat
   description: string;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   timeLimit: number; // in seconds
   budgetLimit: number;
-  tightBudgetLimit?: number;
-  additionalConstraints?: string[] | string;
+  budget?: number; // Backend compat
   inputs: string[];
   outputs: string[];
   creator: User;
   creatorComment?: string;
+
   filteredBasicComponents?: string[];
   allowArsenal?: boolean;
   specialComponents?: CircuitComponent[];

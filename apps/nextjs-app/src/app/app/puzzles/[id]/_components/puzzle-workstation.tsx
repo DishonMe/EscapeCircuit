@@ -69,8 +69,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
 
   const budgetLimit = puzzle?.budgetLimit ?? 0;
-  const tightBudget =
-    puzzle?.tightBudgetLimit ?? Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
+  const tightBudget = Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
 
   const filteredBasics = useMemo(() => {
     return new Set(puzzle?.filteredBasicComponents ?? EMPTY_STRINGS);
@@ -248,12 +247,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       | { kind: 'empty' }
       | { kind: 'component'; placedId: string; componentId: string }
       | {
-          kind: 'port';
-          placedId: string;
-          componentId: string;
-          portIndex: number;
-          portKind: 'input' | 'output';
-        }
+        kind: 'port';
+        placedId: string;
+        componentId: string;
+        portIndex: number;
+        portKind: 'input' | 'output';
+      }
     > = {};
 
     const rotateOffset = (
@@ -558,8 +557,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               {puzzle.title}
             </h1>
             <div className="text-sm text-gray-600">
-              by {puzzle.creator?.firstName ?? ''}{' '}
-              {puzzle.creator?.lastName ?? ''}
+              by {puzzle.creator?.username ?? ''}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

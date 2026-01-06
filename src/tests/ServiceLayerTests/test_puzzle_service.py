@@ -44,8 +44,8 @@ class TestPuzzleServiceBrowse:
 
         result = self.service.browse("valid_token")
 
-        assert len(result) == 2
-        assert result[0]["name"] == "Puzzle1"
+        assert len(result["data"]) == 2
+        assert result["data"][0]["name"] == "Puzzle1"
         self.mock_puzzle_repo.list_published.assert_called_once_with(limit=50, offset=0)
 
     def test_browse_with_pagination(self):
