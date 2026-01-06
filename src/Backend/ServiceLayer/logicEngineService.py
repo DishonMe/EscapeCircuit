@@ -22,7 +22,7 @@ class logicEngineService:
         if "wires" in data and ("placedComponents" in data or "components" in data):
             return self.simulate(data, inputs)
             
-        key = json.dumps(inputs, sort_keys=True)
+        key = json.dumps(inputs, sort_keys=True, separators=(',', ':'))
 
         if isinstance(data.get("eval_map"), dict):
             if key not in data["eval_map"]:
@@ -40,6 +40,21 @@ class logicEngineService:
             if not isinstance(out, dict):
                 raise ValidationError("truth_table output must be dict")
             return {str(k): int(v) for k, v in out.items()}
+
+        # Sequential circuit support (Mealy machine)
+        if isinstance(data.get("mealy_map"), dict) and data.get("type") == "sequential_riddle":
+            mealy_map = data["mealy_map"]
+            if key not in mealy_map:
+                raise ValidationError(f"no mealy_map entry for inputs and state: {key}")
+            transition = mealy_map[key]
+            if not isinstance(transition, dict):
+                raise ValidationError("mealy_map transition must be dict")
+            
+            # Return both outputs and next state values
+            result = {}
+            for k, v in transition.items():
+                result[str(k)] = int(v)
+            return result
 
         raise ValidationError("logic engine format not supported")
 

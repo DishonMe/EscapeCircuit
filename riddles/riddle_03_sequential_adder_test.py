@@ -5,8 +5,8 @@ import pytest
 import json
 
 # Assuming we have access to the logic engine service
-# from Backend.ServiceLayer.logicEngineService import logicEngineService
-# from Backend.DomainLayer.Circuit import Circuit
+from Backend.ServiceLayer.logicEngineService import logicEngineService
+from Backend.DomainLayer.Circuit import Circuit
 
 @pytest.fixture
 def test_cases():
@@ -78,14 +78,14 @@ def test_sample_correct_sequential_circuit(test_cases):
         "outputs": ["OUT", "C_out"],
         "initial_state": {"D1": 0, "D2": 0},
         "mealy_map": {
-            "{\"X\":0,\"D1\":0,\"D2\":0}": {"OUT":0, "C_out":0, "D1_next":0, "D2_next":0},
-            "{\"X\":1,\"D1\":0,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":0},
-            "{\"X\":0,\"D1\":0,\"D2\":1}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":0},
-            "{\"X\":1,\"D1\":0,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":0},
-            "{\"X\":0,\"D1\":1,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":1},
-            "{\"X\":1,\"D1\":1,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":1},
-            "{\"X\":0,\"D1\":1,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":0, "D2_next":1},
-            "{\"X\":1,\"D1\":1,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":1}
+            "{\"D1\":0,\"D2\":0,\"X\":0}": {"OUT":0, "C_out":0, "D1_next":0, "D2_next":0},
+            "{\"D1\":0,\"D2\":0,\"X\":1}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":0},
+            "{\"D1\":0,\"D2\":1,\"X\":0}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":0},
+            "{\"D1\":0,\"D2\":1,\"X\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":0},
+            "{\"D1\":1,\"D2\":0,\"X\":0}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":1},
+            "{\"D1\":1,\"D2\":0,\"X\":1}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":1},
+            "{\"D1\":1,\"D2\":1,\"X\":0}": {"OUT":0, "C_out":1, "D1_next":0, "D2_next":1},
+            "{\"D1\":1,\"D2\":1,\"X\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":1}
         }
     })
 
@@ -108,7 +108,7 @@ def test_sample_correct_sequential_circuit(test_cases):
     ]
 
     for x, d1, d2 in required_states:
-        state_key = f'{{"X":{x},"D1":{d1},"D2":{d2}}}'
+        state_key = f'{{"D1":{d1},"D2":{d2},"X":{x}}}'
         assert state_key in mealy_map, f"Missing state {state_key}"
 
         transition = mealy_map[state_key]
@@ -116,32 +116,52 @@ def test_sample_correct_sequential_circuit(test_cases):
         assert set(transition.keys()) == required_outputs, f"Invalid transition for {state_key}"
 
     # Simulate sequential behavior manually for test cases
+    logic_engine = logicEngineService()
+    
+    # Create a mock circuit object
+    circuit = Circuit(
+        id=1,
+        user_id=1,
+        name="Sequential Adder Solution",
+        structure_json=sample_circuit_json,
+        cost=0
+    )
+    
     for test_case in test_cases:
         input_stream = test_case["input_stream"]
         expected_out = test_case["expected"]["OUT"]
         expected_cout = test_case["expected"]["C_out"]
 
-        # Simulate sequential behavior
-        current_d1, current_d2 = 0, 0  # Initial state
+        # Simulate sequential behavior using logic engine
+        current_state = {"D1": 0, "D2": 0}  # Initial state
         actual_out = []
         actual_cout = []
 
         for x in input_stream:
-            # Look up transition in Mealy map
-            state_key = f'{{"X":{x},"D1":{current_d1},"D2":{current_d2}}}'
-            transition = mealy_map[state_key]
+            # Create input dict for this cycle (input + current state)
+            inputs = {"X": x}
+            inputs.update(current_state)
+
+            # Evaluate the circuit
+            outputs = logic_engine.evaluate(circuit, inputs)
 
             # Record outputs
-            actual_out.append(transition["OUT"])
-            actual_cout.append(transition["C_out"])
+            actual_out.append(outputs["OUT"])
+            actual_cout.append(outputs["C_out"])
 
             # Update state for next cycle
-            current_d1 = transition["D1_next"]
-            current_d2 = transition["D2_next"]
+            current_state["D1"] = outputs["D1_next"]
+            current_state["D2"] = outputs["D2_next"]
 
         # Check that outputs match expected
         assert actual_out == expected_out, f"OUT stream failed. Expected {expected_out}, got {actual_out}"
         assert actual_cout == expected_cout, f"C_out stream failed. Expected {expected_cout}, got {actual_cout}"
+
+    # Test gate constraints
+    allowed_gates = {"AND", "NAND", "DFF"}
+    used_gates = logic_engine.extract_used_gates(sample_circuit_json)
+    for gate in used_gates:
+        assert gate in allowed_gates, f"Disallowed gate used: {gate}"
 
     print("✅ Sample sequential adder circuit test passed!")
 
