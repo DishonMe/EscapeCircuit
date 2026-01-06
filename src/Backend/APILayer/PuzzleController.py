@@ -65,6 +65,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         try:
             return puzzle_service.get(token, puzzle_id)
         except ValidationError as e:
+            print(f"DEBUG: Controller caught ValidationError: {e}")
             raise HTTPException(status_code=404, detail=str(e))
 
     @router.post("")

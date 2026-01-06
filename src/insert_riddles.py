@@ -98,7 +98,20 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
         # Handle sequential variation
         inputs = tc.get('inputs')
         if inputs is None:
-            inputs = tc.get('input_stream')
+            # It's a stream (list), map it to input names if possible
+            input_stream = tc.get('input_stream')
+            if input_stream is not None:
+                # Get input names from puzzle config
+                # Config might have "inputs" or "input"
+                input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
+                if len(input_names) == 1:
+                    # Single input case (e.g. "X")
+                    inputs = {input_names[0]: input_stream}
+                else:
+                    # Fallback if multiple inputs or unknown structure (shouldn't happen for riddle 3)
+                    inputs = {"IN": input_stream}
+            else:
+                inputs = {}
             
         outputs = tc.get('expected_outputs')
         if outputs is None:

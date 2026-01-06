@@ -28,10 +28,16 @@ class PuzzleTestCase:
             raise ValidationError("PuzzleTestCase.expected_outputs cannot be empty")
 
         for k, v in self.inputs.items():
-            if v not in (0, 1):
+            if isinstance(v, list):
+                if not all(x in (0, 1) for x in v):
+                     raise ValidationError(f"Input '{k}' list must contain only 0/1")
+            elif v not in (0, 1):
                 raise ValidationError(f"Input '{k}' must be 0/1")
         for k, v in self.expected_outputs.items():
-            if v not in (0, 1):
+            if isinstance(v, list):
+                if not all(x in (0, 1) for x in v):
+                     raise ValidationError(f"Output '{k}' list must contain only 0/1")
+            elif v not in (0, 1):
                 raise ValidationError(f"Output '{k}' must be 0/1")
 
     def to_dict(self) -> dict:

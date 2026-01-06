@@ -30,12 +30,12 @@ import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
-  { id: 'AND', type: 'AND', cost: 10, pins: 3 },
-  { id: 'OR', type: 'OR', cost: 10, pins: 3 },
-  { id: 'NOT', type: 'NOT', cost: 5, pins: 2 },
-  { id: 'XOR', type: 'XOR', cost: 15, pins: 3 },
-  { id: 'NAND', type: 'NAND', cost: 12, pins: 3 },
-  { id: 'DELAY', type: 'DELAY', cost: 8, pins: 2 },
+  { id: 'AND', type: 'AND', cost: 1, pins: 3 },
+  { id: 'OR', type: 'OR', cost: 1, pins: 3 },
+  { id: 'NOT', type: 'NOT', cost: 1, pins: 2 },
+  { id: 'XOR', type: 'XOR', cost: 1, pins: 3 },
+  { id: 'NAND', type: 'NAND', cost: 1, pins: 3 },
+  { id: 'DFF', type: 'DFF', cost: 1, pins: 2 },
 ];
 
 const EMPTY_STRINGS: string[] = [];
@@ -191,7 +191,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
-      DELAY: {
+      DFF: {
         size: { w: 3, h: 1 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
@@ -806,7 +806,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     <ul className="list-disc list-inside space-y-1">
                       <li><strong>AND</strong>: Outputs 1 only if both inputs are 1</li>
                       <li><strong>NAND</strong>: Outputs 0 only if both inputs are 1 (NOT of AND)</li>
-                      <li><strong>DELAY</strong>: Passes input signal unchanged with one-time-unit delay</li>
+                      <li><strong>DFF</strong>: Passes input signal unchanged with one-time-unit DFF</li>
                     </ul>
                   </div>
 

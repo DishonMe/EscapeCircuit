@@ -73,7 +73,7 @@ const TRUTH_TABLES: Record<
       ['1', '1', '0'],
     ],
   },
-  DELAY: {
+  DFF: {
     inputs: ['IN'],
     outputs: ['OUT'],
     rows: [
