@@ -1,17 +1,30 @@
 'use client';
 
-import { Clock, Star, Circle, Users } from 'lucide-react';
+import { Clock, Star, Circle, Users, Info } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Link } from '@/components/ui/link';
 import { Spinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
+import type { Puzzle } from '@/types/api';
 
 import { usePuzzles } from '../api/get-puzzles';
 
 export const PuzzlesList = () => {
   const searchParams = useSearchParams();
   const page = searchParams?.get('page') ? Number(searchParams.get('page')) : 1;
+
+  const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
 
   const puzzlesQuery = usePuzzles({
     page: page,
@@ -27,6 +40,11 @@ export const PuzzlesList = () => {
 
   const puzzles = puzzlesQuery.data?.data;
   const meta = puzzlesQuery.data?.meta;
+
+  const selectedPuzzle: Puzzle | undefined = useMemo(() => {
+    if (!detailsPuzzleId || !puzzles) return undefined;
+    return puzzles.find((p) => p.id === detailsPuzzleId);
+  }, [detailsPuzzleId, puzzles]);
 
   if (!puzzles) return null;
 
@@ -122,11 +140,19 @@ export const PuzzlesList = () => {
               </div>
             </div>
 
-            {/* Action Button */}
-            <div className="mt-4">
+            {/* Actions */}
+            <div className="mt-4 flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setDetailsPuzzleId(puzzle.id)}
+              >
+                <Info className="mr-2 size-4" /> Puzzle details
+              </Button>
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full rounded bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                className="flex-1 rounded bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
                 Solve Puzzle
               </Link>
@@ -134,6 +160,85 @@ export const PuzzlesList = () => {
           </div>
         ))}
       </div>
+
+      <Dialog
+        open={Boolean(selectedPuzzle)}
+        onOpenChange={(open) => {
+          if (!open) setDetailsPuzzleId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedPuzzle?.title ?? 'Puzzle details'}</DialogTitle>
+            <DialogDescription>
+              Key information before you start solving.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPuzzle ? (
+            <div className="space-y-3 text-sm text-gray-700">
+              <div>
+                <div className="font-medium text-gray-900">Description</div>
+                <div className="mt-1 whitespace-pre-wrap">
+                  {selectedPuzzle.description}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 rounded border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2">
+                <div>
+                  <span className="font-medium text-gray-900">Time:</span>{' '}
+                  {Math.floor(selectedPuzzle.timeLimit / 60)}m{' '}
+                  {(selectedPuzzle.timeLimit % 60).toString().padStart(2, '0')}
+                  s
+                </div>
+                <div>
+                  <span className="font-medium text-gray-900">Budget:</span>{' '}
+                  {selectedPuzzle.budgetLimit}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-900">Tight budget:</span>{' '}
+                  {selectedPuzzle.tightBudgetLimit ?? '—'}
+                </div>
+              </div>
+
+              <div>
+                <div className="font-medium text-gray-900">Additional constraints (optional)</div>
+                <div className="mt-1 space-y-1">
+                  {Array.isArray(selectedPuzzle.additionalConstraints) ? (
+                    selectedPuzzle.additionalConstraints.length > 0 ? (
+                      <ul className="list-disc space-y-1 pl-5">
+                        {selectedPuzzle.additionalConstraints.map((c) => (
+                          <li key={c}>{c}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-gray-500">None provided.</div>
+                    )
+                  ) : selectedPuzzle.additionalConstraints ? (
+                    <div>{selectedPuzzle.additionalConstraints}</div>
+                  ) : (
+                    <div className="text-gray-500">None provided.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailsPuzzleId(null)}>
+              Close
+            </Button>
+            {selectedPuzzle ? (
+              <Link
+                href={paths.app.puzzle.getHref(selectedPuzzle.id)}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Go to puzzle
+              </Link>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (
