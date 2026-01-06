@@ -62,6 +62,7 @@ export type Puzzle = Entity<{
   creatorComment?: string;
 
   filteredBasicComponents?: string[];
+  defaultGateSet?: string[];
   allowArsenal?: boolean;
   specialComponents?: CircuitComponent[];
   rating: number;

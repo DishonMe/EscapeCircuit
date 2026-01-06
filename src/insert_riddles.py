@@ -53,29 +53,48 @@ def insert_riddle(config_path, instructions_path):
     # We might want to store inputs/outputs in the description for now as a workaround 
     # if the DB schema doesn't support them, but for now I'll just use the instruction text.
 
-    c.execute("""
-        INSERT INTO puzzles (
-            name, creator_user_id, description, status, budget, 
-            time_limit_seconds, default_gate_set, rating_count, 
-            avg_difficulty, avg_fun, avg_clearness,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        puzzle_data['name'],
-        creator_id,
-        full_description,
-        'published', # Set to published so it shows up
-        puzzle_data.get('budget', 0),
-        puzzle_data.get('time_limit_seconds'), # Can be None
-        gates_json, # Store as JSON string? Or comma separated?
-                    # PuzzleRepo typically handles this. 
-                    # Let's check how PuzzleRepo stores it. 
-                    # In SQL, usually it's a string.
-        0, 0.0, 0.0, 0.0, 
-        utcnow()
-    ))
-    puzzle_id = c.lastrowid
-    print(f"Inserted Puzzle '{puzzle_data['name']}' with ID {puzzle_id}")
+    try:
+        c.execute("""
+            INSERT INTO puzzles (
+                name, creator_user_id, description, status, budget, 
+                time_limit_seconds, default_gate_set, rating_count, 
+                avg_difficulty, avg_fun, avg_clearness,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            puzzle_data['name'],
+            creator_id,
+            full_description,
+            'published', # Set to published so it shows up
+            puzzle_data.get('budget', 0),
+            puzzle_data.get('time_limit_seconds'), # Can be None
+            gates_json, # Store as JSON string? Or comma separated?
+                        # PuzzleRepo typically handles this. 
+                        # Let's check how PuzzleRepo stores it. 
+                        # In SQL, usually it's a string.
+            0, 0.0, 0.0, 0.0, 
+            utcnow()
+        ))
+        puzzle_id = c.lastrowid
+        print(f"Inserted Puzzle '{puzzle_data['name']}' with ID {puzzle_id}")
+    except sqlite3.IntegrityError:
+        c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],))
+        puzzle_id = c.fetchone()[0]
+        c.execute("""
+            UPDATE puzzles SET 
+                creator_user_id = ?, description = ?, status = ?, budget = ?, 
+                time_limit_seconds = ?, default_gate_set = ?
+            WHERE id = ?
+        """, (
+            creator_id, full_description, 'published', 
+            puzzle_data.get('budget', 0), puzzle_data.get('time_limit_seconds'), 
+            gates_json, puzzle_id
+        ))
+        print(f"Updated Puzzle '{puzzle_data['name']}' with ID {puzzle_id}")
+
+    # 3. Handle Test Cases
+    # Clear old test cases to avoid duplicates on update
+    c.execute("DELETE FROM puzzle_test_cases WHERE puzzle_id = ?", (puzzle_id,))
 
     # 3. Insert Test Cases
     for tc in test_cases:

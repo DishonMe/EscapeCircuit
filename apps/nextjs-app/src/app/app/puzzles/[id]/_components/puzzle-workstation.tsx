@@ -50,7 +50,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const user = useUser();
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
-  const puzzle = puzzleQuery.data?.data;
+  const puzzle = puzzleQuery.data;
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
@@ -72,18 +72,34 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const budgetLimit = puzzle?.budgetLimit ?? 0;
   const tightBudget = Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
 
-  const filteredBasics = useMemo(() => {
-    return new Set(puzzle?.filteredBasicComponents ?? EMPTY_STRINGS);
-  }, [puzzle?.filteredBasicComponents]);
-  const allowArsenal = puzzle?.allowArsenal ?? true;
+  const allowedGates = useMemo(() => {
+    // Whitelist approach: if defaultGateSet is provided, use it.
+    if (puzzle?.defaultGateSet && puzzle.defaultGateSet.length > 0) {
+      return new Set(puzzle.defaultGateSet);
+    }
+    // Fallback to blacklist approach
+    // If no blacklist provided, everything is allowed (empty set of blocked).
+    const blocked = new Set(puzzle?.filteredBasicComponents ?? EMPTY_STRINGS);
+    const allTypes = BASIC_COMPONENTS.map((c) => c.type);
+    return new Set(allTypes.filter((t) => !blocked.has(t)));
+  }, [puzzle?.defaultGateSet, puzzle?.filteredBasicComponents]);
 
   const specialComponents = useMemo(() => {
     return puzzle?.specialComponents ?? EMPTY_COMPONENTS;
   }, [puzzle?.specialComponents]);
 
+  const allowArsenal = puzzle?.allowArsenal ?? true;
+
   const basicComponents = useMemo(() => {
-    return BASIC_COMPONENTS.filter((c) => !filteredBasics.has(c.type));
-  }, [filteredBasics]);
+    return BASIC_COMPONENTS.filter((c) => allowedGates.has(c.type));
+  }, [allowedGates]);
+
+  const filteredBasicTypes = useMemo(() => {
+    // WorkstationMenu expects a blacklist (to hide/dim items).
+    // We calculate it as ALL_BASIC - ALLOWED.
+    const all = new Set(BASIC_COMPONENTS.map(c => c.type));
+    return Array.from(all).filter(t => !allowedGates.has(t));
+  }, [allowedGates]);
 
   const componentCatalog = useMemo(() => {
     const byId = new Map<string, CircuitComponent>();
@@ -629,7 +645,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           basic={visibleBasics}
           special={specialComponents}
           allowArsenal={allowArsenal}
-          filteredBasicTypes={Array.from(filteredBasics)}
+          filteredBasicTypes={filteredBasicTypes}
           selectedComponentId={
             selectedComponent.mode === 'placing'
               ? selectedComponent.componentId

@@ -82,6 +82,7 @@ class Puzzle:
             "timeLimit": self.time_limit_seconds, # Alias for frontend
             "difficulty": diff_str, # Mapped for frontend
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
+            "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "solvedCount": 0, # Placeholder

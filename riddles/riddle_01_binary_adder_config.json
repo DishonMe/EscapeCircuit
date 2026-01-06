@@ -4,7 +4,7 @@
     "description": "Design a full adder circuit using AND, NAND, and DFF gates. Implement the sum and carry-out logic for two input bits and a carry-in bit.",
     "budget": 20,
     "time_limit_seconds": null,
-    "default_gate_set": ["AND", "NAND", "DFF"],
+    "default_gate_set": ["NAND"],
     "inputs": ["A", "B", "C_in"],
     "outputs": ["S", "C_out"]
   },
