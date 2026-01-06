@@ -39,7 +39,10 @@ def build_user_router(user_service: UserService) -> APIRouter:
         try:
             return user_service.login(req.model_dump())
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            if str(e) == "user not found":
+                raise HTTPException(status_code=404, detail="User not found. Please register.")
+            else:
+                raise HTTPException(status_code=401, detail=str(e))
 
     @router.post("/logout")
     def logout(token: str = Depends(oauth2_scheme)):

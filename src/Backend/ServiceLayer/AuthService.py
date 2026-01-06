@@ -45,9 +45,17 @@ class AuthService:
         if not username or not password:
             raise ValidationError("username and password required")
 
-        user = self.user_repo.verify_login(username, password)
+        user = self.user_repo.get_by_username(username)
         if not user:
-            raise ValidationError("invalid credentials")
+            raise ValidationError("user not found")
+
+        # Verify password
+        row = self.user_repo.conn.execute("SELECT pw_salt, pw_hash FROM users WHERE id=?", (user.id,)).fetchone()
+        if not row or row["pw_salt"] is None or row["pw_hash"] is None:
+            raise ValidationError("invalid password")
+        got = UserRepo._hash_password(password, row["pw_salt"])
+        if got != row["pw_hash"]:
+            raise ValidationError("invalid password")
 
         token = secrets.token_urlsafe(32)
         now = time.time()
