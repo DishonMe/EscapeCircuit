@@ -25,7 +25,7 @@ export type User = Entity<{
 }>;
 
 export type AuthResponse = {
-  jwt: string;
+  token: string;
   user: User;
 };
 

@@ -1,6 +1,9 @@
 import { useNotifications } from '@/components/ui/notifications';
 import { env } from '@/config/env';
 
+import Cookies from 'js-cookie';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
+
 type RequestOptions = {
   method?: string;
   headers?: Record<string, string>;
@@ -9,6 +12,7 @@ type RequestOptions = {
   params?: Record<string, string | number | boolean | undefined | null>;
   cache?: RequestCache;
   next?: NextFetchRequestConfig;
+  suppressErrorNotification?: boolean;
 };
 
 function buildUrlWithParams(
@@ -47,6 +51,11 @@ export function getServerCookies() {
   });
 }
 
+function getTokenFromCookieString(cookieString: string): string | undefined {
+  const match = cookieString.match(new RegExp(`${AUTH_TOKEN_COOKIE_NAME}=([^;]+)`));
+  return match ? match[1] : undefined;
+}
+
 async function fetchApi<T>(
   url: string,
   options: RequestOptions = {},
@@ -59,12 +68,23 @@ async function fetchApi<T>(
     params,
     cache = 'no-store',
     next,
+    suppressErrorNotification = false,
   } = options;
 
   // Get cookies from the request when running on server
   let cookieHeader = cookie;
   if (typeof window === 'undefined' && !cookie) {
     cookieHeader = await getServerCookies();
+  }
+
+  // Extract auth token
+  let authToken: string | undefined;
+  if (typeof window !== 'undefined') {
+    // Client-side: read from js-cookie
+    authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+  } else if (cookieHeader) {
+    // Server-side: parse from cookie string
+    authToken = getTokenFromCookieString(cookieHeader);
   }
 
   const fullUrl = buildUrlWithParams(`${env.API_URL}${url}`, params);
@@ -76,6 +96,7 @@ async function fetchApi<T>(
       Accept: 'application/json',
       ...headers,
       ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'include',
@@ -85,7 +106,7 @@ async function fetchApi<T>(
 
   if (!response.ok) {
     const message = (await response.json()).message || response.statusText;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !suppressErrorNotification) {
       useNotifications.getState().addNotification({
         type: 'error',
         title: 'Error',

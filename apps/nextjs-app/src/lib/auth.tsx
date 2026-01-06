@@ -17,9 +17,11 @@ import { api } from './api-client';
 // these are not part of features as this is a module shared across features
 
 export const getUser = async (): Promise<User> => {
-  const response = (await api.get('/users/me')) as { data: User };
+  const response = (await api.get('/users/me', {
+    suppressErrorNotification: true,
+  })) as User;
 
-  return response.data;
+  return response;
 };
 
 const userQueryKey = ['user'];
@@ -28,6 +30,7 @@ export const getUserQueryOptions = () => {
   return queryOptions({
     queryKey: userQueryKey,
     queryFn: getUser,
+    retry: false,
   });
 };
 
@@ -39,6 +42,7 @@ export const useLogin = ({ onSuccess }: { onSuccess?: () => void }) => {
     mutationFn: loginWithEmailAndPassword,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
       onSuccess?.();
     },
   });
@@ -50,6 +54,7 @@ export const useRegister = ({ onSuccess }: { onSuccess?: () => void }) => {
     mutationFn: registerWithEmailAndPassword,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
       onSuccess?.();
     },
   });
@@ -72,7 +77,7 @@ const logout = (): Promise<void> => {
 };
 
 export const loginInputSchema = z.object({
-  email: z.string().min(1, 'Required').email('Invalid email'),
+  username: z.string().min(1, 'Required'),
   password: z.string().min(5, 'Required'),
 });
 
@@ -81,26 +86,11 @@ const loginWithEmailAndPassword = (data: LoginInput): Promise<AuthResponse> => {
   return api.post('/users/login', data);
 };
 
-export const registerInputSchema = z
-  .object({
-    email: z.string().min(1, 'Required'),
-    firstName: z.string().min(1, 'Required'),
-    lastName: z.string().min(1, 'Required'),
-    password: z.string().min(5, 'Required'),
-  })
-  .and(
-    z
-      .object({
-        teamId: z.string().min(1, 'Required'),
-        teamName: z.null().default(null),
-      })
-      .or(
-        z.object({
-          teamName: z.string().min(1, 'Required'),
-          teamId: z.null().default(null),
-        }),
-      ),
-  );
+export const registerInputSchema = z.object({
+  email: z.string().min(1, 'Required').email('Invalid email'),
+  username: z.string().min(1, 'Required'),
+  password: z.string().min(5, 'Required'),
+});
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 
