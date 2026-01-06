@@ -112,6 +112,13 @@ class PuzzleRepo:
         """, (PuzzleStatus.PUBLISHED.value, limit, offset)).fetchall()
         return [self._row_to_puzzle(r) for r in rows]
 
+    def count_published(self) -> int:
+        cur = self.conn.execute("""
+            SELECT COUNT(*) FROM puzzles WHERE status=?
+        """, (PuzzleStatus.PUBLISHED.value,))
+        row = cur.fetchone()
+        return row[0] if row else 0
+
     def search_by_name(self, q: str, only_published: bool = True, limit: int = 50) -> List[Puzzle]:
         like = f"%{q}%"
         if only_published:

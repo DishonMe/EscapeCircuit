@@ -13,6 +13,7 @@ export const getPuzzles = (
   return api.get(`/puzzles`, {
     params: {
       page,
+      limit: 9,
     },
   });
 };

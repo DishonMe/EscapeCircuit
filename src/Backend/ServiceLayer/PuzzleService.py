@@ -32,14 +32,21 @@ class PuzzleService:
     def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> dict:
         _ = self.auth.require_user_id(session_token)
         puzzles = self.repo.list_published(limit=limit, offset=offset)
-        # Mock meta for now
-        total = 100 
+        
+        # Count total published for pagination
+        total = self.repo.count_published()
+        
+        # Avoid division by zero if limit is 0 (should not happen via API validation usually)
+        limit = max(1, limit)
+        
+        total_pages = (total + limit - 1) // limit # Ceiling division
+        
         return {
             "data": [self._enrich_puzzle(p.to_dict()) for p in puzzles],
             "meta": {
                 "page": (offset // limit) + 1,
                 "total": total,
-                "totalPages": (total // limit) + 1
+                "totalPages": total_pages
             }
         }
 
