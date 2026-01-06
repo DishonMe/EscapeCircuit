@@ -7,7 +7,17 @@ export const metadata = {
   description: 'Dashboard',
 };
 
+import { paths } from '@/config/paths';
+import { checkLoggedIn } from '@/utils/auth';
+import { redirect } from 'next/navigation';
+
 const AppLayout = ({ children }: { children: ReactNode }) => {
+  const isLoggedIn = checkLoggedIn();
+
+  if (!isLoggedIn) {
+    redirect(paths.auth.login.getHref());
+  }
+
   return <DashboardLayout>{children}</DashboardLayout>;
 };
 
