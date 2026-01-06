@@ -52,16 +52,22 @@ class TestUserServiceRegister:
         self.mock_user_repo.create.return_value = mock_user
         self.mock_xp.calculate_level.return_value = 1
         self.mock_xp.is_experienced.return_value = False
+        
+        # Mock auth login for auto-login
+        self.mock_auth.login.return_value = "auto_login_token"
 
         # Patch User constructor to avoid id=0 validation error
         with patch('Backend.ServiceLayer.UserService.User', return_value=mock_user):
             result = self.service.register(payload)
 
-        assert result["username"] == "newuser"
-        assert result["role"] == "solver"
-        assert result["level"] == 1
-        assert result["is_experienced"] is False
+        # Updated assertions for nested structure
+        assert result["token"] == "auto_login_token"
+        assert result["user"]["username"] == "newuser"
+        assert result["user"]["role"] == "solver"
+        assert result["user"]["level"] == 1
+        assert result["user"]["is_experienced"] is False
         self.mock_user_repo.create.assert_called_once()
+
 
     def test_register_missing_username(self):
         payload = {"username": "", "password": "secure123"}
@@ -104,10 +110,21 @@ class TestUserServiceLogin:
     def test_login_success(self):
         payload = {"username": "testuser", "password": "secure123"}
         self.mock_auth.login.return_value = "session_token_xyz"
+        
+        user_mock = Mock(spec=User)
+        user_mock.xp = 100
+        # to_dict must return a REAL dictionary so we can assign to it
+        user_mock.to_dict.return_value = {"username": "testuser", "xp": 100}
+        
+        self.mock_user_repo.get_by_username.return_value = user_mock
+        self.mock_xp.calculate_level.return_value = 2
+        self.mock_xp.is_experienced.return_value = False
 
         result = self.service.login(payload)
 
         assert result["token"] == "session_token_xyz"
+        assert result["user"]["username"] == "testuser"
+        assert result["user"]["level"] == 2
         self.mock_auth.login.assert_called_once_with("testuser", "secure123")
 
     def test_login_invalid_credentials(self):

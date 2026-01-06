@@ -184,15 +184,15 @@ class TestPuzzleSerialization:
             created_at=now
         )
         d = puzzle.to_dict()
-        assert d["id"] == 1
+        assert d["id"] == "1"
         assert d["name"] == "Test"
         assert d["creator_user_id"] == 1
         assert d["description"] == "Desc"
         assert d["status"] == "published"
         assert d["budget"] == 100
-        assert d["time_limit_seconds"] == 300
+        assert d["timeLimit"] == 300
         assert d["rating_count"] == 5
-        assert d["created_at"] == now.isoformat()
+        assert d["createdAt"] == int(now.timestamp() * 1000)
         assert set(d["default_gate_set"]) == {"AND", "OR"}
 
     def test_from_dict(self):
