@@ -1,6 +1,14 @@
 'use client';
 
-import { Clock, Star, Circle, Users, Info, MessageSquare } from 'lucide-react';
+import {
+  Clock,
+  Star,
+  Circle,
+  Users,
+  Info,
+  MessageSquare,
+  Medal,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -93,19 +101,25 @@ export const PuzzlesList = () => {
             key={puzzle.id}
             className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
           >
-            {/* Title & Creator */}
-            <div className="mb-3">
-              <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
-              <p className="text-sm text-gray-500">
-                by{' '}
-                {puzzle.creator
-                  ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
-                  : 'Anonymous'}
-              </p>
+            {/* Title & Creator with status badge */}
+            <div className="mb-3 flex flex-wrap items-start gap-2">
+              <div className="flex-1">
+                <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
+                <p className="text-sm text-gray-500">
+                  by{' '}
+                  {puzzle.creator
+                    ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
+                    : 'Anonymous'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                <Medal className="size-3.5" />
+                <span>Unsolved</span>
+              </div>
             </div>
 
-            {/* Difficulty & Time Limit */}
-            <div className="mb-3 flex items-center gap-2">
+            {/* Difficulty, plays, and details */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span
                 className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
                   puzzle.difficulty,
@@ -115,52 +129,34 @@ export const PuzzlesList = () => {
                   puzzle.difficulty.slice(1).toLowerCase()}
               </span>
               <div className="flex items-center gap-1 text-gray-600">
-                <Clock className="size-3.5" />
-                <span className="text-xs">
-                  {Math.floor(puzzle.timeLimit / 60)}:
-                  {(puzzle.timeLimit % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-gray-600">
                 <Users className="size-3.5" />
                 <span className="text-xs">
                   {puzzle.solvedCount || 0} solved
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto w-full shadow-md ring-1 ring-blue-100 sm:w-40"
+                onClick={() => setDetailsPuzzleId(puzzle.id)}
+              >
+                <Info className="mr-2 size-4" /> Puzzle details
+              </Button>
             </div>
 
-            {/* Rating & Solved Status */}
-            <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-              {/* Rating */}
+            {/* Rating and creator comment */}
+            <div className="flex flex-wrap items-start gap-3 border-t border-gray-200 pt-3">
               <div className="flex items-center gap-1">
                 {renderStars(puzzle.rating || 0)}
                 <span className="ml-1 text-xs text-gray-600">
                   {(puzzle.rating || 0).toFixed(1)}
                 </span>
               </div>
-
-              {/* Solved Status */}
-              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-500">
-                <Circle className="size-3.5" />
-                <span>Unsolved</span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="ml-auto">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
-                  onClick={() => setDetailsPuzzleId(puzzle.id)}
-                >
-                  <Info className="mr-2 size-4" /> Puzzle details
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
+                  className="flex items-center w-full sm:w-40"
                   disabled={!puzzle.creatorComment}
                   onClick={() => {
                     if (puzzle.creatorComment) setCommentPuzzleId(puzzle.id);
@@ -170,9 +166,13 @@ export const PuzzlesList = () => {
                   {puzzle.creatorComment ? 'Creator comment' : 'No creator comment'}
                 </Button>
               </div>
+            </div>
+
+            {/* Primary action */}
+            <div className="mt-4 flex justify-center">
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="flex-1 rounded bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                className="w-full max-w-xs rounded bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700"
               >
                 Solve Puzzle
               </Link>
