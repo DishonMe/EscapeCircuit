@@ -734,6 +734,10 @@ export const WorkstationGrid = ({
       <div
         className="absolute z-30"
         style={{ left: mid.x, top: mid.y, transform: 'translate(-50%, -50%)' }}
+        onPointerDown={(e) => {
+          // Keep selection intact while interacting with the delete button
+          e.stopPropagation();
+        }}
       >
         <Button
           size="sm"
