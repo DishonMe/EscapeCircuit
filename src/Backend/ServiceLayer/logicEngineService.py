@@ -22,7 +22,7 @@ class logicEngineService:
         if "wires" in data and ("placedComponents" in data or "components" in data):
             return self.simulate(data, inputs)
             
-        key = json.dumps(inputs, sort_keys=True, separators=(',', ':'))
+        key = json.dumps(inputs, sort_keys=True, separators=(', ', ': '))
 
         if isinstance(data.get("eval_map"), dict):
             if key not in data["eval_map"]:
