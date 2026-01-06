@@ -15,6 +15,7 @@ import {
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
+import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
 import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';
@@ -724,94 +725,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </div>
       </div>
 
-      <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{puzzle.title}</DialogTitle>
-            <DialogDescription>
-              Puzzle description and creator comment.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-gray-700">
-            <div>
-              <div className="font-medium text-gray-900">Description</div>
-              <div className="mt-1 whitespace-pre-wrap">
-                {puzzle.description}
-              </div>
-            </div>
-            {puzzle.creatorComment ? (
-              <div>
-                <div className="font-medium text-gray-900">Creator comment</div>
-                <div className="mt-1 whitespace-pre-wrap">
-                  {puzzle.creatorComment}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Special instructions for Binary Adder puzzle */}
-            {puzzle.title.toLowerCase().includes('binary adder') && (
-              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <div className="font-medium text-blue-900 mb-2">Binary Adder Instructions</div>
-                <div className="text-blue-800 text-sm space-y-2">
-                  <p>
-                    Design a <strong>full adder</strong> circuit that adds three binary digits:
-                    two input bits (A and B) and a carry-in bit (C_in).
-                  </p>
-
-                  <div>
-                    <div className="font-medium mb-1">Truth Table:</div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs border border-blue-300">
-                        <thead>
-                          <tr className="bg-blue-100">
-                            <th className="border border-blue-300 px-2 py-1">A</th>
-                            <th className="border border-blue-300 px-2 py-1">B</th>
-                            <th className="border border-blue-300 px-2 py-1">C_in</th>
-                            <th className="border border-blue-300 px-2 py-1">S</th>
-                            <th className="border border-blue-300 px-2 py-1">C_out</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="font-medium mb-1">Available Gates:</div>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li><strong>AND</strong>: Outputs 1 only if both inputs are 1</li>
-                      <li><strong>NAND</strong>: Outputs 0 only if both inputs are 1 (NOT of AND)</li>
-                      <li><strong>DELAY</strong>: Passes input signal unchanged with one-time-unit delay</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-yellow-100 border border-yellow-300 rounded p-2 mt-2">
-                    <div className="font-medium text-yellow-800 mb-1">💡 Hint:</div>
-                    <p className="text-yellow-700 text-xs">
-                      NAND gates are universal - you can build any logic function with NAND gates.
-                      Think about how to combine these gates to create XOR operations.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPuzzleInfo(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PuzzleDetailsDialog
+        puzzle={puzzle}
+        open={showPuzzleInfo}
+        onOpenChange={setShowPuzzleInfo}
+        showLink={false}
+      />
 
       <Dialog
         open={Boolean(connectivityIssues?.length)}

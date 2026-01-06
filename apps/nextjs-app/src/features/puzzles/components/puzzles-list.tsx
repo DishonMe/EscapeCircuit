@@ -27,6 +27,7 @@ import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 
 import { usePuzzles } from '../api/get-puzzles';
+import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 
 export const PuzzlesList = () => {
   const searchParams = useSearchParams();
@@ -180,84 +181,14 @@ export const PuzzlesList = () => {
         ))}
       </div>
 
-      <Dialog
+      <PuzzleDetailsDialog
+        puzzle={selectedPuzzle}
         open={Boolean(selectedPuzzle)}
         onOpenChange={(open) => {
           if (!open) setDetailsPuzzleId(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedPuzzle?.title ?? 'Puzzle details'}</DialogTitle>
-            <DialogDescription>
-              Key information before you start solving.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedPuzzle ? (
-            <div className="space-y-3 text-sm text-gray-700">
-              <div>
-                <div className="font-medium text-gray-900">Description</div>
-                <div className="mt-1 whitespace-pre-wrap">
-                  {selectedPuzzle.description}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 rounded border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2">
-                <div>
-                  <span className="font-medium text-gray-900">Time:</span>{' '}
-                  {Math.floor(selectedPuzzle.timeLimit / 60)}m{' '}
-                  {(selectedPuzzle.timeLimit % 60).toString().padStart(2, '0')}
-                  s
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Budget:</span>{' '}
-                  {selectedPuzzle.budgetLimit}
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Tight budget:</span>{' '}
-                  {selectedPuzzle.tightBudgetLimit ?? '—'}
-                </div>
-              </div>
-
-              <div>
-                <div className="font-medium text-gray-900">Additional constraints (optional)</div>
-                <div className="mt-1 space-y-1">
-                  {Array.isArray(selectedPuzzle.additionalConstraints) ? (
-                    selectedPuzzle.additionalConstraints.length > 0 ? (
-                      <ul className="list-disc space-y-1 pl-5">
-                        {selectedPuzzle.additionalConstraints.map((c) => (
-                          <li key={c}>{c}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="text-gray-500">None provided.</div>
-                    )
-                  ) : selectedPuzzle.additionalConstraints ? (
-                    <div>{selectedPuzzle.additionalConstraints}</div>
-                  ) : (
-                    <div className="text-gray-500">None provided.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailsPuzzleId(null)}>
-              Close
-            </Button>
-            {selectedPuzzle ? (
-              <Link
-                href={paths.app.puzzle.getHref(selectedPuzzle.id)}
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Go to puzzle
-              </Link>
-            ) : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        showLink={true}
+      />
 
       <Dialog
         open={Boolean(selectedCommentPuzzle)}
@@ -273,7 +204,7 @@ export const PuzzlesList = () => {
             <DialogDescription>Notes from the puzzle creator.</DialogDescription>
           </DialogHeader>
 
-          <div className="text-sm text-gray-700">
+          <div className="max-h-[60vh] overflow-y-auto text-sm text-gray-700">
             <div className="font-medium text-gray-900">Creator comment</div>
             <div className="mt-1 whitespace-pre-wrap">
               {selectedCommentPuzzle?.creatorComment}
