@@ -1,0 +1,18 @@
+{
+  "type": "sequential_riddle",
+  "used_gates": ["AND", "NAND", "DFF"],
+  "input": ["X"],
+  "state": ["D1", "D2"],
+  "outputs": ["OUT", "C_out"],
+  "initial_state": {"D1": 0, "D2": 0},
+  "mealy_map": {
+    "{\"X\":0,\"D1\":0,\"D2\":0}": {"OUT":0, "C_out":0, "D1_next":0, "D2_next":0},
+    "{\"X\":1,\"D1\":0,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":0},
+    "{\"X\":0,\"D1\":0,\"D2\":1}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":0},
+    "{\"X\":1,\"D1\":0,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":0},
+    "{\"X\":0,\"D1\":1,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":0, "D2_next":1},
+    "{\"X\":1,\"D1\":1,\"D2\":0}": {"OUT":1, "C_out":0, "D1_next":1, "D2_next":1},
+    "{\"X\":0,\"D1\":1,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":0, "D2_next":1},
+    "{\"X\":1,\"D1\":1,\"D2\":1}": {"OUT":0, "C_out":1, "D1_next":1, "D2_next":1}
+  }
+}
