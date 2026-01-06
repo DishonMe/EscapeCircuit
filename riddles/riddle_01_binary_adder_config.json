@@ -2,9 +2,9 @@
   "puzzle": {
     "name": "Binary Adder Quiz",
     "description": "Design a full adder circuit using AND, NAND, and DFF gates. Implement the sum and carry-out logic for two input bits and a carry-in bit.",
-    "budget": 20,
+    "budget": 200,
     "time_limit_seconds": null,
-    "default_gate_set": ["NAND"],
+    "default_gate_set": ["XOR", "AND", "OR"],
     "inputs": ["A", "B", "C_in"],
     "outputs": ["S", "C_out"]
   },

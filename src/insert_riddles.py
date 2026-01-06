@@ -1,7 +1,11 @@
 import json
 import os
 import sqlite3
+import sys
 from datetime import datetime, timezone
+
+# Set encoding for Windows console
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Database path
 DB_PATH = 'escape_circuit.db'
@@ -118,8 +122,17 @@ def insert_riddle(config_path, instructions_path):
     print("Done.")
 
 if __name__ == '__main__':
-    # Locate all riddles
-    riddles_dir = 'riddles'
+    # Locate all riddles using absolute path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    riddles_dir = os.path.join(project_root, 'riddles')
+    
+    # Update DB_PATH to be absolute as well
+    DB_PATH = os.path.join(project_root, 'escape_circuit.db')
+    print(f"Project Root: {project_root}")
+    print(f"Riddles Dir: {riddles_dir}")
+    print(f"DB Path: {DB_PATH}")
+
     if not os.path.exists(riddles_dir):
         print(f"Directory '{riddles_dir}' not found.")
         exit(1)
