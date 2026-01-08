@@ -57,8 +57,10 @@ class PuzzleService:
 
     def get(self, session_token: str, puzzle_id: int) -> dict:
         _ = self.auth.require_user_id(session_token)
+        print(f"DEBUG: PuzzleService.get fetching id={puzzle_id}")
         p = self.repo.get_by_id(puzzle_id)
         if not p:
+            print(f"DEBUG: PuzzleService.get id={puzzle_id} NOT FOUND in repo")
             raise ValidationError("puzzle not found")
         
         d = self._enrich_puzzle(p.to_dict())

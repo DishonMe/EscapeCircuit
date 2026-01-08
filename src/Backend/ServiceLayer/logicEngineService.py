@@ -150,6 +150,21 @@ class logicEngineService:
             if pk in parent:
                 root = find(pk)
                 net_values[root] = val
+
+        # Pre-set State (DFF Outputs)
+        for p in placed:
+            cid = p["id"]
+            ctype = comp_types.get(cid, "")
+            if ctype == "DFF":
+                # Check if we have a current state value for this DFF
+                # Inputs should contain { "D1": 0, ... }
+                if cid in inputs:
+                    val = inputs[cid]
+                    # Pin 1 = Q (Output)
+                    pk = f"{cid}#1"
+                    if pk in parent:
+                        root = find(pk)
+                        net_values[root] = val
                 
         # Iteration
         for _ in range(MAX_ITER):
@@ -242,6 +257,22 @@ class logicEngineService:
                      val = net_values.get(root, 0) # Default to 0 if floating?
                      # Floating outputs usually 0 or X. Let's say 0 for safety.
                      results[name] = val if val is not None else 0
+
+        # 4. Capture Next State (DFF Inputs)
+        for p in placed:
+            cid = p["id"]
+            ctype = comp_types.get(cid, "")
+            if ctype == "DFF":
+                # Pin 0 = D (Input)
+                pk_in = f"{cid}#0"
+                d_val = 0
+                if pk_in in parent:
+                    root = find(pk_in)
+                    v = net_values.get(root)
+                    if v is not None:
+                        d_val = v
+                
+                results[f"{cid}_next"] = d_val
                      
         return results
 

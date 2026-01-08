@@ -4,33 +4,85 @@
     "description": "Design a sequential circuit that adds binary numbers bit by bit over multiple clock cycles using DFF gates for state. Each cycle receives one input bit X, and produces sum (OUT) and carry (C_out) outputs.",
     "budget": 15,
     "time_limit_seconds": null,
-    "default_gate_set": ["AND", "NAND", "DFF"],
-    "input": ["X"],
-    "state": ["D1", "D2"],
-    "outputs": ["OUT", "C_out"],
-    "initial_state": {"D1": 0, "D2": 0},
+    "default_gate_set": [
+      "AND",
+      "XOR",
+      "OR",
+      "DFF"
+    ],
+    "input": [
+      "X"
+    ],
+    "state": [
+      "D1",
+      "D2"
+    ],
+    "outputs": [
+      "OUT",
+      "C_out"
+    ],
+    "initial_state": {
+      "D1": 0,
+      "D2": 0
+    },
     "type": "sequential_riddle"
   },
   "test_cases": [
     {
-      "input_stream": [1, 0, 1, 1, 0],
+      "input_stream": [
+        1,
+        1,
+        1
+      ],
       "expected_output_stream": {
-        "OUT": [1, 1, 0, 1, 0],
-        "C_out": [0, 0, 1, 0, 1]
+        "OUT": [
+          1,
+          0,
+          1
+        ],
+        "C_out": [
+          0,
+          1,
+          1
+        ]
       }
     },
     {
-      "input_stream": [0, 0, 1, 0],
+      "input_stream": [
+        0,
+        0,
+        0
+      ],
       "expected_output_stream": {
-        "OUT": [0, 0, 1, 1],
-        "C_out": [0, 0, 0, 0]
+        "OUT": [
+          0,
+          0,
+          0
+        ],
+        "C_out": [
+          0,
+          0,
+          0
+        ]
       }
     },
     {
-      "input_stream": [1, 1, 1],
+      "input_stream": [
+        1,
+        0,
+        0
+      ],
       "expected_output_stream": {
-        "OUT": [1, 1, 0],
-        "C_out": [0, 0, 1]
+        "OUT": [
+          1,
+          1,
+          1
+        ],
+        "C_out": [
+          0,
+          0,
+          0
+        ]
       }
     }
   ]

@@ -45,7 +45,10 @@ def ensure_bit_dict(name: str, d: Dict[str, int]) -> Dict[str, int]:
     if not isinstance(d, dict) or len(d) == 0:
         raise ValidationError(f"{name} cannot be empty")
     for k, v in d.items():
-        if v not in (0, 1):
+        if isinstance(v, list):
+            if not all(x in (0, 1) for x in v):
+                raise ValidationError(f"{name} '{k}' list must contain only 0/1")
+        elif v not in (0, 1):
             raise ValidationError(f"{name} '{k}' must be 0/1")
     return d
 
