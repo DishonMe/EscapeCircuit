@@ -6,13 +6,14 @@ import { hash } from './hash';
 const models = {
   user: {
     id: primaryKey(nanoid),
-    firstName: String,
-    lastName: String,
+    username: String,
     email: String,
     password: String,
     teamId: String,
     role: String,
     bio: String,
+    xp: Number,
+    level: Number,
     createdAt: Date.now,
   },
   team: {
@@ -75,10 +76,17 @@ export const db = factory(models);
 export type Model = keyof typeof models;
 
 const dbFilePath = 'mocked-db.json';
+let memoryDb: Record<string, any> | null = null;
 
 export const loadDb = async () => {
   // If we are running in a Node.js environment
   if (typeof window === 'undefined') {
+    // Avoid disk I/O in non-production to prevent file-watch flicker
+    if (process.env.NODE_ENV !== 'production') {
+      memoryDb = memoryDb ?? {};
+      return memoryDb;
+    }
+
     const { readFile, writeFile } = await import('fs/promises');
     try {
       const data = await readFile(dbFilePath, 'utf8');
@@ -103,6 +111,10 @@ export const loadDb = async () => {
 export const storeDb = async (data: string) => {
   // If we are running in a Node.js environment
   if (typeof window === 'undefined') {
+    if (process.env.NODE_ENV !== 'production') {
+      memoryDb = JSON.parse(data);
+      return;
+    }
     const { writeFile } = await import('fs/promises');
     await writeFile(dbFilePath, data);
   } else {
@@ -112,7 +124,8 @@ export const storeDb = async (data: string) => {
 };
 
 export const persistDb = async (model: Model) => {
-  if (process.env.NODE_ENV === 'test') return;
+  // Avoid writing to disk during local dev to prevent Next.js hot-reload flicker
+  if (process.env.NODE_ENV !== 'production') return;
   const data = await loadDb();
   data[model] = db[model].getAll();
   await storeDb(JSON.stringify(data));
@@ -142,13 +155,14 @@ export const initializeDb = async () => {
     });
 
     const creator = db.user.create({
-      firstName: 'Circuit',
-      lastName: 'Master',
+      username: 'circuitmaster',
       email: 'circuitmaster@example.com',
       password: hash('password'),
       teamId: defaultTeam.id,
       role: 'PLAYER',
       bio: 'Professional circuit designer',
+      xp: 1000,
+      level: 5,
     });
 
     // Create sample puzzles
@@ -250,13 +264,14 @@ export const initializeDb = async () => {
       });
 
     db.user.create({
-      firstName: 'Admin',
-      lastName: 'User',
+      username: 'admin',
       email: adminEmail,
       password: hash('admin'),
       teamId: defaultTeam.id,
       role: 'ADMIN',
       bio: 'Default admin account',
+      xp: 5000,
+      level: 10,
     });
   }
 };

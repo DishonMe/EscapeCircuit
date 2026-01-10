@@ -59,7 +59,32 @@ export function authenticate({
   if (user?.password === hash(password)) {
     const sanitizedUser = sanitizeUser(user);
     const encodedToken = encode(sanitizedUser);
-    return { user: sanitizedUser, jwt: encodedToken };
+    return { user: sanitizedUser, token: encodedToken };
+  }
+
+  const error = new Error('Invalid username or password');
+  throw error;
+}
+
+export function authenticateByUsername({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+}) {
+  const user = db.user.findFirst({
+    where: {
+      username: {
+        equals: username,
+      },
+    },
+  });
+
+  if (user?.password === hash(password)) {
+    const sanitizedUser = sanitizeUser(user);
+    const encodedToken = encode(sanitizedUser);
+    return { user: sanitizedUser, token: encodedToken };
   }
 
   const error = new Error('Invalid username or password');
@@ -68,9 +93,25 @@ export function authenticate({
 
 export const AUTH_COOKIE = `bulletproof_react_app_token`;
 
-export function requireAuth(cookies: Record<string, string>) {
+export function requireAuth(
+  cookies: Record<string, string>,
+  request?: { headers?: Headers | { get: (key: string) => string | null } },
+) {
   try {
-    const encodedToken = cookies[AUTH_COOKIE] || Cookies.get(AUTH_COOKIE);
+    // Try cookie first (server), then JS cookie (client), then Authorization header
+    let encodedToken = cookies[AUTH_COOKIE] || undefined;
+    if (!encodedToken && typeof window !== 'undefined') {
+      encodedToken = Cookies.get(AUTH_COOKIE);
+    }
+    if (!encodedToken && request?.headers) {
+      const getHeader = (name: string) =>
+        // @ts-expect-error - union types
+        request.headers.get ? request.headers.get(name) : request.headers[name];
+      const authHeader = getHeader('authorization') || getHeader('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        encodedToken = authHeader.slice('Bearer '.length);
+      }
+    }
     if (!encodedToken) {
       return { error: 'Unauthorized', user: null };
     }

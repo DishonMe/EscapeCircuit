@@ -17,8 +17,12 @@ export const metadata = {
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
   const queryClient = new QueryClient();
-
-  await queryClient.prefetchQuery(getUserQueryOptions());
+  // Prefetch user if available, but ignore auth errors to avoid reload/flicker on public routes
+  try {
+    await queryClient.prefetchQuery(getUserQueryOptions());
+  } catch (err) {
+    // ignore unauthenticated failures during layout render
+  }
 
   const dehydratedState = dehydrate(queryClient);
 

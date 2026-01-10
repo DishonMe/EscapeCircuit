@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 
+import AuthGate from './_components/auth-gate';
 import { DashboardLayout } from './_components/dashboard-layout';
 
 export const metadata = {
@@ -7,18 +8,12 @@ export const metadata = {
   description: 'Dashboard',
 };
 
-import { paths } from '@/config/paths';
-import { checkLoggedIn } from '@/utils/auth';
-import { redirect } from 'next/navigation';
-
 const AppLayout = ({ children }: { children: ReactNode }) => {
-  const isLoggedIn = checkLoggedIn();
-
-  if (!isLoggedIn) {
-    redirect(paths.auth.login.getHref());
-  }
-
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <AuthGate>
+      <DashboardLayout>{children}</DashboardLayout>
+    </AuthGate>
+  );
 };
 
 export default AppLayout;
