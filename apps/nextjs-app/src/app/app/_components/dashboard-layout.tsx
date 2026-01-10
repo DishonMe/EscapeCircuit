@@ -56,39 +56,36 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-gray-50">
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-60 flex-col border-r border-gray-300 bg-white sm:flex">
-        <nav className="flex flex-col gap-4 px-4 py-6">
-          <div className="flex h-16 shrink-0 items-center px-4">
-            <Logo />
-          </div>
-          {navigation.map((item) => {
-            const isActive = pathname === item.to;
-            return (
-              <NextLink
-                key={item.name}
-                href={item.to}
-                className={cn(
-                  'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-                  'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive && 'bg-blue-50 text-blue-700',
-                )}
-              >
-                <item.icon
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-gray-300 bg-white px-4">
+        <div className="flex items-center gap-6">
+          <Logo />
+          <nav className="hidden sm:flex items-center gap-1">
+            {navigation.map((item) => {
+              const isActive = pathname === item.to;
+              return (
+                <NextLink
+                  key={item.name}
+                  href={item.to}
                   className={cn(
-                    'text-gray-400 group-hover:text-gray-500 mr-3 size-5 shrink-0',
-                    isActive && 'text-blue-500',
+                    'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                    'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive && 'bg-blue-50 text-blue-700',
                   )}
-                  aria-hidden="true"
-                />
-                {item.name}
-              </NextLink>
-            );
-          })}
-        </nav>
-      </aside>
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-60">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-gray-300 bg-white px-4 sm:static sm:h-auto sm:justify-end sm:border-0 sm:bg-transparent sm:px-6">
-          {/* <Progress /> */}
+                >
+                  <item.icon
+                    className={cn(
+                      'text-gray-400 group-hover:text-gray-500 mr-2 size-4 shrink-0',
+                      isActive && 'text-blue-500',
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="hidden md:inline">{item.name}</span>
+                </NextLink>
+              );
+            })}
+          </nav>
+        </div>
+        <div className="flex items-center gap-4">
           <Drawer>
             <DrawerTrigger asChild>
               <Button size="icon" variant="outline" className="sm:hidden">
@@ -157,11 +154,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </header>
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+        </div>
+      </header>
+      <main className="grid flex-1 items-start gap-4 p-4 md:gap-8">
           {children}
         </main>
-      </div>
     </div>
   );
 };

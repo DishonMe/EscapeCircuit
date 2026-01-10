@@ -10,7 +10,7 @@ export const puzzlesHandlers = [
     await networkDelay();
 
     try {
-      const { error } = requireAuth(cookies);
+      const { error } = requireAuth(cookies, { headers: request.headers });
       if (error) {
         return HttpResponse.json({ message: error }, { status: 401 });
       }
@@ -55,11 +55,11 @@ export const puzzlesHandlers = [
     }
   }),
 
-  http.get(`${env.API_URL}/puzzles/:id`, async ({ cookies, params }) => {
+  http.get(`${env.API_URL}/puzzles/:id`, async ({ cookies, params, request }) => {
     await networkDelay();
 
     try {
-      const { error } = requireAuth(cookies);
+      const { error } = requireAuth(cookies, { headers: request.headers });
       if (error) {
         return HttpResponse.json({ message: error }, { status: 401 });
       }
@@ -144,7 +144,7 @@ export const puzzlesHandlers = [
       await networkDelay();
 
       try {
-        const { error } = requireAuth(cookies);
+        const { error } = requireAuth(cookies, { headers: request.headers });
         if (error) {
           return HttpResponse.json({ message: error }, { status: 401 });
         }

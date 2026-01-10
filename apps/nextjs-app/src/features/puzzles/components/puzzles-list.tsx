@@ -41,14 +41,6 @@ export const PuzzlesList = () => {
     page: page,
   });
 
-  if (puzzlesQuery.isLoading) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   const puzzles = puzzlesQuery.data?.data;
   const meta = puzzlesQuery.data?.meta;
 
@@ -62,7 +54,7 @@ export const PuzzlesList = () => {
     return puzzles.find((p) => p.id === commentPuzzleId);
   }, [commentPuzzleId, puzzles]);
 
-  if (!puzzles) return null;
+  const isEmpty = !puzzles || puzzles.length === 0;
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -95,9 +87,24 @@ export const PuzzlesList = () => {
 
   return (
     <div className="space-y-6">
+      {/* Loading */}
+      {puzzlesQuery.isLoading && (
+        <div className="flex h-48 w-full items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!puzzlesQuery.isLoading && isEmpty && (
+        <div className="rounded border border-gray-200 bg-white p-8 text-center text-gray-600">
+          No puzzles available.
+        </div>
+      )}
+
       {/* Puzzle Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {puzzles.map((puzzle) => (
+      {!puzzlesQuery.isLoading && !isEmpty && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {puzzles!.map((puzzle) => (
           <div
             key={puzzle.id}
             className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
@@ -108,9 +115,7 @@ export const PuzzlesList = () => {
                 <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
                 <p className="text-sm text-gray-500">
                   by{' '}
-                  {puzzle.creator
-                    ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
-                    : 'Anonymous'}
+                  {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
                 </p>
               </div>
               <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
@@ -181,6 +186,7 @@ export const PuzzlesList = () => {
           </div>
         ))}
       </div>
+      )}
 
       <PuzzleDetailsDialog
         puzzle={selectedPuzzle}
@@ -201,7 +207,7 @@ export const PuzzlesList = () => {
       />
 
       {/* Pagination */}
-      {meta && meta.totalPages > 1 && (
+      {!puzzlesQuery.isLoading && meta && meta.totalPages > 1 && (
         <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map(
             (pageNum) => (
