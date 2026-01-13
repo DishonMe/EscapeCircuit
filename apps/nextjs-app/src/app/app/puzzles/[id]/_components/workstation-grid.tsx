@@ -205,26 +205,36 @@ export const WorkstationGrid = ({
       return fit;
     };
 
+    const calculatePan = (fit: number, containerWidth: number) => {
+      // Inputs are at column -1. We want to position them with a visible left margin.
+      // Formula: screen_x = pan.x + (col + 0.5) * CELL_PX * fit
+      // To place col -1 at ~15% from left (leaving room for input labels):
+      const targetScreenX = containerWidth * 0.15;
+      const panX = targetScreenX - (-0.5) * CELL_PX * fit;
+      // Pan Y: center vertically
+      const panY = 2 * CELL_PX * fit;
+      return { x: panX, y: panY };
+    };
+
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       const fit = updateFit();
       setZoom(fit);
-      // Position view so inputs (at col -1) are visible on the left
-      // Center vertically, but pan right to show inputs
-      const inputVisiblePanX = 3 * CELL_PX * fit; // Show column -1 with some margin
-      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
+      const pan = calculatePan(fit, el.getBoundingClientRect().width);
+      setPan(pan);
     } else {
       const fit = updateFit();
       setZoom((prev) => Math.max(prev, fit));
-      const inputVisiblePanX = 3 * CELL_PX * fit;
-      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
+      const pan = calculatePan(fit, el.getBoundingClientRect().width);
+      setPan(pan);
     }
 
     const ro = new ResizeObserver(() => {
       const fit = updateFit();
       setZoom((prev) => Math.max(prev, fit));
-      const inputVisiblePanX = 3 * CELL_PX * fit;
-      setPan({ x: inputVisiblePanX, y: 2 * CELL_PX * fit });
+      const rect = el.getBoundingClientRect();
+      const pan = calculatePan(fit, rect.width);
+      setPan(pan);
     });
     ro.observe(el);
 

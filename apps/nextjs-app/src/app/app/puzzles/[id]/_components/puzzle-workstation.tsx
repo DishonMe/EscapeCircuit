@@ -775,7 +775,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             ) : null}
 
             {/* Special instructions for Binary Adder puzzle */}
-            {puzzle.title.toLowerCase().includes('binary adder') && (
+            {puzzle?.title?.toLowerCase().includes('binary adder') && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <div className="font-medium text-blue-900 mb-2">Binary Adder Instructions</div>
                 <div className="text-blue-800 text-sm space-y-2">
