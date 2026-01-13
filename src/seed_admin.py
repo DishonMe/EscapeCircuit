@@ -36,9 +36,10 @@ def seed_admin():
     else:
         # Create
         print(f"Creating user '{username}'...")
-        admin_user = User(id=0, username=username, role=UserRole.ADMIN, xp=0)
-        repo.create(admin_user, password)
-        print(f"User '{username}' created successfully.")
+        # Use a temporary ID; repo will assign the real one
+        admin_user = User(id=1, username=username, role=UserRole.ADMIN, xp=0)
+        created = repo.create(admin_user, password)
+        print(f"User '{username}' created successfully with ID: {created.id}.")
         conn.commit()
 
     conn.close()

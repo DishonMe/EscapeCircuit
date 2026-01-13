@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.UserService import UserService
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
+from Backend.APILayer.auth_utils import verify_token
 
 
 class RegisterReq(BaseModel):
@@ -45,28 +43,28 @@ def build_user_router(user_service: UserService) -> APIRouter:
                 raise HTTPException(status_code=401, detail=str(e))
 
     @router.post("/logout")
-    def logout(token: str = Depends(oauth2_scheme)):
+    def logout(token: str = Depends(verify_token)):
         try:
             return user_service.logout(token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
     @router.get("/me")
-    def me(token: str = Depends(oauth2_scheme)):
+    def me(token: str = Depends(verify_token)):
         try:
             return user_service.me(token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
     @router.get("")
-    def list_users(token: str = Depends(oauth2_scheme), limit: int = 200, offset: int = 0):
+    def list_users(token: str = Depends(verify_token), limit: int = 200, offset: int = 0):
         try:
             return user_service.list_users(token, limit=limit, offset=offset)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
     @router.post("/role")
-    def set_role(req: SetRoleReq, token: str = Depends(oauth2_scheme)):
+    def set_role(req: SetRoleReq, token: str = Depends(verify_token)):
         try:
             return user_service.set_role(token, req.model_dump())
         except ValidationError as e:
