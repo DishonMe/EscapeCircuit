@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { PuzzlesList } from '@/features/puzzles/components/puzzles-list';
 
 export const Puzzles = () => {
@@ -18,9 +20,12 @@ export const Puzzles = () => {
 
         {/* Create Puzzle Button */}
         <div className="mb-6">
-          <button className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <Link
+            href="/app/admin/upload-puzzle"
+            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
             Create New Puzzle
-          </button>
+          </Link>
         </div>
 
         {/* Puzzles List */}

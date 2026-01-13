@@ -26,6 +26,7 @@ from Backend.APILayer.UserController import build_user_router
 from Backend.APILayer.CircuitController import build_circuit_router
 from Backend.APILayer.PuzzleController import build_puzzle_router
 from Backend.APILayer.RatingController import build_rating_router
+from Backend.APILayer.AdminController import build_admin_router
 
 
 def create_app() -> FastAPI:
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(build_circuit_router(circuit_service))
     app.include_router(build_puzzle_router(puzzle_service, solving_service))
     app.include_router(build_rating_router(rating_service))
+    app.include_router(build_admin_router())
 
     @app.get("/")
     def root():
