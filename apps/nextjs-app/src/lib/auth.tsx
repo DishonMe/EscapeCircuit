@@ -64,7 +64,7 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: logout,
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.removeQueries({ queryKey: userQueryKey });
       Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
       onSuccess?.();

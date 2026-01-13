@@ -47,8 +47,17 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 
     @router.get("")
-    def browse(limit: int = 50, offset: int = 0, token: str = Depends(oauth2_scheme)):
+    def browse(
+        limit: int = 50, 
+        offset: int = 0, 
+        page: Optional[int] = None, 
+        token: str = Depends(oauth2_scheme)
+    ):
         try:
+            # Handle pagination logic if page is provided
+            if page is not None and page > 0:
+                offset = (page - 1) * limit
+                
             return puzzle_service.browse(token, limit=limit, offset=offset)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
