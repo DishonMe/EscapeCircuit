@@ -1,5 +1,25 @@
 @echo off
 echo Starting EscapeCircuit (Backend and Frontend)...
+echo.
+echo Initializing database...
+python src\init_db.py
+if errorlevel 1 (
+    echo Database initialization failed.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Loading riddles...
+python src\insert_riddles.py
+if errorlevel 1 (
+    echo Riddle loading failed.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Starting servers...
 echo Press Ctrl+C to stop both servers.
 
 :: Use npx concurrently to run both commands in the same terminal

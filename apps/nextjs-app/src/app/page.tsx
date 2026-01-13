@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -28,8 +27,8 @@ const HomePage = () => {
       <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div className="text-lg font-semibold text-gray-900">EscapeCircuit</div>
         {showLogin ? (
-          <Button asChild variant="primary">
-            <Link href={paths.auth.login.getHref()}>Login</Link>
+          <Button onClick={() => router.push(paths.auth.login.getHref())}>
+            Login
           </Button>
         ) : (
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
