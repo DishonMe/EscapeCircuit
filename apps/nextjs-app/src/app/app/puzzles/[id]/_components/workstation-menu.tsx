@@ -114,11 +114,15 @@ const DraggableItem = ({
   isSelected,
   onSelect,
   onInfoClick,
+  onDragStart,
+  onDragEnd,
 }: {
   component: CircuitComponent;
   isSelected?: boolean;
   onSelect?: (componentId: string) => void;
   onInfoClick?: () => void;
+  onDragStart?: (id: string) => void;
+  onDragEnd?: () => void;
 }) => {
   return (
     <div
@@ -151,7 +155,9 @@ const DraggableItem = ({
             component.id,
           );
           e.dataTransfer.effectAllowed = 'copy';
+          onDragStart?.(component.id);
         }}
+        onDragEnd={() => onDragEnd?.()}
         onClick={() => onSelect?.(component.id)}
         className="flex flex-1 cursor-pointer items-center justify-between"
       >
@@ -171,6 +177,8 @@ export const WorkstationMenu = ({
   filteredBasicTypes,
   selectedComponentId,
   onSelectComponent,
+  onDragStart,
+  onDragEnd,
 }: {
   basic: CircuitComponent[];
   special: CircuitComponent[];
@@ -178,6 +186,8 @@ export const WorkstationMenu = ({
   filteredBasicTypes: string[];
   selectedComponentId?: string;
   onSelectComponent?: (componentId: string) => void;
+  onDragStart?: (id: string) => void;
+  onDragEnd?: () => void;
 }) => {
   const [arsenal, setArsenal] = useState<ArsenalCircuit[]>([]);
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<
@@ -213,6 +223,8 @@ export const WorkstationMenu = ({
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
                 onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
               />
             ))}
           </div>
@@ -229,6 +241,8 @@ export const WorkstationMenu = ({
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
                 onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
               />
             ))}
           </div>

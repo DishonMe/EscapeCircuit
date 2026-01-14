@@ -54,6 +54,15 @@ const GRID_ROWS = 10;
 const GRID_COLS = 14;
 const CELL_PX = 18;
 
+// Visual Feature: Dynamic Wire Coloring
+const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316']; 
+const getWireColor = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  const index = Math.abs(hash % WIRE_COLORS.length);
+  return WIRE_COLORS[index];
+};
+
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
 
@@ -100,6 +109,7 @@ export const WorkstationGrid = ({
   onSelectedComponentChange,
   onPlacedChange,
   onWiresChange,
+  draggedPaletteComponentId,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -111,6 +121,7 @@ export const WorkstationGrid = ({
   onSelectedComponentChange: (next: SelectedComponentState) => void;
   onPlacedChange: (next: PlacedGridComponent[]) => void;
   onWiresChange: (next: Wire[]) => void;
+  draggedPaletteComponentId?: string | null;
 }) => {
   const notifications = useNotifications();
 
@@ -144,6 +155,9 @@ export const WorkstationGrid = ({
     currentHole: HoleCoord;
     offset: { x: number; y: number };
   } | null>(null);
+
+  // Ghost/Preview State
+  const [dropPreview, setDropPreview] = useState<HoleCoord | null>(null);
 
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
 
@@ -824,9 +838,23 @@ export const WorkstationGrid = ({
         onPointerUp={onPointerUpBackground}
         onDragOver={(e) => {
           e.preventDefault();
+          if (!draggedPaletteComponentId) return;
+
+          const el = containerRef.current;
+          if (!el) return;
+          const rect = el.getBoundingClientRect();
+          const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          const world = screenToWorld(local);
+          const origin = {
+            row: clamp(Math.floor(world.row), 0, GRID_ROWS - 1),
+            col: clamp(Math.floor(world.col), 0, GRID_COLS - 1),
+          };
+          setDropPreview(origin);
         }}
+        onDragLeave={() => setDropPreview(null)}
         onDrop={(e) => {
           e.preventDefault();
+          setDropPreview(null);
           const componentId = parseDraggedComponentId(e);
           if (!componentId) return;
           const el = containerRef.current;
@@ -942,6 +970,9 @@ export const WorkstationGrid = ({
             const isSelected =
               selectedEntity.type === 'wire' && selectedEntity.wireId === w.id;
 
+            // Visual Feature: Dynamic Wire Coloring
+            const strokeColor = isSelected ? '#2563eb' : getWireColor(w.id);
+
             return (
               <g key={w.id}>
                 <line
@@ -950,7 +981,7 @@ export const WorkstationGrid = ({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke={isSelected ? '#2563eb' : '#6b7280'}
+                  stroke={strokeColor}
                   strokeWidth={isSelected ? 3 : 2}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -1000,37 +1031,74 @@ export const WorkstationGrid = ({
                   const left = c * CELL_PX;
                   const top = r * CELL_PX;
 
+                  // Canvas Rendering: Grid & Labels (Grid Dots)
+                  // Use small dots instead of full-size buttons for cleaner look
                   return (
-                    <button
+                     <div
                       key={key}
-                      className={cn(
-                        'absolute flex items-center justify-center rounded-full border',
-                        portOcc
-                          ? 'border-blue-300 bg-blue-50'
-                          : occ
-                            ? 'border-gray-300 bg-gray-100'
-                            : 'border-gray-200 bg-white hover:bg-gray-50',
-                      )}
+                      className="absolute flex items-center justify-center p-0"
                       style={{
                         left,
                         top,
-                        width: CELL_PX - 2,
-                        height: CELL_PX - 2,
+                        width: CELL_PX,
+                        height: CELL_PX,
                       }}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onClickHole({ row: r, col: c });
-                      }}
-                      title={`(${r},${c})`}
-                    />
+                     >
+                      <button
+                        className={cn(
+                          'rounded-full transition-colors',
+                          portOcc
+                            ? 'size-1.5 bg-blue-400'
+                            : occ
+                              ? 'size-1.5 bg-gray-400'
+                              : 'size-0.5 bg-gray-300 hover:size-2 hover:bg-gray-400',
+                        )}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClickHole({ row: r, col: c });
+                        }}
+                        title={`(${r},${c})`}
+                      />
+                     </div>
                   );
                 },
               );
             },
           )}
+
+          {/* Feature: Drag-and-Drop Ghost/Preview */}
+          {draggedPaletteComponentId && dropPreview && (() => {
+             const def = catalog[draggedPaletteComponentId];
+             if (!def) return null;
+             const rotation = 0; // Default zero for new drops
+             const size = rotatedSize(def.size, rotation);
+             const isValid = canPlaceComponentAt(draggedPaletteComponentId, dropPreview, rotation);
+             
+             const left = dropPreview.col * CELL_PX;
+             const top = dropPreview.row * CELL_PX;
+
+              return (
+                <div
+                  className={cn(
+                    'absolute rounded border text-[10px] flex items-center justify-center font-medium opacity-60 z-50 pointer-events-none',
+                    isValid
+                      ? 'bg-blue-100 border-blue-400 text-blue-900'
+                      : 'bg-red-100 border-red-400 text-red-900',
+                  )}
+                  style={{
+                    left,
+                    top,
+                    width: size.w * CELL_PX - 2,
+                    height: size.h * CELL_PX - 2,
+                  }}
+                >
+                  {def.label}
+                </div>
+              );
+          })()}
 
           {/* Components */}
           {placed.map((p) => {
@@ -1147,8 +1215,13 @@ export const WorkstationGrid = ({
                   }
                 }}
               >
-                <div className="flex size-full items-start justify-between p-1">
-                  <div className="truncate font-medium">{def.label}</div>
+                 {/* Canvas Rendering: Grid & Labels (Label Visibility) */}
+                 {/* Render label with z-20 and pointer-events-none so it stays on top but doesn't block clicks */}
+                 {/* Name in the middle-bottom with improved style */}
+                <div className="flex size-full items-end justify-center pb-1 z-20 relative pointer-events-none">
+                  <div className="max-w-[90%] truncate rounded-sm bg-white/85 px-1 py-px text-[9px] font-bold uppercase tracking-tight text-slate-800 shadow-sm ring-1 ring-black/5 backdrop-blur-[1px] select-none">
+                    {def.label}
+                  </div>
                 </div>
 
                 {/* Selected Delete Button (Outside) */}
