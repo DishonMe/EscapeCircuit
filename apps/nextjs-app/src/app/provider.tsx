@@ -22,23 +22,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       }),
   );
 
-  const [mswReady, setMswReady] = React.useState(false);
-
   React.useEffect(() => {
-    const init = async () => {
-      await enableMocking();
-      setMswReady(true);
-    };
-    init();
+    // Initialize MSW if enabled (non-blocking)
+    enableMocking();
   }, []);
-
-  if (!mswReady) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center">
-        <div className="size-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary FallbackComponent={MainErrorFallback}>

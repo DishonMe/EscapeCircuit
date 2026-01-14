@@ -28,7 +28,7 @@ def ensure_non_empty(name: str, value: str) -> str:
 def ensure_non_negative_int(name: str, value: int) -> int:
     if not isinstance(value, int):
         raise ValidationError(f"{name} must be int")
-    if value <= 0:
+    if value < 0:
         raise ValidationError(f"{name} cannot be negative")
     return value
 

@@ -4,19 +4,26 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { paths } from '@/config/paths';
 import { LoginForm } from '@/features/auth/components/login-form';
+import { useNotifications } from '@/components/ui/notifications';
 
 const LoginPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
+  const { addNotification } = useNotifications();
 
   return (
     <LoginForm
-      onSuccess={() =>
-        router.replace(
-          `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
-        )
-      }
+      onSuccess={() => {
+        addNotification({
+          type: 'success',
+          title: 'Login Successful',
+          message: 'Welcome back!',
+        });
+        router.push(
+          redirectTo ? decodeURIComponent(redirectTo) : paths.app.puzzles.getHref(),
+        );
+      }}
     />
   );
 };

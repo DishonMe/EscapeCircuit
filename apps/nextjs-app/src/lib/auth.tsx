@@ -36,7 +36,13 @@ export const getUserQueryOptions = () => {
 
 export const useUser = () => useQuery(getUserQueryOptions());
 
-export const useLogin = ({ onSuccess }: { onSuccess?: () => void }) => {
+export const useLogin = ({ 
+  onSuccess, 
+  onError 
+}: { 
+  onSuccess?: () => void;
+  onError?: (error: any) => void;
+}) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: loginWithEmailAndPassword,
@@ -44,6 +50,9 @@ export const useLogin = ({ onSuccess }: { onSuccess?: () => void }) => {
       queryClient.setQueryData(userQueryKey, data.user);
       Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
       onSuccess?.();
+    },
+    onError: (error) => {
+      onError?.(error);
     },
   });
 };
