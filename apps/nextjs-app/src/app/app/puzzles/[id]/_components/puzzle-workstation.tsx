@@ -58,11 +58,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedComponent, setSelectedComponent] =
     useState<SelectedComponentState>({ mode: 'none' });
+  // Feature: Drag-and-Drop Ghost/Preview
+  const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
   const [showCreatorComment, setShowCreatorComment] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
+  const [isSolved, setIsSolved] = useState(false);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
   );
@@ -552,6 +555,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       setPostCheck({ open: true, solved: res.solved, message: res.message });
 
       if (res.solved) {
+        setIsSolved(true);
         exportWorkingAreaJson();
       }
     } catch (e: any) {
@@ -588,7 +592,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <WorkstationTimer timeLimitSeconds={puzzle.timeLimit} />
+            <WorkstationTimer 
+              timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds} 
+            />
             <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
@@ -598,6 +604,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               onClick={() => setShowCreatorComment(true)}
             >
               Creator Comment
+            </Button>
+            {/* Logic Constraint: Puzzle Rating */}
+            <Button
+              variant="outline"
+              disabled={!isSolved}
+              onClick={() => {
+                notifications.addNotification({
+                  type: 'info',
+                  title: 'Rate Puzzle',
+                  message: 'Rating functionality is not implemented yet.',
+                });
+              }}
+            >
+              Rate Puzzle
             </Button>
             <Button onClick={checkSolution} isLoading={isChecking}>
               Check Solution
@@ -664,6 +684,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onSelectComponent={(componentId) =>
             setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
           }
+          onDragStart={setDraggedPaletteComponentId}
+          onDragEnd={() => setDraggedPaletteComponentId(null)}
         />
 
         <WorkstationGrid
@@ -677,6 +699,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onSelectedComponentChange={setSelectedComponent}
           onPlacedChange={onPlacedChange}
           onWiresChange={setWires}
+          draggedPaletteComponentId={draggedPaletteComponentId}
         />
 
         <div className="flex flex-col gap-3">
@@ -890,18 +913,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           setPostCheck(open ? postCheck : ({ open: false } as PostCheckState))
         }
       >
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {postCheck.open && postCheck.solved
                 ? 'Puzzle solved'
                 : 'Failed to solve'}
             </DialogTitle>
-            <DialogDescription>
-              {postCheck.open ? postCheck.message : ''}
+            <div className="mt-2 max-h-[200px] w-full overflow-y-auto rounded bg-gray-50 p-2 text-sm text-gray-700">
+               <p className="whitespace-pre-wrap break-words">
+                {postCheck.open ? postCheck.message : ''}
+              </p>
+            </div>
+            {/* Hidden Description for accessibility but we render custom content above */}
+            <DialogDescription className="sr-only">
+              {postCheck.open ? postCheck.message : 'Solution check result'}
             </DialogDescription>
           </DialogHeader>
-          <div className="text-sm text-gray-700">
+          {/* Visual Fix: Modal Text Overflow */}
+          <div className="max-h-[60vh] overflow-y-auto break-words text-sm text-gray-700">
             {postCheck.open && postCheck.solved ? (
               <div>
                 Congrats! Time, cost, and other stats can be shown here.

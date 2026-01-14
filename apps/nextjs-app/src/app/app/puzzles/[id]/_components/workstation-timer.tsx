@@ -12,7 +12,7 @@ const formatTime = (seconds: number) => {
 export const WorkstationTimer = ({
   timeLimitSeconds,
 }: {
-  timeLimitSeconds: number;
+  timeLimitSeconds?: number | null;
 }) => {
   const [elapsed, setElapsed] = useState(0);
 
@@ -25,16 +25,39 @@ export const WorkstationTimer = ({
     return () => window.clearInterval(interval);
   }, []);
 
-  const remaining = timeLimitSeconds - elapsed;
+  const hasLimit = typeof timeLimitSeconds === 'number' && timeLimitSeconds > 0;
+  // If no limit, we can treat remaining as infinite or calculate differently.
+  // For logic preservation, we define remaining based on limit if exists.
+  const remaining = hasLimit ? (timeLimitSeconds as number) - elapsed : 0;
 
-  const label = useMemo(() => {
-    if (remaining >= 0) return formatTime(remaining);
-    return `+${formatTime(remaining)}`;
-  }, [remaining]);
+  const { label, colorClass } = useMemo(() => {
+    if (!hasLimit) return { label: null, colorClass: '' };
+
+    // Overtime
+    if (remaining <= 0) {
+      return { 
+        label: `+${formatTime(remaining)}`, 
+        colorClass: 'bg-red-50 text-red-700 border-red-200' 
+      };
+    }
+
+    // Normal countdown
+    const percentage = remaining / (timeLimitSeconds as number);
+    let color = 'bg-green-50 text-green-700 border-green-200'; // Default Green ( > 10%)
+
+    if (percentage <= 0.1) {
+      color = 'bg-yellow-50 text-yellow-700 border-yellow-200'; // Yellow ( <= 10%)
+    }
+
+    return { label: formatTime(remaining), colorClass: color };
+  }, [hasLimit, remaining, timeLimitSeconds]);
+
+  if (!label) return null;
 
   return (
-    <div className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
-      <span className="font-medium">Time:</span> {label}
+    <div className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors duration-300 ${colorClass}`}>
+      <span className="opacity-70 mr-1">Time:</span>
+      <span className="font-bold tabular-nums">{label}</span>
     </div>
   );
 };
