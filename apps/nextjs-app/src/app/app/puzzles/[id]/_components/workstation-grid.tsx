@@ -347,12 +347,17 @@ export const WorkstationGrid = ({
   };
 
   const [visible, setVisible] = useState(() => getVisibleRange());
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const update = () => setVisible(getVisibleRange());
+    const update = () => {
+      setVisible(getVisibleRange());
+      const r = el.getBoundingClientRect();
+      setContainerSize({ w: r.width, h: r.height });
+    };
     update();
 
     const ro = new ResizeObserver(update);
@@ -552,8 +557,12 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < outputs.length; i++) {
       const id = `IO:OUT:${outputs[i]}`;
-      const row = Math.min(i, GRID_ROWS - 1);
-      const anchor = toScreenCenter(row, GRID_COLS + 0.8); // Margin from grid
+      // Distribute along the bottom (Layout Update: Outputs to Bottom)
+      const colStep = GRID_COLS / (outputs.length + 1);
+      // Center based on step
+      const col = (i + 1) * colStep - 0.5;
+      const row = GRID_ROWS + 0.5;
+      const anchor = toScreenCenter(row, col);
       outputsPos[id] = { x: anchor.x, y: anchor.y };
     }
 
@@ -677,7 +686,8 @@ export const WorkstationGrid = ({
       wireDraft.start.portId === port.portId
     ) {
       // Clicked on the same port that started the draft.
-      // Keep drafting (Click-to-wire behavior).
+      // Cancel wiring (Toggle/Cancel Logic).
+      setWireDraft(null);
       return;
     }
 
@@ -688,9 +698,17 @@ export const WorkstationGrid = ({
   const onStartWireDrag = (port: PortAddress, e: ReactPointerEvent) => {
     e.stopPropagation();
 
-    // If we are already drafting a wire, don't restart it from this new port.
-    // We will let onPointerUp handle the connection.
-    if (wireDraft) return;
+    // Wiring UX: Toggle/Cancel Logic
+    // If clicking a pin that is already the source, cancel.
+    if (wireDraft) {
+      if (
+        wireDraft.start.ownerId === port.ownerId &&
+        wireDraft.start.portId === port.portId
+      ) {
+        setWireDraft(null);
+      }
+      return;
+    }
 
     const el = containerRef.current;
     if (!el) return;
@@ -1323,6 +1341,73 @@ export const WorkstationGrid = ({
             );
           })}
         </div>
+
+        {/* Navigation Indicators */}
+        {(() => {
+          if (containerSize.w === 0) return null;
+          const indicators: {
+            id: string;
+            label: string;
+            cls: string;
+          }[] = [];
+
+          const In0 = inputs[0] ? ioLayout.inputs[`IO:IN:${inputs[0]}`] : null;
+          const InN =
+            inputs.length > 0
+              ? ioLayout.inputs[`IO:IN:${inputs[inputs.length - 1]}`]
+              : null;
+
+          if (In0 && InN) {
+            // If the bottom-most input is above the visible area
+            if (InN.y < 0) {
+              indicators.push({
+                id: 'in-up',
+                label: 'Inputs ↑',
+                cls: 'top-2 left-4',
+              });
+            }
+            // If the top-most input is below the visible area
+            else if (In0.y > containerSize.h) {
+              indicators.push({
+                id: 'in-down',
+                label: 'Inputs ↓',
+                cls: 'bottom-2 left-4',
+              });
+            }
+          }
+
+          const Out0 = outputs[0]
+            ? ioLayout.outputs[`IO:OUT:${outputs[0]}`]
+            : null;
+          if (Out0) {
+            // If outputs are above (unlikely given bottom placement, but possible with zoom/pan)
+            if (Out0.y < 0) {
+              indicators.push({
+                id: 'out-up',
+                label: 'Outputs ↑',
+                cls: 'top-2 left-1/2 -translate-x-1/2',
+              });
+            } else if (Out0.y > containerSize.h) {
+              indicators.push({
+                id: 'out-down',
+                label: 'Outputs ↓',
+                cls: 'bottom-2 left-1/2 -translate-x-1/2',
+              });
+            }
+          }
+
+          return indicators.map((ind) => (
+            <div
+              key={ind.id}
+              className={cn(
+                'absolute z-40 animate-bounce rounded bg-white/90 px-3 py-1.5 text-xs font-bold shadow-md ring-1 ring-gray-200 backdrop-blur-sm',
+                ind.cls,
+              )}
+            >
+              {ind.label}
+            </div>
+          ));
+        })()}
       </div>
     </div>
   );
