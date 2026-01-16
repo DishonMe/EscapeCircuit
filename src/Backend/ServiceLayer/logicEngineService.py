@@ -22,7 +22,7 @@ class logicEngineService:
         if "wires" in data and ("placedComponents" in data or "components" in data):
             return self.simulate(data, inputs)
             
-        key = json.dumps(inputs, sort_keys=True, separators=(', ', ': '))
+        key = json.dumps(inputs, sort_keys=True, separators=(',', ':')) 
 
         if isinstance(data.get("eval_map"), dict):
             if key not in data["eval_map"]:
@@ -157,14 +157,12 @@ class logicEngineService:
             ctype = comp_types.get(cid, "")
             if ctype == "DFF":
                 # Check if we have a current state value for this DFF
-                # Inputs should contain { "D1": 0, ... }
-                if cid in inputs:
-                    val = inputs[cid]
-                    # Pin 1 = Q (Output)
-                    pk = f"{cid}#1"
-                    if pk in parent:
-                        root = find(pk)
-                        net_values[root] = val
+                # Pin 1 = Q (Output). We set it using the value from 'inputs' (the state history)
+                val = inputs.get(cid, 0)
+                pk = f"{cid}#1"
+                if pk in parent:
+                    root = find(pk)
+                    net_values[root] = val
                 
         # Iteration
         for _ in range(MAX_ITER):
@@ -384,7 +382,7 @@ class logicEngineService:
 
     def has_entry_for_inputs(self, circuit: Circuit, inputs: Dict[str, int]) -> bool:
         data = self._load(circuit.structure_json)
-        key = json.dumps(inputs, sort_keys=True)
+        key = json.dumps(inputs, sort_keys=True, separators=(',', ':'))
 
         if isinstance(data.get("eval_map"), dict):
             return key in data["eval_map"]
