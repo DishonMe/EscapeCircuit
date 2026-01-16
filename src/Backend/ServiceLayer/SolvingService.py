@@ -209,7 +209,7 @@ class SolvingService:
 
         if hasattr(attempt, 'mark_submitted'):
             try:
-                attempt.mark_submitted()
+                attempt.mark_submitted(passed=True)
             except Exception as e:
                 if hasattr(self.conn, "execute"):
                     self.conn.execute("ROLLBACK")

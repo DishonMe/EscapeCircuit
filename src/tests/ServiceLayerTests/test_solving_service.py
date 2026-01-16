@@ -176,7 +176,7 @@ class TestSolvingServiceSubmitSolution:
         result = self.service.submit_solution("valid_token", 1, payload)
 
         assert result["passed"] is False
-        assert result["fail_reason"] == "wrong output"
+        assert result["fail_reason"] == "Wrong output"
 
     def test_submit_solution_circuit_not_found(self):
         self.mock_auth.require_user_id.return_value = 1

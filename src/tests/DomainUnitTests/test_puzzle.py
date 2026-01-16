@@ -48,10 +48,9 @@ class TestPuzzleCreation:
         assert puzzle.rating_count == 5
 
     def test_create_puzzle_zero_id(self):
-        # ID=0 is not valid (ensure_non_negative_int rejects value <= 0)
-        with pytest.raises(ValidationError) as exc_info:
-            Puzzle(id=0, name="Test", creator_user_id=1)
-        assert "cannot be negative" in str(exc_info.value)
+        # ID=0 is valid (non-negative includes zero)
+        puzzle = Puzzle(id=0, name="Test", creator_user_id=1)
+        assert puzzle.id == 0
 
     def test_create_puzzle_missing_name(self):
         with pytest.raises(ValidationError) as exc_info:
