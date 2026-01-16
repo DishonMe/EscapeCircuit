@@ -31,10 +31,9 @@ class TestUserCreation:
         assert user.created_at == now
 
     def test_create_user_zero_id(self):
-        # ID=0 is not valid (ensure_non_negative_int rejects value <= 0)
-        with pytest.raises(ValidationError) as exc_info:
-            User(id=0, username="testuser")
-        assert "cannot be negative" in str(exc_info.value)
+        # ID=0 is valid (non-negative includes zero)
+        user = User(id=0, username="testuser")
+        assert user.id == 0
 
     def test_create_user_missing_username(self):
         with pytest.raises(ValidationError) as exc_info:

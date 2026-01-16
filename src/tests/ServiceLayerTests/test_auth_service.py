@@ -30,6 +30,11 @@ class TestSessionInfo:
 class TestAuthServiceCreation:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo)
 
     def test_auth_service_initialization(self):
@@ -45,11 +50,16 @@ class TestAuthServiceCreation:
 class TestAuthServiceLogin:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verificat ion
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo)
 
     def test_login_success(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
 
@@ -59,11 +69,11 @@ class TestAuthServiceLogin:
         assert self.service._sessions[token].user_id == 1
 
     def test_login_invalid_credentials(self):
-        self.mock_user_repo.verify_login.return_value = None
+        self.mock_user_repo.get_by_username.return_value = None
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("testuser", "wrongpassword")
-        assert "invalid credentials" in str(exc_info.value)
+        assert "user not found" in str(exc_info.value)
 
     def test_login_missing_username(self):
         with pytest.raises(ValidationError) as exc_info:
@@ -82,7 +92,7 @@ class TestAuthServiceLogin:
 
     def test_login_multiple_sessions(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token1 = self.service.login("testuser", "password123")
         token2 = self.service.login("testuser", "password123")
@@ -94,11 +104,16 @@ class TestAuthServiceLogin:
 class TestAuthServiceLogout:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo)
 
     def test_logout_success(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
         assert token in self.service._sessions
@@ -119,7 +134,7 @@ class TestAuthServiceLogout:
 
     def test_logout_already_expired(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
         del self.service._sessions[token]
@@ -131,11 +146,16 @@ class TestAuthServiceLogout:
 class TestAuthServiceRequireUserID:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo, session_ttl_seconds=3600)
 
     def test_require_user_id_valid_token(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
         token = self.service.login("testuser", "password123")
@@ -159,7 +179,7 @@ class TestAuthServiceRequireUserID:
 
     def test_require_user_id_expired_session(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
 
@@ -179,7 +199,7 @@ class TestAuthServiceRequireUserID:
 
     def test_require_user_id_user_deleted(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
 
@@ -192,7 +212,7 @@ class TestAuthServiceRequireUserID:
 
     def test_require_user_id_sliding_expiration(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
         token = self.service.login("testuser", "password123")
@@ -210,12 +230,17 @@ class TestAuthServiceRequireUserID:
 class TestAuthServiceCleanupExpired:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         # Short TTL for testing
         self.service = AuthService(self.mock_user_repo, session_ttl_seconds=1)
 
     def test_cleanup_removes_expired_sessions(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         token = self.service.login("testuser", "password123")
 
@@ -229,7 +254,7 @@ class TestAuthServiceCleanupExpired:
 
         # Cleanup should be called on next login attempt
         user2 = User(id=2, username="testuser2")
-        self.mock_user_repo.verify_login.return_value = user2
+        self.mock_user_repo.get_by_username.return_value = user2
         self.service.login("testuser2", "password123")
 
         # Old expired token should be removed
@@ -239,11 +264,16 @@ class TestAuthServiceCleanupExpired:
 class TestAuthServiceThreadSafety:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo)
 
     def test_concurrent_logins(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         tokens = []
 
@@ -269,7 +299,7 @@ class TestAuthServiceThreadSafety:
 
     def test_concurrent_logouts(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
 
         tokens = [self.service.login("testuser", "password123") for _ in range(5)]
 
@@ -291,13 +321,18 @@ class TestAuthServiceThreadSafety:
 class TestAuthServiceCleanupDuringLogout:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         # Use short TTL to easily expire sessions
         self.service = AuthService(self.mock_user_repo, session_ttl_seconds=1)
 
     def test_logout_triggers_cleanup_of_expired_sessions(self):
         """Test that require_user_id cleans up expired sessions"""
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
         # Create a token
@@ -324,6 +359,16 @@ class TestAuthServiceCleanupDuringLogout:
 class TestAuthServiceNoneInputs:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         self.service = AuthService(self.mock_user_repo)
 
     def test_login_with_none_password(self):
@@ -359,11 +404,11 @@ class TestAuthServiceNoneInputs:
     def test_cleanup_expired_during_require_user_id(self):
         """Test that cleanup_expired_locked is called during require_user_id"""
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token1 = self.service.login("testuser", "password")
-        token2 = self.service.login("testuser", "password")
+        token1 = self.service.login("testuser", "password123")
+        token2 = self.service.login("testuser", "password123")
         
         # Manually expire token1
         session = self.service._sessions[token1]
@@ -384,10 +429,10 @@ class TestAuthServiceNoneInputs:
     def test_require_user_id_updates_session_last_seen(self):
         """Test that require_user_id updates the last_seen timestamp"""
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token = self.service.login("testuser", "password")
+        token = self.service.login("testuser", "password123")
         
         # Get the original last_seen
         original_session = self.service._sessions[token]
@@ -405,12 +450,17 @@ class TestAuthServiceNoneInputs:
 class TestExpiration:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
         # Use short TTL for testing
         self.service = AuthService(self.mock_user_repo, session_ttl_seconds=1)
 
     def test_session_expires_after_ttl(self):
         user = User(id=1, username="testuser")
-        self.mock_user_repo.verify_login.return_value = user
+        self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
         token = self.service.login("testuser", "password123")

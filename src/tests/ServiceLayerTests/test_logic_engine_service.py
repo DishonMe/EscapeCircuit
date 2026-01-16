@@ -15,10 +15,10 @@ class TestLogicEngineServiceEvaluate:
         """Test successful evaluation using eval_map format"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"a": 0, "b": 0}': {"output": 0},
-                '{"a": 0, "b": 1}': {"output": 1},
-                '{"a": 1, "b": 0}': {"output": 1},
-                '{"a": 1, "b": 1}': {"output": 1},
+                '{"a":0,"b":0}': {"output": 0},
+                '{"a":0,"b":1}': {"output": 1},
+                '{"a":1,"b":0}': {"output": 1},
+                '{"a":1,"b":1}': {"output": 1},
             }
         })
         circuit = Circuit(
@@ -37,10 +37,10 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with zero output"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"a": 0, "b": 0}': {"output": 0},
-                '{"a": 0, "b": 1}': {"output": 1},
-                '{"a": 1, "b": 0}': {"output": 1},
-                '{"a": 1, "b": 1}': {"output": 1},
+                '{"a":0,"b":0}': {"output": 0},
+                '{"a":0,"b":1}': {"output": 1},
+                '{"a":1,"b":0}': {"output": 1},
+                '{"a":1,"b":1}': {"output": 1},
             }
         })
         circuit = Circuit(
@@ -59,10 +59,10 @@ class TestLogicEngineServiceEvaluate:
         """Test successful evaluation using truth_table format"""
         structure_json = json.dumps({
             "truth_table": {
-                '{"x": 0, "y": 0}': {"z": 0},
-                '{"x": 0, "y": 1}': {"z": 1},
-                '{"x": 1, "y": 0}': {"z": 1},
-                '{"x": 1, "y": 1}': {"z": 0},
+                '{"x":0,"y":0}': {"z": 0},
+                '{"x":0,"y":1}': {"z": 1},
+                '{"x":1,"y":0}': {"z": 1},
+                '{"x":1,"y":1}': {"z": 0},
             }
         })
         circuit = Circuit(
@@ -81,8 +81,8 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with multiple outputs"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"in": 0}': {"sum": 0, "carry": 0},
-                '{"in": 1}': {"sum": 1, "carry": 0},
+                '{"in":0}': {"sum": 0, "carry": 0},
+                '{"in":1}': {"sum": 1, "carry": 0},
             }
         })
         circuit = Circuit(
@@ -115,7 +115,7 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with missing eval_map entry"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"a": 0, "b": 0}': {"output": 0},
+                '{"a":0,"b":0}': {"output": 0},
             }
         })
         circuit = Circuit(
@@ -135,7 +135,7 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with missing truth_table entry"""
         structure_json = json.dumps({
             "truth_table": {
-                '{"x": 0, "y": 0}': {"z": 0},
+                '{"x":0,"y":0}': {"z": 0},
             }
         })
         circuit = Circuit(
@@ -155,7 +155,7 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with invalid eval_map output (not a dict)"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"a": 0}': "not a dict",
+                '{"a":0}': "not a dict",
             }
         })
         circuit = Circuit(
@@ -175,7 +175,7 @@ class TestLogicEngineServiceEvaluate:
         """Test evaluation with invalid truth_table output (not a dict)"""
         structure_json = json.dumps({
             "truth_table": {
-                '{"x": 0}': [1, 2, 3],
+                '{"x":0}': [1, 2, 3],
             }
         })
         circuit = Circuit(
@@ -213,7 +213,7 @@ class TestLogicEngineServiceEvaluate:
         """Test that input keys are properly sorted for matching"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"a": 0, "b": 1}': {"output": 5},
+                '{"a":0,"b":1}': {"output": 5},
             }
         })
         circuit = Circuit(
@@ -232,7 +232,7 @@ class TestLogicEngineServiceEvaluate:
         """Test that output values are converted to ints"""
         structure_json = json.dumps({
             "eval_map": {
-                '{"x": 1}': {"result": 42},
+                '{"x":1}': {"result": 42},
             }
         })
         circuit = Circuit(
