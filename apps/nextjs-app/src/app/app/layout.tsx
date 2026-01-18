@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 
+import AuthGate from './_components/auth-gate';
 import { DashboardLayout } from './_components/dashboard-layout';
 
 export const metadata = {
@@ -8,7 +9,11 @@ export const metadata = {
 };
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <AuthGate>
+      <DashboardLayout>{children}</DashboardLayout>
+    </AuthGate>
+  );
 };
 
 export default AppLayout;

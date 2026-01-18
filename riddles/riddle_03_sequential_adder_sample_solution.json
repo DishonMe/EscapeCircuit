@@ -1,0 +1,28 @@
+{
+  "totalCost": 7,
+  "placedComponents": [
+    { "id": "DFF1", "componentId": "DFF" },
+    { "id": "DFF2", "componentId": "DFF" },
+    { "id": "XOR1", "componentId": "XOR" },
+    { "id": "XOR2", "componentId": "XOR" },
+    { "id": "AND1", "componentId": "AND" },
+    { "id": "AND2", "componentId": "AND" },
+    { "id": "OR1", "componentId": "OR" }
+  ],
+  "wires": [
+    { "id": "w1", "from": { "componentId": "IO:IN:X", "pinIndex": 0 }, "to": { "componentId": "DFF1", "pinIndex": 0 } },
+    { "id": "w2", "from": { "componentId": "DFF1", "pinIndex": 1 }, "to": { "componentId": "DFF2", "pinIndex": 0 } },
+    { "id": "w3", "from": { "componentId": "DFF1", "pinIndex": 1 }, "to": { "componentId": "XOR1", "pinIndex": 0 } },
+    { "id": "w4", "from": { "componentId": "IO:IN:X", "pinIndex": 0 }, "to": { "componentId": "XOR1", "pinIndex": 1 } },
+    { "id": "w5", "from": { "componentId": "XOR1", "pinIndex": 2 }, "to": { "componentId": "XOR2", "pinIndex": 1 } },
+    { "id": "w6", "from": { "componentId": "DFF2", "pinIndex": 1 }, "to": { "componentId": "XOR2", "pinIndex": 0 } },
+    { "id": "w7", "from": { "componentId": "XOR2", "pinIndex": 2 }, "to": { "componentId": "IO:OUT:OUT", "pinIndex": 0 } },
+    { "id": "w8", "from": { "componentId": "XOR1", "pinIndex": 2 }, "to": { "componentId": "AND1", "pinIndex": 1 } },
+    { "id": "w9", "from": { "componentId": "DFF2", "pinIndex": 1 }, "to": { "componentId": "AND1", "pinIndex": 0 } },
+    { "id": "w10", "from": { "componentId": "DFF1", "pinIndex": 1 }, "to": { "componentId": "AND2", "pinIndex": 0 } },
+    { "id": "w11", "from": { "componentId": "IO:IN:X", "pinIndex": 0 }, "to": { "componentId": "AND2", "pinIndex": 1 } },
+    { "id": "w12", "from": { "componentId": "AND1", "pinIndex": 2 }, "to": { "componentId": "OR1", "pinIndex": 0 } },
+    { "id": "w13", "from": { "componentId": "AND2", "pinIndex": 2 }, "to": { "componentId": "OR1", "pinIndex": 1 } },
+    { "id": "w14", "from": { "componentId": "OR1", "pinIndex": 2 }, "to": { "componentId": "IO:OUT:C_out", "pinIndex": 0 } }
+  ]
+}

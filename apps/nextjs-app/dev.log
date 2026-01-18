@@ -1,0 +1,16 @@
+
+> escapecircuit-nextjs-app@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+  - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1593ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.9s (748 modules)
+ GET / 200 in 3887ms
+ ○ Compiling /app/puzzles ...
+ ✓ Compiled /app/puzzles in 1127ms (1016 modules)
+ ✓ Compiled /app/puzzles/[id] in 316ms (1032 modules)

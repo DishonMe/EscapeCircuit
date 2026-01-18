@@ -4,17 +4,11 @@ import { HttpResponse, http } from 'msw';
 import { env } from '@/config/env';
 
 import { db, persistDb } from '../db';
-import {
-  authenticate,
-  hash,
-  requireAuth,
-  AUTH_COOKIE,
-  networkDelay,
-} from '../utils';
+import { hash } from '../hash';
+import { AUTH_COOKIE, authenticate, authenticateByUsername, networkDelay, requireAuth } from '../utils';
 
 type RegisterBody = {
-  firstName: string;
-  lastName: string;
+  username: string;
   email: string;
   password: string;
   teamId?: string;
@@ -22,12 +16,12 @@ type RegisterBody = {
 };
 
 type LoginBody = {
-  email: string;
+  username: string;
   password: string;
 };
 
 export const authHandlers = [
-  http.post(`${env.API_URL}/auth/register`, async ({ request }) => {
+  http.post(`${env.API_URL}/users/register`, async ({ request }) => {
     await networkDelay();
     try {
       const userObject = (await request.json()) as RegisterBody;
@@ -52,7 +46,7 @@ export const authHandlers = [
 
       if (!userObject.teamId) {
         const team = db.team.create({
-          name: userObject.teamName ?? `${userObject.firstName} Team`,
+          name: userObject.teamName ?? `${userObject.username} Team`,
         });
         await persistDb('team');
         teamId = team.id;
@@ -83,6 +77,8 @@ export const authHandlers = [
         role,
         password: hash(userObject.password),
         teamId,
+        xp: 0,
+        level: 1,
       });
 
       await persistDb('user');
@@ -93,12 +89,12 @@ export const authHandlers = [
       });
 
       // todo: remove once tests in Github Actions are fixed
-      Cookies.set(AUTH_COOKIE, result.jwt, { path: '/' });
+      Cookies.set(AUTH_COOKIE, result.token, { path: '/' });
 
       return HttpResponse.json(result, {
         headers: {
           // with a real API servier, the token cookie should also be Secure and HttpOnly
-          'Set-Cookie': `${AUTH_COOKIE}=${result.jwt}; Path=/;`,
+          'Set-Cookie': `${AUTH_COOKIE}=${result.token}; Path=/;`,
         },
       });
     } catch (error: any) {
@@ -109,20 +105,23 @@ export const authHandlers = [
     }
   }),
 
-  http.post(`${env.API_URL}/auth/login`, async ({ request }) => {
+  http.post(`${env.API_URL}/users/login`, async ({ request }) => {
     await networkDelay();
 
     try {
       const credentials = (await request.json()) as LoginBody;
-      const result = authenticate(credentials);
+      const result = authenticateByUsername({
+        username: credentials.username,
+        password: credentials.password,
+      });
 
       // todo: remove once tests in Github Actions are fixed
-      Cookies.set(AUTH_COOKIE, result.jwt, { path: '/' });
+      Cookies.set(AUTH_COOKIE, result.token, { path: '/' });
 
       return HttpResponse.json(result, {
         headers: {
           // with a real API servier, the token cookie should also be Secure and HttpOnly
-          'Set-Cookie': `${AUTH_COOKIE}=${result.jwt}; Path=/;`,
+          'Set-Cookie': `${AUTH_COOKIE}=${result.token}; Path=/;`,
         },
       });
     } catch (error: any) {
@@ -149,17 +148,15 @@ export const authHandlers = [
     );
   }),
 
-  http.get(`${env.API_URL}/auth/me`, async ({ cookies }) => {
+  http.get(`${env.API_URL}/users/me`, async ({ cookies, request }) => {
     await networkDelay();
 
     try {
-      const { user } = requireAuth(cookies);
+      const { user } = requireAuth(cookies, { headers: request.headers });
       return HttpResponse.json({ data: user });
     } catch (error: any) {
-      return HttpResponse.json(
-        { message: error?.message || 'Server Error' },
-        { status: 500 },
-      );
+      // Return 401 unauthorized to allow client to handle unauthenticated state without treating as server error
+      return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
   }),
 ];

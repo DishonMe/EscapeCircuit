@@ -23,13 +23,16 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
 
+  const isAuthed = user.status === 'success' && !!user.data?.id;
+
   useEffect(() => {
-    if (user.data) {
+    // Redirect only when the auth query succeeds with a user to avoid loops on 401/errored states
+    if (isAuthed) {
       router.replace(
         `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
       );
     }
-  }, [user.data, router, redirectTo]);
+  }, [isAuthed, router, redirectTo]);
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">

@@ -7,14 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Form, Input } from '@/components/ui/form';
 import { paths } from '@/config/paths';
 import { useLogin, loginInputSchema } from '@/lib/auth';
+import { useNotifications } from '@/components/ui/notifications';
 
 type LoginFormProps = {
   onSuccess: () => void;
 };
 
 export const LoginForm = ({ onSuccess }: LoginFormProps) => {
+  const { addNotification } = useNotifications();
+  
   const login = useLogin({
     onSuccess,
+    onError: (error: any) => {
+      addNotification({
+        type: 'error',
+        title: 'Login Failed',
+        message: error?.message || 'Invalid username or password. Please try again.',
+      });
+    },
   });
 
   const searchParams = useSearchParams();
@@ -30,10 +40,10 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         {({ register, formState }) => (
           <>
             <Input
-              type="email"
-              label="Email Address"
-              error={formState.errors['email']}
-              registration={register('email')}
+              type="text"
+              label="Username"
+              error={formState.errors['username']}
+              registration={register('username')}
             />
             <Input
               type="password"

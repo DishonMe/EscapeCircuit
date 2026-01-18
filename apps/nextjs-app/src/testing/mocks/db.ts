@@ -1,16 +1,19 @@
 import { factory, primaryKey } from '@mswjs/data';
 import { nanoid } from 'nanoid';
 
+import { hash } from './hash';
+
 const models = {
   user: {
     id: primaryKey(nanoid),
-    firstName: String,
-    lastName: String,
+    username: String,
     email: String,
     password: String,
     teamId: String,
     role: String,
     bio: String,
+    xp: Number,
+    level: Number,
     createdAt: Date.now,
   },
   team: {
@@ -73,10 +76,17 @@ export const db = factory(models);
 export type Model = keyof typeof models;
 
 const dbFilePath = 'mocked-db.json';
+let memoryDb: Record<string, any> | null = null;
 
 export const loadDb = async () => {
   // If we are running in a Node.js environment
   if (typeof window === 'undefined') {
+    // Avoid disk I/O in non-production to prevent file-watch flicker
+    if (process.env.NODE_ENV !== 'production') {
+      memoryDb = memoryDb ?? {};
+      return memoryDb;
+    }
+
     const { readFile, writeFile } = await import('fs/promises');
     try {
       const data = await readFile(dbFilePath, 'utf8');
@@ -101,6 +111,10 @@ export const loadDb = async () => {
 export const storeDb = async (data: string) => {
   // If we are running in a Node.js environment
   if (typeof window === 'undefined') {
+    if (process.env.NODE_ENV !== 'production') {
+      memoryDb = JSON.parse(data);
+      return;
+    }
     const { writeFile } = await import('fs/promises');
     await writeFile(dbFilePath, data);
   } else {
@@ -110,7 +124,8 @@ export const storeDb = async (data: string) => {
 };
 
 export const persistDb = async (model: Model) => {
-  if (process.env.NODE_ENV === 'test') return;
+  // Avoid writing to disk during local dev to prevent Next.js hot-reload flicker
+  if (process.env.NODE_ENV !== 'production') return;
   const data = await loadDb();
   data[model] = db[model].getAll();
   await storeDb(JSON.stringify(data));
@@ -122,22 +137,32 @@ export const initializeDb = async () => {
     const dataEntres = database[key];
     if (dataEntres) {
       dataEntres?.forEach((entry: Record<string, any>) => {
-        model.create(entry);
+        try {
+          model.create(entry);
+        } catch (error) {
+          // Ignore duplicate key errors
+        }
       });
     }
   });
 
   // Seed some initial data if database is empty
   if (db.puzzle.count() === 0) {
-    // Create a sample user first
+    // Create a sample team and users (passwords are hashed)
+    const defaultTeam = db.team.create({
+      name: 'Default Team',
+      description: 'Default seeded team',
+    });
+
     const creator = db.user.create({
-      firstName: 'Circuit',
-      lastName: 'Master',
+      username: 'circuitmaster',
       email: 'circuitmaster@example.com',
-      password: 'password',
-      teamId: '',
+      password: hash('password'),
+      teamId: defaultTeam.id,
       role: 'PLAYER',
       bio: 'Professional circuit designer',
+      xp: 1000,
+      level: 5,
     });
 
     // Create sample puzzles
@@ -171,7 +196,8 @@ export const initializeDb = async () => {
       tightBudgetLimit: 65,
       inputs: JSON.stringify(['A', 'B']),
       outputs: JSON.stringify(['OUT']),
-      creatorComment: 'Try a minimal-cost design to earn the tight budget medal.',
+      creatorComment:
+        'Try a minimal-cost design to earn the tight budget medal.',
       filteredBasicComponents: JSON.stringify([]),
       allowArsenal: false,
       specialComponents: JSON.stringify([]),
@@ -198,6 +224,54 @@ export const initializeDb = async () => {
       rating: 4.9,
       solvedCount: 12,
       isPublic: true,
+    });
+
+    // Persist seeded data
+    await storeDb(
+      JSON.stringify(
+        {
+          user: db.user.getAll(),
+          team: db.team.getAll(),
+          puzzle: db.puzzle.getAll(),
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  // Ensure default admin always exists
+  const adminEmail = 'admin@mail.com';
+  const existingAdmin = db.user.findFirst({
+    where: {
+      email: {
+        equals: adminEmail,
+      },
+    },
+  });
+
+  if (!existingAdmin) {
+    const defaultTeam =
+      db.team.findFirst({
+        where: {
+          name: {
+            equals: 'Default Team',
+          },
+        },
+      }) ||
+      db.team.create({
+        name: 'Default Team',
+        description: 'Default seeded team',
+      });
+
+    db.user.create({
+      username: 'admin',
+      email: adminEmail,
+      password: hash('admin'),
+      teamId: defaultTeam.id,
+      role: 'ADMIN',
+      bio: 'Default admin account',
+      xp: 5000,
+      level: 10,
     });
   }
 };

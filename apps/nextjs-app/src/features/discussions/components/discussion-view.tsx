@@ -41,7 +41,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
           </span>
           {discussion.author && (
             <span className="ml-2 text-sm font-bold">
-              by {discussion.author.firstName} {discussion.author.lastName}
+              by {discussion.author.username}
             </span>
           )}
         </span>

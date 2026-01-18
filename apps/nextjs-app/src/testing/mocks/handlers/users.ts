@@ -12,17 +12,16 @@ import {
 
 type ProfileBody = {
   email: string;
-  firstName: string;
-  lastName: string;
+  username: string;
   bio: string;
 };
 
 export const usersHandlers = [
-  http.get(`${env.API_URL}/users`, async ({ cookies }) => {
+  http.get(`${env.API_URL}/users`, async ({ cookies, request }) => {
     await networkDelay();
 
     try {
-      const { user, error } = requireAuth(cookies);
+      const { user, error } = requireAuth(cookies, { headers: request.headers });
       if (error) {
         return HttpResponse.json({ message: error }, { status: 401 });
       }
@@ -49,7 +48,7 @@ export const usersHandlers = [
     await networkDelay();
 
     try {
-      const { user, error } = requireAuth(cookies);
+      const { user, error } = requireAuth(cookies, { headers: request.headers });
       if (error) {
         return HttpResponse.json({ message: error }, { status: 401 });
       }
@@ -72,11 +71,11 @@ export const usersHandlers = [
     }
   }),
 
-  http.delete(`${env.API_URL}/users/:userId`, async ({ cookies, params }) => {
+  http.delete(`${env.API_URL}/users/:userId`, async ({ cookies, params, request }) => {
     await networkDelay();
 
     try {
-      const { user, error } = requireAuth(cookies);
+      const { user, error } = requireAuth(cookies, { headers: request.headers });
       if (error) {
         return HttpResponse.json({ message: error }, { status: 401 });
       }

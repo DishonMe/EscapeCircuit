@@ -1,85 +1,47 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 import { Button } from '@/components/ui/button';
-import { Link } from '@/components/ui/link';
 import { paths } from '@/config/paths';
-import { checkLoggedIn } from '@/utils/auth';
+import { useUser } from '@/lib/auth';
 
 const HomePage = () => {
-  const isLoggedIn = checkLoggedIn();
+  const router = useRouter();
+  const user = useUser();
+
+  useEffect(() => {
+    // Wait for auth query to resolve, then route appropriately
+    if (user.status === 'pending') return;
+    if (user.data) {
+      router.replace(paths.app.puzzles.getHref());
+    }
+  }, [user.status, user.data, router]);
+
+  // Show a simple landing with a login button when not authenticated
+  const showLogin = user.status !== 'pending' && !user.data;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            EscapeCircuit
-          </h1>
-          <p className="text-xl text-gray-600 mb-8">Circuit Design Puzzles</p>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Design electronic circuits, solve challenging puzzles, and compete
-            with players worldwide in our circuit design puzzle platform.
+    <div className="flex min-h-screen flex-col bg-white">
+      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <div className="text-lg font-semibold text-gray-900">EscapeCircuit</div>
+        {showLogin ? (
+          <Button onClick={() => router.push(paths.auth.login.getHref())}>
+            Login
+          </Button>
+        ) : (
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+        )}
+      </header>
+      <main className="flex flex-1 items-center justify-center px-4 py-10 text-gray-700">
+        <div className="max-w-xl text-center">
+          <h1 className="text-2xl font-semibold text-gray-900">Welcome</h1>
+          <p className="mt-2 text-gray-600">
+            Please log in to access puzzles and your dashboard.
           </p>
         </div>
-
-        {/* Main Actions */}
-        <div className="flex justify-center gap-4 mb-16">
-          <Link
-            href={
-              isLoggedIn
-                ? paths.app.puzzles.getHref()
-                : paths.auth.login.getHref()
-            }
-          >
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg">
-              {isLoggedIn ? 'Browse Puzzles' : 'Get Started'}
-            </Button>
-          </Link>
-
-          {isLoggedIn && (
-            <Link href={paths.auth.register.getHref()}>
-              <Button
-                variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 text-lg"
-              >
-                Create Puzzle
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          <div className="bg-white border border-gray-300 rounded-lg p-6">
-            <div className="text-2xl mb-4">🔌</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Design Circuits
-            </h3>
-            <p className="text-gray-600">
-              Drag and drop electronic components to build functional circuits
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-300 rounded-lg p-6">
-            <div className="text-2xl mb-4">⏱️</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Beat the Clock
-            </h3>
-            <p className="text-gray-600">
-              Solve puzzles within time limits and budget constraints
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-300 rounded-lg p-6">
-            <div className="text-2xl mb-4">🏆</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Compete & Learn
-            </h3>
-            <p className="text-gray-600">
-              Challenge friends and improve your circuit design skills
-            </p>
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 };

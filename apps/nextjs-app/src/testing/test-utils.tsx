@@ -13,7 +13,8 @@ import {
   createUser as generateUser,
 } from './data-generators';
 import { db } from './mocks/db';
-import { AUTH_COOKIE, authenticate, hash } from './mocks/utils';
+import { hash } from './mocks/hash';
+import { AUTH_COOKIE, authenticate } from './mocks/utils';
 
 export const waitForLoadingToFinish = () =>
   waitForElementToBeRemoved(

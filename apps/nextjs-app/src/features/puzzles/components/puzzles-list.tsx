@@ -1,34 +1,60 @@
 'use client';
 
-import { Clock, Star, Circle, Users } from 'lucide-react';
+import {
+  Clock,
+  Star,
+  Circle,
+  Users,
+  Info,
+  MessageSquare,
+  Medal,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Link } from '@/components/ui/link';
 import { Spinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
+import type { Puzzle } from '@/types/api';
 
 import { usePuzzles } from '../api/get-puzzles';
+import { CreatorCommentDialog } from './creator-comment-dialog';
+import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 
 export const PuzzlesList = () => {
   const searchParams = useSearchParams();
   const page = searchParams?.get('page') ? Number(searchParams.get('page')) : 1;
 
+  const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
+  const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
+
   const puzzlesQuery = usePuzzles({
     page: page,
   });
 
-  if (puzzlesQuery.isLoading) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   const puzzles = puzzlesQuery.data?.data;
   const meta = puzzlesQuery.data?.meta;
 
-  if (!puzzles) return null;
+  const selectedPuzzle: Puzzle | undefined = useMemo(() => {
+    if (!detailsPuzzleId || !puzzles) return undefined;
+    return puzzles.find((p) => p.id === detailsPuzzleId);
+  }, [detailsPuzzleId, puzzles]);
+
+  const selectedCommentPuzzle: Puzzle | undefined = useMemo(() => {
+    if (!commentPuzzleId || !puzzles) return undefined;
+    return puzzles.find((p) => p.id === commentPuzzleId);
+  }, [commentPuzzleId, puzzles]);
+
+  const isEmpty = !puzzles || puzzles.length === 0;
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -49,11 +75,10 @@ export const PuzzlesList = () => {
       stars.push(
         <Star
           key={i}
-          className={`w-3.5 h-3.5 ${
-            i <= Math.floor(rating)
-              ? 'text-yellow-500 fill-yellow-500'
+          className={`size-3.5 ${i <= Math.floor(rating)
+              ? 'fill-yellow-500 text-yellow-500'
               : 'text-gray-300'
-          }`}
+            }`}
         />,
       );
     }
@@ -62,28 +87,47 @@ export const PuzzlesList = () => {
 
   return (
     <div className="space-y-6">
+      {/* Loading */}
+      {puzzlesQuery.isLoading && (
+        <div className="flex h-48 w-full items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!puzzlesQuery.isLoading && isEmpty && (
+        <div className="rounded border border-gray-200 bg-white p-8 text-center text-gray-600">
+          No puzzles available.
+        </div>
+      )}
+
       {/* Puzzle Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {puzzles.map((puzzle) => (
+      {!puzzlesQuery.isLoading && !isEmpty && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {puzzles!.map((puzzle) => (
           <div
             key={puzzle.id}
-            className="bg-white border border-gray-300 rounded-lg p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer relative"
+            className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
           >
-            {/* Title & Creator */}
-            <div className="mb-3">
-              <h3 className="text-gray-900 font-medium mb-1">{puzzle.title}</h3>
-              <p className="text-sm text-gray-500">
-                by{' '}
-                {puzzle.creator
-                  ? `${puzzle.creator.firstName} ${puzzle.creator.lastName}`
-                  : 'Anonymous'}
-              </p>
+          {/* Title & Creator with status badge */}
+            <div className="mb-3 flex flex-wrap items-start gap-2">
+              <div className="flex-1">
+                <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
+                <p className="text-sm text-gray-500">
+                  by{' '}
+                  {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                <Medal className="size-3.5" />
+                <span>Unsolved</span>
+              </div>
             </div>
 
-            {/* Difficulty & Time Limit */}
-            <div className="flex items-center gap-2 mb-3">
+            {/* Difficulty, plays, and details */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span
-                className={`px-2 py-1 border rounded text-xs ${getDifficultyColor(
+                className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
                   puzzle.difficulty,
                 )}`}
               >
@@ -91,42 +135,50 @@ export const PuzzlesList = () => {
                   puzzle.difficulty.slice(1).toLowerCase()}
               </span>
               <div className="flex items-center gap-1 text-gray-600">
-                <Clock className="w-3.5 h-3.5" />
-                <span className="text-xs">
-                  {Math.floor(puzzle.timeLimit / 60)}:
-                  {(puzzle.timeLimit % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-gray-600">
-                <Users className="w-3.5 h-3.5" />
+                <Users className="size-3.5" />
                 <span className="text-xs">
                   {puzzle.solvedCount || 0} solved
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto w-full shadow-md ring-1 ring-blue-100 sm:w-40"
+                onClick={() => setDetailsPuzzleId(puzzle.id)}
+              >
+                <Info className="mr-2 size-4" /> Puzzle details
+              </Button>
             </div>
 
-            {/* Rating & Solved Status */}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-              {/* Rating */}
+            {/* Rating and creator comment */}
+            <div className="flex flex-wrap items-start gap-3 border-t border-gray-200 pt-3">
               <div className="flex items-center gap-1">
                 {renderStars(puzzle.rating || 0)}
-                <span className="text-xs text-gray-600 ml-1">
+                <span className="ml-1 text-xs text-gray-600">
                   {(puzzle.rating || 0).toFixed(1)}
                 </span>
               </div>
-
-              {/* Solved Status */}
-              <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-50 text-gray-500">
-                <Circle className="w-3.5 h-3.5" />
-                <span>Unsolved</span>
+              <div className="ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center w-full sm:w-40"
+                  disabled={!puzzle.creatorComment}
+                  onClick={() => {
+                    if (puzzle.creatorComment) setCommentPuzzleId(puzzle.id);
+                  }}
+                >
+                  <MessageSquare className="mr-2 size-4" />
+                  {puzzle.creatorComment ? 'Creator comment' : 'No creator comment'}
+                </Button>
               </div>
             </div>
 
-            {/* Action Button */}
-            <div className="mt-4">
+            {/* Primary action */}
+            <div className="mt-4 flex justify-center">
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded text-sm font-medium transition-colors"
+                className="w-full max-w-xs rounded bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700"
               >
                 Solve Puzzle
               </Link>
@@ -134,20 +186,38 @@ export const PuzzlesList = () => {
           </div>
         ))}
       </div>
+      )}
+
+      <PuzzleDetailsDialog
+        puzzle={selectedPuzzle}
+        open={Boolean(selectedPuzzle)}
+        onOpenChange={(open) => {
+          if (!open) setDetailsPuzzleId(null);
+        }}
+        showLink={true}
+      />
+
+      <CreatorCommentDialog
+        puzzle={selectedCommentPuzzle}
+        open={Boolean(selectedCommentPuzzle)}
+        onOpenChange={(open) => {
+          if (!open) setCommentPuzzleId(null);
+        }}
+        showLink={true}
+      />
 
       {/* Pagination */}
-      {meta && meta.totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-8">
+      {!puzzlesQuery.isLoading && meta && meta.totalPages > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map(
             (pageNum) => (
               <Link
                 key={pageNum}
                 href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
-                className={`px-3 py-2 border rounded text-sm ${
-                  pageNum === meta.page
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
+                className={`rounded border px-3 py-2 text-sm ${pageNum === meta.page
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 {pageNum}
               </Link>

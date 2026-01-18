@@ -1,8 +1,16 @@
 'use client';
 
+import { Info } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { CircuitComponent, CircuitSolution } from '@/types/api';
+import { cn } from '@/utils/cn';
 
 type ArsenalCircuit = {
   id: string;
@@ -12,6 +20,68 @@ type ArsenalCircuit = {
 };
 
 const ARSENAL_KEY = 'escapecircuit.arsenal.v1';
+
+const TRUTH_TABLES: Record<
+  string,
+  { inputs: string[]; outputs: string[]; rows: string[][] }
+> = {
+  AND: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '1'],
+    ],
+  },
+  OR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '1'],
+    ],
+  },
+  NOT: {
+    inputs: ['IN'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '1'],
+      ['1', '0'],
+    ],
+  },
+  XOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '0'],
+    ],
+  },
+  NAND: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '0'],
+    ],
+  },
+  DFF: {
+    inputs: ['IN'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0'],
+      ['1', '1'],
+    ],
+  },
+};
 
 const loadArsenal = (): ArsenalCircuit[] => {
   try {
@@ -41,22 +111,61 @@ const Category = ({
 
 const DraggableItem = ({
   component,
+  isSelected,
+  onSelect,
+  onInfoClick,
+  onDragStart,
+  onDragEnd,
 }: {
   component: CircuitComponent;
+  isSelected?: boolean;
+  onSelect?: (componentId: string) => void;
+  onInfoClick?: () => void;
+  onDragStart?: (id: string) => void;
+  onDragEnd?: () => void;
 }) => {
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('application/x-escapecircuit-component', component.id);
-        e.dataTransfer.effectAllowed = 'copy';
-      }}
-      className="flex cursor-grab items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-2 text-sm text-gray-700"
+      className={cn(
+        'group flex w-full items-center gap-2 rounded border px-2 py-2 text-left text-sm text-gray-700',
+        isSelected
+          ? 'border-blue-300 bg-blue-50'
+          : 'border-gray-200 bg-gray-50 hover:bg-gray-100',
+      )}
     >
-      <span className="font-medium text-gray-900">{component.type}</span>
-      <span className="text-xs text-gray-600">
-        cost {component.cost} · pins {component.pins}
-      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onInfoClick?.();
+        }}
+        className={cn(
+          'text-blue-500 hover:text-blue-700 transition-opacity',
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
+        title="View Truth Table"
+      >
+        <Info size={16} />
+      </button>
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(
+            'application/x-escapecircuit-component',
+            component.id,
+          );
+          e.dataTransfer.effectAllowed = 'copy';
+          onDragStart?.(component.id);
+        }}
+        onDragEnd={() => onDragEnd?.()}
+        onClick={() => onSelect?.(component.id)}
+        className="flex flex-1 cursor-pointer items-center justify-between"
+      >
+        <span className="font-medium text-gray-900">{component.type}</span>
+        <span className="text-xs text-gray-600">
+          cost {component.cost} · pins {component.pins}
+        </span>
+      </div>
     </div>
   );
 };
@@ -66,13 +175,24 @@ export const WorkstationMenu = ({
   special,
   allowArsenal,
   filteredBasicTypes,
+  selectedComponentId,
+  onSelectComponent,
+  onDragStart,
+  onDragEnd,
 }: {
   basic: CircuitComponent[];
   special: CircuitComponent[];
   allowArsenal: boolean;
   filteredBasicTypes: string[];
+  selectedComponentId?: string;
+  onSelectComponent?: (componentId: string) => void;
+  onDragStart?: (id: string) => void;
+  onDragEnd?: () => void;
 }) => {
   const [arsenal, setArsenal] = useState<ArsenalCircuit[]>([]);
+  const [viewingTruthTableFor, setViewingTruthTableFor] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!allowArsenal) return;
@@ -82,8 +202,14 @@ export const WorkstationMenu = ({
   const visibleArsenal = useMemo(() => {
     if (!allowArsenal) return [];
     const filtered = new Set(filteredBasicTypes);
-    return arsenal.filter((c) => c.usedBasicTypes.every((t) => !filtered.has(t)));
+    return arsenal.filter((c) =>
+      c.usedBasicTypes.every((t) => !filtered.has(t)),
+    );
   }, [allowArsenal, arsenal, filteredBasicTypes]);
+
+  const truthTable = viewingTruthTableFor
+    ? TRUTH_TABLES[viewingTruthTableFor]
+    : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -91,7 +217,15 @@ export const WorkstationMenu = ({
         <Category title="Basic">
           <div className="flex flex-col gap-2">
             {basic.map((c) => (
-              <DraggableItem key={c.id} component={c} />
+              <DraggableItem
+                key={c.id}
+                component={c}
+                isSelected={selectedComponentId === c.id}
+                onSelect={onSelectComponent}
+                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+              />
             ))}
           </div>
         </Category>
@@ -101,7 +235,15 @@ export const WorkstationMenu = ({
         <Category title="Special">
           <div className="flex flex-col gap-2">
             {special.map((c) => (
-              <DraggableItem key={c.id} component={c} />
+              <DraggableItem
+                key={c.id}
+                component={c}
+                isSelected={selectedComponentId === c.id}
+                onSelect={onSelectComponent}
+                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+              />
             ))}
           </div>
         </Category>
@@ -110,7 +252,8 @@ export const WorkstationMenu = ({
       {allowArsenal && visibleArsenal.length ? (
         <Category title="Saved">
           <div className="text-xs text-gray-600">
-            Saved circuits are shown only if they don’t use filtered-out basic gates.
+            Saved circuits are shown only if they don’t use filtered-out basic
+            gates.
           </div>
           <div className="mt-2 flex flex-col gap-2">
             {visibleArsenal.map((c) => (
@@ -130,6 +273,55 @@ export const WorkstationMenu = ({
           </div>
         </Category>
       ) : null}
+
+      <Dialog
+        open={Boolean(viewingTruthTableFor)}
+        onOpenChange={(open) => !open && setViewingTruthTableFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
+          </DialogHeader>
+          {truthTable ? (
+            <div className="overflow-hidden rounded border border-gray-200">
+              <table className="w-full text-sm text-gray-700">
+                <thead className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+                  <tr>
+                    {truthTable.inputs.map((i) => (
+                      <th key={i} className="px-3 py-2 text-center">
+                        {i}
+                      </th>
+                    ))}
+                    {truthTable.outputs.map((o) => (
+                      <th
+                        key={o}
+                        className="border-l border-gray-200 px-3 py-2 text-center"
+                      >
+                        {o}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {truthTable.rows.map((row, idx) => (
+                    <tr key={idx} className="divide-x divide-gray-200">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3 py-2 text-center">
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              No truth table available for this component.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
