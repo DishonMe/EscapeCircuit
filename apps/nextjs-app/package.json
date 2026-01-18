@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.0.2",
+    "@mswjs/data": "^0.13.1",
     "@playwright/test": "^1.43.1",
     "@storybook/addon-a11y": "^8.0.10",
     "@storybook/addon-actions": "^8.0.9",
@@ -93,6 +94,7 @@
     "js-cookie": "^3.0.5",
     "jsdom": "^24.0.0",
     "lint-staged": "^15.2.2",
+    "msw": "^2.12.7",
     "pino-http": "^10.1.0",
     "pino-pretty": "^11.1.0",
     "plop": "^4.0.1",
@@ -107,4 +109,3 @@
     "vitest": "^2.1.4"
   }
 }
-
