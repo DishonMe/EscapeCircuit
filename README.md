@@ -6,50 +6,57 @@ EscapeCircuit is a web app for creating and solving logic-circuit puzzles.
 
 ## Quickstart
 
+### Windows: One Command to Run Everything
+
+Use [run_server.bat](run_server.bat) from the repo root to start both the FastAPI backend and Next.js frontend together:
+
+```
+.\run_server.bat
+```
+
+**What it does:**
+- Initializes the local SQLite database: `python src/init_db.py`
+- Seeds puzzle riddles: `python src/insert_riddles.py`
+- Seeds an admin user (username: `admin`, password: `password123`): `python src/seed_admin.py`
+- Starts the FastAPI server on http://127.0.0.1:8080
+- Starts the Next.js dev server on http://localhost:3000
+
+**Requirements:**
+- Python 3.10+ with `pip` available
+- Node 20+ with `npm` and `npx`
+- Internet access on first run (installs dependencies)
+
+**Stop:** Press Ctrl+C to stop both processes.
+
+### Manual Setup (without .bat)
+
 Prerequisites: Node 20+, Yarn 1.22+.
 
+**Backend:**
+```bash
+pip install -r requirements.txt
+python src/init_db.py
+python src/insert_riddles.py
+python src/seed_admin.py
+python -m uvicorn src.Backend.main:app --reload --host 127.0.0.1 --port 8080
+```
+
+**Frontend (in another terminal):**
 ```bash
 cd apps/nextjs-app
 cp .env.example .env   # adjust values if needed
 yarn install
-# start the web app on http://localhost:3000
 yarn dev
 ```
 
-### Windows: one command for API + Web
-
-Use [run_server.bat](run_server.bat) from the repo root to start both backend (FastAPI/uvicorn) and the Next.js dev server together.
-
-What it does:
-- Runs `python src/init_db.py` and `python src/insert_riddles.py` to prep the local DB and seed riddles.
-- Starts the FastAPI server on http://127.0.0.1:8080.
-- Starts the Next.js app on http://localhost:3000 via `npm run dev` in [apps/nextjs-app](apps/nextjs-app).
-
-Requirements:
-- Python 3.10+ with `pip` available.
-- Node 20+ with `npm` and `npx`.
-- Internet access on first run (installs `requirements.txt` and `concurrently`).
-
-Run it:
-
-```
-.\u200brun_server.bat
-```
-
-Stop with Ctrl+C (stops both processes). If you prefer yarn for the frontend, start the API separately and run `yarn dev` inside apps/nextjs-app.
+Then open http://localhost:3000 in your browser.
 
 ## Common Tasks
 
 ```bash
 yarn build          # production build
 yarn start          # run the built app
-yarn lint           # lint code
-yarn check-types    # TypeScript checks
 yarn test           # unit tests (Vitest)
-yarn test-e2e       # Playwright e2e (requires backend)
-yarn storybook      # UI docs at http://localhost:6006
-yarn build-storybook
-yarn generate       # scaffold components with Plop
 ```
 
 ## Project Layout
@@ -60,18 +67,43 @@ yarn generate       # scaffold components with Plop
 
 ```
 EscapeCircuit/
-├── apps/
-│   ├── nextjs-app/           # active frontend (Next.js 14)
-│   │   ├── public/
-│   │   ├── src/
-│   │   ├── playwright.config.ts
-│   │   ├── vitest.config.ts
-│   │   └── package.json
-│   └── react-vite/           # legacy stub (not in use)
-├── docs/                     # high-level docs (features, setup)
-├── riddles/                  # puzzle/riddle assets and tests
-├── src/                      # backend utilities and scripts
-├── package.json              # root scripts (delegates to apps/nextjs-app)
+├── apps/nextjs-app/                    # Next.js 14 frontend
+│   └── src/
+│       ├── app/                        # App Router & pages
+│       │   └── puzzles/[id]/          # Puzzle workspace
+│       ├── components/
+│       │   └── workstation-grid.tsx   # Circuit design canvas (core UI)
+│       ├── features/                   # Redux-like modules
+│       ├── hooks/                      # Custom React hooks
+│       ├── types/api.ts                # API type definitions
+│       └── utils/                      # Helpers & utilities
+│
+├── src/                                # FastAPI backend (Python)
+│   ├── Backend/
+│   │   ├── main.py                    # FastAPI app entry
+│   │   ├── APILayer/
+│   │   │   ├── AdminController.py     # Auth & admin endpoints
+│   │   │   ├── CircuitController.py   # Circuit/puzzle endpoints
+│   │   │   ├── PuzzleController.py    # Puzzle logic endpoints
+│   │   │   └── auth_utils.py          # JWT & security
+│   │   ├── DomainLayer/               # Business logic & models
+│   │   ├── ServiceLayer/              # Data processing services
+│   │   └── PersistantLayer/           # Database queries (SQLite)
+│   │
+│   ├── init_db.py                     # Database initialization
+│   ├── insert_riddles.py              # Seed riddle data
+│   └── seed_admin.py                  # Create admin user
+│
+├── riddles/                            # Puzzle definitions & tests
+│   ├── riddle_01_binary_adder_*       # Sample puzzles
+│   ├── test.py                        # Puzzle validation tests
+│   └── solution.json                  # Expected solutions
+│
+├── docs/                               # Documentation
+│   ├── FEATURES.md                    # Feature overview
+│   └── SETUP.md                       # Setup guide
+│
+├── run_server.bat                      # Windows startup script
 └── README.md
 ```
 
