@@ -564,7 +564,7 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < inputs.length; i++) {
       const id = `IO:IN:${inputs[i]}`;
-      const row = Math.min(i, GRID_ROWS - 1);
+      const row = Math.min(i * 0.8, GRID_ROWS - 1); // Reduced spacing: 0.8 rows per input
       const anchor = toScreenCenter(row, -1); // just left of col 0
       inputsPos[id] = { x: anchor.x, y: anchor.y };
     }
@@ -1048,10 +1048,10 @@ export const WorkstationGrid = ({
                         className={cn(
                           'rounded-full transition-colors',
                           portOcc
-                            ? 'size-1.5 bg-blue-400'
+                            ? 'size-3 bg-blue-400'
                             : occ
-                              ? 'size-1.5 bg-gray-400'
-                              : 'size-0.5 bg-gray-300 hover:size-2 hover:bg-gray-400',
+                              ? 'size-3 bg-gray-400'
+                              : 'size-1 bg-gray-300 hover:size-4 hover:bg-gray-400',
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -1277,10 +1277,10 @@ export const WorkstationGrid = ({
                           : 'border-purple-300 bg-purple-50',
                       )}
                       style={{
-                        left: pl,
-                        top: pt,
-                        width: CELL_PX - 2,
-                        height: CELL_PX - 2,
+                        left: pl + (CELL_PX - 8) / 2,
+                        top: pt + (CELL_PX - 8) / 2,
+                        width: 8,
+                        height: 8,
                       }}
                       onPointerDown={(e) => onStartWireDrag(effective, e)}
                       onPointerUp={(e) => {
