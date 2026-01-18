@@ -9,13 +9,12 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "test-e2e": "pm2 start \"yarn run-mock-server\" --name server && yarn playwright test",
+    "test-e2e": "yarn playwright test",
     "prepare": "husky",
     "check-types": "tsc --project tsconfig.json --pretty --noEmit",
     "generate": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "run-mock-server": "tsx ./mock-server.ts"
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -49,8 +48,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.0.2",
-    "@mswjs/data": "^0.16.1",
-    "@mswjs/http-middleware": "^0.10.1",
     "@playwright/test": "^1.43.1",
     "@storybook/addon-a11y": "^8.0.10",
     "@storybook/addon-actions": "^8.0.9",
@@ -96,7 +93,6 @@
     "js-cookie": "^3.0.5",
     "jsdom": "^24.0.0",
     "lint-staged": "^15.2.2",
-    "msw": "^2.2.14",
     "pino-http": "^10.1.0",
     "pino-pretty": "^11.1.0",
     "plop": "^4.0.1",
@@ -109,8 +105,6 @@
     "typescript": "^5.4.5",
     "vite-tsconfig-paths": "^4.3.2",
     "vitest": "^2.1.4"
-  },
-  "msw": {
-    "workerDirectory": "public"
   }
 }
+

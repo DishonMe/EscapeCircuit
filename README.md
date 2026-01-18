@@ -1,123 +1,99 @@
 # EscapeCircuit 🔌⚡
 
-**"Wire your way out."**
+"Wire your way out."
 
-An interactive puzzle game for creating and solving logic circuits. Design custom puzzles, manage components within budget constraints, and challenge others to solve your creations.
+EscapeCircuit is a web app for creating and solving logic-circuit puzzles.
 
-## Project Overview
+## Quickstart
 
-EscapeCircuit is a web-based application where users can:
-
-- **Solve Logic Puzzles**: Place circuit components and connect them with wires to achieve target outputs
-- **Create Puzzles**: Design custom logic circuit puzzles with configurable difficulty and budgets
-- **Manage Profiles**: Track puzzle-solving achievements and view creation statistics
-- **Browse Puzzles**: Discover and play puzzles created by the community
-- **Moderate Content**: Admin tools for managing puzzles and user submissions
-
-## Tech Stack
-
-- **Frontend**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **UI Components**: Radix UI
-- **State Management**: React Context/Hooks
-- **Testing**: Vitest + Playwright
-- **Code Quality**: ESLint, TypeScript
-
-## Getting Started
-
-### Prerequisites
-- Node.js and Yarn
-
-### Installation
+Prerequisites: Node 20+, Yarn 1.22+.
 
 ```bash
-# Install dependencies for the React Vite app
-yarn prepare
-
-# Navigate to the app directory
-cd apps/react-vite
-
-# Start development server
+cd apps/nextjs-app
+cp .env.example .env   # adjust values if needed
+yarn install
+# start the web app on http://localhost:3000
 yarn dev
 ```
 
-### Available Scripts
+### Windows: one command for API + Web
+
+Use [run_server.bat](run_server.bat) from the repo root to start both backend (FastAPI/uvicorn) and the Next.js dev server together.
+
+What it does:
+- Runs `python src/init_db.py` and `python src/insert_riddles.py` to prep the local DB and seed riddles.
+- Starts the FastAPI server on http://127.0.0.1:8080.
+- Starts the Next.js app on http://localhost:3000 via `npm run dev` in [apps/nextjs-app](apps/nextjs-app).
+
+Requirements:
+- Python 3.10+ with `pip` available.
+- Node 20+ with `npm` and `npx`.
+- Internet access on first run (installs `requirements.txt` and `concurrently`).
+
+Run it:
+
+```
+.\u200brun_server.bat
+```
+
+Stop with Ctrl+C (stops both processes). If you prefer yarn for the frontend, start the API separately and run `yarn dev` inside apps/nextjs-app.
+
+## Common Tasks
 
 ```bash
-# Development
-yarn dev              # Start dev server
-
-# Building
-yarn build           # Build for production
-yarn preview         # Preview production build
-
-# Testing & Quality
-yarn test            # Run unit tests
-yarn test-e2e        # Run end-to-end tests
-yarn lint            # Run ESLint
-yarn check-types     # Type check with TypeScript
-
-# Code Generation
-yarn generate        # Generate new components/files with Plop
-
-# Documentation
-yarn storybook       # Start Storybook development
-yarn build-storybook # Build Storybook
+yarn build          # production build
+yarn start          # run the built app
+yarn lint           # lint code
+yarn check-types    # TypeScript checks
+yarn test           # unit tests (Vitest)
+yarn test-e2e       # Playwright e2e (requires backend)
+yarn storybook      # UI docs at http://localhost:6006
+yarn build-storybook
+yarn generate       # scaffold components with Plop
 ```
 
-## Project Structure
+## Project Layout
+
+- apps/nextjs-app/ — main Next.js 14 App Router client (TypeScript, Tailwind, Zustand, React Query)
+
+### Repository Tree
 
 ```
-apps/react-vite/
-├── src/
-│   ├── components/       # Reusable UI components
-│   ├── features/         # Feature-specific modules
-│   ├── hooks/            # Custom React hooks
-│   ├── lib/              # Utility functions and helpers
-│   ├── types/            # TypeScript type definitions
-│   ├── utils/            # Utility functions
-│   ├── app/              # Main app layout
-│   ├── config/           # Configuration files
-│   └── main.tsx          # Entry point
-├── public/               # Static assets
-└── package.json
+EscapeCircuit/
+├── apps/
+│   ├── nextjs-app/           # active frontend (Next.js 14)
+│   │   ├── public/
+│   │   ├── src/
+│   │   ├── playwright.config.ts
+│   │   ├── vitest.config.ts
+│   │   └── package.json
+│   └── react-vite/           # legacy stub (not in use)
+├── docs/                     # high-level docs (features, setup)
+├── riddles/                  # puzzle/riddle assets and tests
+├── src/                      # backend utilities and scripts
+├── package.json              # root scripts (delegates to apps/nextjs-app)
+└── README.md
 ```
 
-## Features
+## Environment
 
-### Circuit Board
-- Drag-and-drop component placement
-- Visual wire routing and connections
-- Real-time cost calculation
-- Budget tracking against limits
+Copy `.env.example` to `.env` in `apps/nextjs-app` and adjust:
 
-### Puzzle Management
-- Puzzle creation wizard
-- Difficulty configuration
-- Budget constraints
-- Input/output specification
-
-### User Features
-- Profile pages with statistics
-- Puzzle history and achievements
-- Community puzzle browsing
-- Search and filtering
-
-### Admin Tools
-- Content moderation
-- Puzzle review system
-- User management
+- `NEXT_PUBLIC_API_URL` — API base (default `http://localhost:8080/api`)
+- `NEXT_PUBLIC_URL` — app origin (default `http://localhost:3000`)
 
 ## Documentation
 
-For detailed information about project structure, standards, and architectural decisions, see the [docs folder](docs/).
+- Frontend app details live in [apps/nextjs-app/README.md](apps/nextjs-app/README.md)
+- Additional high-level notes are in [docs/FEATURES.md](docs/FEATURES.md)
 
 ## Team
 
-- **Academic Advisor**: Niv Gilboa
-- **Clients**: Gera Weiss and Oded Margalit
-- **Development Team**: Dor Steinlauf, Noam Yosef, Mendy Dishon, Yuval Zarmi
+**Academic Advisor:** Niv Gilboa.
+
+**Clients:** Gera Weiss and Oded Margalit.
+
+**Team:** Dor Steinlauf, Noam Yosef, Mendy Dishon, Yuval Zarmi.
 
 ## License
 

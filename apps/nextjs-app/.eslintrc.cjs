@@ -7,7 +7,6 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   ignorePatterns: [
     'node_modules/*',
-    'public/mockServiceWorker.js',
     'generators/*',
   ],
   extends: ['eslint:recommended', 'next/core-web-vitals'],

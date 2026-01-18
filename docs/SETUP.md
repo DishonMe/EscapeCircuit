@@ -17,138 +17,64 @@ yarn prepare
 # Or manually navigate to the app
 cd apps/react-vite
 yarn install
-```
+# EscapeCircuit Setup Guide
 
-### 2. Environment Configuration
+Current frontend: Next.js app in `apps/nextjs-app`.
 
-Create a `.env.local` file in `apps/react-vite/`:
+## Prerequisites
 
-```env
-# API Configuration
-VITE_API_URL=http://localhost:3000/api
+- Node.js 20+
+- Yarn 1.22+
+- Python 3.10+ (for backend if running locally)
 
-# Feature Flags
-VITE_ENABLE_ADMIN_PANEL=false
-VITE_ENABLE_COMMUNITY_FEATURES=true
-```
-
-## Development
-
-### Start Development Server
+## Install & Run (Frontend)
 
 ```bash
-cd apps/react-vite
-yarn dev
-```
-
-The application will be available at `http://localhost:5173`
-
-### Build for Production
-
-```bash
-yarn build
-```
-
-### Preview Production Build
-
-```bash
-yarn preview
-```
-
-## Testing
-
-### Unit Tests
-
-```bash
-yarn test
-```
-
-### E2E Tests
-
-```bash
-# Start the mock server in one terminal
-yarn run-mock-server
-
-# In another terminal, run tests
-yarn test-e2e
-```
-
-## Code Quality
-
-### Linting
-
-```bash
-yarn lint
-```
-
-### Type Checking
-
-```bash
-yarn check-types
-```
-
-### Generate New Components
-
-```bash
-yarn generate
-```
-
-This uses Plop to scaffold new components with tests.
-
-## Storybook (UI Component Documentation)
-
-```bash
-# Start Storybook
-yarn storybook
-
-# Build Storybook for deployment
-yarn build-storybook
-```
-
-Storybook will be available at `http://localhost:6006`
-
-## Troubleshooting
-
-### Port Already in Use
-If port 5173 is already in use, Vite will automatically use the next available port.
-
-### Module Not Found Errors
-Clear node_modules and reinstall:
-```bash
-rm -rf node_modules
+cd apps/nextjs-app
+cp .env.example .env   # adjust API URL if needed
 yarn install
+yarn dev               # http://localhost:3000
 ```
 
-### Build Fails with TypeScript Errors
-Run type checking separately:
+Key env vars:
+
+- `NEXT_PUBLIC_API_URL` (default `http://localhost:8080/api`)
+- `NEXT_PUBLIC_URL` (default `http://localhost:3000`)
+
+## Backend + Frontend together (Windows)
+
+From repo root:
+
 ```bash
-yarn check-types
+.\run_server.bat
 ```
 
-### E2E Tests Failing
-Ensure the mock server is running and the app is not already running on port 5173.
+This seeds the DB, starts FastAPI on 127.0.0.1:8080, and runs the Next.js dev server on 3000.
 
-## Project Structure Quick Reference
+## Tests & Quality (Frontend)
+
+- `yarn test` — unit (Vitest)
+- `yarn test-e2e` — Playwright (requires backend running)
+- `yarn lint` — lint
+- `yarn check-types` — TypeScript checks
+- `yarn storybook` — UI docs at http://localhost:6006
+- `yarn generate` — scaffold components (Plop)
+
+## Structure (Frontend)
 
 ```
-apps/react-vite/
+apps/nextjs-app/
+├── public/
 ├── src/
-│   ├── app/              # App entry point and routing
-│   ├── components/       # Reusable UI components
-│   ├── features/         # Feature modules
-│   ├── hooks/            # Custom hooks
-│   ├── lib/              # Utilities and helpers
-│   ├── types/            # TypeScript types
-│   └── main.tsx          # React app entry
-├── public/               # Static files
-├── playwright.config.ts  # E2E test configuration
-├── vitest.config.ts      # Unit test configuration
-└── tsconfig.json         # TypeScript configuration
+│   ├── app/
+│   ├── components/
+│   ├── features/
+│   ├── hooks/
+│   ├── lib/
+│   ├── types/
+│   └── utils/
+├── playwright.config.ts
+├── vitest.config.ts
+└── package.json
 ```
-
-## Next Steps
-
-1. Read [ARCHITECTURE.md](ARCHITECTURE.md) to understand the project structure
-2. Check out the [React Vite documentation](https://vitejs.dev/)
-3. Review the example components in `src/components`
-4. Start building features following the established patterns
+```bash
