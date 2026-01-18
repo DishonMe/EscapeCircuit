@@ -1051,7 +1051,7 @@ export const WorkstationGrid = ({
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-gray-400'
-                              : 'size-1 bg-gray-300 hover:size-4 hover:bg-gray-400',
+                              : 'size-1 bg-gray-300 hover:bg-gray-400',
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -1271,7 +1271,7 @@ export const WorkstationGrid = ({
                       type="button"
                       key={port.id}
                       className={cn(
-                        'absolute flex items-center justify-center rounded-full border',
+                        'absolute flex items-center justify-center rounded-full border transition-transform hover:scale-150',
                         port.kind === 'input'
                           ? 'border-green-300 bg-green-50'
                           : 'border-purple-300 bg-purple-50',
@@ -1324,7 +1324,7 @@ export const WorkstationGrid = ({
               <button
                 type="button"
                 key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700 transition-transform hover:scale-125"
                 style={{
                   left: pt.x,
                   top: pt.y,
@@ -1373,7 +1373,7 @@ export const WorkstationGrid = ({
               <button
                 type="button"
                 key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700 transition-transform hover:scale-125"
                 style={{
                   left: pt.x,
                   top: pt.y,
