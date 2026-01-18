@@ -8,8 +8,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest",
-    "test-e2e": "yarn playwright test",
     "prepare": "husky",
     "check-types": "tsc --project tsconfig.json --pretty --noEmit",
     "generate": "plop",
