@@ -564,7 +564,7 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < inputs.length; i++) {
       const id = `IO:IN:${inputs[i]}`;
-      const row = Math.min(i, GRID_ROWS - 1);
+      const row = Math.min(i * 0.8, GRID_ROWS - 1); // Reduced spacing: 0.8 rows per input
       const anchor = toScreenCenter(row, -1); // just left of col 0
       inputsPos[id] = { x: anchor.x, y: anchor.y };
     }
@@ -597,8 +597,17 @@ export const WorkstationGrid = ({
     const nextZoom = clamp(zoom * factor, minZoom, 4);
 
     // keep cursor world point stable
-    const afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
-    const afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
+    let afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
+    let afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
+
+    // Apply pan limits - keep inputs on left, outputs on bottom
+    const minPanX = -(1) * CELL_PX * nextZoom; // Inputs at col -1, keep them very close to left edge
+    const maxPanX = rect.width - GRID_COLS * CELL_PX * nextZoom + 50; // Some right margin
+    const minPanY = 50 - (0) * CELL_PX * nextZoom; // Top margin
+    const maxPanY = rect.height - (GRID_ROWS + 0.5) * CELL_PX * nextZoom - 20; // More room below for outputs
+    
+    afterPanX = clamp(afterPanX, minPanX, maxPanX);
+    afterPanY = clamp(afterPanY, minPanY, maxPanY);
 
     setZoom(nextZoom);
     setPan({ x: afterPanX, y: afterPanY });
@@ -653,10 +662,28 @@ export const WorkstationGrid = ({
 
     const start = panStartRef.current;
     if (!start) return;
-    setPan({
-      x: start.panX + (e.clientX - start.x),
-      y: start.panY + (e.clientY - start.y),
-    });
+    
+    const newPanX = start.panX + (e.clientX - start.x);
+    const newPanY = start.panY + (e.clientY - start.y);
+    
+    // Apply pan limits to keep inputs/outputs in view
+    const el = containerRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      // Keep inputs on left side (col -1), very close to left edge
+      const minPanX = -(1) * CELL_PX * zoom;
+      const maxPanX = rect.width - GRID_COLS * CELL_PX * zoom + 50;
+      // Keep outputs on bottom with more room
+      const minPanY = 50 - (0) * CELL_PX * zoom;
+      const maxPanY = rect.height - (GRID_ROWS + 0.5) * CELL_PX * zoom - 20;
+      
+      setPan({
+        x: clamp(newPanX, minPanX, maxPanX),
+        y: clamp(newPanY, minPanY, maxPanY),
+      });
+    } else {
+      setPan({ x: newPanX, y: newPanY });
+    }
   };
 
   const onPointerUpBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -1048,10 +1075,10 @@ export const WorkstationGrid = ({
                         className={cn(
                           'rounded-full transition-colors',
                           portOcc
-                            ? 'size-1.5 bg-blue-400'
+                            ? 'size-3 bg-blue-400'
                             : occ
-                              ? 'size-1.5 bg-gray-400'
-                              : 'size-0.5 bg-gray-300 hover:size-2 hover:bg-gray-400',
+                              ? 'size-3 bg-gray-400'
+                              : 'size-1 bg-gray-300 hover:bg-gray-400',
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -1271,16 +1298,16 @@ export const WorkstationGrid = ({
                       type="button"
                       key={port.id}
                       className={cn(
-                        'absolute flex items-center justify-center rounded-full border',
+                        'absolute flex items-center justify-center rounded-full border transition-transform hover:scale-150',
                         port.kind === 'input'
                           ? 'border-green-300 bg-green-50'
                           : 'border-purple-300 bg-purple-50',
                       )}
                       style={{
-                        left: pl,
-                        top: pt,
-                        width: CELL_PX - 2,
-                        height: CELL_PX - 2,
+                        left: pl + (CELL_PX - 8) / 2,
+                        top: pt + (CELL_PX - 8) / 2,
+                        width: 8,
+                        height: 8,
                       }}
                       onPointerDown={(e) => onStartWireDrag(effective, e)}
                       onPointerUp={(e) => {
@@ -1324,7 +1351,7 @@ export const WorkstationGrid = ({
               <button
                 type="button"
                 key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125"
                 style={{
                   left: pt.x,
                   top: pt.y,
@@ -1373,7 +1400,7 @@ export const WorkstationGrid = ({
               <button
                 type="button"
                 key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs text-orange-700 transition-transform hover:scale-125"
                 style={{
                   left: pt.x,
                   top: pt.y,
@@ -1415,56 +1442,101 @@ export const WorkstationGrid = ({
           })}
         </div>
 
-        {/* Navigation Indicators */}
+        {/* Persistent Direction Indicators */}
         {(() => {
           if (containerSize.w === 0) return null;
           const indicators: {
             id: string;
             label: string;
-            cls: string;
+            color: string;
+            position: { x: number; y: number };
+            rotation: number;
           }[] = [];
 
-          const In0 = inputs[0] ? ioLayout.inputs[`IO:IN:${inputs[0]}`] : null;
-          const InN =
-            inputs.length > 0
-              ? ioLayout.inputs[`IO:IN:${inputs[inputs.length - 1]}`]
-              : null;
-
-          if (In0 && InN) {
-            // If the bottom-most input is above the visible area
-            if (InN.y < 0) {
+          // Input indicator - positioned above the middle of inputs
+          if (inputs.length > 0) {
+            const firstInput = ioLayout.inputs[`IO:IN:${inputs[0]}`];
+            const lastInput = ioLayout.inputs[`IO:IN:${inputs[inputs.length - 1]}`];
+            
+            if (firstInput && lastInput) {
+              const midY = (firstInput.y + lastInput.y) / 2;
+              const midX = firstInput.x;
+              
+              // Calculate position and rotation
+              let rotation = 0;
+              let posX = midX - 40; // Position to the left of inputs column
+              let posY = Math.max(16, Math.min(containerSize.h - 40, midY - 30));
+              
+              // Determine arrow direction based on where inputs are
+              if (midX < 0) {
+                rotation = 0; // point right (inputs are off-screen left)
+                posX = 16;
+              } else if (midX > containerSize.w) {
+                rotation = 180; // point left (inputs are off-screen right)
+                posX = containerSize.w - 60;
+              } else if (midY < 80) {
+                rotation = -90; // point up (inputs are off-screen top)
+                posY = 16;
+                posX = midX - 30;
+              } else if (midY > containerSize.h - 50) {
+                rotation = 90; // point down (inputs are off-screen bottom)
+                posY = containerSize.h - 40;
+                posX = midX - 30;
+              } else {
+                rotation = 90; // point down (inputs are on-screen, position above)
+                posY = firstInput.y - 60; // Position above topmost input
+                posX = midX - 30;
+              }
+              
               indicators.push({
-                id: 'in-up',
-                label: 'Inputs ↑',
-                cls: 'top-2 left-4',
-              });
-            }
-            // If the top-most input is below the visible area
-            else if (In0.y > containerSize.h) {
-              indicators.push({
-                id: 'in-down',
-                label: 'Inputs ↓',
-                cls: 'bottom-2 left-4',
+                id: 'inputs',
+                label: 'IN',
+                color: 'bg-green-500 text-white',
+                position: { x: posX, y: posY },
+                rotation,
               });
             }
           }
 
-          const Out0 = outputs[0]
-            ? ioLayout.outputs[`IO:OUT:${outputs[0]}`]
-            : null;
-          if (Out0) {
-            // If outputs are above (unlikely given bottom placement, but possible with zoom/pan)
-            if (Out0.y < 0) {
+          // Output indicator - positioned to the left of outputs
+          if (outputs.length > 0) {
+            const firstOutput = ioLayout.outputs[`IO:OUT:${outputs[0]}`];
+            const lastOutput = ioLayout.outputs[`IO:OUT:${outputs[outputs.length - 1]}`];
+            
+            if (firstOutput && lastOutput) {
+              const midX = (firstOutput.x + lastOutput.x) / 2;
+              const midY = firstOutput.y;
+              
+              // Calculate position and rotation
+              let rotation = 0;
+              let posX = Math.max(50, Math.min(containerSize.w - 50, midX - 50));
+              let posY = midY - 40;
+              
+              // Determine arrow direction based on where outputs are
+              if (midY > containerSize.h) {
+                rotation = 90; // point down (outputs are off-screen below)
+                posY = containerSize.h - 24;
+              } else if (midY < 0) {
+                rotation = -90; // point up (outputs are off-screen above)
+                posY = 16;
+              } else if (midX < 100) {
+                rotation = 0; // point right (outputs are off-screen left)
+                posX = 16;
+              } else if (midX > containerSize.w - 50) {
+                rotation = 180; // point left (outputs are off-screen right)
+                posX = containerSize.w - 60;
+              } else {
+                rotation = 0; // point right (outputs are on-screen, position to left)
+                posX = firstOutput.x - 90; // Position to the left of leftmost output
+                posY = midY - 15;
+              }
+              
               indicators.push({
-                id: 'out-up',
-                label: 'Outputs ↑',
-                cls: 'top-2 left-1/2 -translate-x-1/2',
-              });
-            } else if (Out0.y > containerSize.h) {
-              indicators.push({
-                id: 'out-down',
-                label: 'Outputs ↓',
-                cls: 'bottom-2 left-1/2 -translate-x-1/2',
+                id: 'outputs',
+                label: 'OUT',
+                color: 'bg-orange-500 text-white',
+                position: { x: posX, y: posY },
+                rotation,
               });
             }
           }
@@ -1473,11 +1545,25 @@ export const WorkstationGrid = ({
             <div
               key={ind.id}
               className={cn(
-                'absolute z-40 animate-bounce rounded bg-white/90 px-3 py-1.5 text-xs font-bold shadow-md ring-1 ring-gray-200 backdrop-blur-sm',
-                ind.cls,
+                'absolute z-40 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 ring-black/10',
+                ind.color,
               )}
+              style={{
+                left: ind.position.x,
+                top: ind.position.y,
+              }}
             >
-              {ind.label}
+              <span>{ind.label}</span>
+              <svg
+                viewBox="0 0 16 16"
+                className="size-3"
+                fill="currentColor"
+                style={{
+                  transform: `rotate(${ind.rotation}deg)`,
+                }}
+              >
+                <path d="M8 0l8 8-8 8V0z" />
+              </svg>
             </div>
           ));
         })()}
