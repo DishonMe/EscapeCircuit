@@ -19,6 +19,15 @@ echo Starting EscapeCircuit (Backend and Frontend)...
 @REM )
 
 echo.
+echo Seeding admin user...
+python src\seed_admin.py
+if errorlevel 1 (
+    echo Admin seeding failed.
+    pause
+    exit /b 1
+)
+
+echo.
 echo Starting servers...
 echo Press Ctrl+C to stop both servers.
 
