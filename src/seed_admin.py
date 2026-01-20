@@ -10,7 +10,7 @@ from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
 
 def seed_admin():
-    db_path = 'escape_circuit.db'
+    db_path = '../escape_circuit.db'
     print(f"Connecting to {db_path}...")
     conn = sqlite3.connect(db_path)
     repo = UserRepo(conn)
