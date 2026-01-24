@@ -290,12 +290,15 @@ class SolvingService:
             if input_stream is None and isinstance(tc, dict):
                 input_stream = tc.get("input_stream")
                 
-            if input_stream is not None:
+            if input_stream is not None and len(input_stream) > 0:
                 # === SEQUENTIAL SIMULATION (INJECTED LOGIC) ===
                 # 'current_state' acts as our look-back history
                 current_state = {str(did): 0 for did in dff_ids}
                 
-                expected_stream = getattr(tc, "expected_output_stream", None) or tc.get("expected_output_stream")
+                expected_stream = getattr(tc, "expected_output_stream", None) or tc.get("expected_output_stream", {})
+                if not expected_stream:
+                    return False, "Sequential test case has input_stream but no expected_output_stream", [{"error": "malformed test case"}]
+                    
                 actual_stream = {k: [] for k in expected_stream.keys()}
                 
                 # Loop through discrete time steps (cycles)

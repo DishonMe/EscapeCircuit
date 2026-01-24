@@ -1,28 +1,28 @@
 @echo off
 echo Starting EscapeCircuit (Backend and Frontend)...
-@REM echo.
-@REM echo Initializing database...
-@REM python src\init_db.py
-@REM if errorlevel 1 (
-@REM     echo Database initialization failed.
-@REM     pause
-@REM     exit /b 1
-@REM )
+echo.
+echo Initializing database...
+python src\init_db.py
+if errorlevel 1 (
+    echo Database initialization failed.
+    pause
+    exit /b 1
+)
 
-@REM echo.
-@REM echo Loading riddles...
-@REM python src\insert_riddles.py
-@REM if errorlevel 1 (
-@REM     echo Riddle loading failed.
-@REM     pause
-@REM     exit /b 1
-@REM )
+echo.
+echo Loading riddles...
+python src\insert_riddles.py
+if errorlevel 1 (
+    echo Riddle loading failed.
+    pause
+    exit /b 1
+)
 
 echo.
 echo Seeding admin user...
 python src\seed_admin.py
 if errorlevel 1 (
-    echo Admin seeding failed.
+    echo Admin user seeding failed.
     pause
     exit /b 1
 )

@@ -39,6 +39,8 @@ class PuzzleRepo:
             kind TEXT NOT NULL,
             inputs TEXT NOT NULL,
             expected_outputs TEXT NOT NULL,
+            input_stream TEXT,
+            expected_output_stream TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(puzzle_id) REFERENCES puzzles(id) ON DELETE CASCADE
         );
@@ -137,13 +139,15 @@ class PuzzleRepo:
 
     def add_test_case(self, tc: PuzzleTestCase) -> PuzzleTestCase:
         cur = self.conn.execute("""
-            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, created_at)
-            VALUES(?,?,?,?,?)
+            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, created_at)
+            VALUES(?,?,?,?,?,?,?)
         """, (
             tc.puzzle_id,
             tc.kind.value,
-            json.dumps(tc.inputs),
-            json.dumps(tc.expected_outputs),
+            json.dumps(tc.inputs) if tc.inputs else json.dumps({}),
+            json.dumps(tc.expected_outputs) if tc.expected_outputs else json.dumps({}),
+            json.dumps(tc.input_stream) if tc.input_stream else None,
+            json.dumps(tc.expected_output_stream) if tc.expected_output_stream else None,
             tc.created_at.isoformat(),
         ))
         tc.id = int(cur.lastrowid)
@@ -158,8 +162,10 @@ class PuzzleRepo:
                 "id": int(r["id"]),
                 "puzzle_id": int(r["puzzle_id"]),
                 "kind": r["kind"],
-                "inputs": json.loads(r["inputs"]),
-                "expected_outputs": json.loads(r["expected_outputs"]),
+                "inputs": json.loads(r["inputs"]) if r["inputs"] else {},
+                "expected_outputs": json.loads(r["expected_outputs"]) if r["expected_outputs"] else {},
+                "input_stream": json.loads(r["input_stream"]) if r["input_stream"] else [],
+                "expected_output_stream": json.loads(r["expected_output_stream"]) if r["expected_output_stream"] else {},
                 "created_at": r["created_at"],
             })
             for r in rows
