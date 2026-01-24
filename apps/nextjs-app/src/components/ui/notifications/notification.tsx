@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Info, CircleAlert, CircleX, CircleCheck } from 'lucide-react';
 
 const icons = {
@@ -25,6 +26,14 @@ export const Notification = ({
   notification: { id, type, title, message },
   onDismiss,
 }: NotificationProps) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss(id);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [id, onDismiss]);
+
   return (
     <div className="flex w-full flex-col items-center space-y-4 sm:items-end">
       <div className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black/5">
