@@ -28,6 +28,18 @@ if errorlevel 1 (
 )
 
 echo.
+echo Installing frontend dependencies...
+cd apps\nextjs-app
+call npm install
+if errorlevel 1 (
+    echo Frontend dependency installation failed.
+    cd ..\..
+    pause
+    exit /b 1
+)
+cd ..\..
+
+echo.
 echo Starting servers...
 echo Press Ctrl+C to stop both servers.
 
