@@ -21,6 +21,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# 3. Seed Admin User
+echo ""
+echo "Seeding admin user..."
+python3 src/seed_admin.py
+if [ $? -ne 0 ]; then
+    echo "Admin user seeding failed."
+    exit 1
+fi
+
 echo ""
 echo "Starting servers..."
 echo "Press Ctrl+C to stop both servers."

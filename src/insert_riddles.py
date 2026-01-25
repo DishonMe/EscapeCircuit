@@ -97,38 +97,43 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
     for tc in test_cases:
         # Handle sequential variation
         inputs = tc.get('inputs')
-        if inputs is None:
+        expected_outputs = tc.get('expected_outputs')
+        input_stream = tc.get('input_stream')
+        expected_output_stream = tc.get('expected_output_stream')
+        
+        # For backward compatibility: convert input_stream to inputs if needed
+        if inputs is None and input_stream is not None:
             # It's a stream (list), map it to input names if possible
-            input_stream = tc.get('input_stream')
-            if input_stream is not None:
-                # Get input names from puzzle config
-                # Config might have "inputs" or "input"
-                input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
-                if len(input_names) == 1:
-                    # Single input case (e.g. "X")
-                    inputs = {input_names[0]: input_stream}
-                else:
-                    # Fallback if multiple inputs or unknown structure (shouldn't happen for riddle 3)
-                    inputs = {"IN": input_stream}
+            # Get input names from puzzle config
+            # Config might have "inputs" or "input"
+            input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
+            if len(input_names) == 1:
+                # Single input case (e.g. "X")
+                inputs = {input_names[0]: input_stream}
             else:
-                inputs = {}
-            
-        outputs = tc.get('expected_outputs')
-        if outputs is None:
-            outputs = tc.get('expected_output_stream')
+                # Fallback if multiple inputs or unknown structure
+                inputs = {"IN": input_stream}
+        
+        # Map expected_output_stream to expected_outputs if needed
+        if expected_outputs is None:
+            expected_outputs = expected_output_stream
             
         inputs_json = json.dumps(inputs or {})
-        outputs_json = json.dumps(outputs or {})
+        expected_outputs_json = json.dumps(expected_outputs or {})
+        input_stream_json = json.dumps(input_stream) if input_stream else None
+        expected_output_stream_json = json.dumps(expected_output_stream) if expected_output_stream else None
         
         c.execute("""
             INSERT INTO puzzle_test_cases (
-                puzzle_id, kind, inputs, expected_outputs, created_at
-            ) VALUES (?, ?, ?, ?, ?)
+                puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_id,
             'blackbox',
             inputs_json,
-            outputs_json,
+            expected_outputs_json,
+            input_stream_json,
+            expected_output_stream_json,
             utcnow()
         ))
         

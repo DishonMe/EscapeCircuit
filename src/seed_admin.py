@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import os
+from pathlib import Path
 
 # Add src to path if needed (though running from root usually works if we import from Backend)
 # sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -10,7 +11,8 @@ from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
 
 def seed_admin():
-    db_path = '../escape_circuit.db'
+    # Use same path as Backend/main.py: parent.parent.parent / "escape_circuit.db"
+    db_path = Path(__file__).parent.parent / "escape_circuit.db"
     print(f"Connecting to {db_path}...")
     conn = sqlite3.connect(db_path)
     repo = UserRepo(conn)
