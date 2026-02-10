@@ -3,3 +3,5 @@ uvicorn
 pydantic
 pytest
 python-multipart
+google-auth
+requests

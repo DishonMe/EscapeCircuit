@@ -17,6 +17,10 @@ class LoginReq(BaseModel):
     password: str
 
 
+class GoogleLoginReq(BaseModel):
+    token: str
+
+
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
@@ -41,6 +45,13 @@ def build_user_router(user_service: UserService) -> APIRouter:
                 raise HTTPException(status_code=404, detail="User not found. Please register.")
             else:
                 raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/google-login")
+    def google_login(req: GoogleLoginReq):
+        try:
+            return user_service.google_login(req.token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
 
     @router.post("/logout")
     def logout(token: str = Depends(verify_token)):

@@ -1,5 +1,10 @@
 from typing import Dict, Any, List
 
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
+import os
+
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
@@ -78,6 +83,52 @@ class UserService:
             d["is_experienced"] = self.xp.is_experienced(u.xp)
             out.append(d)
         return out
+
+    def google_login(self, token: str) -> dict:
+        """Verify a Google id_token, find-or-create the user, and return a session."""
+        if not token:
+            raise ValidationError("token is required")
+
+        google_client_id = os.environ.get(
+            "GOOGLE_CLIENT_ID",
+            "138879283241-0kfmc6auoir4a5ao9btos3hhklgee1jm.apps.googleusercontent.com",
+        )
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                token, google_requests.Request(), audience=google_client_id
+            )
+        except Exception as e:
+            raise ValidationError(f"invalid google token: {e}")
+
+        email = idinfo.get("email")
+        name = idinfo.get("name", "")
+        if not email:
+            raise ValidationError("google token missing email")
+
+        # Look up existing user by email
+        user = self.user_repo.get_by_email(email)
+
+        if not user:
+            # Pick a unique username (Google name may collide with existing usernames)
+            base_username = name or email.split("@")[0]
+            username = base_username
+            counter = 1
+            while self.user_repo.get_by_username(username):
+                username = f"{base_username}_{counter}"
+                counter += 1
+
+            # Create a new SOLVER user (no password)
+            new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+            user = self.user_repo.create(new_user, password=None)
+
+        # Log in via trusted external path (no password check)
+        session_token = self.auth.login_external(user.id)
+
+        d = user.to_dict()
+        d["level"] = self.xp.calculate_level(user.xp)
+        d["is_experienced"] = self.xp.is_experienced(user.xp)
+        return {"token": session_token, "user": d}
 
     def set_role(self, session_token: str, payload: Dict[str, Any]) -> dict:
         admin_id = self.auth.require_user_id(session_token)

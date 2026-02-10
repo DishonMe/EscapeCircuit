@@ -65,6 +65,20 @@ class AuthService:
 
         return token
 
+    def login_external(self, user_id: int) -> str:
+        """Create a session for a user verified by an external provider (e.g. Google).
+        Skips password verification – caller is responsible for identity validation."""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+
+        token = secrets.token_urlsafe(32)
+        now = time.time()
+        with self._lock:
+            self._cleanup_expired_locked()
+            self._sessions[token] = SessionInfo(user_id=user.id, created_at=now, last_seen=now)
+        return token
+
     def logout(self, token: str) -> None:
         token = (token or "").strip()
         if not token:
