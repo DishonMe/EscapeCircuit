@@ -31,6 +31,7 @@ class UserService:
         # Domain objects require a truthy id; repo will replace it on insert.
         user = User(id=0, username=username, role=UserRole.SOLVER, xp=0)
         created = self.user_repo.create(user, password=password)
+        self.user_repo.conn.commit()
         
         # Auto login
         token = self.auth.login(username, password)

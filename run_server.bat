@@ -6,10 +6,9 @@ echo.
 echo Cleaning up stale processes...
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM uvicorn.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
-:: Remove SQLite WAL/SHM lock files if present
-del /q "%~dp0escape_circuit.db-wal" >nul 2>&1
-del /q "%~dp0escape_circuit.db-shm" >nul 2>&1
+timeout /t 2 /nobreak >nul
+:: Note: Do NOT delete WAL/SHM files — SQLite recovers them automatically
+:: and deleting them can lose committed data
 echo Done.
 echo.
 

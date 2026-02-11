@@ -134,6 +134,11 @@ export const PuzzlesList = () => {
                 <div className="flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
                   <CheckCircle2 className="size-3.5" />
                   <span>Solved</span>
+                  {puzzle.best_medal && puzzle.best_medal >= 1 && (
+                    <span className="ml-1">
+                      {puzzle.best_medal >= 3 ? '🥇' : puzzle.best_medal === 2 ? '🥈' : '🥉'}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">

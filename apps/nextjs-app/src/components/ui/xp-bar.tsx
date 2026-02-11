@@ -3,26 +3,19 @@
 import { useMemo } from 'react';
 
 /**
- * Level thresholds matching the backend XPService.
- * Index = level (1-based), value = minimum XP for that level.
+ * Level formula matching the backend XPService:
+ * level = floor(sqrt(xp / 100)) + 1
+ *
+ * Threshold for level L = (L-1)^2 * 100
  */
-const LEVEL_THRESHOLDS = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000];
-
 function getLevelInfo(xp: number) {
-  let level = 1;
-  for (let i = 0; i < LEVEL_THRESHOLDS.length; i++) {
-    if (xp >= LEVEL_THRESHOLDS[i]) {
-      level = i + 1;
-    }
-  }
+  const safeXp = Math.max(0, xp);
+  const level = Math.floor(Math.sqrt(safeXp / 100)) + 1;
 
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1] ?? 0;
-  const nextThreshold =
-    level < LEVEL_THRESHOLDS.length
-      ? LEVEL_THRESHOLDS[level]
-      : LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1] + 2000; // beyond max
+  const currentThreshold = (level - 1) ** 2 * 100;
+  const nextThreshold = level ** 2 * 100;
 
-  const xpIntoLevel = xp - currentThreshold;
+  const xpIntoLevel = safeXp - currentThreshold;
   const xpForLevel = nextThreshold - currentThreshold;
   const pct = xpForLevel > 0 ? Math.min(100, (xpIntoLevel / xpForLevel) * 100) : 100;
 

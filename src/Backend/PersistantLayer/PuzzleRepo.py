@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from Backend.DomainLayer.Puzzle import Puzzle
 from Backend.DomainLayer.PuzzleTestCase import PuzzleTestCase
-from Backend.DomainLayer.Enums import PuzzleStatus, GateType
+from Backend.DomainLayer.Enums import PuzzleStatus, GateType, PuzzleDifficulty
 
 
 class PuzzleRepo:
@@ -24,6 +24,7 @@ class PuzzleRepo:
             status TEXT NOT NULL,
             budget INTEGER NOT NULL,
             time_limit_seconds INTEGER,
+            difficulty TEXT NOT NULL DEFAULT 'EASY',
             default_gate_set TEXT NOT NULL,
             rating_count INTEGER NOT NULL,
             avg_difficulty REAL NOT NULL,
@@ -32,6 +33,13 @@ class PuzzleRepo:
             created_at TEXT NOT NULL
         );
         """)
+        # Migrate existing DBs that lack the difficulty column
+        try:
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzles);").fetchall()}
+            if "difficulty" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'EASY';")
+        except Exception:
+            pass
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS puzzle_test_cases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,10 +58,10 @@ class PuzzleRepo:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
                 name, creator_user_id, description, status,
-                budget, time_limit_seconds, default_gate_set,
+                budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, avg_difficulty, avg_fun, avg_clearness,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
@@ -61,6 +69,7 @@ class PuzzleRepo:
             puzzle.status.value,
             puzzle.budget,
             puzzle.time_limit_seconds,
+            puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
             puzzle.avg_difficulty,
@@ -84,6 +93,7 @@ class PuzzleRepo:
                 status=?,
                 budget=?,
                 time_limit_seconds=?,
+                difficulty=?,
                 default_gate_set=?,
                 rating_count=?,
                 avg_difficulty=?,
@@ -97,6 +107,7 @@ class PuzzleRepo:
             puzzle.status.value,
             puzzle.budget,
             puzzle.time_limit_seconds,
+            puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
             float(puzzle.avg_difficulty),
@@ -174,6 +185,11 @@ class PuzzleRepo:
     @staticmethod
     def _row_to_puzzle(row: sqlite3.Row) -> Puzzle:
         gate_values = json.loads(row["default_gate_set"])
+        # Safely read difficulty — may be missing in old DBs
+        try:
+            diff_val = row["difficulty"]
+        except (IndexError, KeyError):
+            diff_val = "EASY"
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -182,6 +198,7 @@ class PuzzleRepo:
             "status": row["status"],
             "budget": int(row["budget"]),
             "time_limit_seconds": row["time_limit_seconds"],
+            "difficulty": diff_val or "EASY",
             "default_gate_set": gate_values,
             "rating_count": int(row["rating_count"]),
             "avg_difficulty": float(row["avg_difficulty"]),

@@ -53,6 +53,7 @@ class SolveRepo:
             "cost_used INTEGER",
             "time_taken_seconds INTEGER",
             "xp_earned INTEGER DEFAULT 0",
+            "highest_medal INTEGER DEFAULT 0",
         ]:
             self._add_column_if_missing("solve_attempts", coldef)
 
@@ -192,12 +193,13 @@ class SolveRepo:
     # --- solve status map ---
     def get_solve_status_map(self, user_id: int) -> Dict[int, dict]:
         """Return a mapping of puzzle_id -> solve metadata for all puzzles
-        the user has passed.  Includes best time and total xp earned."""
+        the user has passed.  Includes best time, total xp, and best medal."""
         rows = self.conn.execute(
             """
             SELECT puzzle_id,
                    MIN(time_taken_seconds) AS best_time,
                    SUM(xp_earned)          AS total_xp,
+                   MAX(highest_medal)      AS best_medal,
                    MIN(submitted_at)       AS first_solved_at
             FROM solve_attempts
             WHERE user_id = ? AND passed = 1
@@ -211,6 +213,7 @@ class SolveRepo:
                 "is_solved": True,
                 "best_time": r["best_time"],
                 "total_xp": r["total_xp"] or 0,
+                "best_medal": r["best_medal"] or 0,
                 "first_solved_at": r["first_solved_at"],
             }
         return result
@@ -228,16 +231,28 @@ class SolveRepo:
         ).fetchone()
         return int(row["best_xp"]) if row and row["best_xp"] is not None else 0
 
-    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int) -> int:
-        """Convenience: insert a passed attempt with time/xp metadata and return its id."""
+    def get_solved_counts(self) -> Dict[int, int]:
+        """Return a mapping of puzzle_id -> number of distinct users who solved it."""
+        rows = self.conn.execute(
+            """
+            SELECT puzzle_id, COUNT(DISTINCT user_id) AS solver_count
+            FROM solve_attempts
+            WHERE passed = 1
+            GROUP BY puzzle_id
+            """
+        ).fetchall()
+        return {int(r["puzzle_id"]): int(r["solver_count"]) for r in rows}
+
+    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0) -> int:
+        """Convenience: insert a passed attempt with time/xp/medal metadata and return its id."""
         from Backend.DomainLayer.Utils import utcnow
         now = utcnow()
         cur = self.conn.execute(
             """
-            INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed, time_taken_seconds, xp_earned)
-            VALUES(?,?,?,?,1,?,?)
+            INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed, time_taken_seconds, xp_earned, highest_medal)
+            VALUES(?,?,?,?,1,?,?,?)
             """,
-            (int(puzzle_id), int(user_id), now, now, int(time_taken_seconds), int(xp_earned)),
+            (int(puzzle_id), int(user_id), now, now, int(time_taken_seconds), int(xp_earned), int(medal)),
         )
         return int(cur.lastrowid)
 

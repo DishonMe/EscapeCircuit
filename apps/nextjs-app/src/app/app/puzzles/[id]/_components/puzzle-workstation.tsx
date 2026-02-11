@@ -46,7 +46,7 @@ const EMPTY_COMPONENTS: CircuitComponent[] = [];
 
 type PostCheckState =
   | { open: false }
-  | { open: true; solved: boolean; message: string };
+  | { open: true; solved: boolean; message: string; medal?: string };
 
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
@@ -557,7 +557,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         solution: buildSolution(),
         timeTaken,
       });
-      setPostCheck({ open: true, solved: res.solved, message: res.message });
+      setPostCheck({ open: true, solved: res.solved, message: res.message, medal: res.medal });
 
       if (res.solved) {
         setIsSolved(true);
@@ -949,8 +949,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           {/* Visual Fix: Modal Text Overflow */}
           <div className="max-h-[60vh] overflow-y-auto break-words text-sm text-gray-700">
             {postCheck.open && postCheck.solved ? (
-              <div>
-                Congrats! Time, cost, and other stats can be shown here.
+              <div className="space-y-2">
+                {postCheck.medal && postCheck.medal !== 'NONE' && (
+                  <div className="flex items-center gap-2 text-lg font-semibold">
+                    <span>
+                      {postCheck.medal === 'GOLD' ? '🥇' : postCheck.medal === 'SILVER' ? '🥈' : '🥉'}
+                    </span>
+                    <span className={
+                      postCheck.medal === 'GOLD' ? 'text-yellow-500' :
+                      postCheck.medal === 'SILVER' ? 'text-gray-400' :
+                      'text-amber-700'
+                    }>
+                      {postCheck.medal} Medal
+                    </span>
+                  </div>
+                )}
+                <p>Congrats! Your solution passed all test cases.</p>
               </div>
             ) : (
               <div>

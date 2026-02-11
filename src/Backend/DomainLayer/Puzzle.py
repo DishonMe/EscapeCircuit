@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Set
 
-from .Enums import GateType, PuzzleStatus
+from .Enums import GateType, PuzzleStatus, PuzzleDifficulty
 from .Exceptions import ValidationError
 from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_optional_positive_int, ensure_gate_set
 
@@ -16,6 +16,7 @@ class Puzzle:
 
     budget: int = 0
     time_limit_seconds: Optional[int] = None
+    difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
 
     rating_count: int = 0
@@ -60,14 +61,6 @@ class Puzzle:
             self.status = PuzzleStatus.UNPUBLISHED
 
     def to_dict(self) -> dict:
-        # Helper to map avg_difficulty (float 0-10 or similar) to Enum strings
-        # Assuming: <3 EASY, <7 MEDIUM, >=7 HARD. Adjust logic as needed.
-        diff_str = "EASY"
-        if self.avg_difficulty >= 7:
-            diff_str = "HARD"
-        elif self.avg_difficulty >= 4:
-            diff_str = "MEDIUM"
-        
         return {
             "id": str(self.id), # Frontend often expects string IDs or handles both
             "name": self.name,
@@ -80,7 +73,7 @@ class Puzzle:
             "budgetLimit": self.budget,
             "time_limit_seconds": self.time_limit_seconds,
             "timeLimit": self.time_limit_seconds, # Alias for frontend
-            "difficulty": diff_str, # Mapped for frontend
+            "difficulty": self.difficulty.value, # Creator-set difficulty
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
@@ -106,6 +99,7 @@ class Puzzle:
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
             time_limit_seconds=d.get("time_limit_seconds", None),
+            difficulty=PuzzleDifficulty(d["difficulty"]) if "difficulty" in d else PuzzleDifficulty.EASY,
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
             rating_count=int(d.get("rating_count", 0)),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),

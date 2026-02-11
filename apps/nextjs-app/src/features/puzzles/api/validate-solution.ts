@@ -11,6 +11,8 @@ export type ValidateSolutionResponse = {
   message: string;
   xp_earned?: number;
   time_taken?: number;
+  medal?: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD';
+  medal_value?: number;
 };
 
 export const validateSolution = ({
