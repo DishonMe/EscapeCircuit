@@ -69,6 +69,11 @@ export type Puzzle = Entity<{
   solvedCount: number;
   isPublic: boolean;
   solution?: CircuitSolution;
+
+  // Solve tracking (injected per-user by browse endpoint)
+  is_solved?: boolean;
+  best_time?: number | null;
+  total_xp?: number;
 }>;
 
 export type CircuitComponent = {

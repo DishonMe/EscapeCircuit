@@ -39,6 +39,7 @@ class SolveReq(BaseModel):
 
 class ValidateSolutionReq(BaseModel):
     solution: Dict[str, Any]
+    time_taken: int = 0
 
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService) -> APIRouter:
@@ -56,7 +57,30 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             if page is not None and page > 0:
                 offset = (page - 1) * limit
                 
-            return puzzle_service.browse(token, limit=limit, offset=offset)
+            result = puzzle_service.browse(token, limit=limit, offset=offset)
+
+            # Inject is_solved status per puzzle for the current user
+            try:
+                from Backend.ServiceLayer.AuthService import AuthService
+                user_id = puzzle_service.auth.require_user_id(token)
+                if puzzle_service.solve_repo:
+                    status_map = puzzle_service.solve_repo.get_solve_status_map(user_id)
+                    for p in result.get("data", []):
+                        pid = p.get("id")
+                        try:
+                            pid = int(pid)
+                        except (TypeError, ValueError):
+                            pid = None
+                        if pid and pid in status_map:
+                            p["is_solved"] = True
+                            p["best_time"] = status_map[pid].get("best_time")
+                            p["total_xp"] = status_map[pid].get("total_xp", 0)
+                        else:
+                            p["is_solved"] = False
+            except Exception:
+                pass  # gracefully degrade if solve_repo unavailable
+
+            return result
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
@@ -129,7 +153,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     @router.post("/{puzzle_id}/validate")
     def validate(puzzle_id: int, req: ValidateSolutionReq, token: str = Depends(verify_token)):
         try:
-            return solving_service.validate_solution(token, puzzle_id, req.solution)
+            return solving_service.validate_solution(token, puzzle_id, req.solution, time_taken=req.time_taken)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 

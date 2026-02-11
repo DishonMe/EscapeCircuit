@@ -29,7 +29,7 @@ class UserService:
             raise ValidationError("username already exists")
 
         # Domain objects require a truthy id; repo will replace it on insert.
-        user = User(id="0", username=username, role=UserRole.SOLVER, xp=0)
+        user = User(id=0, username=username, role=UserRole.SOLVER, xp=0)
         created = self.user_repo.create(user, password=password)
         
         # Auto login

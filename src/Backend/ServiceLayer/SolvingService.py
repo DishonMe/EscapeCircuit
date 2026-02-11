@@ -7,6 +7,7 @@ from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
@@ -23,11 +24,13 @@ class SolvingService:
         auth: AuthService,
         logic_engine: logicEngineService,
         xp_service: XPService,
+        user_repo: UserRepo | None = None,
     ):
         self.conn = conn
         self.solve_repo = solve_repo
         self.puzzle_repo = puzzle_repo
         self.circuit_repo = circuit_repo
+        self.user_repo = user_repo
         self.auth = auth
         self.logic_engine = logic_engine
         self.xp_service = xp_service
@@ -224,11 +227,12 @@ class SolvingService:
         }
 
     # ---------- New Validation Logic (Stateless) ----------
-    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], time_taken: int = 0) -> Dict[str, Any]:
         """
         Stateless validation of a solution attempt.
+        If the solution passes, persist the solve with time/xp metadata.
         """
-        _ = self.auth.require_user_id(token)
+        user_id = self.auth.require_user_id(token)
         
         p = self.puzzle_repo.get_by_id(puzzle_id)
         if not p:
@@ -250,7 +254,46 @@ class SolvingService:
         passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases)
         
         if passed:
-            return {"solved": True, "message": "All test cases passed!"}
+            # --- Calculate raw XP for this solve based on difficulty tier ---
+            raw_xp = 100  # default
+            if hasattr(self.xp_service, 'easy_xp'):
+                avg_diff = getattr(p, 'avg_difficulty', None)
+                if avg_diff is not None:
+                    tier = self.xp_service.tier_from_avg_difficulty(avg_diff) if hasattr(self.xp_service, 'tier_from_avg_difficulty') else 'easy'
+                else:
+                    tier = 'easy'
+                raw_xp = getattr(self.xp_service, f'{tier}_xp', 100)
+
+            # --- Relative XP: only award the improvement over previous best ---
+            previous_best_xp = 0
+            if hasattr(self.solve_repo, 'get_best_xp_for_puzzle'):
+                previous_best_xp = self.solve_repo.get_best_xp_for_puzzle(user_id, puzzle_id)
+
+            # The XP actually granted this attempt is max(0, raw - previous_best)
+            xp_earned = max(0, raw_xp - previous_best_xp)
+
+            if hasattr(self.solve_repo, 'add_solve'):
+                self.solve_repo.add_solve(
+                    user_id=user_id,
+                    puzzle_id=puzzle_id,
+                    time_taken_seconds=max(0, int(time_taken)),
+                    xp_earned=xp_earned,
+                )
+
+            # --- Accumulate XP on the User entity (only the delta) ---
+            if self.user_repo is not None and xp_earned > 0:
+                user = self.user_repo.get_by_id(user_id)
+                if user:
+                    new_xp = int(user.xp) + int(xp_earned)
+                    self.user_repo.update_xp(user_id, new_xp)
+
+            self.conn.commit()
+
+            msg = "All test cases passed!"
+            if xp_earned == 0:
+                msg += " No XP improvement this time."
+
+            return {"solved": True, "message": msg, "xp_earned": xp_earned, "time_taken": int(time_taken)}
         else:
             return {"solved": False, "message": fail_msg, "details": details}
 

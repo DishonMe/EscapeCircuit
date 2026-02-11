@@ -1,6 +1,18 @@
 @echo off
 echo Starting EscapeCircuit (Backend and Frontend)...
 echo.
+
+:: Kill any stale Python/uvicorn processes that may be locking the database
+echo Cleaning up stale processes...
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM uvicorn.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+:: Remove SQLite WAL/SHM lock files if present
+del /q "%~dp0escape_circuit.db-wal" >nul 2>&1
+del /q "%~dp0escape_circuit.db-shm" >nul 2>&1
+echo Done.
+echo.
+
 echo Initializing database...
 python src\init_db.py
 if errorlevel 1 (
@@ -48,7 +60,7 @@ echo Press Ctrl+C to stop both servers.
 :: --names: labels for output
 :: -c: colors for output
 call npx -y concurrently -k -n "API,WEB" -c "blue,magenta" ^
-  "pip install -r requirements.txt && cd src && python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8080" ^
+  "pip install -r requirements.txt && cd src && python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8081" ^
   "cd apps\nextjs-app && npm run dev"
 
 pause

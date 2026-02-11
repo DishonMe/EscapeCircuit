@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown';
 import { Link } from '@/components/ui/link';
+import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
@@ -86,6 +87,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </nav>
         </div>
         <div className="flex items-center gap-4">
+          <XPBar currentXP={user.data?.xp ?? 0} />
           <Drawer>
             <DrawerTrigger asChild>
               <Button size="icon" variant="outline" className="sm:hidden">
