@@ -108,3 +108,30 @@ const registerWithEmailAndPassword = (
 ): Promise<AuthResponse> => {
   return api.post('/users/register', data);
 };
+
+// --- Google Login ---
+
+const loginWithGoogle = (token: string): Promise<AuthResponse> => {
+  return api.post('/users/google-login', { token });
+};
+
+export const useGoogleLogin = ({
+  onSuccess,
+  onError,
+}: {
+  onSuccess?: () => void;
+  onError?: (error: any) => void;
+}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: loginWithGoogle,
+    onSuccess: (data) => {
+      queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      onSuccess?.();
+    },
+    onError: (error) => {
+      onError?.(error);
+    },
+  });
+};

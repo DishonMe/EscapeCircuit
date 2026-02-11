@@ -45,6 +45,7 @@ class UserRepo:
             "INSERT INTO users(username, email, role, bio, xp, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?,?,?)",
             (user.username, user.email, user.role.value, user.bio, user.xp, user.created_at.isoformat(), salt, pw_hash),
         )
+        self.conn.commit()
         new_id = int(cur.lastrowid)
         return User(id=new_id, username=user.username, email=user.email, role=user.role, bio=user.bio, xp=user.xp, created_at=user.created_at)
 
@@ -62,6 +63,18 @@ class UserRepo:
 
     def get_by_username(self, username: str) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        return User.from_dict({
+            "id": int(row["id"]),
+            "username": row["username"],
+            "email": row["email"],
+            "role": row["role"],
+            "bio": row["bio"],
+            "xp": int(row["xp"]),
+            "created_at": row["created_at"],
+        }) if row else None
+
+    def get_by_email(self, email: str) -> Optional[User]:
+        row = self.conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],

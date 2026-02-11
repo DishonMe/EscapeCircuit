@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import * as React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -24,9 +25,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   return (
     <ErrorBoundary FallbackComponent={MainErrorFallback}>
       <QueryClientProvider client={queryClient}>
-        {process.env.DEV && <ReactQueryDevtools />}
-        <Notifications />
-        {children}
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          {process.env.DEV && <ReactQueryDevtools />}
+          <Notifications />
+          {children}
+        </GoogleOAuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
