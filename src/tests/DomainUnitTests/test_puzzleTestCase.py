@@ -391,7 +391,7 @@ class TestPuzzleTestCaseSerialization:
             expected_outputs={"r": 1}
         )
         d = test_case.to_dict()
-        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "created_at"}
+        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "input_stream", "expected_output_stream", "created_at"}
 
 
 class TestPuzzleTestCaseEdgeCases:

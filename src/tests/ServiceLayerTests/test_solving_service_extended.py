@@ -6,7 +6,7 @@ from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
 from Backend.DomainLayer.PuzzleTestCase import PuzzleTestCase
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
-from Backend.DomainLayer.Enums import PuzzleStatus, TestCaseKind
+from Backend.DomainLayer.Enums import PuzzleStatus, TestCaseKind, Medal, PuzzleDifficulty
 from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
@@ -25,6 +25,11 @@ class TestSolvingServiceExtended:
         self.mock_conn = Mock()
         
         self.mock_repo.get_progress.return_value = None
+        self.mock_xp.tier_from_avg_difficulty.return_value = PuzzleDifficulty.EASY
+        self.mock_xp.calculate_medal.return_value = Medal.BRONZE
+        self.mock_xp.calculate_solve_xp.return_value = 50
+        self.mock_xp.award_creator_solve_xp.return_value = 0
+        self.mock_repo.get_best_xp_for_puzzle.return_value = 0
         
         self.service = SolvingService(
             self.mock_conn,
@@ -38,7 +43,10 @@ class TestSolvingServiceExtended:
 
     def test_validate_solution_success(self):
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(
+            id=1, creator_user_id=1, avg_difficulty=2.0,
+            time_limit_seconds=None, budget=0,
+        )
         
         tc = PuzzleTestCase(id=1, puzzle_id=1, kind=TestCaseKind.BLACKBOX, inputs={"A": 0}, expected_outputs={"O": 1})
         self.mock_puzzle_repo.list_test_cases.return_value = [tc]
@@ -59,7 +67,10 @@ class TestSolvingServiceExtended:
 
     def test_validate_solution_fail(self):
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(
+            id=1, creator_user_id=1, avg_difficulty=2.0,
+            time_limit_seconds=None, budget=0,
+        )
         tc = PuzzleTestCase(id=1, puzzle_id=1, kind=TestCaseKind.BLACKBOX, inputs={"A": 0}, expected_outputs={"O": 1})
         self.mock_puzzle_repo.list_test_cases.return_value = [tc]
         

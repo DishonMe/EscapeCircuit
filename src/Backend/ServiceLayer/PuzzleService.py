@@ -85,7 +85,7 @@ class PuzzleService:
             raise ValidationError("creator required")
 
         from Backend.DomainLayer.Puzzle import Puzzle
-        from Backend.DomainLayer.Enums import GateType
+        from Backend.DomainLayer.Enums import GateType, PuzzleDifficulty
 
         name = (payload.get("name") or "").strip()
         if not name:
@@ -93,6 +93,12 @@ class PuzzleService:
 
         default_gate_set_raw = payload.get("default_gate_set", [])
         gate_set = {GateType(x) for x in default_gate_set_raw}
+
+        raw_diff = payload.get("difficulty", "EASY")
+        try:
+            difficulty = PuzzleDifficulty(raw_diff)
+        except (ValueError, KeyError):
+            difficulty = PuzzleDifficulty.EASY
 
         p = Puzzle(
             id=0,
@@ -103,6 +109,7 @@ class PuzzleService:
             budget=int(payload.get("budget", 0)),
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
+            difficulty=difficulty,
         )
         created = self.repo.create(p)
         return self._enrich_puzzle(created.to_dict())

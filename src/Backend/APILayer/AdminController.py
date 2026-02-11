@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
 import shutil
 import os
 import tempfile
@@ -33,7 +33,8 @@ def build_admin_router():
         sample_solution_file: UploadFile = File(...),
         instructions_file: UploadFile = File(...),
         readme_file: UploadFile = File(...),
-        config_file: UploadFile = File(...)
+        config_file: UploadFile = File(...),
+        difficulty: str = Form("EASY")
     ):
         conn = get_db_conn()
         try:
@@ -63,6 +64,15 @@ def build_admin_router():
                 save_file_to_riddles(test_file)
                 save_file_to_riddles(sample_solution_file)
                 save_file_to_riddles(readme_file)
+
+                # Inject difficulty into config file so insert_riddle picks it up
+                import json
+                with open(config_path, 'r', encoding='utf-8') as cf:
+                    config_data = json.load(cf)
+                if difficulty in ("EASY", "MEDIUM", "HARD"):
+                    config_data.setdefault('puzzle', {})['difficulty'] = difficulty
+                    with open(config_path, 'w', encoding='utf-8') as cf:
+                        json.dump(config_data, cf, indent=2)
 
                 # Ignore users for now - hardcoded ID
                 # admin_id = get_or_create_admin(conn)

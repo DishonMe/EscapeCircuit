@@ -8,6 +8,7 @@ import {
   Info,
   MessageSquare,
   Medal,
+  CheckCircle2,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -107,8 +108,19 @@ export const PuzzlesList = () => {
         {puzzles!.map((puzzle) => (
           <div
             key={puzzle.id}
-            className="relative cursor-pointer rounded-lg border border-gray-300 bg-white p-5 transition-all hover:border-blue-400 hover:shadow-lg"
+            className={`relative cursor-pointer rounded-lg border-2 bg-white p-5 transition-all hover:shadow-lg ${
+              puzzle.is_solved
+                ? 'border-green-400 hover:border-green-500'
+                : 'border-gray-300 hover:border-blue-400'
+            }`}
           >
+            {/* Solved checkmark overlay */}
+            {puzzle.is_solved && (
+              <div className="absolute -right-2 -top-2 z-10 flex size-8 items-center justify-center rounded-full bg-green-500 text-white shadow-md">
+                <CheckCircle2 className="size-5" />
+              </div>
+            )}
+
           {/* Title & Creator with status badge */}
             <div className="mb-3 flex flex-wrap items-start gap-2">
               <div className="flex-1">
@@ -118,11 +130,36 @@ export const PuzzlesList = () => {
                   {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
                 </p>
               </div>
-              <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
-                <Medal className="size-3.5" />
-                <span>Unsolved</span>
-              </div>
+              {puzzle.is_solved ? (
+                <div className="flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
+                  <CheckCircle2 className="size-3.5" />
+                  <span>Solved</span>
+                  {puzzle.best_medal && puzzle.best_medal >= 1 && (
+                    <span className="ml-1">
+                      {puzzle.best_medal >= 3 ? '🥇' : puzzle.best_medal === 2 ? '🥈' : '🥉'}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                  <Medal className="size-3.5" />
+                  <span>Unsolved</span>
+                </div>
+              )}
             </div>
+
+            {/* Best Time (if solved) */}
+            {puzzle.is_solved && puzzle.best_time != null && (
+              <div className="mb-3 flex items-center gap-1 text-sm text-green-700">
+                <Clock className="size-3.5" />
+                <span>Best Time: {Math.floor(puzzle.best_time / 60)}:{String(puzzle.best_time % 60).padStart(2, '0')}</span>
+                {puzzle.total_xp ? (
+                  <span className="ml-2 rounded bg-yellow-50 px-1.5 py-0.5 text-xs font-medium text-yellow-700">
+                    +{puzzle.total_xp} XP
+                  </span>
+                ) : null}
+              </div>
+            )}
 
             {/* Difficulty, plays, and details */}
             <div className="mb-3 flex flex-wrap items-center gap-2">

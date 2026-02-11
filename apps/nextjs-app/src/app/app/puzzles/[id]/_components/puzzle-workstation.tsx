@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -45,11 +46,13 @@ const EMPTY_COMPONENTS: CircuitComponent[] = [];
 
 type PostCheckState =
   | { open: false }
-  | { open: true; solved: boolean; message: string };
+  | { open: true; solved: boolean; message: string; medal?: string };
 
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
+  const startTime = useRef(Date.now());
+  const queryClient = useQueryClient();
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
@@ -548,15 +551,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     setIsChecking(true);
     try {
+      const timeTaken = Math.floor((Date.now() - startTime.current) / 1000);
       const res = await validateSolution({
         puzzleId: puzzle.id,
         solution: buildSolution(),
+        timeTaken,
       });
-      setPostCheck({ open: true, solved: res.solved, message: res.message });
+      setPostCheck({ open: true, solved: res.solved, message: res.message, medal: res.medal });
 
       if (res.solved) {
         setIsSolved(true);
         exportWorkingAreaJson();
+        // Invalidate caches so the puzzles list shows "Solved" and XP bar updates
+        await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
+        await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
       }
     } catch (e: any) {
       notifications.addNotification({
@@ -584,9 +592,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
-              {puzzle.title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {puzzle.title}
+              </h1>
+              {isSolved && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-700">
+                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  Solved
+                </span>
+              )}
+            </div>
             <div className="text-sm text-gray-600">
               by {puzzle.creator?.username ?? ''}
             </div>
@@ -933,8 +949,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           {/* Visual Fix: Modal Text Overflow */}
           <div className="max-h-[60vh] overflow-y-auto break-words text-sm text-gray-700">
             {postCheck.open && postCheck.solved ? (
-              <div>
-                Congrats! Time, cost, and other stats can be shown here.
+              <div className="space-y-2">
+                {postCheck.medal && postCheck.medal !== 'NONE' && (
+                  <div className="flex items-center gap-2 text-lg font-semibold">
+                    <span>
+                      {postCheck.medal === 'GOLD' ? '🥇' : postCheck.medal === 'SILVER' ? '🥈' : '🥉'}
+                    </span>
+                    <span className={
+                      postCheck.medal === 'GOLD' ? 'text-yellow-500' :
+                      postCheck.medal === 'SILVER' ? 'text-gray-400' :
+                      'text-amber-700'
+                    }>
+                      {postCheck.medal} Medal
+                    </span>
+                  </div>
+                )}
+                <p>Congrats! Your solution passed all test cases.</p>
               </div>
             ) : (
               <div>

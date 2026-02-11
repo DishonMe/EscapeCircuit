@@ -1,6 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from math import floor, sqrt
 from typing import Optional
 
+from Backend.DomainLayer.Enums import PuzzleDifficulty, Medal
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
 
@@ -8,62 +10,110 @@ from Backend.PersistantLayer.UserRepo import UserRepo
 @dataclass(slots=True)
 class XPService:
     """
-    Implements the XP policy mentioned in ADD/ARD:
-    - Levels derived from XP thresholds
-    - Experienced user: Level >= 5
-    - Abuse resistance: repeated solves do NOT re-grant bonuses
+    Advanced XP & Medal system.
+    - Difficulty-based base XP
+    - Medal bonuses (Bronze/Silver/Gold)
+    - Delta XP: only awards improvement over previous best
+    - Creator reward when someone solves their puzzle
+    - Level = floor(sqrt(xp / 100)) + 1
     """
     user_repo: UserRepo
 
-    # core XP config
-    easy_xp: int = 50
-    medium_xp: int = 100
-    hard_xp: int = 150
+    # --- Base XP per difficulty ---
+    BASE_XP: dict = field(default_factory=lambda: {
+        PuzzleDifficulty.EASY: 50,
+        PuzzleDifficulty.MEDIUM: 100,
+        PuzzleDifficulty.HARD: 200,
+    })
 
-    first_solve_bonus: int = 50
-    time_bonus: int = 25
+    # --- Medal bonus (added on top of base) ---
+    MEDAL_BONUS: dict = field(default_factory=lambda: {
+        Medal.NONE: 0,
+        Medal.BRONZE: 0,
+        Medal.SILVER: 25,
+        Medal.GOLD: 50,
+    })
 
-    repeat_solve_xp: int = 10  # if user already solved puzzle before
+    # Creator gets this much XP each time someone solves their puzzle
+    SOLVE_REWARD_CREATOR: int = 10
+
     # Rating XP (ADD): rater gets 5 XP, puzzle creator gets 1 XP.
     rating_rater_xp: int = 5
     rating_creator_xp: int = 1
 
-    # Level thresholds (index = level, value = min XP)
-    # Level 1 starts at 0, Level 5 at 2000 -> matches ARD "Level 5 experienced"
-    level_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000]
-
+    # ---- Level calculation ----
     def calculate_level(self, xp_total: int) -> int:
-        xp_total = int(xp_total)
-        if xp_total < 0:
-            xp_total = 0
-        lvl = 1
-        for i, thr in enumerate(self.level_thresholds, start=1):
-            if xp_total >= thr:
-                lvl = i
-        return lvl
+        xp_total = max(0, int(xp_total))
+        return floor(sqrt(xp_total / 100)) + 1
 
     def is_experienced(self, xp_total: int) -> bool:
         return self.calculate_level(xp_total) >= 5
 
-    def tier_from_avg_difficulty(self, avg_difficulty: float) -> str:
-        """Map a numeric difficulty rating (1..5) to a tier string."""
+    # ---- Difficulty tier helpers ----
+    def tier_from_avg_difficulty(self, avg_difficulty: float) -> PuzzleDifficulty:
+        """Map a numeric difficulty rating to a PuzzleDifficulty enum."""
         try:
             d = float(avg_difficulty)
         except Exception:
             d = 1.0
+        if d >= 7.0:
+            return PuzzleDifficulty.HARD
         if d >= 4.0:
-            return "hard"
-        if d >= 2.5:
-            return "medium"
-        return "easy"
+            return PuzzleDifficulty.MEDIUM
+        return PuzzleDifficulty.EASY
 
-    def get_arsenal_limit(self, xp_total: int) -> int:
-        """Arsenal capacity based on level.
-
-        This is intentionally simple and can be tuned later, but ensures:
-        - early users have a small limit
-        - progressing levels increases capacity
+    # ---- Medal calculation ----
+    def calculate_medal(
+        self,
+        passed: bool,
+        time_taken: int,
+        time_limit: Optional[int],
+        cost_used: int,
+        budget: int,
+    ) -> Medal:
         """
+        Bronze = solved the puzzle.
+        Silver = solved + 1 bonus condition (beats timer OR tight budget).
+        Gold   = solved + both bonus conditions.
+        """
+        if not passed:
+            return Medal.NONE
+
+        bonus_count = 0
+
+        # Condition 1: Beats the timer
+        if time_limit is not None and time_limit > 0 and time_taken <= time_limit:
+            bonus_count += 1
+
+        # Condition 2: Tight budget (cost <= budget)
+        if budget > 0 and cost_used <= budget:
+            bonus_count += 1
+
+        if bonus_count >= 2:
+            return Medal.GOLD
+        elif bonus_count >= 1:
+            return Medal.SILVER
+        else:
+            return Medal.BRONZE
+
+    # ---- XP for a solve (with delta logic) ----
+    def calculate_solve_xp(
+        self,
+        difficulty: PuzzleDifficulty,
+        medal: Medal,
+        previous_best_xp: int,
+    ) -> int:
+        """
+        Raw XP = base(difficulty) + medal_bonus(medal).
+        Delta  = max(0, raw - previous_best_xp).
+        """
+        base = self.BASE_XP.get(difficulty, 50)
+        bonus = self.MEDAL_BONUS.get(medal, 0)
+        raw_xp = base + bonus
+        return max(0, raw_xp - previous_best_xp)
+
+    # ---- Arsenal capacity ----
+    def get_arsenal_limit(self, xp_total: int) -> int:
         lvl = self.calculate_level(int(xp_total))
         if lvl <= 2:
             return 5
@@ -75,6 +125,7 @@ class XPService:
             return 35
         return 50
 
+    # ---- Internal: apply XP delta to user ----
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:
             return 0
@@ -85,49 +136,33 @@ class XPService:
         self.user_repo.update_xp(user_id, user.xp)
         return delta
 
+    # ---- Public award methods ----
     def award_solve_xp(
         self,
         user_id: int,
-        difficulty_tier: str,
-        is_first_solve: bool,
-        timer_beaten: bool,
-        already_solved_before: bool
+        difficulty_tier: str = "easy",
+        is_first_solve: bool = False,
+        timer_beaten: bool = False,
+        already_solved_before: bool = False,
+        **kwargs,
     ) -> int:
-        """
-        Abuse resistance:
-        - if already_solved_before => grant only repeat_solve_xp, NO bonuses.
-        - otherwise base XP by tier + optional bonuses.
-        """
-        if already_solved_before:
-            return self._apply_xp(user_id, self.repeat_solve_xp)
+        """Legacy-compatible wrapper. New code should use calculate_solve_xp + _apply_xp directly."""
+        diff = PuzzleDifficulty(difficulty_tier.upper()) if difficulty_tier else PuzzleDifficulty.EASY
+        base = self.BASE_XP.get(diff, 50)
+        return self._apply_xp(user_id, base)
 
-        tier = (difficulty_tier or "easy").strip().lower()
-        if tier == "hard":
-            base = self.hard_xp
-        elif tier == "medium":
-            base = self.medium_xp
-        else:
-            base = self.easy_xp
-
-        bonus = 0
-        if is_first_solve:
-            bonus += self.first_solve_bonus
-        if timer_beaten:
-            bonus += self.time_bonus
-
-        return self._apply_xp(user_id, base + bonus)
+    def award_creator_solve_xp(self, creator_user_id: int, solver_user_id: int) -> int:
+        """Award creator XP when someone (other than them) solves their puzzle."""
+        if int(creator_user_id) == int(solver_user_id):
+            return 0
+        return self._apply_xp(creator_user_id, self.SOLVE_REWARD_CREATOR)
 
     def award_rating_xp(self, rater_user_id: int, creator_user_id: int, first_time_rating: bool) -> int:
-        """Award rating XP.
-
-        Only the first rating per (puzzle,user) grants XP.
-        Returns total XP applied (rater + creator).
-        """
+        """Award rating XP. Only the first rating per (puzzle,user) grants XP."""
         if not first_time_rating:
             return 0
         total = 0
         total += self._apply_xp(rater_user_id, self.rating_rater_xp)
-        # creator also gets 1 XP (even if it's the same user, don't double-award)
         if int(creator_user_id) != int(rater_user_id):
             total += self._apply_xp(creator_user_id, self.rating_creator_xp)
         return total

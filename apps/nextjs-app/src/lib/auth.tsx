@@ -47,6 +47,8 @@ export const useLogin = ({
   return useMutation({
     mutationFn: loginWithEmailAndPassword,
     onSuccess: (data) => {
+      // Clear stale queries from any previous session before setting new user
+      queryClient.removeQueries();
       queryClient.setQueryData(userQueryKey, data.user);
       Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
       onSuccess?.();
@@ -74,7 +76,8 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   return useMutation({
     mutationFn: logout,
     onSettled: () => {
-      queryClient.removeQueries({ queryKey: userQueryKey });
+      // Clear ALL cached queries so the next user gets fresh data
+      queryClient.removeQueries();
       Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
       onSuccess?.();
     },

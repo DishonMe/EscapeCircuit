@@ -25,6 +25,7 @@ export default function UploadPuzzlePage() {
 
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">("EASY");
 
   const requiredFiles = [
     { key: "config", label: "Configuration JSON", ext: ".json" },
@@ -60,9 +61,12 @@ export default function UploadPuzzlePage() {
     formData.append("setup_file", files.setup!);
     formData.append("instructions_file", files.instructions!);
     formData.append("readme_file", files.readme!);
+    formData.append("difficulty", difficulty);
 
     try {
-      const res = await fetch("http://127.0.0.1:8080/admin/upload-puzzle", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
+      const baseUrl = apiUrl.replace(/\/api\/?$/, "");
+      const res = await fetch(`${baseUrl}/admin/upload-puzzle`, {
         method: "POST",
         body: formData,
       });
@@ -102,6 +106,20 @@ export default function UploadPuzzlePage() {
       <h1 className="text-3xl font-bold mb-6">Upload New Puzzle</h1>
       
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Difficulty selector */}
+        <div className="flex flex-col">
+          <label className="font-semibold mb-2">Difficulty</label>
+          <select
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as "EASY" | "MEDIUM" | "HARD")}
+            className="border p-2 rounded bg-white"
+          >
+            <option value="EASY">Easy</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HARD">Hard</option>
+          </select>
+        </div>
+
         {requiredFiles.map((req) => (
           <div key={req.key} className="flex flex-col">
             <label className="font-semibold mb-2">{req.label}</label>

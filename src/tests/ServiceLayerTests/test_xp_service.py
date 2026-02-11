@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 from typing import Dict, Any
 
 from Backend.ServiceLayer.XPService import XPService
+from Backend.DomainLayer.Enums import PuzzleDifficulty, Medal
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
@@ -15,22 +16,16 @@ class TestXPServiceCreation:
 
     def test_xp_service_initialization(self):
         assert self.service.user_repo == self.mock_user_repo
-        assert self.service.easy_xp == 50
-        assert self.service.medium_xp == 100
-        assert self.service.hard_xp == 150
-        assert self.service.first_solve_bonus == 50
-        assert self.service.time_bonus == 25
+        assert self.service.BASE_XP[PuzzleDifficulty.EASY] == 50
+        assert self.service.BASE_XP[PuzzleDifficulty.MEDIUM] == 100
+        assert self.service.BASE_XP[PuzzleDifficulty.HARD] == 200
+        assert self.service.SOLVE_REWARD_CREATOR == 10
 
-    def test_xp_service_custom_values(self):
-        custom_service = XPService(
-            user_repo=self.mock_user_repo,
-            easy_xp=100,
-            medium_xp=200,
-            hard_xp=300,
-        )
-        assert custom_service.easy_xp == 100
-        assert custom_service.medium_xp == 200
-        assert custom_service.hard_xp == 300
+    def test_medal_bonus_values(self):
+        assert self.service.MEDAL_BONUS[Medal.NONE] == 0
+        assert self.service.MEDAL_BONUS[Medal.BRONZE] == 0
+        assert self.service.MEDAL_BONUS[Medal.SILVER] == 25
+        assert self.service.MEDAL_BONUS[Medal.GOLD] == 50
 
 
 class TestXPServiceCalculateLevel:
@@ -39,44 +34,53 @@ class TestXPServiceCalculateLevel:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_calculate_level_0_xp(self):
+        # floor(sqrt(0/100)) + 1 = 1
         level = self.service.calculate_level(0)
         assert level == 1
 
-    def test_calculate_level_below_threshold(self):
-        # Level 2 starts at 250 XP
-        level = self.service.calculate_level(249)
+    def test_calculate_level_below_first_threshold(self):
+        # floor(sqrt(99/100)) + 1 = floor(0.99) + 1 = 1
+        level = self.service.calculate_level(99)
         assert level == 1
 
-    def test_calculate_level_at_threshold(self):
-        level = self.service.calculate_level(250)
+    def test_calculate_level_at_level_2(self):
+        # floor(sqrt(100/100)) + 1 = 1 + 1 = 2
+        level = self.service.calculate_level(100)
         assert level == 2
 
-    def test_calculate_level_between_thresholds(self):
-        # 500 XP: Level 3 starts at 600, so it's level 2
-        level = self.service.calculate_level(500)
+    def test_calculate_level_at_level_3(self):
+        # floor(sqrt(400/100)) + 1 = 2 + 1 = 3
+        level = self.service.calculate_level(400)
+        assert level == 3
+
+    def test_calculate_level_between_levels(self):
+        # floor(sqrt(350/100)) + 1 = floor(1.87) + 1 = 1 + 1 = 2
+        level = self.service.calculate_level(350)
         assert level == 2
 
-    def test_calculate_level_at_level_5_threshold(self):
-        # Level 5 starts at 2000 XP
-        level = self.service.calculate_level(2000)
-        assert level == 6
+    def test_calculate_level_at_level_5(self):
+        # floor(sqrt(1600/100)) + 1 = 4 + 1 = 5
+        level = self.service.calculate_level(1600)
+        assert level == 5
 
     def test_calculate_level_high_xp(self):
+        # floor(sqrt(10000/100)) + 1 = 10 + 1 = 11
         level = self.service.calculate_level(10000)
-        assert level >= 5
+        assert level == 11
 
     def test_calculate_level_negative_xp_treated_as_zero(self):
         level = self.service.calculate_level(-100)
         assert level == 1
 
     def test_calculate_level_progression(self):
-        # Verify progression through levels
+        # Level thresholds: (L-1)^2 * 100
+        # L=1: 0, L=2: 100, L=3: 400, L=4: 900, L=5: 1600, L=6: 2500
         assert self.service.calculate_level(0) == 1
-        assert self.service.calculate_level(250) == 2
-        assert self.service.calculate_level(600) == 3
-        assert self.service.calculate_level(1100) == 4
-        assert self.service.calculate_level(1700) == 5
-        assert self.service.calculate_level(2000) == 6
+        assert self.service.calculate_level(100) == 2
+        assert self.service.calculate_level(400) == 3
+        assert self.service.calculate_level(900) == 4
+        assert self.service.calculate_level(1600) == 5
+        assert self.service.calculate_level(2500) == 6
 
 
 class TestXPServiceIsExperienced:
@@ -85,22 +89,22 @@ class TestXPServiceIsExperienced:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_is_experienced_at_level_5(self):
-        # Level 5 requires 2000 XP
-        assert self.service.is_experienced(2000) is True
+        # Level 5 requires 1600 XP: floor(sqrt(1600/100)) + 1 = 5
+        assert self.service.is_experienced(1600) is True
 
     def test_is_experienced_above_level_5(self):
         assert self.service.is_experienced(5000) is True
 
     def test_is_experienced_below_level_5(self):
-        # Below level 5 (which starts at 1700 XP)
-        assert self.service.is_experienced(1699) is False
+        # 1599 XP -> level 4
+        assert self.service.is_experienced(1599) is False
 
     def test_is_experienced_level_1(self):
         assert self.service.is_experienced(0) is False
 
     def test_is_experienced_level_4(self):
-        # Level 4 is at 1700 XP, experienced starts at 1700 (level 5)
-        assert self.service.is_experienced(1700) is True
+        # Level 4 requires 900 XP
+        assert self.service.is_experienced(900) is False
 
 
 class TestXPServiceApplyXP:
@@ -149,97 +153,47 @@ class TestXPServiceAwardSolveXP:
         self.mock_user_repo = Mock(spec=UserRepo)
         self.service = XPService(user_repo=self.mock_user_repo)
 
-    def test_award_solve_xp_easy_first_solve(self):
-        user = User(id=1, username="user", xp=0)
-        self.mock_user_repo.get_by_id.return_value = user
+    def test_calculate_solve_xp_easy_bronze(self):
+        # BASE_XP[EASY]=50 + MEDAL_BONUS[BRONZE]=0 = 50, prev=0 -> delta=50
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.EASY, Medal.BRONZE, previous_best_xp=0)
+        assert xp == 50
 
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="easy",
-            is_first_solve=True,
-            timer_beaten=False,
-            already_solved_before=False,
-        )
+    def test_calculate_solve_xp_medium_silver(self):
+        # BASE_XP[MEDIUM]=100 + MEDAL_BONUS[SILVER]=25 = 125, prev=0 -> delta=125
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.MEDIUM, Medal.SILVER, previous_best_xp=0)
+        assert xp == 125
 
-        # easy_xp (50) + first_solve_bonus (50) = 100
-        assert xp_awarded == 100
-        assert user.xp == 100
+    def test_calculate_solve_xp_hard_gold(self):
+        # BASE_XP[HARD]=200 + MEDAL_BONUS[GOLD]=50 = 250, prev=0 -> delta=250
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.HARD, Medal.GOLD, previous_best_xp=0)
+        assert xp == 250
 
-    def test_award_solve_xp_medium_no_bonuses(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
+    def test_calculate_solve_xp_delta_improvement(self):
+        # Had bronze (50), now got silver (50+25=75), delta = 75-50 = 25
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.EASY, Medal.SILVER, previous_best_xp=50)
+        assert xp == 25
 
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="medium",
-            is_first_solve=False,
-            timer_beaten=False,
-            already_solved_before=False,
-        )
+    def test_calculate_solve_xp_no_improvement(self):
+        # Had gold (250), same gold again -> delta = 0
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.HARD, Medal.GOLD, previous_best_xp=250)
+        assert xp == 0
 
-        assert xp_awarded == 100
-        assert user.xp == 200
+    def test_calculate_solve_xp_downgrade_no_negative(self):
+        # Had gold (250), now bronze (200) -> delta = max(0, 200-250) = 0
+        xp = self.service.calculate_solve_xp(PuzzleDifficulty.HARD, Medal.BRONZE, previous_best_xp=250)
+        assert xp == 0
 
-    def test_award_solve_xp_hard_with_bonuses(self):
-        user = User(id=1, username="user", xp=0)
-        self.mock_user_repo.get_by_id.return_value = user
+    def test_award_creator_solve_xp(self):
+        creator = User(id=2, username="creator", xp=0)
+        self.mock_user_repo.get_by_id.return_value = creator
 
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="hard",
-            is_first_solve=True,
-            timer_beaten=True,
-            already_solved_before=False,
-        )
+        xp = self.service.award_creator_solve_xp(creator_user_id=2, solver_user_id=1)
+        assert xp == 10  # SOLVE_REWARD_CREATOR
 
-        # hard_xp (150) + first_solve_bonus (50) + time_bonus (25) = 225
-        assert xp_awarded == 225
-        assert user.xp == 225
-
-    def test_award_solve_xp_already_solved(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
-
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="hard",
-            is_first_solve=True,
-            timer_beaten=True,
-            already_solved_before=True,
-        )
-
-        # Should only get repeat_solve_xp (10), no bonuses
-        assert xp_awarded == 10
-        assert user.xp == 110
-
-    def test_award_solve_xp_default_easy_tier(self):
-        user = User(id=1, username="user", xp=0)
-        self.mock_user_repo.get_by_id.return_value = user
-
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="",
-            is_first_solve=True,
-            timer_beaten=False,
-            already_solved_before=False,
-        )
-
-        # Default to easy
-        assert xp_awarded == 100
-
-    def test_award_solve_xp_case_insensitive_tier(self):
-        user = User(id=1, username="user", xp=0)
-        self.mock_user_repo.get_by_id.return_value = user
-
-        xp_awarded = self.service.award_solve_xp(
-            user_id=1,
-            difficulty_tier="HARD",
-            is_first_solve=False,
-            timer_beaten=False,
-            already_solved_before=False,
-        )
-
-        assert xp_awarded == 150  # hard_xp
+    def test_award_creator_solve_xp_same_user(self):
+        # Creator solving own puzzle gets no creator bonus
+        xp = self.service.award_creator_solve_xp(creator_user_id=1, solver_user_id=1)
+        assert xp == 0
 
 
 class TestXPServiceAwardRatingXP:
@@ -283,21 +237,60 @@ class TestXPServiceAwardRatingXP:
         self.mock_user_repo.update_xp.assert_not_called()
 
 
-class TestXPServiceLevelThresholds:
+class TestXPServiceLevelFormula:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
         self.service = XPService(user_repo=self.mock_user_repo)
 
-    def test_level_thresholds_are_correct(self):
-        expected_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000]
-        assert self.service.level_thresholds == expected_thresholds
+    def test_level_formula_consistency(self):
+        # Verify floor(sqrt(xp/100)) + 1 at boundary values
+        # Level L requires (L-1)^2 * 100 XP 
+        for L in range(1, 15):
+            threshold = (L - 1) ** 2 * 100
+            assert self.service.calculate_level(threshold) == L
 
-    def test_level_thresholds_are_increasing(self):
-        thresholds = self.service.level_thresholds
-        for i in range(len(thresholds) - 1):
-            assert thresholds[i] < thresholds[i + 1]
+    def test_level_5_is_experienced(self):
+        # Level 5 requires (5-1)^2 * 100 = 1600 XP
+        assert self.service.calculate_level(1600) == 5
+        assert self.service.is_experienced(1600) is True
+        assert self.service.is_experienced(1599) is False
 
-    def test_level_5_threshold_is_2000(self):
-        # Experienced users require level 5, which is at index 4, but at XP 1700 (index 4 threshold)
-        # Actually, level 5 is at index 4 of the array which means level 5
-        assert self.service.level_thresholds[4] == 1700
+
+class TestXPServiceMedalCalculation:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def test_medal_not_passed(self):
+        medal = self.service.calculate_medal(passed=False, time_taken=10, time_limit=60, cost_used=5, budget=10)
+        assert medal == Medal.NONE
+
+    def test_medal_bronze_no_conditions(self):
+        # Solved but neither timer beaten nor budget met
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=15, budget=10)
+        assert medal == Medal.BRONZE
+
+    def test_medal_silver_timer_only(self):
+        # Beats timer but over budget
+        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=15, budget=10)
+        assert medal == Medal.SILVER
+
+    def test_medal_silver_budget_only(self):
+        # Under budget but over timer
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=5, budget=10)
+        assert medal == Medal.SILVER
+
+    def test_medal_gold_both_conditions(self):
+        # Both conditions met
+        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, budget=10)
+        assert medal == Medal.GOLD
+
+    def test_medal_bronze_no_time_limit(self):
+        # No time limit set, over budget -> only budget condition could count
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=15, budget=10)
+        assert medal == Medal.BRONZE
+
+    def test_medal_silver_no_time_limit_but_under_budget(self):
+        # No time limit, under budget -> 1 condition
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
+        assert medal == Medal.SILVER

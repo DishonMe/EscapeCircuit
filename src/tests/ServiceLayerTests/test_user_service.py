@@ -27,6 +27,7 @@ class TestUserServiceCreation:
 class TestUserServiceRegister:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_user_repo.conn = Mock()  # register() calls conn.commit()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_xp = Mock(spec=XPService)
         self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)
