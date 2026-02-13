@@ -283,15 +283,31 @@ class SolvingService:
                 )
 
             # --- Relative XP: only award improvement over previous best ---
-            # Check if user already earned max XP for this puzzle
-            from Backend.PersistantLayer.SolveRepo import PuzzleProgress
-            from Backend.DomainLayer.Utils import utcnow
-            old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+            # Get the ACTUAL previous best XP from solve_attempts (most reliable source)
+            all_attempts = self.solve_repo.conn.execute("""
+                SELECT id, xp_earned FROM solve_attempts
+                WHERE user_id = ? AND puzzle_id = ? AND passed = 1
+                ORDER BY id DESC
+            """, (int(user_id), int(puzzle_id))).fetchall()
+            
+            previous_best_xp = 0
+            if all_attempts:
+                previous_best_xp = max([int(row['xp_earned']) for row in all_attempts])
+            
+            # DEBUG: Log all attempts found
+            import sys
+            print(f"\n[DEBUG XP] === SOLVE ATTEMPT ===", file=sys.stderr)
+            print(f"[DEBUG XP] user={user_id}, puzzle={puzzle_id}", file=sys.stderr)
+            print(f"[DEBUG XP] Found {len(all_attempts)} previous passed attempts:", file=sys.stderr)
+            for row in all_attempts:
+                print(f"[DEBUG XP]   - attempt id={row['id']}, xp_earned={row['xp_earned']}", file=sys.stderr)
+            print(f"[DEBUG XP] previous_best_xp={previous_best_xp}", file=sys.stderr)
 
-            if old_progress and old_progress.max_xp_reached:
-                # Already earned maximum XP — no more XP can be gained
+            if previous_best_xp >= (self.xp_service.BASE_XP.get(difficulty, 100) + self.xp_service.MEDAL_BONUS.get(Medal.GOLD, 50)):
+                # Already earned maximum XP for this puzzle (gold medal on this difficulty)
                 raw_xp = 0
                 xp_earned = 0
+                print(f"[DEBUG XP] MAX XP REACHED ({previous_best_xp}), no more XP awarded", file=sys.stderr)
             else:
                 # Step 1: Compute raw XP potential for this attempt (no delta subtraction)
                 raw_xp = 0
@@ -304,11 +320,12 @@ class SolvingService:
                 else:
                     raw_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
 
-                # Step 2: Fetch previous best raw XP from progress
-                previous_best_xp = old_progress.best_xp if old_progress else 0
-
-                # Step 3: Delta = improvement only
+                # Step 2: Delta = improvement only
                 xp_earned = max(0, raw_xp - previous_best_xp)
+                
+                # DEBUG: Log XP calculation
+                print(f"[DEBUG XP] difficulty={difficulty.name}, medal={medal.name}", file=sys.stderr)
+                print(f"[DEBUG XP] raw_xp={raw_xp}, previous_best={previous_best_xp}, delta={xp_earned}", file=sys.stderr)
 
             # --- Compute max possible XP for this puzzle's difficulty (Gold medal) ---
             max_possible_xp = 0
@@ -317,8 +334,8 @@ class SolvingService:
             max_possible_xp = base_xp + gold_bonus
 
             # Determine new best_xp and whether max has been reached
-            new_best_xp = max(old_progress.best_xp if old_progress else 0, raw_xp)
-            new_max_xp_reached = (old_progress.max_xp_reached if old_progress else False) or (new_best_xp >= max_possible_xp)
+            new_best_xp = max(previous_best_xp, raw_xp)
+            new_max_xp_reached = (new_best_xp >= max_possible_xp)
 
             # --- Persist the solve attempt (store RAW xp, not delta, so future
             #     lookups via get_best_xp_for_puzzle return the correct baseline) ---
@@ -331,7 +348,15 @@ class SolvingService:
                     medal=medal.value if isinstance(medal, Medal) else int(medal),
                 )
 
-            # --- Update puzzle_progress with best medal, best_xp, max_xp_reached ---
+            # --- Get current progress for updating medal and upgrades ---
+            from Backend.PersistantLayer.SolveRepo import PuzzleProgress
+            from Backend.DomainLayer.Utils import utcnow
+            old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+            
+            # --- Calculate cumulative XP awarded (sum of deltas) ---
+            new_total_xp_awarded = (old_progress.total_xp_awarded if old_progress else 0) + xp_earned
+            
+            # --- Update puzzle_progress with best medal, best_xp, max_xp_reached, and total_xp_awarded ---
             if hasattr(self.solve_repo, 'upsert_progress'):
                 new_best_medal = max(
                     getattr(old_progress, 'best_medal', 0),
@@ -350,17 +375,21 @@ class SolvingService:
                     best_medal=new_best_medal,
                     timer_upgraded=timer_upgraded,
                     tight_upgraded=tight_upgraded,
-                    first_solved_at=utcnow().isoformat(),
+                    first_solved_at=old_progress.first_solved_at if old_progress and old_progress.first_solved_at else utcnow().isoformat(),
                     max_xp_reached=new_max_xp_reached,
                     best_xp=new_best_xp,
+                    total_xp_awarded=new_total_xp_awarded,
                 ))
 
             # --- Accumulate XP on the User entity (only the delta) ---
             if self.user_repo is not None and xp_earned > 0:
                 user = self.user_repo.get_by_id(user_id)
                 if user:
-                    new_xp = int(user.xp) + int(xp_earned)
+                    old_xp = int(user.xp)
+                    new_xp = old_xp + int(xp_earned)
                     self.user_repo.update_xp(user_id, new_xp)
+                    import sys
+                    print(f"[DEBUG XP] USER XP UPDATE: {old_xp} + {xp_earned} = {new_xp}", file=sys.stderr)
 
             # --- Award creator XP (wrapped in try/except so a missing creator
             #     cannot prevent the solve from being committed) ---
@@ -391,6 +420,10 @@ class SolvingService:
             if xp_earned == 0:
                 msg += " No XP improvement this time."
 
+            # DEBUG: Log what's being returned
+            import sys
+            print(f"[DEBUG XP] RESPONSE: xp_earned={xp_earned}, raw_xp={raw_xp}, medal={medal_name}", file=sys.stderr)
+            
             return {
                 "solved": True,
                 "message": msg,

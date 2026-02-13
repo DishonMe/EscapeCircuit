@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Link } from '@/components/ui/link';
 import { Spinner } from '@/components/ui/spinner';
+import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
@@ -155,13 +156,17 @@ export const PuzzlesList = () => {
               <div className="mb-3 flex items-center gap-1 text-sm text-green-700">
                 <Clock className="size-3.5" />
                 <span>Best Time: {Math.floor(puzzle.best_time / 60)}:{String(puzzle.best_time % 60).padStart(2, '0')}</span>
-                {puzzle.total_xp ? (
-                  <span className="ml-2 rounded bg-yellow-50 px-1.5 py-0.5 text-xs font-medium text-yellow-700">
-                    +{puzzle.total_xp} XP
-                  </span>
-                ) : null}
               </div>
             )}
+
+            {/* XP Progress Bar */}
+            <div className="mb-3 rounded-md bg-gray-50 p-3">
+              <PuzzleXPBar
+                avgDifficulty={puzzle.avg_difficulty ?? 0}
+                currentXP={puzzle.total_xp ?? 0}
+                isSolved={puzzle.is_solved ?? false}
+              />
+            </div>
 
             {/* Difficulty, plays, and details */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
