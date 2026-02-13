@@ -5,6 +5,7 @@ from typing import Dict, Optional, Any
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.PuzzleService import PuzzleService
 from Backend.ServiceLayer.SolvingService import SolvingService
+from Backend.ServiceLayer.RatingService import RatingService
 from Backend.APILayer.auth_utils import verify_token
 
 
@@ -44,8 +45,21 @@ class ValidateSolutionReq(BaseModel):
     time_taken: int = 0
 
 
-def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService) -> APIRouter:
+def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
+
+    def _inject_rating_metrics(puzzle_dict: dict) -> dict:
+        """Inject rating_metrics into a puzzle dict if rating_service is available."""
+        if not rating_service:
+            return puzzle_dict
+        try:
+            pid = puzzle_dict.get("id")
+            if pid is not None:
+                metrics = rating_service.get_puzzle_metrics(int(pid))
+                puzzle_dict["rating_metrics"] = metrics
+        except Exception:
+            pass
+        return puzzle_dict
 
     @router.get("")
     def browse(
@@ -85,6 +99,16 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             p["best_medal"] = 0
                         # Global solved count (all users)
                         p["solvedCount"] = solved_counts.get(pid, 0) if pid else 0
+                        # Can-rate flag (solved OR 5 min spent)
+                        if pid and rating_service:
+                            try:
+                                p["can_rate"] = rating_service._can_rate(user_id, pid)
+                            except Exception:
+                                p["can_rate"] = p.get("is_solved", False)
+                        else:
+                            p["can_rate"] = p.get("is_solved", False)
+                        # Inject rating metrics
+                        _inject_rating_metrics(p)
             except Exception:
                 pass  # gracefully degrade if solve_repo unavailable
 
@@ -102,7 +126,35 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     @router.get("/{puzzle_id}")
     def get_one(puzzle_id: int, token: str = Depends(verify_token)):
         try:
-            return puzzle_service.get(token, puzzle_id)
+            result = puzzle_service.get(token, puzzle_id)
+            _inject_rating_metrics(result)
+
+            # Inject per-user solve status (same as browse does)
+            try:
+                user_id = puzzle_service.auth.require_user_id(token)
+                if puzzle_service.solve_repo:
+                    is_passed = puzzle_service.solve_repo.has_passed(user_id, puzzle_id)
+                    result["is_solved"] = is_passed
+                    if is_passed:
+                        status_map = puzzle_service.solve_repo.get_solve_status_map(user_id)
+                        info = status_map.get(puzzle_id, {})
+                        result["best_time"] = info.get("best_time")
+                        result["total_xp"] = info.get("total_xp", 0)
+                        result["best_medal"] = info.get("best_medal", 0)
+                    else:
+                        result["best_medal"] = 0
+                    # Can-rate flag (solved OR 5 min spent)
+                    if rating_service:
+                        try:
+                            result["can_rate"] = rating_service._can_rate(user_id, puzzle_id)
+                        except Exception:
+                            result["can_rate"] = is_passed
+                    else:
+                        result["can_rate"] = is_passed
+            except Exception:
+                pass
+
+            return result
         except ValidationError as e:
             print(f"DEBUG: Controller caught ValidationError: {e}")
             raise HTTPException(status_code=404, detail=str(e))

@@ -59,6 +59,7 @@ class RatingRepo:
                 rating.puzzle_id,
                 rating.user_id
             ))
+            self.conn.commit()
             rating.id = existing.id
             return rating
 
@@ -75,6 +76,7 @@ class RatingRepo:
             1 if rating.is_experienced_at_rating else 0
         ))
         rating.id = int(cur.lastrowid)
+        self.conn.commit()
         return rating
 
     def list_by_puzzle(self, puzzle_id: int) -> List[Rating]:
@@ -94,3 +96,17 @@ class RatingRepo:
             })
             for r in rows
         ]
+
+    def delete(self, puzzle_id: int, user_id: int) -> bool:
+        cur = self.conn.execute("""
+            DELETE FROM ratings WHERE puzzle_id=? AND user_id=?
+        """, (int(puzzle_id), int(user_id)))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # Aliases for spec compatibility
+    add_rating = upsert
+    update_rating = upsert
+    delete_rating = delete
+    get_ratings_for_puzzle = list_by_puzzle
+    get_user_rating = get_by_puzzle_user

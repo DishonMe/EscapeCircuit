@@ -26,6 +26,7 @@ import { Link } from '@/components/ui/link';
 import { Spinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
+import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 
 import { usePuzzles } from '../api/get-puzzles';
 import { CreatorCommentDialog } from './creator-comment-dialog';
@@ -37,6 +38,7 @@ export const PuzzlesList = () => {
 
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
+  const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
 
   const puzzlesQuery = usePuzzles({
     page: page,
@@ -189,12 +191,118 @@ export const PuzzlesList = () => {
 
             {/* Rating and creator comment */}
             <div className="flex flex-wrap items-start gap-3 border-t border-gray-200 pt-3">
-              <div className="flex items-center gap-1">
-                {renderStars(puzzle.rating || 0)}
-                <span className="ml-1 text-xs text-gray-600">
-                  {(puzzle.rating || 0).toFixed(1)}
+              {/* Weighted Difficulty — clickable to open rating dialog */}
+              <button
+                type="button"
+                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
+                  puzzle.can_rate
+                    ? 'cursor-pointer hover:bg-yellow-50'
+                    : 'cursor-default opacity-80'
+                }`}
+                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                onClick={() => {
+                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
+                }}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Difficulty
                 </span>
-              </div>
+                <div className="flex items-center gap-1">
+                  {puzzle.rating_metrics && puzzle.rating_metrics.count > 0 ? (
+                    <>
+                      {renderStars(puzzle.rating_metrics.weighted_difficulty)}
+                      <span className="ml-1 text-xs text-gray-600">
+                        {puzzle.rating_metrics.weighted_difficulty.toFixed(1)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                      No Ratings
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              {/* Fun Rating — clickable to open rating dialog */}
+              <button
+                type="button"
+                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
+                  puzzle.can_rate
+                    ? 'cursor-pointer hover:bg-yellow-50'
+                    : 'cursor-default opacity-80'
+                }`}
+                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                onClick={() => {
+                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
+                }}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Fun
+                </span>
+                <div className="flex items-center gap-1">
+                  {puzzle.rating_metrics?.avg_fun != null ? (
+                    <>
+                      <span className="text-xl leading-none" title={`Fun: ${puzzle.rating_metrics.avg_fun.toFixed(1)}/5`}>
+                        {puzzle.rating_metrics.avg_fun < 2
+                          ? '😞'
+                          : puzzle.rating_metrics.avg_fun < 3.5
+                            ? '😊'
+                            : '😄'}
+                      </span>
+                      <span className="ml-1 text-xs text-gray-600">
+                        {puzzle.rating_metrics.avg_fun.toFixed(1)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                      Needs Votes
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              {/* Clearness — clickable to open rating dialog */}
+              <button
+                type="button"
+                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
+                  puzzle.can_rate
+                    ? 'cursor-pointer hover:bg-yellow-50'
+                    : 'cursor-default opacity-80'
+                }`}
+                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                onClick={() => {
+                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
+                }}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Clearness
+                </span>
+                <div className="flex items-center gap-1">
+                  {puzzle.rating_metrics?.avg_clearness != null ? (
+                    <>
+                      <span className="text-xl leading-none" title={`Clearness: ${puzzle.rating_metrics.avg_clearness.toFixed(1)}/5`}>
+                        {puzzle.rating_metrics.avg_clearness < 2
+                          ? '❌'
+                          : puzzle.rating_metrics.avg_clearness < 3.5
+                            ? '💡'
+                            : '✨'}
+                      </span>
+                      <span className="ml-1 text-xs text-gray-600">
+                        {puzzle.rating_metrics.avg_clearness < 2
+                          ? 'Not clear'
+                          : puzzle.rating_metrics.avg_clearness < 3.5
+                            ? 'Clear'
+                            : 'Very clear'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                      Needs Votes
+                    </span>
+                  )}
+                </div>
+              </button>
+
               <div className="ml-auto">
                 <Button
                   variant="outline"
@@ -242,6 +350,16 @@ export const PuzzlesList = () => {
         }}
         showLink={true}
       />
+
+      {ratingPuzzleId && (
+        <RatingDialog
+          puzzleId={ratingPuzzleId}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setRatingPuzzleId(null);
+          }}
+        />
+      )}
 
       {/* Pagination */}
       {!puzzlesQuery.isLoading && meta && meta.totalPages > 1 && (

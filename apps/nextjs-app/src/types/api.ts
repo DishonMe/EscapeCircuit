@@ -72,9 +72,13 @@ export type Puzzle = Entity<{
 
   // Solve tracking (injected per-user by browse endpoint)
   is_solved?: boolean;
+  can_rate?: boolean;
   best_time?: number | null;
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
+
+  // Rating metrics (injected by browse/get endpoints)
+  rating_metrics?: RatingMetrics;
 }>;
 
 export type CircuitComponent = {
@@ -113,3 +117,36 @@ export type PuzzleAttempt = Entity<{
   timeSpent: number;
   solution?: CircuitSolution;
 }>;
+
+// --- Rating System Types ---
+
+export type RatingMetrics = {
+  puzzle_id: number;
+  count: number;
+  avg_difficulty: number | null;
+  weighted_difficulty: number;
+  avg_fun: number | null;
+  avg_clearness: number | null;
+  experienced: {
+    count: number;
+    avg_difficulty: number | null;
+    avg_fun: number | null;
+    avg_clearness: number | null;
+  };
+};
+
+export type RatingEntry = {
+  id: number;
+  puzzle_id: number;
+  user_id: number;
+  difficulty: number;
+  fun: number;
+  clearness: number;
+  created_at: string;
+  is_experienced_at_rating: boolean;
+};
+
+export type PuzzleRatingsResponse = {
+  metrics: RatingMetrics;
+  my_rating: RatingEntry | null;
+};
