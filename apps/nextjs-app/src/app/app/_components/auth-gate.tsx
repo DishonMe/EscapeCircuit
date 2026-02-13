@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 
 import { useUser } from '@/lib/auth';
 import { paths } from '@/config/paths';
+import CreatorNotificationsPopup from '@/features/notifications/creator-notifications-popup';
 
 const AuthGate = ({ children }: { children: React.ReactNode }) => {
   const user = useUser();
@@ -17,7 +18,12 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user.status, user.data, router, pathname]);
 
-  return <>{children}</>;
+  return (
+    <>
+      <CreatorNotificationsPopup />
+      {children}
+    </>
+  );
 };
 
 export default AuthGate;

@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.UserService import UserService
+from Backend.ServiceLayer.NotificationService import NotificationService
 from Backend.APILayer.auth_utils import verify_token
 
 
@@ -26,7 +27,7 @@ class SetRoleReq(BaseModel):
     role: str  # "admin"/"creator"/"solver"
 
 
-def build_user_router(user_service: UserService) -> APIRouter:
+def build_user_router(user_service: UserService, notification_service: NotificationService = None) -> APIRouter:
     router = APIRouter(prefix="/users", tags=["users"])
 
     @router.post("/register")
@@ -80,5 +81,24 @@ def build_user_router(user_service: UserService) -> APIRouter:
             return user_service.set_role(token, req.model_dump())
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
+
+    # --- Creator Notifications ---
+    @router.get("/me/notifications")
+    def get_notifications(token: str = Depends(verify_token)):
+        if not notification_service:
+            return []
+        try:
+            return notification_service.get_unread(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.patch("/me/notifications/read")
+    def mark_notifications_read(token: str = Depends(verify_token)):
+        if not notification_service:
+            return {"marked_read": 0}
+        try:
+            return notification_service.mark_all_read(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
 
     return router

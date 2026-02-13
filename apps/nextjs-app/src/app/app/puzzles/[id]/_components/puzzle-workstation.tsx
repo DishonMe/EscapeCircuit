@@ -16,7 +16,6 @@ import {
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
-import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
@@ -65,13 +64,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
-  const [showCreatorComment, setShowCreatorComment] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
   );
+
+  // Sync isSolved from API data (so page refresh preserves solved state)
+  useEffect(() => {
+    if (puzzle?.is_solved) {
+      setIsSolved(true);
+    }
+  }, [puzzle?.is_solved]);
 
   const notifications = useNotifications();
 
@@ -614,27 +619,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
-            <Button
-              variant="outline"
-              disabled={!puzzle.creatorComment}
-              onClick={() => setShowCreatorComment(true)}
-            >
-              Creator Comment
-            </Button>
-            {/* Logic Constraint: Puzzle Rating */}
-            <Button
-              variant="outline"
-              disabled={!isSolved}
-              onClick={() => {
-                notifications.addNotification({
-                  type: 'info',
-                  title: 'Rate Puzzle',
-                  message: 'Rating functionality is not implemented yet.',
-                });
-              }}
-            >
-              Rate Puzzle
-            </Button>
             <Button onClick={checkSolution} isLoading={isChecking}>
               Check Solution
             </Button>
@@ -884,13 +868,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         showLink={false}
       />
 
-      <CreatorCommentDialog
-        puzzle={puzzle}
-        open={showCreatorComment}
-        onOpenChange={setShowCreatorComment}
-        showLink={false}
-      />
-
       <Dialog
         open={Boolean(connectivityIssues?.length)}
         onOpenChange={(open) => (open ? null : setConnectivityIssues(null))}
@@ -925,9 +902,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       <Dialog
         open={postCheck.open}
-        onOpenChange={(open) =>
-          setPostCheck(open ? postCheck : ({ open: false } as PostCheckState))
-        }
+        onOpenChange={(open) => {
+          setPostCheck(open ? postCheck : ({ open: false } as PostCheckState));
+        }}
       >
         <DialogContent className="max-w-[90vw] sm:max-w-2xl">
           <DialogHeader>
@@ -992,6 +969,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };
