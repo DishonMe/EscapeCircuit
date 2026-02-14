@@ -77,6 +77,9 @@ export type Puzzle = Entity<{
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
 
+  // Difficulty ratings (injected by backend)
+  avg_difficulty?: number;
+
   // Rating metrics (injected by browse/get endpoints)
   rating_metrics?: RatingMetrics;
 }>;

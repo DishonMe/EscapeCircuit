@@ -15,6 +15,7 @@ class PuzzleProgress:
     first_solved_at: Optional[str]
     max_xp_reached: bool = False
     best_xp: int = 0
+    total_xp_awarded: int = 0  # Sum of all deltas awarded (not raw xp_earned)
 
 
 class SolveRepo:
@@ -69,6 +70,7 @@ class SolveRepo:
             first_solved_at TEXT,
             max_xp_reached INTEGER NOT NULL DEFAULT 0,
             best_xp INTEGER NOT NULL DEFAULT 0,
+            total_xp_awarded INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(user_id, puzzle_id)
         );
         """)
@@ -77,6 +79,7 @@ class SolveRepo:
         for coldef in [
             "max_xp_reached INTEGER NOT NULL DEFAULT 0",
             "best_xp INTEGER NOT NULL DEFAULT 0",
+            "total_xp_awarded INTEGER NOT NULL DEFAULT 0",
         ]:
             col = coldef.split()[0]
             pp_cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzle_progress);").fetchall()}
@@ -217,32 +220,38 @@ class SolveRepo:
             first_solved_at=row["first_solved_at"],
             max_xp_reached=bool(int(row["max_xp_reached"])) if "max_xp_reached" in row.keys() else False,
             best_xp=int(row["best_xp"]) if "best_xp" in row.keys() else 0,
+            total_xp_awarded=int(row["total_xp_awarded"]) if "total_xp_awarded" in row.keys() else 0,
         )
 
     # --- solve status map ---
     def get_solve_status_map(self, user_id: int) -> Dict[int, dict]:
         """Return a mapping of puzzle_id -> solve metadata for all puzzles
-        the user has passed.  Includes best time, total xp, and best medal."""
+        the user has passed.  Includes best time, total xp (deltas), and best medal."""
+        # Get from puzzle_progress which has the correct total_xp_awarded (sum of deltas)
         rows = self.conn.execute(
             """
-            SELECT puzzle_id,
-                   MIN(time_taken_seconds) AS best_time,
-                   SUM(xp_earned)          AS total_xp,
-                   MAX(highest_medal)      AS best_medal,
-                   MIN(submitted_at)       AS first_solved_at
-            FROM solve_attempts
-            WHERE user_id = ? AND passed = 1
-            GROUP BY puzzle_id
+            SELECT pp.puzzle_id, pp.best_medal, pp.total_xp_awarded,
+                   sa.best_time, sa.first_solved_at
+            FROM puzzle_progress pp
+            LEFT JOIN (
+                SELECT puzzle_id, 
+                       MIN(time_taken_seconds) AS best_time,
+                       MIN(submitted_at) AS first_solved_at
+                FROM solve_attempts
+                WHERE user_id = ? AND passed = 1
+                GROUP BY puzzle_id
+            ) sa ON pp.puzzle_id = sa.puzzle_id
+            WHERE pp.user_id = ?
             """,
-            (int(user_id),),
+            (int(user_id), int(user_id)),
         ).fetchall()
         result: Dict[int, dict] = {}
         for r in rows:
             result[int(r["puzzle_id"])] = {
                 "is_solved": True,
                 "best_time": r["best_time"],
-                "total_xp": r["total_xp"] or 0,
-                "best_medal": r["best_medal"] or 0,
+                "total_xp": int(r["total_xp_awarded"]) or 0,
+                "best_medal": int(r["best_medal"]) or 0,
                 "first_solved_at": r["first_solved_at"],
             }
         return result
@@ -290,15 +299,16 @@ class SolveRepo:
     def upsert_progress(self, progress: PuzzleProgress) -> None:
         self.conn.execute(
             """
-            INSERT INTO puzzle_progress(user_id, puzzle_id, best_medal, timer_upgraded, tight_upgraded, first_solved_at, max_xp_reached, best_xp)
-            VALUES(?,?,?,?,?,?,?,?)
+            INSERT INTO puzzle_progress(user_id, puzzle_id, best_medal, timer_upgraded, tight_upgraded, first_solved_at, max_xp_reached, best_xp, total_xp_awarded)
+            VALUES(?,?,?,?,?,?,?,?,?)
             ON CONFLICT(user_id, puzzle_id) DO UPDATE SET
                 best_medal=excluded.best_medal,
                 timer_upgraded=excluded.timer_upgraded,
                 tight_upgraded=excluded.tight_upgraded,
                 first_solved_at=COALESCE(puzzle_progress.first_solved_at, excluded.first_solved_at),
                 max_xp_reached=excluded.max_xp_reached,
-                best_xp=excluded.best_xp
+                best_xp=excluded.best_xp,
+                total_xp_awarded=excluded.total_xp_awarded
             """,
             (
                 int(progress.user_id),
@@ -309,5 +319,6 @@ class SolveRepo:
                 progress.first_solved_at,
                 1 if progress.max_xp_reached else 0,
                 int(progress.best_xp),
+                int(progress.total_xp_awarded),
             ),
         )
