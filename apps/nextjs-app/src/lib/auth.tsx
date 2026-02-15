@@ -114,11 +114,49 @@ const registerWithEmailAndPassword = (
 
 // --- Google Login ---
 
-const loginWithGoogle = (token: string): Promise<AuthResponse> => {
+const loginWithGoogle = (token: string): Promise<any> => {
   return api.post('/users/google-login', { token });
 };
 
+const completeGoogleRegistration = (data: {
+  token: string;
+  username: string;
+  password: string;
+}): Promise<AuthResponse> => {
+  return api.post('/users/google-complete-registration', data);
+};
+
 export const useGoogleLogin = ({
+  onSuccess,
+  onError,
+  onNeedsPassword,
+}: {
+  onSuccess?: () => void;
+  onError?: (error: any) => void;
+  onNeedsPassword?: (data: { email: string; name: string; token: string }) => void;
+}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: loginWithGoogle,
+    onSuccess: (data) => {
+      // Check if this is an incomplete registration requiring password setup
+      if (data.requires_password) {
+        onNeedsPassword?.(data);
+        return;
+      }
+
+      // Normal successful login
+      queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      onSuccess?.();
+    },
+    onError: (error) => {
+      onError?.(error);
+    },
+  });
+};
+
+export const useCompleteGoogleRegistration = ({
   onSuccess,
   onError,
 }: {
@@ -127,7 +165,7 @@ export const useGoogleLogin = ({
 }) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: loginWithGoogle,
+    mutationFn: completeGoogleRegistration,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
       Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);

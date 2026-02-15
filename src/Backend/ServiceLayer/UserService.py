@@ -28,13 +28,19 @@ class UserService:
     def register(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
+        email = (payload.get("email") or "").strip()
+        
         if not username or not password:
             raise ValidationError("username and password required")
+        if not email:
+            raise ValidationError("email is required")
         if self.user_repo.get_by_username(username):
             raise ValidationError("username already exists")
+        if self.user_repo.get_by_email(email):
+            raise ValidationError("email already exists")
 
         # Domain objects require a truthy id; repo will replace it on insert.
-        user = User(id=0, username=username, role=UserRole.SOLVER, xp=0)
+        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
         created = self.user_repo.create(user, password=password)
         self.user_repo.conn.commit()
         
@@ -90,10 +96,9 @@ class UserService:
         if not token:
             raise ValidationError("token is required")
 
-        google_client_id = os.environ.get(
-            "GOOGLE_CLIENT_ID",
-            "138879283241-0kfmc6auoir4a5ao9btos3hhklgee1jm.apps.googleusercontent.com",
-        )
+        google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        if not google_client_id:
+            raise ValidationError("google_login_disabled")
 
         try:
             idinfo = google_id_token.verify_oauth2_token(
@@ -111,19 +116,76 @@ class UserService:
         user = self.user_repo.get_by_email(email)
 
         if not user:
-            # Pick a unique username (Google name may collide with existing usernames)
-            base_username = name or email.split("@")[0]
-            username = base_username
-            counter = 1
-            while self.user_repo.get_by_username(username):
-                username = f"{base_username}_{counter}"
-                counter += 1
+            # User doesn't exist - need to set up password
+            # Return info for frontend to redirect to password setup
+            return {
+                "requires_password": True,
+                "email": email,
+                "name": name,
+                "token": token  # Pass token to complete registration later
+            }
 
-            # Create a new SOLVER user (no password)
-            new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
-            user = self.user_repo.create(new_user, password=None)
+        # User exists - log in normally
+        session_token = self.auth.login_external(user.id)
 
-        # Log in via trusted external path (no password check)
+        d = user.to_dict()
+        d["level"] = self.xp.calculate_level(user.xp)
+        d["is_experienced"] = self.xp.is_experienced(user.xp)
+        return {"token": session_token, "user": d}
+
+    def google_complete_registration(self, payload: Dict[str, Any]) -> dict:
+        """Complete Google registration by setting username and password.
+        
+        This is called when a user logs in with Google for the first time.
+        If an account with the same email already exists, this links to that account
+        instead of creating a new one.
+        """
+        token = payload.get("token") or ""
+        username = (payload.get("username") or "").strip()
+        password = payload.get("password") or ""
+
+        if not token:
+            raise ValidationError("token is required")
+        if not username or not password:
+            raise ValidationError("username and password required")
+
+        # Verify the Google token again
+        google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        if not google_client_id:
+            raise ValidationError("google_login_disabled")
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                token, google_requests.Request(), audience=google_client_id
+            )
+        except Exception as e:
+            raise ValidationError(f"invalid google token: {e}")
+
+        email = idinfo.get("email")
+        name = idinfo.get("name", "")
+        if not email:
+            raise ValidationError("google token missing email")
+
+        # Check if user with this email already exists (link to existing account)
+        existing_user = self.user_repo.get_by_email(email)
+        if existing_user:
+            # Link to existing account by logging in
+            session_token = self.auth.login_external(existing_user.id)
+            d = existing_user.to_dict()
+            d["level"] = self.xp.calculate_level(existing_user.xp)
+            d["is_experienced"] = self.xp.is_experienced(existing_user.xp)
+            return {"token": session_token, "user": d}
+
+        # Email doesn't exist yet. Check if username is available
+        if self.user_repo.get_by_username(username):
+            raise ValidationError("username already exists")
+
+        # Create new user with username, email, and password
+        new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+        user = self.user_repo.create(new_user, password=password)
+        self.user_repo.conn.commit()
+
+        # Log in via trusted external path
         session_token = self.auth.login_external(user.id)
 
         d = user.to_dict()

@@ -17,6 +17,13 @@ type LoginFormProps = {
 export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const { addNotification } = useNotifications();
   
+  // Check if Google login is configured
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const isGoogleLoginEnabled = 
+    googleClientId && 
+    googleClientId !== 'your_google_client_id_here' &&
+    googleClientId.length > 0;
+  
   const login = useLogin({
     onSuccess,
     onError: (error: any) => {
@@ -31,11 +38,29 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const googleLogin = useGoogleLogin({
     onSuccess,
     onError: (error: any) => {
+      // Handle disabled Google login gracefully
+      if (error?.message === 'google_login_disabled') {
+        addNotification({
+          type: 'info',
+          title: 'Google Login Not Available',
+          message: 'Google login is not configured. Please use username/password login.',
+        });
+        return;
+      }
       addNotification({
         type: 'error',
         title: 'Google Login Failed',
         message: error?.message || 'Could not sign in with Google. Please try again.',
       });
+    },
+    onNeedsPassword: (data) => {
+      // Redirect to password setup page with email, name, and token
+      const params = new URLSearchParams({
+        email: data.email,
+        name: data.name,
+        token: data.token,
+      });
+      window.location.href = `${paths.auth.completeGoogle.getHref()}?${params.toString()}`;
     },
   });
 
@@ -76,32 +101,36 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         )}
       </Form>
 
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500">OR</span>
-        </div>
-      </div>
+      {isGoogleLoginEnabled && (
+        <>
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-white px-2 text-gray-500">OR</span>
+            </div>
+          </div>
 
-      <div className="flex justify-center">
-        <GoogleLogin
-          onSuccess={(credentialResponse) => {
-            const credential = credentialResponse.credential;
-            if (credential) {
-              googleLogin.mutate(credential);
-            }
-          }}
-          onError={() => {
-            addNotification({
-              type: 'error',
-              title: 'Google Login Failed',
-              message: 'Could not sign in with Google. Please try again.',
-            });
-          }}
-        />
-      </div>
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={(credentialResponse) => {
+                const credential = credentialResponse.credential;
+                if (credential) {
+                  googleLogin.mutate(credential);
+                }
+              }}
+              onError={() => {
+                addNotification({
+                  type: 'error',
+                  title: 'Google Login Failed',
+                  message: 'Could not sign in with Google. Please try again.',
+                });
+              }}
+            />
+          </div>
+        </>
+      )}
 
       <div className="mt-2 flex items-center justify-end">
         <div className="text-sm">
