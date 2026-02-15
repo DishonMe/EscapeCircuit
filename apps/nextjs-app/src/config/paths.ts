@@ -12,6 +12,9 @@ export const paths = {
       getHref: (redirectTo?: string | null | undefined) =>
         `/auth/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
     },
+    completeGoogle: {
+      getHref: () => `/auth/complete-google`,
+    },
   },
 
   app: {

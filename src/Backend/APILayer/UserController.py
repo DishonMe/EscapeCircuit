@@ -22,6 +22,12 @@ class GoogleLoginReq(BaseModel):
     token: str
 
 
+class GoogleCompleteRegistrationReq(BaseModel):
+    token: str
+    username: str
+    password: str
+
+
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
@@ -53,6 +59,13 @@ def build_user_router(user_service: UserService, notification_service: Notificat
             return user_service.google_login(req.token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/google-complete-registration")
+    def google_complete_registration(req: GoogleCompleteRegistrationReq):
+        try:
+            return user_service.google_complete_registration(req.model_dump())
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     @router.post("/logout")
     def logout(token: str = Depends(verify_token)):
