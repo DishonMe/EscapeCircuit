@@ -243,14 +243,17 @@ class SolvingService:
         test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
         if not test_cases:
             raise ValidationError("puzzle has no test cases")
+        
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
             
         # Reconstruct "Structure JSON" for Logic Engine
         tcircuit = Circuit(
             id=0,
             user_id=0,
             name="Validation Check",
-            cost=solution_payload.get("totalCost", 0),
-            structure_json=json.dumps(solution_payload)
+            cost=expanded_solution.get("totalCost", 0),
+            structure_json=json.dumps(expanded_solution)
         )
         
         passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases)
@@ -548,3 +551,39 @@ class SolvingService:
                     return False, str(e), [{"error": str(e)}]
 
         return True, None, []
+
+    def _expand_arsenal_pieces(self, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Expand arsenal pieces in the solution by adding their truth tables.
+        This allows the logic engine to evaluate them correctly.
+        """
+        # Make a deep copy to avoid modifying the original
+        expanded = json.loads(json.dumps(solution_payload))
+        
+        placed_components = expanded.get("placedComponents", []) or expanded.get("components", [])
+        
+        # Store arsenal piece info for quick lookup during evaluation
+        expanded["_arsenal_pieces"] = {}
+        
+        for placed in placed_components:
+            component_id = placed.get("componentId")
+            
+            # Check if this looks like an arsenal piece (numeric ID)
+            try:
+                piece_id = int(component_id)
+                # Try to fetch the arsenal piece
+                arsenal_piece = self.circuit_repo.get_by_id(piece_id)
+                if arsenal_piece and arsenal_piece.is_arsenal:
+                    # Store the truth table and input/output info
+                    expanded["_arsenal_pieces"][placed.get("id")] = {
+                        "id": piece_id,
+                        "name": arsenal_piece.name,
+                        "num_inputs": arsenal_piece.num_inputs,
+                        "num_outputs": arsenal_piece.num_outputs,
+                        "truth_table": arsenal_piece.truth_table,
+                    }
+            except (ValueError, TypeError):
+                # Not a numeric ID, so not an arsenal piece
+                pass
+        
+        return expanded

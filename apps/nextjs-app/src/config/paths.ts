@@ -27,6 +27,14 @@ export const paths = {
     puzzle: {
       getHref: (id: string) => `/app/puzzles/${id}`,
     },
+    arsenal: {
+      root: {
+        getHref: () => '/app/arsenal',
+      },
+      creator: {
+        getHref: () => '/app/arsenal/creator',
+      },
+    },
     discussions: {
       getHref: () => '/app/discussions',
     },

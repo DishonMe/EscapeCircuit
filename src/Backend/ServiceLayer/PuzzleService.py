@@ -14,11 +14,12 @@ class PuzzleService:
     """
     All actions must call AuthService.
     """
-    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService, solve_repo: SolveRepo | None = None):
+    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService, solve_repo: SolveRepo | None = None, arsenal_service = None):
         self.repo = puzzle_repo
         self.user_repo = user_repo
         self.auth = auth_service
         self.solve_repo = solve_repo
+        self.arsenal_service = arsenal_service
 
     def _enrich_puzzle(self, p_dict: dict) -> dict:
         # Helper to attach creator object
@@ -56,7 +57,7 @@ class PuzzleService:
         return [self._enrich_puzzle(p.to_dict()) for p in puzzles]
 
     def get(self, session_token: str, puzzle_id: int) -> dict:
-        _ = self.auth.require_user_id(session_token)
+        user_id = self.auth.require_user_id(session_token)
         print(f"DEBUG: PuzzleService.get fetching id={puzzle_id}")
         p = self.repo.get_by_id(puzzle_id)
         if not p:
@@ -73,6 +74,19 @@ class PuzzleService:
             first_tc = tcs[0]
             d["inputs"] = list(first_tc.inputs.keys())
             d["outputs"] = list(first_tc.expected_outputs.keys())
+        
+        # Add available arsenal pieces if arsenal service is available
+        if self.arsenal_service:
+            try:
+                allowed_gates = set(p.default_gate_set) if p.default_gate_set else set()
+                allowed_gates_str = {g.value for g in allowed_gates}
+                # Note: get_available_pieces_for_puzzle expects session_token
+                # But we already have user_id, so we use it directly
+                pieces = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates_str)
+                d["specialComponents"] = pieces
+            except Exception:
+                # If arsenal service fails, just don't include pieces
+                d["specialComponents"] = []
         
         return d
 

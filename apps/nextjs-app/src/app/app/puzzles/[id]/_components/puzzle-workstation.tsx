@@ -216,12 +216,62 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     const ui = new Map<string, ComponentDef>();
     for (const [id, def] of componentCatalog.entries()) {
-      const hc = hardcoded[def.type];
-      const size = hc?.size ?? {
-        w: 4,
-        h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
-      };
-      const ports = hc?.ports ?? toDefaultPorts(def.pins, size);
+      // Arsenal pieces have custom sizing: width 4, height = max(inputs, outputs)
+      const isArsenal = (def as any).is_arsenal === true;
+      
+      let size: { w: number; h: number };
+      let ports: ComponentDef['ports'];
+      
+      if (isArsenal) {
+        // Arsenal piece sizing: width=4 (fixed), height=max(inputs, outputs)
+        const num_inputs = (def as any).num_inputs ?? 0;
+        const num_outputs = (def as any).num_outputs ?? 0;
+        
+        // If inputs or outputs are 0, fall back to pins-based calculation
+        if (num_inputs > 0 && num_outputs > 0) {
+          size = {
+            h: Math.max(num_inputs, num_outputs),
+            w: 4,
+          };
+          
+          // Generate ports for arsenal pieces
+          ports = [];
+          
+          // Place inputs on the left (col 0), distributed vertically
+          for (let i = 0; i < num_inputs; i++) {
+            ports.push({
+              id: `IN${i}`,
+              kind: 'input',
+              offset: { row: i, col: 0 },
+            });
+          }
+          
+          // Place outputs on the right (col = width - 1), distributed vertically
+          for (let i = 0; i < num_outputs; i++) {
+            ports.push({
+              id: `OUT${i}`,
+              kind: 'output',
+              offset: { row: i, col: size.w - 1 },
+            });
+          }
+        } else {
+          // Fallback: use pins to estimate size
+          size = {
+            w: 4,
+            h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
+          };
+          ports = toDefaultPorts(def.pins, size);
+        }
+      } else {
+        // Basic component sizing (hardcoded or dynamic)
+        const hc = hardcoded[def.type];
+        size = hc?.size ?? {
+          w: 4,
+          h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
+        };
+        ports = (hardcoded[def.type]?.ports) ?? toDefaultPorts(def.pins, size);
+      }
+      
       ui.set(id, {
         id,
         label: def.type,
