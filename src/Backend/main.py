@@ -17,6 +17,7 @@ from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 from Backend.ServiceLayer.UserService import UserService
 from Backend.ServiceLayer.CircuitService import CircuitService
+from Backend.ServiceLayer.ArsenalService import ArsenalService
 from Backend.ServiceLayer.PuzzleService import PuzzleService
 from Backend.ServiceLayer.SolvingService import SolvingService
 from Backend.ServiceLayer.RatingService import RatingService
@@ -26,6 +27,7 @@ from Backend.ServiceLayer.NotificationService import NotificationService
 # Controllers
 from Backend.APILayer.UserController import build_user_router
 from Backend.APILayer.CircuitController import build_circuit_router
+from Backend.APILayer.ArsenalController import build_arsenal_router
 from Backend.APILayer.PuzzleController import build_puzzle_router
 from Backend.APILayer.RatingController import build_rating_router
 from Backend.APILayer.AdminController import build_admin_router
@@ -77,6 +79,15 @@ def create_app() -> FastAPI:
         xp_service
     )
 
+    # Arsenal Service
+    arsenal_service = ArsenalService(
+        circuit_repo, 
+        user_repo, 
+        auth_service, 
+        logic_engine, 
+        xp_service
+    )
+
     # Solving Service
     # Note: SolvingService takes 'conn' as first arg for transaction handling in tests/production
     solving_service = SolvingService(
@@ -97,7 +108,8 @@ def create_app() -> FastAPI:
         puzzle_repo,
         user_repo,
         auth_service,
-        solve_repo
+        solve_repo,
+        arsenal_service
     )
 
     # Rating Service
@@ -130,6 +142,7 @@ def create_app() -> FastAPI:
     # 5. Routers
     app.include_router(build_user_router(user_service, notification_service))
     app.include_router(build_circuit_router(circuit_service))
+    app.include_router(build_arsenal_router(arsenal_service))
     app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service))
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router())

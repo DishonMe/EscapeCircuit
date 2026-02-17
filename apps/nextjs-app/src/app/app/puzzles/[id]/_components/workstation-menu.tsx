@@ -193,6 +193,7 @@ export const WorkstationMenu = ({
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<
     string | null
   >(null);
+  const [viewingTruthTableData, setViewingTruthTableData] = useState<any>(null);
 
   useEffect(() => {
     if (!allowArsenal) return;
@@ -206,6 +207,32 @@ export const WorkstationMenu = ({
       c.usedBasicTypes.every((t) => !filtered.has(t)),
     );
   }, [allowArsenal, arsenal, filteredBasicTypes]);
+
+  const handleInfoClick = (componentId: string, component: CircuitComponent) => {
+    setViewingTruthTableFor(component.type || componentId);
+    
+    // Check if component has truth_table data (from API arsenal pieces)
+    const truthTableSource = TRUTH_TABLES[component.type || componentId];
+    const apiData = (component as any).truth_table;
+    
+    if (apiData) {
+      // Parse the truth table from API data
+      try {
+        const parsedTT = typeof apiData === 'string' ? JSON.parse(apiData) : apiData;
+        // Convert to the expected format
+        const inputKeys = Object.keys(parsedTT)[0]?.split(',') || [];
+        setViewingTruthTableData({
+          inputs: inputKeys,
+          outputs: Object.keys(parsedTT[Object.keys(parsedTT)[0]] || {}),
+          rows: Object.entries(parsedTT).map(([input, output]: any) => [input, ...Object.values(output)]),
+        });
+      } catch {
+        setViewingTruthTableData(truthTableSource);
+      }
+    } else {
+      setViewingTruthTableData(truthTableSource);
+    }
+  };
 
   const truthTable = viewingTruthTableFor
     ? TRUTH_TABLES[viewingTruthTableFor]
@@ -222,7 +249,7 @@ export const WorkstationMenu = ({
                 component={c}
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onInfoClick={() => handleInfoClick(c.id, c)}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
@@ -232,7 +259,10 @@ export const WorkstationMenu = ({
       ) : null}
 
       {special.length ? (
-        <Category title="Special">
+        <Category title="Arsenal">
+          <div className="text-xs text-gray-600 mb-2">
+            Custom circuit pieces available for this puzzle
+          </div>
           <div className="flex flex-col gap-2">
             {special.map((c) => (
               <DraggableItem
@@ -240,7 +270,7 @@ export const WorkstationMenu = ({
                 component={c}
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onInfoClick={() => handleInfoClick(c.id, c)}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
@@ -282,17 +312,17 @@ export const WorkstationMenu = ({
           <DialogHeader>
             <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
           </DialogHeader>
-          {truthTable ? (
+          {viewingTruthTableData ? (
             <div className="overflow-hidden rounded border border-gray-200">
               <table className="w-full text-sm text-gray-700">
                 <thead className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
                   <tr>
-                    {truthTable.inputs.map((i) => (
+                    {viewingTruthTableData.inputs.map((i: string) => (
                       <th key={i} className="px-3 py-2 text-center">
                         {i}
                       </th>
                     ))}
-                    {truthTable.outputs.map((o) => (
+                    {viewingTruthTableData.outputs.map((o: string) => (
                       <th
                         key={o}
                         className="border-l border-gray-200 px-3 py-2 text-center"
@@ -303,9 +333,9 @@ export const WorkstationMenu = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {truthTable.rows.map((row, idx) => (
+                  {viewingTruthTableData.rows.map((row: string[], idx: number) => (
                     <tr key={idx} className="divide-x divide-gray-200">
-                      {row.map((cell, cIdx) => (
+                      {row.map((cell: string, cIdx: number) => (
                         <td key={cIdx} className="px-3 py-2 text-center">
                           {cell}
                         </td>

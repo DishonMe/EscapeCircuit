@@ -13,6 +13,11 @@ class Circuit:
     name: str
     cost: int
     structure_json: str
+    is_arsenal: bool = False
+    basic_gates: str = ""  # JSON list of basic gates used
+    truth_table: str = ""  # JSON dict of truth table
+    num_inputs: int = 0  # Number of inputs (for arsenal pieces)
+    num_outputs: int = 0  # Number of outputs (for arsenal pieces)
 
     def __post_init__(self) -> None:
         if self.id < 0:
@@ -29,6 +34,25 @@ class Circuit:
             json.loads(self.structure_json)
         except (json.JSONDecodeError, ValueError):
             raise ValidationError("Circuit.structure_json must be valid JSON")
+        
+        # Validate arsenal-specific fields if it's an arsenal piece
+        if self.is_arsenal:
+            if not self.basic_gates or not self.basic_gates.strip():
+                raise ValidationError("Circuit.basic_gates is required for arsenal pieces")
+            if not self.truth_table or not self.truth_table.strip():
+                raise ValidationError("Circuit.truth_table is required for arsenal pieces")
+            try:
+                gates = json.loads(self.basic_gates)
+                if not isinstance(gates, list):
+                    raise ValidationError("Circuit.basic_gates must be a JSON list")
+            except (json.JSONDecodeError, ValueError):
+                raise ValidationError("Circuit.basic_gates must be valid JSON")
+            try:
+                tt = json.loads(self.truth_table)
+                if not isinstance(tt, dict):
+                    raise ValidationError("Circuit.truth_table must be a JSON dict")
+            except (json.JSONDecodeError, ValueError):
+                raise ValidationError("Circuit.truth_table must be valid JSON")
 
     def get_list_of_gates(self) -> list:
         structure = json.loads(self.structure_json)
@@ -72,6 +96,27 @@ class Circuit:
             "name": self.name,
             "cost": self.cost,
             "structure_json": self.structure_json,
+            "is_arsenal": self.is_arsenal,
+            "basic_gates": self.basic_gates,
+            "truth_table": self.truth_table,
+            "num_inputs": self.num_inputs,
+            "num_outputs": self.num_outputs,
+        }
+
+    def to_circuit_component(self) -> dict:
+        """Convert arsenal piece to CircuitComponent format for display/placement"""
+        total_pins = self.num_inputs + self.num_outputs
+        
+        return {
+            "id": str(self.id),  # Use circuit ID as component ID for placement
+            "type": self.name,  # Use circuit name as the type/label
+            "cost": int(self.cost),
+            "pins": total_pins,
+            "basic_gates": self.basic_gates,
+            "truth_table": self.truth_table,
+            "is_arsenal": True,
+            "num_inputs": self.num_inputs,
+            "num_outputs": self.num_outputs,
         }
 
     @staticmethod
@@ -82,6 +127,11 @@ class Circuit:
             name=d["name"],
             cost=d["cost"],
             structure_json=d["structure_json"],
+            is_arsenal=d.get("is_arsenal", False),
+            basic_gates=d.get("basic_gates", ""),
+            truth_table=d.get("truth_table", ""),
+            num_inputs=d.get("num_inputs", 0),
+            num_outputs=d.get("num_outputs", 0),
         )
 
     # --- getters ---
