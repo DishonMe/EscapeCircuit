@@ -142,7 +142,7 @@ def create_app() -> FastAPI:
     # 5. Routers
     app.include_router(build_user_router(user_service, notification_service))
     app.include_router(build_circuit_router(circuit_service))
-    app.include_router(build_arsenal_router(arsenal_service))
+    app.include_router(build_arsenal_router(arsenal_service, solving_service))
     app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service))
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router())

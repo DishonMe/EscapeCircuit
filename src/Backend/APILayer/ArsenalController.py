@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Dict, Any, Union, List, Optional
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.ArsenalService import ArsenalService
+from Backend.ServiceLayer.SolvingService import SolvingService
 from Backend.APILayer.auth_utils import verify_token
 
 
@@ -19,7 +21,13 @@ class RenameArsenalPieceReq(BaseModel):
     new_name: str
 
 
-def build_arsenal_router(arsenal_service: ArsenalService) -> APIRouter:
+class SimulateReq(BaseModel):
+    solution: Dict[str, Any]
+    inputs: Union[Dict[str, int], List[Dict[str, int]], Dict[str, List[int]]]
+    isSequence: Optional[bool] = None
+
+
+def build_arsenal_router(arsenal_service: ArsenalService, solving_service: SolvingService) -> APIRouter:
     router = APIRouter(prefix="/arsenal", tags=["arsenal"])
 
     @router.post("")
@@ -76,5 +84,21 @@ def build_arsenal_router(arsenal_service: ArsenalService) -> APIRouter:
             return arsenal_service.get_available_pieces_for_puzzle(token, gates_set)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/simulate")
+    def simulate(req: SimulateReq, token: str = Depends(verify_token)):
+        """Simulate an arsenal piece with given inputs (no puzzle required)"""
+        try:
+            # Determine if it's a sequence simulation
+            is_sequence = req.isSequence if req.isSequence is not None else (
+                isinstance(req.inputs, dict) and 
+                any(isinstance(v, list) for v in req.inputs.values())
+            )
+            # Use puzzle_id=0 as a placeholder since this is for an arsenal piece, not a puzzle
+            return solving_service.simulate_solution(token, 0, req.solution, req.inputs, is_sequence=is_sequence)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router
