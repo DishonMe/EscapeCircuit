@@ -1,18 +1,18 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import Cookies from 'js-cookie';
 
 import { Link } from '@/components/ui/link';
 import { paths } from '@/config/paths';
-import { useUser } from '@/lib/auth';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 type LayoutProps = {
   children: ReactNode;
 };
 
 export const AuthLayout = ({ children }: LayoutProps) => {
-  const user = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const isLoginPage = pathname === paths.auth.login.getHref();
@@ -23,16 +23,25 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
 
-  const isAuthed = user.status === 'success' && !!user.data?.id;
+  const [hasCheckedToken, setHasCheckedToken] = useState(false);
 
   useEffect(() => {
-    // Redirect only when the auth query succeeds with a user to avoid loops on 401/errored states
-    if (isAuthed) {
-      router.replace(
-        `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
-      );
+    // Check if user has a valid token - if so, redirect to dashboard
+    // This is done synchronously without an API call to avoid delays on auth pages
+    try {
+      const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+      if (token) {
+        // User is already logged in, redirect them
+        router.replace(
+          `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
+        );
+      }
+    } catch (error) {
+      console.error('Error checking auth token:', error);
     }
-  }, [isAuthed, router, redirectTo]);
+    
+    setHasCheckedToken(true);
+  }, [router, redirectTo]);
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">
