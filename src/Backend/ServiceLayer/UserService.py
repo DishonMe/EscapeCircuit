@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -80,9 +80,55 @@ class UserService:
         d["is_experienced"] = self.xp.is_experienced(user.xp)
         return d
 
-    def list_users(self, session_token: str, limit: int = 200, offset: int = 0) -> List[dict]:
+    def list_users(
+        self, 
+        session_token: str, 
+        limit: int = 200, 
+        offset: int = 0,
+        username_search: Optional[str] = None,
+        role: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        min_level: Optional[int] = None,
+        max_level: Optional[int] = None,
+        experience_level: str = "all",
+        order_by: str = "created_at",
+        order_direction: str = "DESC"
+    ) -> List[dict]:
+        """
+        List users with optional filters and ordering.
+        
+        Note: Level-based filtering is converted to XP ranges based on XPService thresholds.
+        Args:
+            experience_level: 'all', 'experienced', 'inexperienced'
+        """
         _ = self.auth.require_user_id(session_token)
-        users = self.user_repo.list_all(limit=limit, offset=offset)
+        
+        # Convert level ranges to xp ranges
+        min_xp = None
+        max_xp = None
+        if min_level is not None or max_level is not None:
+            # Get XP thresholds from XPService
+            # Assuming XPService has a way to convert level to xp
+            # For now, we'll use a rough estimate: level * 100
+            if min_level is not None:
+                min_xp = self.xp.calculate_xp_for_level(min_level) if hasattr(self.xp, 'calculate_xp_for_level') else (min_level - 1) * 100
+            if max_level is not None:
+                max_xp = self.xp.calculate_xp_for_level(max_level + 1) - 1 if hasattr(self.xp, 'calculate_xp_for_level') else (max_level * 100) + 99
+        
+        users = self.user_repo.list_all(
+            limit=limit,
+            offset=offset,
+            username_search=username_search,
+            role=role,
+            date_from=date_from,
+            date_to=date_to,
+            min_xp=min_xp,
+            max_xp=max_xp,
+            experience_level=experience_level,
+            order_by=order_by,
+            order_direction=order_direction
+        )
         out = []
         for u in users:
             d = u.to_dict()

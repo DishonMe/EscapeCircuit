@@ -116,19 +116,263 @@ class PuzzleRepo:
             puzzle.id
         ))
 
-    def list_published(self, limit: int = 50, offset: int = 0) -> List[Puzzle]:
-        rows = self.conn.execute("""
+    def list_published(
+        self, 
+        limit: int = 50, 
+        offset: int = 0,
+        search: Optional[str] = None,
+        creator_id: Optional[int] = None,
+        min_difficulty: Optional[float] = None,
+        max_difficulty: Optional[float] = None,
+        only_experienced_difficulty: bool = False,
+        min_clearness: Optional[float] = None,
+        max_clearness: Optional[float] = None,
+        only_experienced_clearness: bool = False,
+        min_fun: Optional[float] = None,
+        max_fun: Optional[float] = None,
+        only_experienced_fun: bool = False,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        order_only_experienced: bool = False
+    ) -> List[Puzzle]:
+        """
+        List published puzzles with optional filters and ordering.
+        
+        Args:
+            search: Partial puzzle name search
+            order_by: 'created_at' (default), 'difficulty', 'fun', or 'clearness'
+            order_direction: 'DESC' (default) or 'ASC'
+            order_only_experienced: If True, uses avg ratings for ordering (experienced users only)
+        """
+        where_clauses = ["status=?"]
+        params = [PuzzleStatus.PUBLISHED.value]
+        
+        if search is not None:
+            where_clauses.append("name LIKE ?")
+            params.append(f"%{search}%")
+        
+        if creator_id is not None:
+            where_clauses.append("creator_user_id=?")
+            params.append(creator_id)
+        
+        if min_difficulty is not None or max_difficulty is not None:
+            if only_experienced_difficulty:
+                # For experienced users: filter by avg_difficulty rating (with fallback to base difficulty)
+                # COALESCE to handle NULL avg_difficulty by using base difficulty
+                difficulty_case = """
+                    CASE 
+                        WHEN avg_difficulty IS NOT NULL THEN avg_difficulty
+                        WHEN difficulty = 'EASY' THEN 1
+                        WHEN difficulty = 'MEDIUM' THEN 2
+                        WHEN difficulty = 'HARD' THEN 3
+                        ELSE 1.5
+                    END
+                """
+                if min_difficulty is not None:
+                    where_clauses.append(f"({difficulty_case}) >= ?")
+                    params.append(min_difficulty)
+                if max_difficulty is not None:
+                    where_clauses.append(f"({difficulty_case}) <= ?")
+                    params.append(max_difficulty)
+            else:
+                # For all users: filter by base puzzle difficulty enum
+                # Convert enum strings to numeric values for proper comparison
+                if min_difficulty is not None:
+                    min_level = self._difficulty_to_level(min_difficulty)
+                    where_clauses.append("""
+                        CASE 
+                            WHEN difficulty = 'EASY' THEN 1
+                            WHEN difficulty = 'MEDIUM' THEN 2
+                            WHEN difficulty = 'HARD' THEN 3
+                            ELSE 1.5
+                        END >= ?
+                    """)
+                    params.append(min_difficulty)
+                if max_difficulty is not None:
+                    max_level = self._difficulty_to_level(max_difficulty)
+                    where_clauses.append("""
+                        CASE 
+                            WHEN difficulty = 'EASY' THEN 1
+                            WHEN difficulty = 'MEDIUM' THEN 2
+                            WHEN difficulty = 'HARD' THEN 3
+                            ELSE 1.5
+                        END <= ?
+                    """)
+                    params.append(max_difficulty)
+        
+        if min_clearness is not None or max_clearness is not None:
+            # Exclude unrated puzzles when filtering by clearness
+            where_clauses.append("avg_clearness > 0")
+            if only_experienced_clearness:
+                if min_clearness is not None:
+                    where_clauses.append("avg_clearness>=?")
+                    params.append(min_clearness)
+                if max_clearness is not None:
+                    where_clauses.append("avg_clearness<=?")
+                    params.append(max_clearness)
+            else:
+                # Filter by min/max clearness regardless of experience
+                if min_clearness is not None:
+                    where_clauses.append("avg_clearness>=?")
+                    params.append(min_clearness)
+                if max_clearness is not None:
+                    where_clauses.append("avg_clearness<=?")
+                    params.append(max_clearness)
+        
+        if min_fun is not None or max_fun is not None:
+            # Exclude unrated puzzles when filtering by fun
+            where_clauses.append("avg_fun > 0")
+            if only_experienced_fun:
+                if min_fun is not None:
+                    where_clauses.append("avg_fun>=?")
+                    params.append(min_fun)
+                if max_fun is not None:
+                    where_clauses.append("avg_fun<=?")
+                    params.append(max_fun)
+            else:
+                # Filter by min/max fun regardless of experience
+                if min_fun is not None:
+                    where_clauses.append("avg_fun>=?")
+                    params.append(min_fun)
+                if max_fun is not None:
+                    where_clauses.append("avg_fun<=?")
+                    params.append(max_fun)
+        
+        if date_from is not None:
+            where_clauses.append("created_at>=?")
+            params.append(date_from)
+        
+        if date_to is not None:
+            where_clauses.append("created_at<=?")
+            params.append(date_to)
+        
+        # Build order by clause
+        valid_order_fields = ["created_at", "difficulty", "fun", "clearness"]
+        if order_by not in valid_order_fields:
+            order_by = "created_at"
+        
+        if order_by == "created_at":
+            order_clause = f"created_at {order_direction}"
+        elif order_by == "difficulty":
+            order_clause = f"avg_difficulty {order_direction}"
+        elif order_by == "fun":
+            order_clause = f"avg_fun {order_direction}"
+        elif order_by == "clearness":
+            order_clause = f"avg_clearness {order_direction}"
+        else:
+            order_clause = "created_at DESC"
+        
+        where_sql = " AND ".join(where_clauses)
+        query = f"""
             SELECT * FROM puzzles
-            WHERE status=?
-            ORDER BY id DESC
+            WHERE {where_sql}
+            ORDER BY {order_clause}
             LIMIT ? OFFSET ?
-        """, (PuzzleStatus.PUBLISHED.value, limit, offset)).fetchall()
+        """
+        params.extend([limit, offset])
+        
+        rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_puzzle(r) for r in rows]
 
-    def count_published(self) -> int:
-        cur = self.conn.execute("""
-            SELECT COUNT(*) FROM puzzles WHERE status=?
-        """, (PuzzleStatus.PUBLISHED.value,))
+    def count_published(
+        self,
+        search: Optional[str] = None,
+        creator_id: Optional[int] = None,
+        min_difficulty: Optional[float] = None,
+        max_difficulty: Optional[float] = None,
+        only_experienced_difficulty: bool = False,
+        min_clearness: Optional[float] = None,
+        max_clearness: Optional[float] = None,
+        only_experienced_clearness: bool = False,
+        min_fun: Optional[float] = None,
+        max_fun: Optional[float] = None,
+        only_experienced_fun: bool = False,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+    ) -> int:
+        """Count published puzzles with optional filters."""
+        where_clauses = ["status=?"]
+        params = [PuzzleStatus.PUBLISHED.value]
+        
+        if search is not None:
+            where_clauses.append("name LIKE ?")
+            params.append(f"%{search}%")
+        
+        if creator_id is not None:
+            where_clauses.append("creator_user_id=?")
+            params.append(creator_id)
+        
+        if min_difficulty is not None or max_difficulty is not None:
+            if only_experienced_difficulty:
+                # For experienced users: filter by avg_difficulty rating (with fallback to base difficulty)
+                difficulty_case = """
+                    CASE 
+                        WHEN avg_difficulty IS NOT NULL THEN avg_difficulty
+                        WHEN difficulty = 'EASY' THEN 1
+                        WHEN difficulty = 'MEDIUM' THEN 2
+                        WHEN difficulty = 'HARD' THEN 3
+                        ELSE 1.5
+                    END
+                """
+                if min_difficulty is not None:
+                    where_clauses.append(f"({difficulty_case}) >= ?")
+                    params.append(min_difficulty)
+                if max_difficulty is not None:
+                    where_clauses.append(f"({difficulty_case}) <= ?")
+                    params.append(max_difficulty)
+            else:
+                # For all users: filter by base puzzle difficulty enum
+                if min_difficulty is not None:
+                    where_clauses.append("""
+                        CASE 
+                            WHEN difficulty = 'EASY' THEN 1
+                            WHEN difficulty = 'MEDIUM' THEN 2
+                            WHEN difficulty = 'HARD' THEN 3
+                            ELSE 1.5
+                        END >= ?
+                    """)
+                    params.append(min_difficulty)
+                if max_difficulty is not None:
+                    where_clauses.append("""
+                        CASE 
+                            WHEN difficulty = 'EASY' THEN 1
+                            WHEN difficulty = 'MEDIUM' THEN 2
+                            WHEN difficulty = 'HARD' THEN 3
+                            ELSE 1.5
+                        END <= ?
+                    """)
+                    params.append(max_difficulty)
+        
+        if min_clearness is not None or max_clearness is not None:
+            if only_experienced_clearness:
+                if min_clearness is not None:
+                    where_clauses.append("avg_clearness>=?")
+                    params.append(min_clearness)
+                if max_clearness is not None:
+                    where_clauses.append("avg_clearness<=?")
+                    params.append(max_clearness)
+        
+        if min_fun is not None or max_fun is not None:
+            if only_experienced_fun:
+                if min_fun is not None:
+                    where_clauses.append("avg_fun>=?")
+                    params.append(min_fun)
+                if max_fun is not None:
+                    where_clauses.append("avg_fun<=?")
+                    params.append(max_fun)
+        
+        if date_from is not None:
+            where_clauses.append("created_at>=?")
+            params.append(date_from)
+        
+        if date_to is not None:
+            where_clauses.append("created_at<=?")
+            params.append(date_to)
+        
+        where_sql = " AND ".join(where_clauses)
+        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles WHERE {where_sql}", params)
         row = cur.fetchone()
         return row[0] if row else 0
 
@@ -181,6 +425,16 @@ class PuzzleRepo:
             })
             for r in rows
         ]
+
+    @staticmethod
+    def _difficulty_to_level(difficulty_value: float) -> str:
+        """Convert a floating point difficulty value to puzzle difficulty level string."""
+        if difficulty_value <= 1.5:
+            return "EASY"
+        elif difficulty_value <= 2.5:
+            return "MEDIUM"
+        else:
+            return "HARD"
 
     @staticmethod
     def _row_to_puzzle(row: sqlite3.Row) -> Puzzle:

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from Backend.PersistantLayer.NotificationRepo import NotificationRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -41,15 +41,61 @@ class NotificationService:
 
     # --- Called by API layer ---
 
-    def get_unread(self, token: str) -> List[dict]:
-        """Get all unread notifications for the authenticated user."""
+    def get_unread(
+        self, 
+        token: str,
+        notif_type: Optional[str] = None,
+        puzzle_name: Optional[str] = None,
+        actor_username: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        limit: Optional[int] = None,
+        offset: int = 0
+    ) -> List[dict]:
+        """Get all unread notifications for the authenticated user with optional filters."""
         user_id = self.auth.require_user_id(token)
-        return self.repo.get_unread(user_id)
+        return self.repo.get_unread(
+            user_id=user_id,
+            notif_type=notif_type,
+            puzzle_name=puzzle_name,
+            actor_username=actor_username,
+            date_from=date_from,
+            date_to=date_to,
+            order_by=order_by,
+            order_direction=order_direction,
+            limit=limit,
+            offset=offset
+        )
 
-    def get_all(self, token: str) -> List[dict]:
-        """Get all notifications (both read and unread) for the authenticated user."""
+    def get_all(
+        self, 
+        token: str,
+        notif_type: Optional[str] = None,
+        puzzle_name: Optional[str] = None,
+        actor_username: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        limit: Optional[int] = None,
+        offset: int = 0
+    ) -> List[dict]:
+        """Get all notifications (both read and unread) for the authenticated user with optional filters."""
         user_id = self.auth.require_user_id(token)
-        return self.repo.get_all(user_id)
+        return self.repo.get_all(
+            user_id=user_id,
+            notif_type=notif_type,
+            puzzle_name=puzzle_name,
+            actor_username=actor_username,
+            date_from=date_from,
+            date_to=date_to,
+            order_by=order_by,
+            order_direction=order_direction,
+            limit=limit,
+            offset=offset
+        )
 
     def mark_all_read(self, token: str) -> dict:
         """Mark all notifications as read for the authenticated user."""

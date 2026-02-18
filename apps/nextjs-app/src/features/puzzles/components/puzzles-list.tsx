@@ -9,9 +9,11 @@ import {
   MessageSquare,
   Medal,
   CheckCircle2,
+  Filter,
+  X,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, ChangeEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +31,7 @@ import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 
-import { usePuzzles } from '../api/get-puzzles';
+import { usePuzzles, PuzzleFilters } from '../api/get-puzzles';
 import { CreatorCommentDialog } from './creator-comment-dialog';
 import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 
@@ -40,9 +42,14 @@ export const PuzzlesList = () => {
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(true);
+  const [filters, setFilters] = useState<PuzzleFilters>({ page: 1 });
 
   const puzzlesQuery = usePuzzles({
-    page: page,
+    filters: {
+      page: filters.page || page,
+      ...filters,
+    },
   });
 
   const puzzles = puzzlesQuery.data?.data;
@@ -91,6 +98,188 @@ export const PuzzlesList = () => {
 
   return (
     <div className="space-y-6">
+      {/* Filter Controls */}
+      <div className="flex items-center justify-between gap-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className="gap-2"
+        >
+          <Filter className="size-4" />
+          Filters {Object.values(filters).filter((v) => v && v !== 1).length > 0 && `(${Object.values(filters).filter((v) => v && v !== 1).length})`}
+        </Button>
+        {Object.values(filters).filter((v) => v && v !== 1).length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilters({ page: 1 })}
+            className="text-gray-600"
+          >
+            <X className="size-4" />
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
+          {/* Top Level: name, min difficulty, min fun, min clearness */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Search Name */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Search Name</label>
+              <input
+                type="text"
+                placeholder="Puzzle name..."
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.search || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Min Difficulty */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Min Difficulty</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.minDifficulty || ''}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, minDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              >
+                <option value="">Any</option>
+                <option value="1">Easy</option>
+                <option value="2">Medium</option>
+                <option value="3">Hard</option>
+              </select>
+            </div>
+
+            {/* Min Fun */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Min Fun Rating</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.5"
+                placeholder="0-5"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.minFun || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Min Clearness */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Min Clearness Rating</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.5"
+                placeholder="0-5"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.minClearness || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              />
+            </div>
+          </div>
+
+          {/* Mid Level: order, max difficulty, max fun, max clearness */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Order By */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Order By</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.orderBy || 'created_at'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
+              >
+                <option value="created_at">Newest</option>
+                <option value="difficulty">Difficulty</option>
+                <option value="fun">Fun</option>
+                <option value="clearness">Clearness</option>
+              </select>
+            </div>
+
+            {/* Max Difficulty */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Max Difficulty</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.maxDifficulty || ''}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, maxDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              >
+                <option value="">Any</option>
+                <option value="1">Easy</option>
+                <option value="2">Medium</option>
+                <option value="3">Hard</option>
+              </select>
+            </div>
+
+            {/* Max Fun */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Max Fun Rating</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.5"
+                placeholder="0-5"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.maxFun || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Max Clearness */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Max Clearness Rating</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.5"
+                placeholder="0-5"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.maxClearness || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
+              />
+            </div>
+          </div>
+
+          {/* Last Level: direction, experienced/inexperienced/all */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Direction */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Direction</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.orderDirection || 'ASC'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any, page: 1 })}
+              >
+                <option value="ASC">Ascending</option>
+                <option value="DESC">Descending</option>
+              </select>
+            </div>
+
+            {/* Experience Level */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Experience Level</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.experienceLevel || 'all'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any, page: 1 })}
+              >
+                <option value="all">All</option>
+                <option value="experienced">Experienced</option>
+                <option value="inexperienced">Inexperienced</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading */}
       {puzzlesQuery.isLoading && (
         <div className="flex h-48 w-full items-center justify-center">
