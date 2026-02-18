@@ -38,6 +38,8 @@ const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'NOT', type: 'NOT', cost: 1, pins: 2 },
   { id: 'XOR', type: 'XOR', cost: 1, pins: 3 },
   { id: 'NAND', type: 'NAND', cost: 1, pins: 3 },
+  { id: 'NOR', type: 'NOR', cost: 1, pins: 3 },
+  { id: 'XNOR', type: 'XNOR', cost: 1, pins: 3 },
   { id: 'DFF', type: 'DFF', cost: 1, pins: 2 },
 ];
 
@@ -169,35 +171,51 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       { size: { w: number; h: number }; ports: ComponentDef['ports'] }
     > = {
       AND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       OR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       XOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NAND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      NOR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      XNOR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NOT: {
@@ -225,7 +243,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       let ports: ComponentDef['ports'];
       
       if (isArsenal) {
-        // Arsenal piece sizing: width=4 (fixed), height=max(inputs, outputs)
+        // Arsenal piece sizing: width=3 (fixed), height=max(inputs, outputs)
         const num_inputs = (def as any).num_inputs ?? 0;
         const num_outputs = (def as any).num_outputs ?? 0;
         
@@ -233,7 +251,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         if (num_inputs > 0 && num_outputs > 0) {
           size = {
             h: Math.max(num_inputs, num_outputs),
-            w: 4,
+            w: 3,
           };
           
           // Generate ports for arsenal pieces
@@ -259,7 +277,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         } else {
           // Fallback: use pins to estimate size
           size = {
-            w: 4,
+            w: 3,
             h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
           };
           ports = toDefaultPorts(def.pins, size);
@@ -618,7 +636,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       if (res.solved) {
         setIsSolved(true);
-        exportWorkingAreaJson();
         // Invalidate caches so the puzzles list shows "Solved" and XP bar updates
         await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
         await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
@@ -634,11 +651,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   };
 
-  const onExitWithoutSaving = () => {
-    router.push(paths.app.puzzles.getHref());
+  const onSolveAgain = () => {
+    // Reset all state for a fresh start
+    setPlaced([]);
+    setWires([]);
+    setSelectedComponent({ mode: 'none' });
+    setDraggedPaletteComponentId(null);
+    setShowPuzzleInfo(false);
+    setShowDebugger(false);
+    setPostCheck({ open: false });
+    setIsChecking(false);
+    setIsSolved(false);
+    setConnectivityIssues(null);
+    startTime.current = Date.now();
+    // Refresh the page to ensure clean state
+    router.refresh();
   };
 
-  const onSubmitAndExit = () => {
+  const onBrowsePuzzles = () => {
     router.push(paths.app.puzzles.getHref());
   };
 
@@ -820,7 +850,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button
               variant="outline"
               className="mt-3 w-full"
-              onClick={onExitWithoutSaving}
+              onClick={onBrowsePuzzles}
             >
               Exit Puzzle
             </Button>
@@ -1018,19 +1048,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setPostCheck({ open: false })}
+              onClick={onSolveAgain}
+              disabled={!postCheck.open}
             >
-              Return to puzzle
+              {postCheck.open && postCheck.solved ? 'Solve again' : 'Try again'}
             </Button>
             <Button
-              onClick={onSubmitAndExit}
-              disabled={!postCheck.open || !postCheck.solved}
+              onClick={onBrowsePuzzles}
+              disabled={!postCheck.open}
             >
-              Submit solution and exit
-            </Button>
-            <Button variant="ghost" onClick={onExitWithoutSaving}>
-              Exit without saving
+              Browse puzzles
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -50,8 +50,8 @@ export type SelectedComponentState =
   | { mode: 'none' }
   | { mode: 'placing'; componentId: string; rotation: 0 | 90 };
 
-const GRID_ROWS = 10;
-const GRID_COLS = 14;
+const GRID_ROWS = 15;
+const GRID_COLS = 30;
 const CELL_PX = 18;
 
 // Visual Feature: Dynamic Wire Coloring
@@ -626,14 +626,19 @@ export const WorkstationGrid = ({
     let afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
     let afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
 
-    // Apply pan limits - keep inputs on left, outputs on bottom
-    const minPanX = -(1) * CELL_PX * nextZoom; // Inputs at col -1, keep them very close to left edge
-    const maxPanX = rect.width - GRID_COLS * CELL_PX * nextZoom + 50; // Some right margin
-    const minPanY = 50 - (0) * CELL_PX * nextZoom; // Top margin
-    const maxPanY = rect.height - (GRID_ROWS + 0.5) * CELL_PX * nextZoom - 20; // More room below for outputs
-    
-    afterPanX = clamp(afterPanX, minPanX, maxPanX);
-    afterPanY = clamp(afterPanY, minPanY, maxPanY);
+    // Apply pan limits - allow full scrolling of the grid
+    if (rect) {
+      const gridWidthPx = (GRID_COLS + 1) * CELL_PX * nextZoom;
+      const gridHeightPx = (GRID_ROWS + 1) * CELL_PX * nextZoom;
+      
+      const minPanX = Math.min(0, rect.width - gridWidthPx);
+      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
+      const minPanY = Math.min(0, rect.height - gridHeightPx);
+      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
+      
+      afterPanX = clamp(afterPanX, minPanX, maxPanX);
+      afterPanY = clamp(afterPanY, minPanY, maxPanY);
+    }
 
     setZoom(nextZoom);
     setPan({ x: afterPanX, y: afterPanY });
@@ -696,12 +701,15 @@ export const WorkstationGrid = ({
     const el = containerRef.current;
     if (el) {
       const rect = el.getBoundingClientRect();
-      // Keep inputs on left side (col -1), very close to left edge
-      const minPanX = -(1) * CELL_PX * zoom;
-      const maxPanX = rect.width - GRID_COLS * CELL_PX * zoom + 50;
-      // Keep outputs on bottom with more room
-      const minPanY = 50 - (0) * CELL_PX * zoom;
-      const maxPanY = rect.height - (GRID_ROWS + 0.5) * CELL_PX * zoom - 20;
+      // Allow panning the full grid - left edge should show col -1, right edge should show the grid
+      const gridWidthPx = (GRID_COLS + 1) * CELL_PX * zoom;
+      const gridHeightPx = (GRID_ROWS + 1) * CELL_PX * zoom;
+      
+      // Pan limits: ensure grid fits properly in view with margins
+      const minPanX = Math.min(0, rect.width - gridWidthPx);
+      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
+      const minPanY = Math.min(0, rect.height - gridHeightPx);
+      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
       
       setPan({
         x: clamp(newPanX, minPanX, maxPanX),
@@ -877,7 +885,7 @@ export const WorkstationGrid = ({
           Working Area
         </div>
         <div className="text-xs text-gray-600">
-          14×10 grid. Wheel to zoom. Drag background to pan. Click/drag ports to
+          15×30 grid. Wheel to zoom. Drag background to pan. Click/drag ports to
           wire. While placing, press R to rotate.
         </div>
       </div>
