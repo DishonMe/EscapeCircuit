@@ -31,6 +31,8 @@ const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'NOT', type: 'NOT', cost: 1, pins: 2 },
   { id: 'XOR', type: 'XOR', cost: 1, pins: 3 },
   { id: 'NAND', type: 'NAND', cost: 1, pins: 3 },
+  { id: 'NOR', type: 'NOR', cost: 1, pins: 3 },
+  { id: 'XNOR', type: 'XNOR', cost: 1, pins: 3 },
   // DFF intentionally excluded from arsenal creation
 ];
 
@@ -151,6 +153,22 @@ export default function ArsenalCreatorPage() {
         ],
       },
       NAND: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      NOR: {
+        size: { w: 4, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+        ],
+      },
+      XNOR: {
         size: { w: 4, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
