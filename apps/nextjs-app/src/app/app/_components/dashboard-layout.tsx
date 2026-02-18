@@ -46,7 +46,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   });
   const userRole = user.data?.role?.toLowerCase() || '';
   const navigation = [
-    { name: 'Dashboard', to: paths.app.root.getHref(), icon: Home },
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
     { name: 'Arsenal', to: paths.app.arsenal.root.getHref(), icon: Zap },
     { name: 'Discussions', to: paths.app.discussions.getHref(), icon: Folder },
@@ -95,6 +94,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
         <div className="flex items-center gap-4">
           <XPBar currentXP={user.data?.xp ?? 0} />
+          <div className="hidden md:flex items-center gap-2 text-sm">
+            <span className="font-medium text-gray-900">{user.data?.username}</span>
+            <span className="text-gray-500">•</span>
+            <span className="text-gray-600 capitalize">{user.data?.role}</span>
+          </div>
           <Drawer>
             <DrawerTrigger asChild>
               <Button size="icon" variant="outline" className="sm:hidden">

@@ -116,8 +116,7 @@ async function fetchApi<T>(
     if (typeof window !== 'undefined' && !suppressErrorNotification) {
       useNotifications.getState().addNotification({
         type: 'error',
-        title: response.status === 401 ? 'Unauthorized' : response.status === 403 ? 'Forbidden' : 'Error',
-        message: message || response.statusText,
+        title: message || response.statusText,
       });
     }
     throw new Error(message);

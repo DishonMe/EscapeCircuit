@@ -125,11 +125,7 @@ export const RatingDialog = ({
       });
       onOpenChange(false);
     } catch (e: any) {
-      notifications.addNotification({
-        type: 'error',
-        title: 'Rating failed',
-        message: e?.message ?? 'Could not submit rating.',
-      });
+      // Error notification handled automatically by API client
     }
   };
 
@@ -143,11 +139,7 @@ export const RatingDialog = ({
       });
       onOpenChange(false);
     } catch (e: any) {
-      notifications.addNotification({
-        type: 'error',
-        title: 'Delete failed',
-        message: e?.message ?? 'Could not delete rating.',
-      });
+      // Error notification handled automatically by API client
     }
   };
 

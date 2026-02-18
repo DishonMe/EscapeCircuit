@@ -280,11 +280,7 @@ export default function ArsenalCreatorPage() {
         saving: false,
         error: error?.response?.data?.detail || 'Failed to save arsenal piece. Please check your circuit and try again.',
       });
-      addNotification({
-        type: 'error',
-        title: 'Failed to Create Arsenal Piece',
-        message: error?.response?.data?.detail || 'Failed to save arsenal piece. Please check your circuit and try again.',
-      });
+      // Error notification handled automatically by API client
     }
   };
 
