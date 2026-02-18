@@ -331,6 +331,32 @@ export const WorkstationGrid = ({
     return occ;
   }, [allPorts]);
 
+  // Helper function to get display label with numbering
+  const getComponentDisplayLabel = (
+    componentId: string,
+    placedId: string,
+  ): string => {
+    const def = catalog[componentId];
+    if (!def) return componentId;
+
+    // Count how many components have the same componentId
+    const sameTypeComponents = placed.filter((p) => p.componentId === componentId);
+
+    // If only one of this type, don't show the number
+    if (sameTypeComponents.length <= 1) {
+      return def.label;
+    }
+
+    // If multiple, find the index of the current component
+    const index = sameTypeComponents.findIndex((p) => p.id === placedId);
+    if (index === -1) {
+      return def.label;
+    }
+
+    // Return numbered label like "1-and", "2-and"
+    return `${index + 1}-${def.label.toLowerCase()}`;
+  };
+
   const worldToScreen = (hole: HoleCoord) => {
     const x = pan.x + hole.col * CELL_PX * zoom;
     const y = pan.y + hole.row * CELL_PX * zoom;
@@ -1104,6 +1130,12 @@ export const WorkstationGrid = ({
              const size = rotatedSize(def.size, rotation);
              const isValid = canPlaceComponentAt(draggedPaletteComponentId, dropPreview, rotation);
              
+             // Count how many components of this type will exist after placing this one
+             const sameTypeCount = placed.filter((p) => p.componentId === draggedPaletteComponentId).length + 1;
+             const displayLabel = sameTypeCount > 1 
+               ? `${sameTypeCount}-${def.label.toLowerCase()}` 
+               : def.label;
+             
              const left = dropPreview.col * CELL_PX;
              const top = dropPreview.row * CELL_PX;
 
@@ -1122,7 +1154,7 @@ export const WorkstationGrid = ({
                     height: size.h * CELL_PX - 2,
                   }}
                 >
-                  {def.label}
+                  {displayLabel}
                 </div>
               );
           })()}
@@ -1247,7 +1279,7 @@ export const WorkstationGrid = ({
                  {/* Name in the middle-bottom with improved style */}
                 <div className="flex size-full items-end justify-center pb-1 z-20 relative pointer-events-none">
                   <div className="max-w-[90%] truncate rounded-sm bg-white/85 px-1 py-px text-[9px] font-bold uppercase tracking-tight text-slate-800 shadow-sm ring-1 ring-black/5 backdrop-blur-[1px] select-none">
-                    {def.label}
+                    {getComponentDisplayLabel(p.componentId, p.id)}
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Union, List
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.PuzzleService import PuzzleService
@@ -43,6 +43,12 @@ class SolveReq(BaseModel):
 class ValidateSolutionReq(BaseModel):
     solution: Dict[str, Any]
     time_taken: int = 0
+
+
+class SimulateReq(BaseModel):
+    solution: Dict[str, Any]
+    inputs: Union[Dict[str, int], List[Dict[str, int]], Dict[str, List[int]]]
+    isSequence: Optional[bool] = None
 
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None) -> APIRouter:
@@ -216,5 +222,19 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             return solving_service.validate_solution(token, puzzle_id, req.solution, time_taken=req.time_taken)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    @router.post("/{puzzle_id}/simulate")
+    def simulate(puzzle_id: int, req: SimulateReq, token: str = Depends(verify_token)):
+        try:
+            # Determine if it's a sequence simulation
+            is_sequence = req.isSequence if req.isSequence is not None else (
+                isinstance(req.inputs, dict) and 
+                any(isinstance(v, list) for v in req.inputs.values())
+            )
+            return solving_service.simulate_solution(token, puzzle_id, req.solution, req.inputs, is_sequence=is_sequence)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router

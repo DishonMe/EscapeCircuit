@@ -565,25 +565,395 @@ class SolvingService:
         # Store arsenal piece info for quick lookup during evaluation
         expanded["_arsenal_pieces"] = {}
         
+        print(f"[ARSENAL EXPAND] Processing {len(placed_components)} components")
+        
         for placed in placed_components:
             component_id = placed.get("componentId")
+            placed_id = placed.get("id")
             
-            # Check if this looks like an arsenal piece (numeric ID)
+            print(f"[ARSENAL EXPAND]   Checking component: {component_id}")
+            
+            # Try to convert to int - could be numeric string or already an int
+            piece_id = None
             try:
-                piece_id = int(component_id)
-                # Try to fetch the arsenal piece
-                arsenal_piece = self.circuit_repo.get_by_id(piece_id)
-                if arsenal_piece and arsenal_piece.is_arsenal:
-                    # Store the truth table and input/output info
-                    expanded["_arsenal_pieces"][placed.get("id")] = {
-                        "id": piece_id,
-                        "name": arsenal_piece.name,
-                        "num_inputs": arsenal_piece.num_inputs,
-                        "num_outputs": arsenal_piece.num_outputs,
-                        "truth_table": arsenal_piece.truth_table,
-                    }
+                if isinstance(component_id, int):
+                    piece_id = component_id
+                    print(f"[ARSENAL EXPAND]     -> Is int: {piece_id}")
+                elif isinstance(component_id, str):
+                    piece_id = int(component_id)
+                    print(f"[ARSENAL EXPAND]     -> Converted string to int: {piece_id}")
+                else:
+                    print(f"[ARSENAL EXPAND]     -> Not numeric (type: {type(component_id).__name__})")
             except (ValueError, TypeError):
-                # Not a numeric ID, so not an arsenal piece
-                pass
+                # Not a numeric ID, skip
+                print(f"[ARSENAL EXPAND]     -> Failed to convert to int")
+                continue
+            
+            if piece_id is not None:
+                # Try to fetch the arsenal piece
+                try:
+                    arsenal_piece = self.circuit_repo.get_by_id(piece_id)
+                    if arsenal_piece:
+                        print(f"[ARSENAL EXPAND]     -> Found circuit {piece_id}, is_arsenal={arsenal_piece.is_arsenal}")
+                        if arsenal_piece.is_arsenal:
+                            # Get the truth table and parse if needed
+                            truth_table = arsenal_piece.truth_table
+                            if isinstance(truth_table, str):
+                                truth_table = json.loads(truth_table)
+                            
+                            print(f"[ARSENAL EXPAND]     -> Truth table keys: {list(truth_table.keys())[:3]}...")  # Show first 3 keys
+                            
+                            # Store the truth table and input/output info
+                            expanded["_arsenal_pieces"][placed_id] = {
+                                "id": piece_id,
+                                "name": arsenal_piece.name,
+                                "num_inputs": arsenal_piece.num_inputs,
+                                "num_outputs": arsenal_piece.num_outputs,
+                                "truth_table": truth_table,
+                            }
+                            print(f"[ARSENAL EXPAND]     -> Stored arsenal piece {arsenal_piece.name}")
+                    else:
+                        print(f"[ARSENAL EXPAND]     -> Circuit not found in database")
+                except Exception as e:
+                    # Failed to fetch arsenal piece, skip
+                    print(f"[ARSENAL EXPAND]     -> Error fetching: {str(e)}")
+        
+        print(f"[ARSENAL EXPAND] Total arsenal pieces loaded: {len(expanded['_arsenal_pieces'])}")
         
         return expanded
+
+    # ---------- Simulation for Debugger ----------
+    def simulate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], inputs: Dict[str, Any], is_sequence: bool = False) -> Dict[str, Any]:
+        """
+        Simulate a circuit with given inputs and return all gate outputs and puzzle outputs.
+        Used by the debugger to trace circuit behavior.
+        
+        If is_sequence is True, inputs is a dict of lists (sequences) instead of a dict of integers.
+        puzzle_id=0 is used for arsenal pieces (no puzzle validation).
+        """
+        user_id = self.auth.require_user_id(token)
+        
+        # Only validate puzzle exists if puzzle_id > 0 (puzzle_id=0 is for arsenal pieces)
+        if puzzle_id > 0:
+            p = self.puzzle_repo.get_by_id(puzzle_id)
+            if not p:
+                raise ValidationError("puzzle not found")
+        
+        if not is_sequence:
+            # Single-step simulation
+            return self._simulate_single_step(puzzle_id, solution_payload, inputs)
+        else:
+            # Sequence simulation
+            return self._simulate_sequence(puzzle_id, solution_payload, inputs)
+
+    def _simulate_single_step(self, puzzle_id: int, solution_payload: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
+        """Simulate a single step and return gate and puzzle outputs."""
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
+        
+        # Build and simulate the circuit
+        return self._run_simulation(expanded_solution, inputs)
+
+    def _simulate_sequence(self, puzzle_id: int, solution_payload: Dict[str, Any], input_sequences: Dict[str, list]) -> Dict[str, Any]:
+        """Simulate a sequence of inputs and return results for each step."""
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
+        
+        # Get sequence length
+        lengths = [len(v) for v in input_sequences.values()]
+        if not lengths:
+            raise ValidationError("No input sequences provided")
+        if len(set(lengths)) > 1:
+            raise ValidationError("All input sequences must have the same length")
+        
+        seq_length = lengths[0]
+        
+        # Simulate each step
+        all_steps = []
+        for step_idx in range(seq_length):
+            # Build input dict for this step
+            step_inputs = {}
+            for input_name, sequence in input_sequences.items():
+                step_inputs[input_name] = sequence[step_idx]
+            
+            # Run simulation for this step
+            result = self._run_simulation(expanded_solution, step_inputs)
+            all_steps.append(result)
+        
+        # Combine results
+        return {
+            "steps": all_steps,
+            "success": True
+        }
+
+    def _run_simulation(self, expanded_solution: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
+        """Run a single simulation step with expanded solution and given inputs."""
+        # Reconstruct Circuit for Logic Engine
+        tcircuit = Circuit(
+            id=0,
+            user_id=0,
+            name="Simulation",
+            cost=expanded_solution.get("totalCost", 0),
+            structure_json=json.dumps(expanded_solution)
+        )
+        
+        # Get the full circuit data with placed components and wires
+        data = json.loads(tcircuit.structure_json)
+        placed = data.get("placedComponents", [])
+        wires = data.get("wires", [])
+        arsenal_pieces = data.get("_arsenal_pieces", {})
+        
+        # DEBUG: Log what components we received
+        print(f"[DEBUGGER] Total placed components: {len(placed)}")
+        print(f"[DEBUGGER] Total arsenal pieces detected: {len(arsenal_pieces)}")
+        for pc in placed:
+            comp_id = pc.get("id")
+            comp_type = pc.get("componentId")
+            is_arsenal = comp_id in arsenal_pieces
+            print(f"[DEBUGGER]   Component: {comp_id} (type: {comp_type}, is_arsenal: {is_arsenal})")
+        
+        # Evaluate the circuit to get puzzle outputs
+        try:
+            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs)
+        except Exception as e:
+            raise ValidationError(f"Circuit evaluation failed: {str(e)}")
+        
+        # Build gate info by re-simulating through the logic engine with better tracing
+        gate_outputs = []
+        
+        # Map component ID -> type
+        comp_types = {}
+        for pc in placed:
+            comp_types[pc["id"]] = pc["componentId"]
+        
+        # Gate truth tables (matching existing definitions)
+        TRUTH_TABLES = {
+            "AND": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "1"]]},
+            "OR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "1"]]},
+            "NOT": {"inputs": ["IN"], "outputs": ["OUT"], "rows": [["0", "1"], ["1", "0"]]},
+            "XOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "0"]]},
+            "NAND": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "0"]]},
+            "NOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "0"]]},
+            "XNOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "1"]]},
+            "DFF": {"inputs": ["IN"], "outputs": ["OUT"], "rows": [["0", "0"], ["1", "1"]]},
+        }
+        
+        # Helper function to get gate outputs by evaluating its truth table
+        def get_gate_output(gate_type, input_vals):
+            """Get output values for a gate based on its inputs."""
+            if gate_type not in TRUTH_TABLES:
+                return None
+            tt = TRUTH_TABLES[gate_type]
+            if len(input_vals) != len(tt["inputs"]):
+                return None
+            key = "".join(str(v) for v in input_vals)
+            for row in tt["rows"]:
+                row_inputs = "".join(row[:len(tt["inputs"])])
+                if row_inputs == key:
+                    return row[len(tt["inputs"]):]
+            return None
+        
+        # Cache for gate outputs as we compute them
+        gate_result_cache = {}  # comp_id -> output values
+        
+        def get_source_value(source_comp_id, source_pin):
+            """Get the output value from a source component/input."""
+            if source_comp_id.startswith("IO:IN:"):
+                input_name = source_comp_id.replace("IO:IN:", "")
+                return inputs.get(input_name, 0)
+            elif source_comp_id.startswith("IO:OUT:"):
+                output_name = source_comp_id.replace("IO:OUT:", "")
+                return puzzle_outputs.get(output_name, 0)
+            elif source_comp_id in gate_result_cache:
+                outputs = gate_result_cache[source_comp_id]
+                if source_pin < len(outputs):
+                    return int(outputs[source_pin])
+                return 0
+            else:
+                # Gate not yet computed
+                return None
+        
+        def evaluate_gate(comp_id, comp_type):
+            """Evaluate a single gate and return its outputs."""
+            if comp_id in gate_result_cache:
+                return gate_result_cache[comp_id]
+            
+            # Check if this is an arsenal piece
+            if comp_id in arsenal_pieces:
+                arsenal_info = arsenal_pieces[comp_id]
+                num_inputs = arsenal_info.get("num_inputs", 0)
+                num_outputs = arsenal_info.get("num_outputs", 0)
+                truth_table = arsenal_info.get("truth_table", {})
+                
+                print(f"[DEBUGGER] Evaluating arsenal piece {comp_id}: {num_inputs} inputs, {num_outputs} outputs")
+                
+                # Collect inputs from wires
+                gate_inputs = [None] * num_inputs
+                
+                for wire in wires:
+                    if wire["to"]["componentId"] == comp_id:
+                        to_pin = wire["to"]["pinIndex"]
+                        from_comp_id = wire["from"]["componentId"]
+                        from_pin = wire["from"]["pinIndex"]
+                        
+                        if to_pin < num_inputs:
+                            value = get_source_value(from_comp_id, from_pin)
+                            if value is not None:
+                                gate_inputs[to_pin] = value
+                
+                # Fill unconnected inputs with 0
+                gate_inputs = [v if v is not None else 0 for v in gate_inputs]
+                
+                print(f"[DEBUGGER]   Inputs: {gate_inputs}")
+                
+                # Try different key formats for the truth table lookup
+                try:
+                    # Build different key formats
+                    bin_key = "".join(str(int(v)) for v in gate_inputs)  # "001"
+                    
+                    input_dict = {}
+                    for i in range(num_inputs):
+                        input_dict[f"in{i}"] = int(gate_inputs[i])
+                    
+                    keys_to_try = [
+                        bin_key,  # "001" - most common format
+                        json.dumps(input_dict),  # {"in0": 0, "in1": 0, "in2": 1}
+                        json.dumps({str(i): int(gate_inputs[i]) for i in range(num_inputs)}),  # {"0": 0, "1": 0, "2": 1}
+                        ",".join(str(int(v)) for v in gate_inputs),  # 0,0,1
+                    ]
+                    
+                    print(f"[DEBUGGER]   Trying keys: {keys_to_try}")
+                    
+                    for key_attempt in keys_to_try:
+                        if key_attempt in truth_table:
+                            print(f"[DEBUGGER]   Found key: {key_attempt}")
+                            outputs_dict = truth_table[key_attempt]
+                            
+                            # Extract output values in order
+                            output_vals = []
+                            
+                            if isinstance(outputs_dict, str):
+                                # Output is a binary string like "01" - convert each character
+                                output_vals = list(outputs_dict)
+                                print(f"[DEBUGGER]   Outputs (from string): {output_vals}")
+                                gate_result_cache[comp_id] = output_vals
+                                return output_vals
+                            elif isinstance(outputs_dict, dict):
+                                # Output is a dict - extract values in order
+                                for i in range(num_outputs):
+                                    # Try different output key formats
+                                    found = False
+                                    for out_key in [f"out{i}", f"OUT{i}", f"output{i}", i, str(i)]:
+                                        if out_key in outputs_dict:
+                                            output_vals.append(str(outputs_dict[out_key]))
+                                            found = True
+                                            break
+                                    if not found:
+                                        output_vals.append("0")
+                                print(f"[DEBUGGER]   Outputs (from dict): {output_vals}")
+                                gate_result_cache[comp_id] = output_vals
+                                return output_vals
+                            elif isinstance(outputs_dict, (int, float)):
+                                # Single numeric output
+                                gate_result_cache[comp_id] = [str(int(outputs_dict))]
+                                print(f"[DEBUGGER]   Outputs: [{int(outputs_dict)}]")
+                                return [str(int(outputs_dict))]
+                            break
+                    
+                    print(f"[DEBUGGER]   No matching truth table entry found")
+                except Exception as e:
+                    print(f"[DEBUGGER]   Error evaluating: {str(e)}")
+                
+                return None
+            
+            # Regular gate
+            if comp_type not in TRUTH_TABLES:
+                return None
+            
+            tt = TRUTH_TABLES[comp_type]
+            num_inputs = len(tt["inputs"])
+            
+            # Collect inputs from wires
+            gate_inputs = [None] * num_inputs
+            
+            for wire in wires:
+                if wire["to"]["componentId"] == comp_id:
+                    to_pin = wire["to"]["pinIndex"]
+                    from_comp_id = wire["from"]["componentId"]
+                    from_pin = wire["from"]["pinIndex"]
+                    
+                    if to_pin < len(gate_inputs):
+                        value = get_source_value(from_comp_id, from_pin)
+                        if value is not None:
+                            gate_inputs[to_pin] = value
+            
+            # Fill unconnected inputs with 0
+            gate_inputs = [v if v is not None else 0 for v in gate_inputs]
+            
+            # Compute output
+            outputs = get_gate_output(comp_type, gate_inputs)
+            if outputs:
+                gate_result_cache[comp_id] = outputs
+                return outputs
+            
+            return None
+        
+        # Iteratively evaluate gates until stable
+        max_iterations = 100
+        iteration = 0
+        last_cache_size = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            
+            for pc in placed:
+                comp_id = pc["id"]
+                comp_type = comp_types.get(comp_id, "")
+                
+                # Check if it's an arsenal piece or a regular gate
+                is_arsenal = comp_id in arsenal_pieces
+                is_gate = comp_type in TRUTH_TABLES
+                
+                if (is_arsenal or is_gate) and comp_id not in gate_result_cache:
+                    result = evaluate_gate(comp_id, comp_type)
+                    if result:
+                        print(f"[DEBUGGER] Successfully evaluated {comp_id}: {result}")
+            
+            # Check if we've converged
+            if len(gate_result_cache) == last_cache_size:
+                print(f"[DEBUGGER] Converged after {iteration} iterations, {len(gate_result_cache)} gates evaluated")
+                break
+            last_cache_size = len(gate_result_cache)
+        
+        # Collect all evaluated gates/arsenal pieces into output list
+        for pc in placed:
+            comp_id = pc["id"]
+            comp_type = comp_types.get(comp_id, "")
+            
+            if comp_id in gate_result_cache:
+                outputs = gate_result_cache[comp_id]
+                
+                # Determine display label
+                if comp_id in arsenal_pieces:
+                    display_label = arsenal_pieces[comp_id].get("name", comp_type)
+                else:
+                    display_label = comp_type
+                
+                # Format output values
+                if isinstance(outputs, list):
+                    values_str = ";".join(str(o) for o in outputs)
+                else:
+                    values_str = str(outputs)
+                
+                gate_outputs.append({
+                    "placedId": comp_id,
+                    "componentId": comp_type,
+                    "displayLabel": display_label,
+                    "values": values_str
+                })
+        
+        return {
+            "gateOutputs": gate_outputs,
+            "puzzleOutputs": puzzle_outputs,
+            "success": True
+        }

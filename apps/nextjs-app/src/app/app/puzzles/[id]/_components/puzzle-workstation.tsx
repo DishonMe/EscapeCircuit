@@ -30,6 +30,7 @@ import {
 } from './workstation-grid';
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
+import { CircuitDebugger } from '@/components/circuit-debugger';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -64,6 +65,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
+  const [showDebugger, setShowDebugger] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
@@ -666,6 +668,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <WorkstationTimer 
               timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds} 
             />
+            <Button variant="outline" onClick={() => setShowDebugger(true)}>
+              Debug
+            </Button>
             <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
@@ -916,6 +921,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         open={showPuzzleInfo}
         onOpenChange={setShowPuzzleInfo}
         showLink={false}
+      />
+
+      <CircuitDebugger
+        isOpen={showDebugger}
+        onClose={() => setShowDebugger(false)}
+        inputs={inputs}
+        outputs={outputs}
+        placed={placed}
+        wires={wires}
+        catalog={uiCatalog}
+        puzzleId={puzzleId}
       />
 
       <Dialog

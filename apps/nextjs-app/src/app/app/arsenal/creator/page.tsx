@@ -23,6 +23,7 @@ import {
   type SelectedComponentState,
 } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { WorkstationMenu } from '@/app/app/puzzles/[id]/_components/workstation-menu';
+import { CircuitDebugger } from '@/components/circuit-debugger';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -45,6 +46,7 @@ export default function ArsenalCreatorPage() {
   const [numOutputs, setNumOutputs] = useState(1);
   const [pieceName, setPieceName] = useState('');
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showDebugger, setShowDebugger] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ open: false });
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
@@ -340,6 +342,13 @@ export default function ArsenalCreatorPage() {
             </div>
           </div>
           <Button
+            onClick={() => setShowDebugger(true)}
+            variant="outline"
+            className="w-full mt-2"
+          >
+            Debug
+          </Button>
+          <Button
             onClick={() => setShowNameDialog(true)}
             disabled={placed.length === 0}
             className="w-full mt-4"
@@ -440,6 +449,17 @@ export default function ArsenalCreatorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CircuitDebugger
+        isOpen={showDebugger}
+        onClose={() => setShowDebugger(false)}
+        inputs={inputs}
+        outputs={outputs}
+        placed={placed}
+        wires={wires}
+        catalog={uiCatalog}
+        puzzleId="arsenal-creator"
+      />
     </div>
   );
 }
