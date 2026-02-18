@@ -129,51 +129,51 @@ export default function ArsenalCreatorPage() {
       { size: { w: number; h: number }; ports: ComponentDef['ports'] }
     > = {
       AND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       OR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       XOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NAND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       XNOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NOT: {

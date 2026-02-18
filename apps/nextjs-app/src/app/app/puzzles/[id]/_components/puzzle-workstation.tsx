@@ -171,51 +171,51 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       { size: { w: number; h: number }; ports: ComponentDef['ports'] }
     > = {
       AND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       OR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       XOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NAND: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       XNOR: {
-        size: { w: 4, h: 2 },
+        size: { w: 3, h: 2 },
         ports: [
           { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
           { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
-          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 3 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
         ],
       },
       NOT: {
@@ -243,7 +243,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       let ports: ComponentDef['ports'];
       
       if (isArsenal) {
-        // Arsenal piece sizing: width=4 (fixed), height=max(inputs, outputs)
+        // Arsenal piece sizing: width=3 (fixed), height=max(inputs, outputs)
         const num_inputs = (def as any).num_inputs ?? 0;
         const num_outputs = (def as any).num_outputs ?? 0;
         
@@ -251,7 +251,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         if (num_inputs > 0 && num_outputs > 0) {
           size = {
             h: Math.max(num_inputs, num_outputs),
-            w: 4,
+            w: 3,
           };
           
           // Generate ports for arsenal pieces
@@ -277,7 +277,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         } else {
           // Fallback: use pins to estimate size
           size = {
-            w: 4,
+            w: 3,
             h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
           };
           ports = toDefaultPorts(def.pins, size);

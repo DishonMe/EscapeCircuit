@@ -22,8 +22,8 @@ export type PlacedBoardComponent = {
   pins: number;
 };
 
-const ROWS = 12;
-const COLS = 28;
+const ROWS = 16;
+const COLS = 36;
 
 const PIN_SIZE = 16;
 

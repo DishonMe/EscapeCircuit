@@ -50,8 +50,8 @@ export type SelectedComponentState =
   | { mode: 'none' }
   | { mode: 'placing'; componentId: string; rotation: 0 | 90 };
 
-const GRID_ROWS = 10;
-const GRID_COLS = 14;
+const GRID_ROWS = 15;
+const GRID_COLS = 30;
 const CELL_PX = 18;
 
 // Visual Feature: Dynamic Wire Coloring
