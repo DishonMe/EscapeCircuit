@@ -58,36 +58,36 @@ class ArsenalService:
         # Validate name
         name = (payload.get("name") or "").strip()
         if not name:
-            raise ValidationError("name is required")
+            raise ValidationError("Arsenal piece name is required. Please provide a name for your custom component.")
         
         # Check arsenal capacity
         current_arsenal = self.repo.list_arsenal_by_user(user_id)
         if len(current_arsenal) >= self.MAX_ARSENAL_SIZE:
-            raise ValidationError(f"arsenal limit reached ({self.MAX_ARSENAL_SIZE})")
+            raise ValidationError(f"You have reached the maximum number of arsenal pieces ({self.MAX_ARSENAL_SIZE}). You can create more by earning XP or delete existing pieces.")
         
         # Validate user exists
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            raise ValidationError("user not found")
+            raise ValidationError("Your user account could not be found. Please log in again.")
         
         # Validate structure_json
         structure_json = payload.get("structure_json") or ""
         if not isinstance(structure_json, str) or not structure_json.strip():
-            raise ValidationError("structure_json is required")
+            raise ValidationError("Circuit structure (JSON) is required. Please provide a valid circuit structure.")
         
         try:
             structure = json.loads(structure_json)
         except (json.JSONDecodeError, ValueError):
-            raise ValidationError("structure_json must be valid JSON")
+            raise ValidationError("Invalid circuit structure. Please ensure you provide valid JSON that represents your circuit.")
         
         # Validate inputs and outputs
         num_inputs = payload.get("num_inputs", 0)
         num_outputs = payload.get("num_outputs", 0)
         
         if not isinstance(num_inputs, int) or num_inputs < self.MIN_INPUTS or num_inputs > self.MAX_INPUTS:
-            raise ValidationError(f"num_inputs must be between {self.MIN_INPUTS} and {self.MAX_INPUTS}")
+            raise ValidationError(f"Number of inputs must be between {self.MIN_INPUTS} and {self.MAX_INPUTS}. Adjust your circuit accordingly.")
         if not isinstance(num_outputs, int) or num_outputs < self.MIN_OUTPUTS or num_outputs > self.MAX_OUTPUTS:
-            raise ValidationError(f"num_outputs must be between {self.MIN_OUTPUTS} and {self.MAX_OUTPUTS}")
+            raise ValidationError(f"Number of outputs must be between {self.MIN_OUTPUTS} and {self.MAX_OUTPUTS}. Adjust your circuit accordingly.")
         
         # Extract and validate gates - no DFF allowed in arsenal pieces
         # Use provided basic_gates if available, otherwise extract from structure
@@ -103,7 +103,7 @@ class ArsenalService:
             basic_gates = self._extract_basic_gates(structure_json)
         
         if GateType.DFF.value in basic_gates:
-            raise ValidationError("DFF (Dynamic Flip-Flop) is not allowed in arsenal pieces")
+            raise ValidationError("DFF (Dynamic Flip-Flop) gates are not allowed in custom arsenal pieces. Design your circuit using other available gates.")
         
         # Get or calculate truth table
         truth_table = payload.get("truth_table")

@@ -27,10 +27,19 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const login = useLogin({
     onSuccess,
     onError: (error: any) => {
+      let message = error?.message || 'Invalid username or password. Please try again.';
+      
+      // Provide specific guidance based on error
+      if (message.includes('not found')) {
+        message = 'Username not found. Please check your username or create a new account.';
+      } else if (message.includes('invalid password')) {
+        message = 'Incorrect password. Please try again or use the password reset feature.';
+      }
+      
       addNotification({
         type: 'error',
-        title: 'Login Failed',
-        message: error?.message || 'Invalid username or password. Please try again.',
+        title: 'Failed to log in',
+        message,
       });
     },
   });
@@ -43,14 +52,14 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         addNotification({
           type: 'info',
           title: 'Google Login Not Available',
-          message: 'Google login is not configured. Please use username/password login.',
+          message: 'Google login has not been configured on this server. Please use your username and password to log in.',
         });
         return;
       }
       addNotification({
         type: 'error',
-        title: 'Google Login Failed',
-        message: error?.message || 'Could not sign in with Google. Please try again.',
+        title: 'Google Sign-In Failed',
+        message: error?.message || 'Could not authenticate with Google. Please make sure your Google account is verified and try again.',
       });
     },
     onNeedsPassword: (data) => {
@@ -123,8 +132,8 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
               onError={() => {
                 addNotification({
                   type: 'error',
-                  title: 'Google Login Failed',
-                  message: 'Could not sign in with Google. Please try again.',
+                  title: 'Google Sign-In Failed',
+                  message: 'Could not authenticate with Google. Please try again or use username/password login.',
                 });
               }}
             />

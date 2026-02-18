@@ -43,7 +43,7 @@ class AuthService:
         username = (username or "").strip()
         password = password or ""
         if not username or not password:
-            raise ValidationError("username and password required")
+            raise ValidationError("Username and password are required for login.")
 
         user = self.user_repo.get_by_username(username)
         if not user:

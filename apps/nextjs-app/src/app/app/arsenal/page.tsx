@@ -52,8 +52,8 @@ export default function ArsenalPage() {
     } catch (error: any) {
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: error?.response?.data?.detail || 'Failed to delete piece',
+        title: 'Failed to Delete Arsenal Piece',
+        message: error?.response?.data?.detail || 'Could not delete this arsenal piece. Please try again.',
       });
     } finally {
       setDeletingPieceId(null);
@@ -84,8 +84,8 @@ export default function ArsenalPage() {
     } catch (error: any) {
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: error?.response?.data?.detail || 'Failed to rename piece',
+        title: 'Failed to Rename Arsenal Piece',
+        message: error?.response?.data?.detail || 'Could not rename this arsenal piece. The name may already exist.',
       });
     }
   };
