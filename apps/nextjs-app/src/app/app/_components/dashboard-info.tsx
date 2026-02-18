@@ -4,30 +4,33 @@ import { useUser } from '@/lib/auth';
 
 export const DashboardInfo = () => {
   const user = useUser();
+  const userRole = user.data?.role?.toLowerCase().trim() || '';
+  // Only show admin content if role is explicitly 'admin'
+  const isAdmin = userRole === 'admin';
+
+  if (!user.data) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>
       <h1 className="text-xl">
-        Welcome <b>{`${user.data?.username}`}</b>
+        Welcome <b>{user.data.username}</b>
       </h1>
       <h4 className="my-3">
-        Your role is : <b>{user.data?.role}</b>
+        Your role is : <b>{user.data.role}</b>
       </h4>
-      <p className="font-medium">In this application you can:</p>
-      {user.data?.role === 'USER' && (
-        <ul className="my-4 list-inside list-disc">
-          <li>Create comments in discussions</li>
-          <li>Delete own comments</li>
-        </ul>
-      )}
-      {user.data?.role === 'ADMIN' && (
-        <ul className="my-4 list-inside list-disc">
-          <li>Create discussions</li>
-          <li>Edit discussions</li>
-          <li>Delete discussions</li>
-          <li>Comment on discussions</li>
-          <li>Delete all comments</li>
-        </ul>
+      
+      {/* Only show this if user is NOT admin */}
+      {!isAdmin && (
+        <>
+          <p className="font-medium">In this application you can:</p>
+          <ul className="my-4 list-inside list-disc">
+            <li>Solve puzzles</li>
+            <li>Rate puzzles</li>
+            <li>Participate in discussions</li>
+          </ul>
+        </>
       )}
     </>
   );

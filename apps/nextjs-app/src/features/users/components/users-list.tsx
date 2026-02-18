@@ -19,9 +19,28 @@ export const UsersList = () => {
     );
   }
 
-  const users = usersQuery.data?.data;
+  if (usersQuery.isError) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm text-red-700">
+          Failed to load users. {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
+        </p>
+      </div>
+    );
+  }
 
-  if (!users) return null;
+  // The API returns { data: User[] } or just User[]
+  const users = Array.isArray(usersQuery.data) 
+    ? usersQuery.data 
+    : usersQuery.data?.data;
+
+  if (!users || users.length === 0) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <p className="text-gray-600">No users found.</p>
+      </div>
+    );
+  }
 
   return (
     <Table

@@ -27,5 +27,5 @@ export const validateSolution = ({
   return api.post(`/puzzles/${puzzleId}/validate`, {
     solution,
     time_taken: timeTaken ?? 0,
-  });
+  }, { suppressErrorNotification: true });
 };

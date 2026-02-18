@@ -36,8 +36,8 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
   if (!email || !token) {
     return (
       <div className="space-y-4 text-center">
-        <h2 className="text-xl font-semibold">Invalid Request</h2>
-        <p>Missing required information. Please try logging in again.</p>
+        <h2 className="text-xl font-semibold">Session Expired</h2>
+        <p>Your registration session has expired. Please start the login process again.</p>
         <NextLink href={paths.auth.login.getHref()} className="text-blue-600 hover:text-blue-500">
           Back to Login
         </NextLink>
@@ -49,16 +49,24 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
     onSuccess: () => {
       addNotification({
         type: 'success',
-        title: 'Account Created',
-        message: 'Welcome! Your account has been set up.',
+        title: 'Account Successfully Created',
+        message: 'Welcome! Your account is ready. You can now explore puzzles and start solving circuits.',
       });
       onSuccess();
     },
     onError: (error: any) => {
+      let message = error?.message || 'Could not complete registration. Please try again.';
+      
+      if (message.includes('already exists')) {
+        message = 'Username already taken. Please choose a different username.';
+      } else if (message.includes('password')) {
+        message = 'Password does not meet requirements. Please ensure it is at least 5 characters.';
+      }
+      
       addNotification({
         type: 'error',
-        title: 'Setup Failed',
-        message: error?.message || 'Could not complete registration. Please try again.',
+        title: 'Account Setup Failed',
+        message,
       });
     },
   });

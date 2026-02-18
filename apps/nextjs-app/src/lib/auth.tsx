@@ -95,7 +95,7 @@ export const loginInputSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginInputSchema>;
 const loginWithEmailAndPassword = (data: LoginInput): Promise<AuthResponse> => {
-  return api.post('/users/login', data);
+  return api.post('/users/login', data, { suppressErrorNotification: true });
 };
 
 export const registerInputSchema = z.object({
@@ -109,13 +109,13 @@ export type RegisterInput = z.infer<typeof registerInputSchema>;
 const registerWithEmailAndPassword = (
   data: RegisterInput,
 ): Promise<AuthResponse> => {
-  return api.post('/users/register', data);
+  return api.post('/users/register', data, { suppressErrorNotification: true });
 };
 
 // --- Google Login ---
 
 const loginWithGoogle = (token: string): Promise<any> => {
-  return api.post('/users/google-login', { token });
+  return api.post('/users/google-login', { token }, { suppressErrorNotification: true });
 };
 
 const completeGoogleRegistration = (data: {
@@ -123,7 +123,7 @@ const completeGoogleRegistration = (data: {
   username: string;
   password: string;
 }): Promise<AuthResponse> => {
-  return api.post('/users/google-complete-registration', data);
+  return api.post('/users/google-complete-registration', data, { suppressErrorNotification: true });
 };
 
 export const useGoogleLogin = ({

@@ -25,7 +25,7 @@ const RegisterPage = () => {
     <RegisterForm
       onSuccess={() =>
         router.replace(
-          `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
+          `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.puzzles.getHref()}`,
         )
       }
       chooseTeam={chooseTeam}

@@ -499,8 +499,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       if (def && !canAddCost(def.cost)) {
         notifications.addNotification({
           type: 'warning',
-          title: 'Budget exceeded',
-          message: 'You cannot add components beyond the Budget limit.',
+          title: 'Budget Limit Exceeded',
+          message: `This component costs ${def.cost} but only ${budgetLimit - currentCost} budget remaining. Remove or replace existing components to stay within the limit.`,
         });
         return;
       }
@@ -641,10 +641,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
       }
     } catch (e: any) {
+      let errorTitle = 'Validation Failed';
+      let errorMessage = e?.message ?? 'Something went wrong';
+      
+      // Provide more specific error messages
+      if (errorMessage.includes('Circuit cost') || errorMessage.includes('exceeds')) {
+        errorTitle = 'Budget Exceeded';
+        errorMessage = 'Your circuit exceeds the budget limit. Try removing some components or using less expensive alternatives.';
+      } else if (errorMessage.includes('not found')) {
+        errorTitle = 'Puzzle Not Found';
+        errorMessage = 'This puzzle could not be found. Please refresh the page and try again.';
+      } else if (errorMessage.includes('test case') || errorMessage.includes('test cases')) {
+        errorTitle = 'Puzzle Test Cases Issue';
+        errorMessage = 'This puzzle has no test cases configured. Please contact the puzzle creator.';
+      }
+      
       notifications.addNotification({
         type: 'error',
-        title: 'Validation failed',
-        message: e?.message ?? 'Something went wrong',
+        title: errorTitle,
+        message: errorMessage,
       });
     } finally {
       setIsChecking(false);

@@ -46,6 +46,11 @@ class NotificationService:
         user_id = self.auth.require_user_id(token)
         return self.repo.get_unread(user_id)
 
+    def get_all(self, token: str) -> List[dict]:
+        """Get all notifications (both read and unread) for the authenticated user."""
+        user_id = self.auth.require_user_id(token)
+        return self.repo.get_all(user_id)
+
     def mark_all_read(self, token: str) -> dict:
         """Mark all notifications as read for the authenticated user."""
         user_id = self.auth.require_user_id(token)

@@ -19,10 +19,10 @@ export const paths = {
 
   app: {
     root: {
-      getHref: () => '/app',
+      getHref: () => '/app/puzzles',
     },
     dashboard: {
-      getHref: () => '/app',
+      getHref: () => '/app/puzzles',
     },
     puzzles: {
       getHref: () => '/app/puzzles',
@@ -49,6 +49,9 @@ export const paths = {
     },
     profile: {
       getHref: () => '/app/profile',
+    },
+    notifications: {
+      getHref: () => '/app/notifications',
     },
   },
   public: {

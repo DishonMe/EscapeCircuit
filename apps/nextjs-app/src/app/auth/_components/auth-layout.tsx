@@ -27,14 +27,18 @@ export const AuthLayout = ({ children }: LayoutProps) => {
 
   useEffect(() => {
     // Check if user has a valid token - if so, redirect to dashboard
-    // This is done synchronously without an API call to avoid delays on auth pages
+    // This is only checking synchronously without an API call
     try {
       const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
       if (token) {
-        // User is already logged in, redirect them
-        router.replace(
-          `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
-        );
+        // User has a token cookie, assume they're logged in
+        // Use the redirectTo parameter if provided, otherwise go to puzzles (not /app to avoid potential issues)
+        const destination = redirectTo 
+          ? decodeURIComponent(redirectTo)
+          : paths.app.puzzles.getHref();
+        
+        // Replace instead of push to prevent back button from going to login
+        router.replace(destination);
       }
     } catch (error) {
       console.error('Error checking auth token:', error);

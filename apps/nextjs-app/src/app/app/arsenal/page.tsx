@@ -50,11 +50,7 @@ export default function ArsenalPage() {
         message: 'Arsenal piece deleted',
       });
     } catch (error: any) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: error?.response?.data?.detail || 'Failed to delete piece',
-      });
+      // Error notification handled automatically by API client
     } finally {
       setDeletingPieceId(null);
     }
@@ -82,11 +78,7 @@ export default function ArsenalPage() {
       setSelectedPiece(null);
       setNewName('');
     } catch (error: any) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: error?.response?.data?.detail || 'Failed to rename piece',
-      });
+      // Error notification handled automatically by API client
     }
   };
 

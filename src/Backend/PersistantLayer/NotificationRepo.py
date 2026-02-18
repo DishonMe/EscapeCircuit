@@ -55,6 +55,18 @@ class NotificationRepo:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_all(self, user_id: int) -> List[dict]:
+        """Return all notifications for a user (both read and unread), newest first."""
+        rows = self.conn.execute(
+            """SELECT id, type, message, xp_amount, puzzle_name,
+                      actor_username, created_at
+               FROM creator_notifications
+               WHERE user_id = ?
+               ORDER BY created_at DESC""",
+            (int(user_id),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def mark_all_read(self, user_id: int) -> int:
         """Mark all unread notifications as read. Return count updated."""
         cur = self.conn.execute(

@@ -76,7 +76,7 @@ class SolvingService:
 
         circuit_id = payload["circuit_id"] if isinstance(payload, dict) and "circuit_id" in payload else payload
         if not circuit_id:
-            raise ValidationError("circuit_id required")
+            raise ValidationError("Circuit ID is required. Please provide your saved circuit to validate.")
 
         attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
         if not attempt:
@@ -85,9 +85,9 @@ class SolvingService:
 
         circuit = self.circuit_repo.get_by_id(int(circuit_id))
         if not circuit:
-            raise ValidationError("circuit not found")
+            raise ValidationError("Circuit not found. Please save your circuit design first.")
         if int(circuit.user_id) != int(user_id):
-            raise ValidationError("forbidden")
+            raise ValidationError("You do not have permission to use this circuit. Only your own circuits can be submitted.")
 
         test_cases = self.puzzle_repo.list_test_cases(int(puzzle_id))
         if not test_cases:
@@ -242,7 +242,7 @@ class SolvingService:
             
         test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
         if not test_cases:
-            raise ValidationError("puzzle has no test cases")
+            raise ValidationError("This puzzle has no test cases configured. Please contact the puzzle creator.")
         
         # Expand arsenal pieces in the solution
         expanded_solution = self._expand_arsenal_pieces(solution_payload)

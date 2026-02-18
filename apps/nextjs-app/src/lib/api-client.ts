@@ -105,12 +105,18 @@ async function fetchApi<T>(
   });
 
   if (!response.ok) {
-    const message = (await response.json()).message || response.statusText;
+    let message = '';
+    try {
+      const errorData = await response.json();
+      message = errorData.message || errorData.detail || response.statusText;
+    } catch {
+      message = response.statusText || 'An error occurred';
+    }
+    
     if (typeof window !== 'undefined' && !suppressErrorNotification) {
       useNotifications.getState().addNotification({
         type: 'error',
-        title: 'Error',
-        message,
+        title: message || response.statusText,
       });
     }
     throw new Error(message);

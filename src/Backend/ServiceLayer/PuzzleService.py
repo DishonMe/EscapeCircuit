@@ -96,14 +96,14 @@ class PuzzleService:
         if not user:
             raise ValidationError("user not found")
         if user.role not in (UserRole.CREATOR, UserRole.ADMIN):
-            raise ValidationError("creator required")
+            raise ValidationError("Only creators and admins can create puzzles. Contact an admin to upgrade your account to creator.")
 
         from Backend.DomainLayer.Puzzle import Puzzle
         from Backend.DomainLayer.Enums import GateType, PuzzleDifficulty
 
         name = (payload.get("name") or "").strip()
         if not name:
-            raise ValidationError("name required")
+            raise ValidationError("Puzzle name is required. Please provide a meaningful name for your puzzle.")
 
         default_gate_set_raw = payload.get("default_gate_set", [])
         gate_set = {GateType(x) for x in default_gate_set_raw}
@@ -144,13 +144,13 @@ class PuzzleService:
         # Publish preconditions (ADD/ARD):
         # 1) at least one test case
         if not self.repo.list_test_cases(puzzle_id):
-            raise ValidationError("cannot publish without test cases")
+            raise ValidationError("Cannot publish puzzle without test cases. Add at least one test case that demonstrates the solution.")
 
         # 2) creator must have solved (self-solve). If SolveRepo isn't wired yet,
         #    we skip this check to avoid breaking dependency injection.
         if self.solve_repo is not None and user.role != UserRole.ADMIN:
             if not self.solve_repo.has_passed(user_id, puzzle_id):
-                raise ValidationError("creator must solve the puzzle before publishing")
+                raise ValidationError("You must solve this puzzle yourself before publishing it. This ensures the puzzle is actually solvable.")
 
         # treat created_at as upload datetime
         p.created_at = utcnow()
