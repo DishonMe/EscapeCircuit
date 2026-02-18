@@ -618,7 +618,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       if (res.solved) {
         setIsSolved(true);
-        exportWorkingAreaJson();
         // Invalidate caches so the puzzles list shows "Solved" and XP bar updates
         await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
         await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
@@ -634,11 +633,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   };
 
-  const onExitWithoutSaving = () => {
-    router.push(paths.app.puzzles.getHref());
+  const onSolveAgain = () => {
+    // Reset all state for a fresh start
+    setPlaced([]);
+    setWires([]);
+    setSelectedComponent({ mode: 'none' });
+    setDraggedPaletteComponentId(null);
+    setShowPuzzleInfo(false);
+    setShowDebugger(false);
+    setPostCheck({ open: false });
+    setIsChecking(false);
+    setIsSolved(false);
+    setConnectivityIssues(null);
+    startTime.current = Date.now();
+    // Refresh the page to ensure clean state
+    router.refresh();
   };
 
-  const onSubmitAndExit = () => {
+  const onBrowsePuzzles = () => {
     router.push(paths.app.puzzles.getHref());
   };
 
@@ -820,7 +832,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button
               variant="outline"
               className="mt-3 w-full"
-              onClick={onExitWithoutSaving}
+              onClick={onBrowsePuzzles}
             >
               Exit Puzzle
             </Button>
@@ -1018,19 +1030,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setPostCheck({ open: false })}
+              onClick={onSolveAgain}
+              disabled={!postCheck.open}
             >
-              Return to puzzle
+              {postCheck.open && postCheck.solved ? 'Solve again' : 'Try again'}
             </Button>
             <Button
-              onClick={onSubmitAndExit}
-              disabled={!postCheck.open || !postCheck.solved}
+              onClick={onBrowsePuzzles}
+              disabled={!postCheck.open}
             >
-              Submit solution and exit
-            </Button>
-            <Button variant="ghost" onClick={onExitWithoutSaving}>
-              Exit without saving
+              Browse puzzles
             </Button>
           </DialogFooter>
         </DialogContent>
