@@ -50,6 +50,9 @@ export const paths = {
     profile: {
       getHref: () => '/app/profile',
     },
+    notifications: {
+      getHref: () => '/app/notifications',
+    },
   },
   public: {
     discussion: {

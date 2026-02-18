@@ -84,7 +84,8 @@ def build_user_router(user_service: UserService, notification_service: Notificat
     @router.get("")
     def list_users(token: str = Depends(verify_token), limit: int = 200, offset: int = 0):
         try:
-            return user_service.list_users(token, limit=limit, offset=offset)
+            users = user_service.list_users(token, limit=limit, offset=offset)
+            return {"data": users}
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
@@ -102,6 +103,15 @@ def build_user_router(user_service: UserService, notification_service: Notificat
             return []
         try:
             return notification_service.get_unread(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.get("/me/notifications/history")
+    def get_notifications_history(token: str = Depends(verify_token)):
+        if not notification_service:
+            return []
+        try:
+            return notification_service.get_all(token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 

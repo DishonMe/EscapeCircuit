@@ -44,3 +44,19 @@ export const useMarkNotificationsRead = () => {
     },
   });
 };
+
+// --- Fetch all notifications history (both read and unread) ---
+export const getCreatorNotificationsHistory = async (): Promise<CreatorNotification[]> => {
+  return await api.get('/users/me/notifications/history') as CreatorNotification[];
+};
+
+export const creatorNotificationsHistoryQueryOptions = () =>
+  queryOptions({
+    queryKey: ['creator-notifications-history'],
+    queryFn: getCreatorNotificationsHistory,
+    retry: 1,
+    staleTime: 0, // Always fetch fresh data
+  });
+
+export const useCreatorNotificationsHistory = () =>
+  useQuery(creatorNotificationsHistoryQueryOptions());

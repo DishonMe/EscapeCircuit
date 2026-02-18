@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, PanelLeft, Folder, Users, User2, Gamepad2, Zap } from 'lucide-react';
+import { Home, PanelLeft, Folder, Users, User2, Gamepad2, Zap, Bell } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -44,12 +44,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const logout = useLogout({
     onSuccess: () => router.push(paths.auth.login.getHref(pathname)),
   });
+  const userRole = user.data?.role?.toLowerCase() || '';
   const navigation = [
     { name: 'Dashboard', to: paths.app.root.getHref(), icon: Home },
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
     { name: 'Arsenal', to: paths.app.arsenal.root.getHref(), icon: Zap },
     { name: 'Discussions', to: paths.app.discussions.getHref(), icon: Folder },
-    user.data?.role === 'ADMIN' && {
+    (userRole === 'creator' || userRole === 'admin') && {
+      name: 'Notifications',
+      to: paths.app.notifications.getHref(),
+      icon: Bell,
+    },
+    userRole === 'admin' && {
       name: 'Users',
       to: paths.app.users.getHref(),
       icon: Users,
