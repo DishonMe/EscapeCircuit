@@ -71,7 +71,23 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     def browse(
         limit: int = 50, 
         offset: int = 0, 
-        page: Optional[int] = None, 
+        page: Optional[int] = None,
+        search: Optional[str] = None,
+        creator_id: Optional[int] = None,
+        min_difficulty: Optional[float] = None,
+        max_difficulty: Optional[float] = None,
+        only_experienced_difficulty: bool = False,
+        min_clearness: Optional[float] = None,
+        max_clearness: Optional[float] = None,
+        only_experienced_clearness: bool = False,
+        min_fun: Optional[float] = None,
+        max_fun: Optional[float] = None,
+        only_experienced_fun: bool = False,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        order_only_experienced: bool = False,
         token: str = Depends(verify_token)
     ):
         try:
@@ -79,7 +95,27 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             if page is not None and page > 0:
                 offset = (page - 1) * limit
                 
-            result = puzzle_service.browse(token, limit=limit, offset=offset)
+            result = puzzle_service.browse(
+                token, 
+                limit=limit, 
+                offset=offset,
+                search=search,
+                creator_id=creator_id,
+                min_difficulty=min_difficulty,
+                max_difficulty=max_difficulty,
+                only_experienced_difficulty=only_experienced_difficulty,
+                min_clearness=min_clearness,
+                max_clearness=max_clearness,
+                only_experienced_clearness=only_experienced_clearness,
+                min_fun=min_fun,
+                max_fun=max_fun,
+                only_experienced_fun=only_experienced_fun,
+                date_from=date_from,
+                date_to=date_to,
+                order_by=order_by,
+                order_direction=order_direction,
+                order_only_experienced=order_only_experienced
+            )
 
             # Inject is_solved status per puzzle for the current user
             try:

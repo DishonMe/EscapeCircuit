@@ -30,12 +30,66 @@ class PuzzleService:
                 p_dict["creator"] = user.to_dict()
         return p_dict
 
-    def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> dict:
+    def browse(
+        self, 
+        session_token: str, 
+        limit: int = 50, 
+        offset: int = 0,
+        search: str = None,
+        creator_id: int = None,
+        min_difficulty: float = None,
+        max_difficulty: float = None,
+        only_experienced_difficulty: bool = False,
+        min_clearness: float = None,
+        max_clearness: float = None,
+        only_experienced_clearness: bool = False,
+        min_fun: float = None,
+        max_fun: float = None,
+        only_experienced_fun: bool = False,
+        date_from: str = None,
+        date_to: str = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        order_only_experienced: bool = False
+    ) -> dict:
         _ = self.auth.require_user_id(session_token)
-        puzzles = self.repo.list_published(limit=limit, offset=offset)
+        puzzles = self.repo.list_published(
+            limit=limit,
+            offset=offset,
+            search=search,
+            creator_id=creator_id,
+            min_difficulty=min_difficulty,
+            max_difficulty=max_difficulty,
+            only_experienced_difficulty=only_experienced_difficulty,
+            min_clearness=min_clearness,
+            max_clearness=max_clearness,
+            only_experienced_clearness=only_experienced_clearness,
+            min_fun=min_fun,
+            max_fun=max_fun,
+            only_experienced_fun=only_experienced_fun,
+            date_from=date_from,
+            date_to=date_to,
+            order_by=order_by,
+            order_direction=order_direction,
+            order_only_experienced=order_only_experienced
+        )
         
-        # Count total published for pagination
-        total = self.repo.count_published()
+        # Count total with same filters for pagination
+        total = self.repo.count_published(
+            search=search,
+            creator_id=creator_id,
+            min_difficulty=min_difficulty,
+            max_difficulty=max_difficulty,
+            only_experienced_difficulty=only_experienced_difficulty,
+            min_clearness=min_clearness,
+            max_clearness=max_clearness,
+            only_experienced_clearness=only_experienced_clearness,
+            min_fun=min_fun,
+            max_fun=max_fun,
+            only_experienced_fun=only_experienced_fun,
+            date_from=date_from,
+            date_to=date_to
+        )
         
         # Avoid division by zero if limit is 0 (should not happen via API validation usually)
         limit = max(1, limit)
