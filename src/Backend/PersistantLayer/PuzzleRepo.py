@@ -439,6 +439,7 @@ class PuzzleRepo:
         search: Optional[str] = None,
         status: Optional[str] = None,
         creator_id: Optional[int] = None,
+        creator_username: Optional[str] = None,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         order_by: str = "created_at",
@@ -447,33 +448,38 @@ class PuzzleRepo:
         """List ALL puzzles (any status) for admin moderation."""
         where_clauses = []
         params = []
+        join_sql = ""
 
         if search is not None:
-            where_clauses.append("name LIKE ?")
+            where_clauses.append("p.name LIKE ?")
             params.append(f"%{search}%")
         if status is not None:
-            where_clauses.append("status = ?")
+            where_clauses.append("p.status = ?")
             params.append(status)
         if creator_id is not None:
-            where_clauses.append("creator_user_id = ?")
+            where_clauses.append("p.creator_user_id = ?")
             params.append(int(creator_id))
+        if creator_username is not None:
+            join_sql = "JOIN users u ON p.creator_user_id = u.id"
+            where_clauses.append("u.username LIKE ?")
+            params.append(f"%{creator_username}%")
         if date_from is not None:
-            where_clauses.append("created_at >= ?")
+            where_clauses.append("p.created_at >= ?")
             params.append(date_from)
         if date_to is not None:
-            where_clauses.append("created_at <= ?")
+            where_clauses.append("p.created_at <= ?")
             params.append(date_to)
 
         valid_order_fields = ["created_at", "avg_fun", "avg_clearness", "rating_count", "name"]
         if order_by not in valid_order_fields:
             order_by = "created_at"
-        order_clause = f"{order_by} {order_direction}"
+        order_clause = f"p.{order_by} {order_direction}"
 
         where_sql = ""
         if where_clauses:
             where_sql = "WHERE " + " AND ".join(where_clauses)
 
-        query = f"SELECT * FROM puzzles {where_sql} ORDER BY {order_clause} LIMIT ? OFFSET ?"
+        query = f"SELECT p.* FROM puzzles p {join_sql} {where_sql} ORDER BY {order_clause} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_puzzle(r) for r in rows]
@@ -483,34 +489,40 @@ class PuzzleRepo:
         search: Optional[str] = None,
         status: Optional[str] = None,
         creator_id: Optional[int] = None,
+        creator_username: Optional[str] = None,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
     ) -> int:
         """Count ALL puzzles (any status) for admin moderation."""
         where_clauses = []
         params = []
+        join_sql = ""
 
         if search is not None:
-            where_clauses.append("name LIKE ?")
+            where_clauses.append("p.name LIKE ?")
             params.append(f"%{search}%")
         if status is not None:
-            where_clauses.append("status = ?")
+            where_clauses.append("p.status = ?")
             params.append(status)
         if creator_id is not None:
-            where_clauses.append("creator_user_id = ?")
+            where_clauses.append("p.creator_user_id = ?")
             params.append(int(creator_id))
+        if creator_username is not None:
+            join_sql = "JOIN users u ON p.creator_user_id = u.id"
+            where_clauses.append("u.username LIKE ?")
+            params.append(f"%{creator_username}%")
         if date_from is not None:
-            where_clauses.append("created_at >= ?")
+            where_clauses.append("p.created_at >= ?")
             params.append(date_from)
         if date_to is not None:
-            where_clauses.append("created_at <= ?")
+            where_clauses.append("p.created_at <= ?")
             params.append(date_to)
 
         where_sql = ""
         if where_clauses:
             where_sql = "WHERE " + " AND ".join(where_clauses)
 
-        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles {where_sql}", params)
+        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles p {join_sql} {where_sql}", params)
         row = cur.fetchone()
         return row[0] if row else 0
 

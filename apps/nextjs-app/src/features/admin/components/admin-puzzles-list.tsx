@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { Filter, X, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,49 +14,168 @@ import {
 } from '../api/get-admin-puzzles';
 import { AdminDeletePuzzle } from './admin-delete-puzzle';
 
+// Debounce hook — delays value updates until user stops typing
+function useDebouncedValue<T>(value: T, delay: number = 400): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export const AdminPuzzlesList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<AdminPuzzleFilters>({});
 
-  const puzzlesQuery = useAdminPuzzles({ filters });
+  // Debounce text inputs so the API isn't called on every keystroke
+  const debouncedFilters = useDebouncedValue(filters);
+
+  const puzzlesQuery = useAdminPuzzles({ filters: debouncedFilters });
 
   const handleClearFilters = () => {
     setFilters({});
   };
 
-  if (puzzlesQuery.isLoading) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (puzzlesQuery.isError) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-700">
-          Failed to load puzzles.{' '}
-          {puzzlesQuery.error?.message &&
-            `Error: ${puzzlesQuery.error.message}`}
-        </p>
-      </div>
-    );
-  }
-
   const puzzles = puzzlesQuery.data?.data || [];
 
-  if (puzzles.length === 0) {
+  // Render content below filters based on query state
+  const renderContent = () => {
+    if (puzzlesQuery.isLoading) {
+      return (
+        <div className="flex h-48 w-full items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      );
+    }
+
+    if (puzzlesQuery.isError) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-700">
+            Failed to load puzzles.{' '}
+            {puzzlesQuery.error?.message &&
+              `Error: ${puzzlesQuery.error.message}`}
+          </p>
+        </div>
+      );
+    }
+
+    if (puzzles.length === 0) {
+      return (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-gray-600">No puzzles found.</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="text-gray-600">No puzzles found.</p>
-      </div>
+      <Table
+        data={puzzles}
+        columns={[
+          {
+            title: 'Name',
+            field: 'name',
+            Cell({ entry }: { entry: any }) {
+              return (
+                <span className="font-medium">
+                  {entry.name || entry.title}
+                </span>
+              );
+            },
+          },
+          {
+            title: 'Status',
+            field: 'status',
+            Cell({ entry }: { entry: any }) {
+              const color =
+                entry.status === 'published'
+                  ? 'text-green-600 bg-green-50'
+                  : entry.status === 'draft'
+                    ? 'text-yellow-600 bg-yellow-50'
+                    : 'text-gray-500 bg-gray-50';
+              return (
+                <span
+                  className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}
+                >
+                  {entry.status}
+                </span>
+              );
+            },
+          },
+          {
+            title: 'Creator',
+            field: 'creator_user_id',
+            Cell({ entry }: { entry: any }) {
+              return (
+                <span>{entry.creator?.username || 'Unknown'}</span>
+              );
+            },
+          },
+          {
+            title: 'Ratings',
+            field: 'rating_count',
+          },
+          {
+            title: 'Flags',
+            field: 'id',
+            Cell({ entry }: { entry: any }) {
+              const flags: string[] = entry.flags || [];
+              if (flags.length === 0)
+                return <span className="text-gray-400">-</span>;
+              return (
+                <div className="flex flex-wrap gap-1">
+                  {flags.map((f: string) => (
+                    <span
+                      key={f}
+                      className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-700"
+                    >
+                      <AlertTriangle className="size-3" />{' '}
+                      {f.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              );
+            },
+          },
+          {
+            title: 'Created',
+            field: 'created_at',
+            Cell({ entry }: { entry: any }) {
+              const ts = entry.created_at || entry.createdAt;
+              return (
+                <span>
+                  {ts
+                    ? formatDate(
+                        typeof ts === 'string'
+                          ? new Date(ts).getTime()
+                          : ts,
+                      )
+                    : '-'}
+                </span>
+              );
+            },
+          },
+          {
+            title: '',
+            field: 'id',
+            Cell({ entry }: { entry: any }) {
+              return (
+                <AdminDeletePuzzle
+                  puzzleId={Number(entry.id)}
+                  puzzleName={entry.name || entry.title || 'Unknown'}
+                />
+              );
+            },
+          },
+        ]}
+      />
     );
-  }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Filter Controls */}
+      {/* Filter Controls — always visible */}
       <div className="flex items-center justify-between gap-4">
         <Button
           variant="outline"
@@ -82,7 +201,7 @@ export const AdminPuzzlesList = () => {
         )}
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter Panel — always visible when toggled */}
       {showFilters && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -192,107 +311,8 @@ export const AdminPuzzlesList = () => {
         </div>
       )}
 
-      {/* Puzzles Table */}
-      <Table
-        data={puzzles}
-        columns={[
-          {
-            title: 'Name',
-            field: 'name',
-            Cell({ entry }: { entry: any }) {
-              return (
-                <span className="font-medium">
-                  {entry.name || entry.title}
-                </span>
-              );
-            },
-          },
-          {
-            title: 'Status',
-            field: 'status',
-            Cell({ entry }: { entry: any }) {
-              const color =
-                entry.status === 'published'
-                  ? 'text-green-600 bg-green-50'
-                  : entry.status === 'draft'
-                    ? 'text-yellow-600 bg-yellow-50'
-                    : 'text-gray-500 bg-gray-50';
-              return (
-                <span
-                  className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}
-                >
-                  {entry.status}
-                </span>
-              );
-            },
-          },
-          {
-            title: 'Creator',
-            field: 'creator_user_id',
-            Cell({ entry }: { entry: any }) {
-              return (
-                <span>{entry.creator?.username || 'Unknown'}</span>
-              );
-            },
-          },
-          {
-            title: 'Ratings',
-            field: 'rating_count',
-          },
-          {
-            title: 'Flags',
-            field: 'id',
-            Cell({ entry }: { entry: any }) {
-              const flags: string[] = entry.flags || [];
-              if (flags.length === 0)
-                return <span className="text-gray-400">-</span>;
-              return (
-                <div className="flex flex-wrap gap-1">
-                  {flags.map((f: string) => (
-                    <span
-                      key={f}
-                      className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-700"
-                    >
-                      <AlertTriangle className="size-3" />{' '}
-                      {f.replace(/_/g, ' ')}
-                    </span>
-                  ))}
-                </div>
-              );
-            },
-          },
-          {
-            title: 'Created',
-            field: 'created_at',
-            Cell({ entry }: { entry: any }) {
-              const ts = entry.created_at || entry.createdAt;
-              return (
-                <span>
-                  {ts
-                    ? formatDate(
-                        typeof ts === 'string'
-                          ? new Date(ts).getTime()
-                          : ts,
-                      )
-                    : '-'}
-                </span>
-              );
-            },
-          },
-          {
-            title: '',
-            field: 'id',
-            Cell({ entry }: { entry: any }) {
-              return (
-                <AdminDeletePuzzle
-                  puzzleId={Number(entry.id)}
-                  puzzleName={entry.name || entry.title || 'Unknown'}
-                />
-              );
-            },
-          },
-        ]}
-      />
+      {/* Content: loading / error / empty / table */}
+      {renderContent()}
     </div>
   );
 };

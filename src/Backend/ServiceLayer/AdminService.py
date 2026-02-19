@@ -211,24 +211,13 @@ class AdminService:
     ) -> dict:
         self._require_admin(session_token)
 
-        # Resolve creator_username to creator_id if provided
-        if creator_username and not creator_id:
-            user = self.user_repo.get_by_username(creator_username)
-            if user:
-                creator_id = user.id
-            else:
-                # Username doesn't match any user — return empty results
-                return {
-                    "data": [],
-                    "meta": {"page": 1, "total": 0, "totalPages": 0},
-                }
-
         puzzles = self.puzzle_repo.list_all_for_admin(
             limit=limit,
             offset=offset,
             search=search,
             status=status,
             creator_id=creator_id,
+            creator_username=creator_username,
             date_from=date_from,
             date_to=date_to,
             order_by=order_by,
@@ -238,6 +227,7 @@ class AdminService:
             search=search,
             status=status,
             creator_id=creator_id,
+            creator_username=creator_username,
             date_from=date_from,
             date_to=date_to,
         )
