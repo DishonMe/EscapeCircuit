@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { Filter, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,50 +14,134 @@ import { DeleteUser } from './delete-user';
 import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
 import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
 
+// Debounce hook — delays value updates until user stops typing
+function useDebouncedValue<T>(value: T, delay: number = 400): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export const UsersList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<UserFilters>({});
 
-  const usersQuery = useUsers({ filters });
+  // Debounce text inputs so the API isn't called on every keystroke
+  const debouncedFilters = useDebouncedValue(filters);
+
+  const usersQuery = useUsers({ filters: debouncedFilters });
 
   const handleClearFilters = () => {
     setFilters({});
   };
 
-  if (usersQuery.isLoading) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (usersQuery.isError) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-700">
-          Failed to load users. {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
-        </p>
-      </div>
-    );
-  }
-
   // The API returns { data: User[] } or just User[]
-  const users = Array.isArray(usersQuery.data)
-    ? usersQuery.data
-    : usersQuery.data?.data;
+  const users = usersQuery.data
+    ? Array.isArray(usersQuery.data)
+      ? usersQuery.data
+      : usersQuery.data?.data
+    : [];
 
-  if (!users || users.length === 0) {
+  // Render content below filters based on query state
+  const renderContent = () => {
+    if (usersQuery.isLoading) {
+      return (
+        <div className="flex h-48 w-full items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      );
+    }
+
+    if (usersQuery.isError) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-700">
+            Failed to load users. {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
+          </p>
+        </div>
+      );
+    }
+
+    if (!users || users.length === 0) {
+      return (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-gray-600">No users found.</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="text-gray-600">No users found.</p>
-      </div>
+      <Table
+        data={users}
+        columns={[
+          {
+            title: 'Username',
+            field: 'username',
+          },
+          {
+            title: 'Email',
+            field: 'email',
+          },
+          {
+            title: 'Role',
+            field: 'role',
+            Cell({ entry: { role } }: { entry: any }) {
+              const roleColors: Record<string, string> = {
+                admin: 'bg-purple-50 text-purple-700',
+                creator: 'bg-green-50 text-green-700',
+                solver: 'bg-gray-50 text-gray-700',
+                pending_creator: 'bg-yellow-50 text-yellow-700',
+              };
+              const color = roleColors[role] || 'bg-gray-50 text-gray-700';
+              const label = role === 'pending_creator' ? 'Pending Creator' : role;
+              return (
+                <span className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}>
+                  {label}
+                </span>
+              );
+            },
+          },
+          {
+            title: 'Created At',
+            field: 'createdAt',
+            Cell({ entry: { createdAt } }: { entry: any }) {
+              return <span>{formatDate(createdAt)}</span>;
+            },
+          },
+          {
+            title: 'Actions',
+            field: 'id',
+            Cell({ entry }: { entry: any }) {
+              return (
+                <div className="flex gap-2 items-center">
+                  {entry.role === 'solver' && (
+                    <AssignCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                    />
+                  )}
+                  {(entry.role === 'creator' || entry.role === 'pending_creator') && (
+                    <RemoveCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                      currentRole={entry.role}
+                    />
+                  )}
+                  <DeleteUser id={entry.id} />
+                </div>
+              );
+            },
+          },
+        ]}
+      />
     );
-  }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Filter Controls */}
+      {/* Filter Controls — always visible */}
       <div className="flex items-center justify-between gap-4">
         <Button
           variant="outline"
@@ -81,7 +165,7 @@ export const UsersList = () => {
         )}
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter Panel — always visible when toggled */}
       {showFilters && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -157,70 +241,8 @@ export const UsersList = () => {
         </div>
       )}
 
-      {/* Users Table */}
-      <Table
-        data={users}
-        columns={[
-          {
-            title: 'Username',
-            field: 'username',
-          },
-          {
-            title: 'Email',
-            field: 'email',
-          },
-          {
-            title: 'Role',
-            field: 'role',
-            Cell({ entry: { role } }: { entry: any }) {
-              const roleColors: Record<string, string> = {
-                admin: 'bg-purple-50 text-purple-700',
-                creator: 'bg-green-50 text-green-700',
-                solver: 'bg-gray-50 text-gray-700',
-                pending_creator: 'bg-yellow-50 text-yellow-700',
-              };
-              const color = roleColors[role] || 'bg-gray-50 text-gray-700';
-              const label = role === 'pending_creator' ? 'Pending Creator' : role;
-              return (
-                <span className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}>
-                  {label}
-                </span>
-              );
-            },
-          },
-          {
-            title: 'Created At',
-            field: 'createdAt',
-            Cell({ entry: { createdAt } }: { entry: any }) {
-              return <span>{formatDate(createdAt)}</span>;
-            },
-          },
-          {
-            title: 'Actions',
-            field: 'id',
-            Cell({ entry }: { entry: any }) {
-              return (
-                <div className="flex gap-2 items-center">
-                  {entry.role === 'solver' && (
-                    <AssignCreatorButton
-                      userId={Number(entry.id)}
-                      username={entry.username}
-                    />
-                  )}
-                  {(entry.role === 'creator' || entry.role === 'pending_creator') && (
-                    <RemoveCreatorButton
-                      userId={Number(entry.id)}
-                      username={entry.username}
-                      currentRole={entry.role}
-                    />
-                  )}
-                  <DeleteUser id={entry.id} />
-                </div>
-              );
-            },
-          },
-        ]}
-      />
+      {/* Content: loading / error / empty / table */}
+      {renderContent()}
     </div>
   );
 };
