@@ -5,6 +5,7 @@ class UserRole(str, Enum):
     SOLVER = "solver"
     CREATOR = "creator"
     ADMIN = "admin"
+    PENDING_CREATOR = "pending_creator"
 
 
 class PuzzleStatus(str, Enum):
@@ -29,6 +30,13 @@ class Medal(int, Enum):
 class TestCaseKind(str, Enum):
     BLACKBOX = "blackbox"
     WHITEBOX = "whitebox"
+
+
+class AuditActionType(str, Enum):
+    ASSIGN_CREATOR = "assign_creator"
+    REMOVE_CREATOR = "remove_creator"
+    DELETE_PUZZLE = "delete_puzzle"
+    UNPUBLISH_PUZZLE = "unpublish_puzzle"
 
 
 class GateType(str, Enum):

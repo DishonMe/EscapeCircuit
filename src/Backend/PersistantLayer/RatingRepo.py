@@ -104,6 +104,10 @@ class RatingRepo:
         self.conn.commit()
         return cur.rowcount > 0
 
+    def delete_by_puzzle(self, puzzle_id: int) -> None:
+        """Delete all ratings for a puzzle."""
+        self.conn.execute("DELETE FROM ratings WHERE puzzle_id=?", (int(puzzle_id),))
+
     # Aliases for spec compatibility
     add_rating = upsert
     update_rating = upsert

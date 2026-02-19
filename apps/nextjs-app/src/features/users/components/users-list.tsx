@@ -11,6 +11,8 @@ import { formatDate } from '@/utils/format';
 import { useUsers, UserFilters } from '../api/get-users';
 
 import { DeleteUser } from './delete-user';
+import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
+import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
 
 export const UsersList = () => {
   const [showFilters, setShowFilters] = useState(false);
@@ -41,8 +43,8 @@ export const UsersList = () => {
   }
 
   // The API returns { data: User[] } or just User[]
-  const users = Array.isArray(usersQuery.data) 
-    ? usersQuery.data 
+  const users = Array.isArray(usersQuery.data)
+    ? usersQuery.data
     : usersQuery.data?.data;
 
   if (!users || users.length === 0) {
@@ -106,6 +108,7 @@ export const UsersList = () => {
                 <option value="">All Roles</option>
                 <option value="solver">Solver</option>
                 <option value="creator">Creator</option>
+                <option value="pending_creator">Pending Creator</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -169,19 +172,51 @@ export const UsersList = () => {
           {
             title: 'Role',
             field: 'role',
+            Cell({ entry: { role } }: { entry: any }) {
+              const roleColors: Record<string, string> = {
+                admin: 'bg-purple-50 text-purple-700',
+                creator: 'bg-green-50 text-green-700',
+                solver: 'bg-gray-50 text-gray-700',
+                pending_creator: 'bg-yellow-50 text-yellow-700',
+              };
+              const color = roleColors[role] || 'bg-gray-50 text-gray-700';
+              const label = role === 'pending_creator' ? 'Pending Creator' : role;
+              return (
+                <span className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}>
+                  {label}
+                </span>
+              );
+            },
           },
           {
             title: 'Created At',
             field: 'createdAt',
-            Cell({ entry: { createdAt } }) {
+            Cell({ entry: { createdAt } }: { entry: any }) {
               return <span>{formatDate(createdAt)}</span>;
             },
           },
           {
-            title: '',
+            title: 'Actions',
             field: 'id',
-            Cell({ entry: { id } }) {
-              return <DeleteUser id={id} />;
+            Cell({ entry }: { entry: any }) {
+              return (
+                <div className="flex gap-2 items-center">
+                  {entry.role === 'solver' && (
+                    <AssignCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                    />
+                  )}
+                  {(entry.role === 'creator' || entry.role === 'pending_creator') && (
+                    <RemoveCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                      currentRole={entry.role}
+                    />
+                  )}
+                  <DeleteUser id={entry.id} />
+                </div>
+              );
             },
           },
         ]}

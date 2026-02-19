@@ -3,6 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState, ChangeEvent, FormEvent } from "react";
+import Cookies from "js-cookie";
+import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
 
 export default function UploadPuzzlePage() {
   const queryClient = useQueryClient();
@@ -66,8 +68,12 @@ export default function UploadPuzzlePage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
       const baseUrl = apiUrl.replace(/\/api\/?$/, "");
+      const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
       const res = await fetch(`${baseUrl}/admin/upload-puzzle`, {
         method: "POST",
+        headers: {
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: formData,
       });
 
@@ -87,6 +93,7 @@ export default function UploadPuzzlePage() {
       
       try {
         await queryClient.invalidateQueries({ queryKey: ['puzzles'] });
+        await queryClient.invalidateQueries({ queryKey: ['admin-puzzles'] });
       } catch (e) {
         console.error("Failed to invalidate queries", e);
       }

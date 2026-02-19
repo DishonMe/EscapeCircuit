@@ -426,6 +426,112 @@ class PuzzleRepo:
             for r in rows
         ]
 
+    def delete(self, puzzle_id: int) -> bool:
+        """Delete a puzzle and its test cases (FK cascade handles test_cases).
+        Returns True if a row was actually deleted."""
+        cur = self.conn.execute("DELETE FROM puzzles WHERE id=?", (int(puzzle_id),))
+        return cur.rowcount > 0
+
+    def list_all_for_admin(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        creator_id: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+    ) -> List[Puzzle]:
+        """List ALL puzzles (any status) for admin moderation."""
+        where_clauses = []
+        params = []
+
+        if search is not None:
+            where_clauses.append("name LIKE ?")
+            params.append(f"%{search}%")
+        if status is not None:
+            where_clauses.append("status = ?")
+            params.append(status)
+        if creator_id is not None:
+            where_clauses.append("creator_user_id = ?")
+            params.append(int(creator_id))
+        if date_from is not None:
+            where_clauses.append("created_at >= ?")
+            params.append(date_from)
+        if date_to is not None:
+            where_clauses.append("created_at <= ?")
+            params.append(date_to)
+
+        valid_order_fields = ["created_at", "avg_fun", "avg_clearness", "rating_count", "name"]
+        if order_by not in valid_order_fields:
+            order_by = "created_at"
+        order_clause = f"{order_by} {order_direction}"
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        query = f"SELECT * FROM puzzles {where_sql} ORDER BY {order_clause} LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        rows = self.conn.execute(query, params).fetchall()
+        return [self._row_to_puzzle(r) for r in rows]
+
+    def count_all_for_admin(
+        self,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        creator_id: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+    ) -> int:
+        """Count ALL puzzles (any status) for admin moderation."""
+        where_clauses = []
+        params = []
+
+        if search is not None:
+            where_clauses.append("name LIKE ?")
+            params.append(f"%{search}%")
+        if status is not None:
+            where_clauses.append("status = ?")
+            params.append(status)
+        if creator_id is not None:
+            where_clauses.append("creator_user_id = ?")
+            params.append(int(creator_id))
+        if date_from is not None:
+            where_clauses.append("created_at >= ?")
+            params.append(date_from)
+        if date_to is not None:
+            where_clauses.append("created_at <= ?")
+            params.append(date_to)
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles {where_sql}", params)
+        row = cur.fetchone()
+        return row[0] if row else 0
+
+    def get_by_creator_and_status(self, creator_user_id: int, status: PuzzleStatus) -> List[Puzzle]:
+        """Get all puzzles by a creator with a specific status."""
+        rows = self.conn.execute(
+            "SELECT * FROM puzzles WHERE creator_user_id=? AND status=?",
+            (int(creator_user_id), status.value),
+        ).fetchall()
+        return [self._row_to_puzzle(r) for r in rows]
+
+    def delete_by_ids(self, puzzle_ids: List[int]) -> int:
+        """Delete multiple puzzles by IDs. Returns count deleted."""
+        if not puzzle_ids:
+            return 0
+        placeholders = ",".join("?" * len(puzzle_ids))
+        cur = self.conn.execute(
+            f"DELETE FROM puzzles WHERE id IN ({placeholders})", puzzle_ids
+        )
+        return cur.rowcount
+
     @staticmethod
     def _difficulty_to_level(difficulty_value: float) -> str:
         """Convert a floating point difficulty value to puzzle difficulty level string."""

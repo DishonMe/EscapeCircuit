@@ -183,20 +183,51 @@ def main():
         # 2. Get Admin
         admin_id = get_or_create_admin(conn)
         
-        # 3. Iterate and Insertion
+        # 3. Build set of puzzle names that were admin-deleted (should not be re-imported)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS deleted_puzzle_names (
+                name TEXT PRIMARY KEY
+            )
+        """)
+        conn.commit()
+        deleted_names = set()
+        try:
+            rows = conn.execute("SELECT name FROM deleted_puzzle_names").fetchall()
+            deleted_names = {r[0] for r in rows}
+        except sqlite3.OperationalError:
+            pass
+        if deleted_names:
+            print(f"  Skipping {len(deleted_names)} admin-deleted puzzle(s).")
+
+        # 4. Iterate and insert/update ALL riddles from files,
+        #    but skip any whose name was admin-deleted.
         print("Importing riddles...")
         count = 0
         for filename in os.listdir(RIDDLES_DIR):
-            if filename.endswith('_config.json'):
-                config_path = os.path.join(RIDDLES_DIR, filename)
-                base_name = filename.replace('_config.json', '')
-                instr_path = os.path.join(RIDDLES_DIR, f"{base_name}_instructions.md")
-                
-                try:
-                    insert_riddle(conn, config_path, instr_path, admin_id)
-                    count += 1
-                except Exception as e:
-                    print(f"Error inserting {filename}: {e}")
+            if not filename.endswith('_config.json'):
+                continue
+            config_path = os.path.join(RIDDLES_DIR, filename)
+
+            # Read the puzzle name from the config to check against deleted list
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                puzzle_name = cfg.get('puzzle', {}).get('name', '')
+            except Exception:
+                puzzle_name = ''
+
+            if puzzle_name in deleted_names:
+                print(f"  Skipped (admin-deleted): {puzzle_name}")
+                continue
+
+            base_name = filename.replace('_config.json', '')
+            instr_path = os.path.join(RIDDLES_DIR, f"{base_name}_instructions.md")
+
+            try:
+                insert_riddle(conn, config_path, instr_path, admin_id)
+                count += 1
+            except Exception as e:
+                print(f"Error inserting {filename}: {e}")
                     
         print(f"Done. Imported {count} riddles.")
         

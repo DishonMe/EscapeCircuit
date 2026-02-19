@@ -116,6 +116,30 @@ def build_user_router(user_service: UserService, notification_service: Notificat
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
+    @router.delete("/{user_id}")
+    def delete_user(user_id: int, token: str = Depends(verify_token)):
+        try:
+            return user_service.delete_user(token, user_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    @router.post("/me/accept-creator")
+    def accept_creator(token: str = Depends(verify_token)):
+        try:
+            return user_service.accept_creator_role(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @router.post("/me/decline-creator")
+    def decline_creator(token: str = Depends(verify_token)):
+        try:
+            return user_service.decline_creator_role(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     @router.post("/role")
     def set_role(req: SetRoleReq, token: str = Depends(verify_token)):
         try:
