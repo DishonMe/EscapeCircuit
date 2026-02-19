@@ -296,6 +296,19 @@ class SolveRepo:
         )
         return int(cur.lastrowid)
 
+    def delete_by_puzzle(self, puzzle_id: int) -> None:
+        """Delete all solve attempts and progress for a puzzle."""
+        self.conn.execute("DELETE FROM solve_attempts WHERE puzzle_id=?", (int(puzzle_id),))
+        self.conn.execute("DELETE FROM puzzle_progress WHERE puzzle_id=?", (int(puzzle_id),))
+
+    def delete_by_puzzle_ids(self, puzzle_ids: list) -> None:
+        """Delete all solve attempts and progress for a list of puzzles."""
+        if not puzzle_ids:
+            return
+        placeholders = ",".join("?" * len(puzzle_ids))
+        self.conn.execute(f"DELETE FROM solve_attempts WHERE puzzle_id IN ({placeholders})", puzzle_ids)
+        self.conn.execute(f"DELETE FROM puzzle_progress WHERE puzzle_id IN ({placeholders})", puzzle_ids)
+
     def upsert_progress(self, progress: PuzzleProgress) -> None:
         self.conn.execute(
             """

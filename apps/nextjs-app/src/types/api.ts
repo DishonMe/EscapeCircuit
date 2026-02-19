@@ -18,7 +18,7 @@ export type Meta = {
 export type User = Entity<{
   username: string;
   email: string;
-  role: 'admin' | 'creator' | 'solver' | 'ADMIN' | 'USER' | 'GAME_MASTER' | 'PLAYER'; // Support both for safety
+  role: 'admin' | 'creator' | 'solver' | 'pending_creator' | 'ADMIN' | 'USER' | 'GAME_MASTER' | 'PLAYER'; // Support both for safety
   bio: string;
   xp: number;
   level: number;
@@ -152,4 +152,22 @@ export type RatingEntry = {
 export type PuzzleRatingsResponse = {
   metrics: RatingMetrics;
   my_rating: RatingEntry | null;
+};
+
+// --- Admin Panel Types ---
+
+export type AuditLogEntry = {
+  id: number;
+  admin_user_id: number;
+  action_type: string;
+  target_user_id: number | null;
+  target_puzzle_id: number | null;
+  details: Record<string, any>;
+  created_at: string;
+};
+
+export type AdminPuzzle = Puzzle & {
+  flags: string[]; // 'low_fun', 'low_clearness', 'unrated'
+  status: 'draft' | 'published' | 'unpublished';
+  rating_count?: number;
 };

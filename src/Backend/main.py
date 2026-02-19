@@ -11,6 +11,7 @@ from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.PersistantLayer.NotificationRepo import NotificationRepo
+from Backend.PersistantLayer.AuditLogRepo import AuditLogRepo
 
 # Services
 from Backend.ServiceLayer.AuthService import AuthService
@@ -23,6 +24,7 @@ from Backend.ServiceLayer.SolvingService import SolvingService
 from Backend.ServiceLayer.RatingService import RatingService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
 from Backend.ServiceLayer.NotificationService import NotificationService
+from Backend.ServiceLayer.AdminService import AdminService
 
 # Controllers
 from Backend.APILayer.UserController import build_user_router
@@ -53,6 +55,7 @@ def create_app() -> FastAPI:
     rating_repo = RatingRepo(conn)
     solve_repo = SolveRepo(conn)
     notification_repo = NotificationRepo(conn)
+    audit_log_repo = AuditLogRepo(conn)
 
     # 3. Services
     # logic engine (stateless)
@@ -122,6 +125,17 @@ def create_app() -> FastAPI:
         notification_service,
     )
 
+    # Admin Service
+    admin_service = AdminService(
+        user_repo=user_repo,
+        puzzle_repo=puzzle_repo,
+        solve_repo=solve_repo,
+        rating_repo=rating_repo,
+        audit_log_repo=audit_log_repo,
+        notification_repo=notification_repo,
+        auth_service=auth_service,
+    )
+
     # 4. FastAPI App
     app = FastAPI(title="EscapeCircuit Backend")
 
@@ -145,7 +159,7 @@ def create_app() -> FastAPI:
     app.include_router(build_arsenal_router(arsenal_service, solving_service))
     app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service))
     app.include_router(build_rating_router(rating_service))
-    app.include_router(build_admin_router())
+    app.include_router(build_admin_router(admin_service))
 
     @app.get("/")
     def root():

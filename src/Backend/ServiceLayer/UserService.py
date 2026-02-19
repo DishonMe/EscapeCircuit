@@ -239,6 +239,61 @@ class UserService:
         d["is_experienced"] = self.xp.is_experienced(user.xp)
         return {"token": session_token, "user": d}
 
+    def accept_creator_role(self, session_token: str) -> dict:
+        """User accepts the pending_creator invitation."""
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        if user.role != UserRole.PENDING_CREATOR:
+            raise ValidationError("no pending creator invitation")
+
+        self.user_repo.update_role(user_id, UserRole.CREATOR)
+        self.user_repo.conn.commit()
+
+        d = user.to_dict()
+        d["role"] = UserRole.CREATOR.value
+        d["level"] = self.xp.calculate_level(user.xp)
+        d["is_experienced"] = self.xp.is_experienced(user.xp)
+        return {"ok": True, "new_role": UserRole.CREATOR.value, "user": d}
+
+    def decline_creator_role(self, session_token: str) -> dict:
+        """User declines the pending_creator invitation."""
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        if user.role != UserRole.PENDING_CREATOR:
+            raise ValidationError("no pending creator invitation")
+
+        self.user_repo.update_role(user_id, UserRole.SOLVER)
+        self.user_repo.conn.commit()
+
+        d = user.to_dict()
+        d["role"] = UserRole.SOLVER.value
+        d["level"] = self.xp.calculate_level(user.xp)
+        d["is_experienced"] = self.xp.is_experienced(user.xp)
+        return {"ok": True, "new_role": UserRole.SOLVER.value, "user": d}
+
+    def delete_user(self, session_token: str, target_user_id: int) -> dict:
+        """Admin-only: delete a user by ID."""
+        admin_id = self.auth.require_user_id(session_token)
+        admin = self.user_repo.get_by_id(admin_id)
+        if not admin or admin.role != UserRole.ADMIN:
+            raise ValidationError("admin required")
+        if target_user_id == admin_id:
+            raise ValidationError("cannot delete yourself")
+
+        target = self.user_repo.get_by_id(target_user_id)
+        if not target:
+            raise ValidationError("user not found")
+
+        deleted = self.user_repo.delete(target_user_id)
+        self.user_repo.conn.commit()
+        if not deleted:
+            raise ValidationError("user not found")
+        return {"ok": True}
+
     def set_role(self, session_token: str, payload: Dict[str, Any]) -> dict:
         admin_id = self.auth.require_user_id(session_token)
         admin = self.user_repo.get_by_id(admin_id)

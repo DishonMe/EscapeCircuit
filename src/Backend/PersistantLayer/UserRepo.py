@@ -107,6 +107,11 @@ class UserRepo:
             raise ValidationError("xp cannot be negative")
         self.conn.execute("UPDATE users SET xp=? WHERE id=?", (int(xp), int(user_id)))
 
+    def delete(self, user_id: int) -> bool:
+        """Delete a user by ID. Returns True if a row was actually deleted."""
+        cur = self.conn.execute("DELETE FROM users WHERE id=?", (int(user_id),))
+        return cur.rowcount > 0
+
     def update_role(self, user_id: int, role: UserRole) -> None:
         self.conn.execute("UPDATE users SET role=? WHERE id=?", (role.value, int(user_id)))
 

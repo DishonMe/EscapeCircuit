@@ -16,6 +16,18 @@ export const canViewUsers = (user: User | null | undefined) => {
   return normalizeRole(user?.role) === 'admin';
 };
 
+export const canManageUsers = (user: User | null | undefined) => {
+  return normalizeRole(user?.role) === 'admin';
+};
+
+export const canManagePuzzles = (user: User | null | undefined) => {
+  return normalizeRole(user?.role) === 'admin';
+};
+
+export const isPendingCreator = (user: User | null | undefined) => {
+  return normalizeRole(user?.role) === 'pending_creator';
+};
+
 export const canDeleteComment = (
   user: User | null | undefined,
   comment: Comment,

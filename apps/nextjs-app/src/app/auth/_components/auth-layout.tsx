@@ -26,25 +26,34 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const [hasCheckedToken, setHasCheckedToken] = useState(false);
 
   useEffect(() => {
-    // Check if user has a valid token - if so, redirect to dashboard
-    // This is only checking synchronously without an API call
-    try {
-      const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
-      if (token) {
-        // User has a token cookie, assume they're logged in
-        // Use the redirectTo parameter if provided, otherwise go to puzzles (not /app to avoid potential issues)
-        const destination = redirectTo 
-          ? decodeURIComponent(redirectTo)
-          : paths.app.puzzles.getHref();
-        
-        // Replace instead of push to prevent back button from going to login
-        router.replace(destination);
+    // Check if user has a valid token by verifying with the API
+    const checkAuth = async () => {
+      try {
+        const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+        if (token) {
+          // Verify the token is still valid with the API
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const res = await fetch(`${apiUrl}/users/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            // Token is valid — redirect to dashboard
+            const destination = redirectTo
+              ? decodeURIComponent(redirectTo)
+              : paths.app.puzzles.getHref();
+            router.replace(destination);
+            return;
+          }
+          // Token is invalid/expired — clear it and stay on login page
+          Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+        }
+      } catch (error) {
+        // Network error — clear potentially stale cookie
+        Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
       }
-    } catch (error) {
-      console.error('Error checking auth token:', error);
-    }
-    
-    setHasCheckedToken(true);
+      setHasCheckedToken(true);
+    };
+    checkAuth();
   }, [router, redirectTo]);
 
   return (

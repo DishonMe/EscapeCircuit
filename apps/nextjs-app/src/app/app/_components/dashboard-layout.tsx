@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, PanelLeft, Folder, Users, User2, Gamepad2, Zap, Bell } from 'lucide-react';
+import { Home, PanelLeft, Folder, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -19,6 +19,7 @@ import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
+import { CreatorInviteBanner } from '@/features/admin/components/creator-invite-banner';
 
 type SideNavigationItem = {
   name: string;
@@ -55,9 +56,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       icon: Bell,
     },
     userRole === 'admin' && {
-      name: 'Users',
+      name: 'Admin',
       to: paths.app.users.getHref(),
-      icon: Users,
+      icon: Shield,
     },
   ].filter(Boolean) as SideNavigationItem[];
 
@@ -170,6 +171,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </header>
       <main className="grid flex-1 items-start gap-4 p-4 md:gap-8">
+          <CreatorInviteBanner />
           {children}
         </main>
     </div>

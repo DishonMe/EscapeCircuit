@@ -60,10 +60,17 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Now run the concurrently command
+    if sys.platform == "win32":
+        backend_cmd = "pip install -r requirements.txt && cd src && python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8080"
+        frontend_cmd = "cd apps\\nextjs-app && npm run dev"
+    else:
+        backend_cmd = "pip3 install -r requirements.txt && cd src && python3 -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8080"
+        frontend_cmd = "cd apps/nextjs-app && npm run dev"
+
     cmd = (
-        'npx -y concurrently -k -n "API,WEB" -c "blue,magenta" '
-        '"pip install -r requirements.txt && cd src && python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8080" '
-        '"cd apps\\nextjs-app && npm run dev"'
+        f'npx -y concurrently -k -n "API,WEB" -c "blue,magenta" '
+        f'"{backend_cmd}" '
+        f'"{frontend_cmd}"'
     )
     
     print("\n=== Starting servers ===\n")
