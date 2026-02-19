@@ -9,6 +9,7 @@ export interface AdminPuzzleFilters {
   search?: string;
   status?: 'draft' | 'published' | 'unpublished';
   creatorId?: number;
+  creatorUsername?: string;
   dateFrom?: string;
   dateTo?: string;
   orderBy?: 'created_at' | 'avg_fun' | 'avg_clearness' | 'rating_count' | 'name';
@@ -25,6 +26,7 @@ export const getAdminPuzzles = (
   if (filters.search) params.search = filters.search;
   if (filters.status) params.status = filters.status;
   if (filters.creatorId) params.creator_id = filters.creatorId;
+  if (filters.creatorUsername) params.creator_username = filters.creatorUsername;
   if (filters.dateFrom) params.date_from = filters.dateFrom;
   if (filters.dateTo) params.date_to = filters.dateTo;
   if (filters.orderBy) params.order_by = filters.orderBy;

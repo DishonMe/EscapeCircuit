@@ -85,7 +85,7 @@ export const AdminPuzzlesList = () => {
       {/* Filter Panel */}
       {showFilters && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Name Search */}
             <div>
               <label className="text-sm font-medium text-gray-700">
@@ -100,6 +100,25 @@ export const AdminPuzzlesList = () => {
                   setFilters({
                     ...filters,
                     search: e.target.value || undefined,
+                  })
+                }
+              />
+            </div>
+
+            {/* Creator Username */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">
+                Creator
+              </label>
+              <input
+                type="text"
+                placeholder="Search by creator username..."
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.creatorUsername || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setFilters({
+                    ...filters,
+                    creatorUsername: e.target.value || undefined,
                   })
                 }
               />
