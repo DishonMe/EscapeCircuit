@@ -18,13 +18,19 @@ export const Puzzles = () => {
           </p>
         </div>
 
-        {/* Create Puzzle Button */}
-        <div className="mb-6">
+        {/* Create Puzzle Buttons */}
+        <div className="mb-6 flex gap-3">
+          <Link
+            href="/app/create-puzzle"
+            className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            ✏️ Create with Form
+          </Link>
           <Link
             href="/app/admin/upload-puzzle"
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Create New Puzzle
+            📤 Upload from Files
           </Link>
         </div>
 

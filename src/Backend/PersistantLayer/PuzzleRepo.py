@@ -21,6 +21,7 @@ class PuzzleRepo:
             name TEXT NOT NULL UNIQUE,
             creator_user_id INTEGER NOT NULL,
             description TEXT NOT NULL,
+            instructions TEXT,
             status TEXT NOT NULL,
             budget INTEGER NOT NULL,
             time_limit_seconds INTEGER,
@@ -30,6 +31,9 @@ class PuzzleRepo:
             avg_difficulty REAL NOT NULL,
             avg_fun REAL NOT NULL,
             avg_clearness REAL NOT NULL,
+            total_gate_count INTEGER,
+            min_cycles INTEGER,
+            max_cycles INTEGER,
             created_at TEXT NOT NULL
         );
         """)
@@ -38,21 +42,47 @@ class PuzzleRepo:
             cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzles);").fetchall()}
             if "difficulty" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'EASY';")
+            if "instructions" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN instructions TEXT;")
+            if "total_gate_count" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN total_gate_count INTEGER;")
+            if "min_cycles" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN min_cycles INTEGER;")
+            if "max_cycles" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN max_cycles INTEGER;")
         except Exception:
             pass
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS puzzle_test_cases (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY,
             puzzle_id INTEGER NOT NULL,
             kind TEXT NOT NULL,
             inputs TEXT NOT NULL,
             expected_outputs TEXT NOT NULL,
             input_stream TEXT,
             expected_output_stream TEXT,
+            gate_name TEXT,
+            gate_limit INTEGER,
             created_at TEXT NOT NULL,
             FOREIGN KEY(puzzle_id) REFERENCES puzzles(id) ON DELETE CASCADE
         );
         """)
+        # Migrate existing DBs - add gate_name and gate_limit columns if missing
+        try:
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzle_test_cases);").fetchall()}
+            if "gate_name" not in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases ADD COLUMN gate_name TEXT;")
+            if "gate_limit" not in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases ADD COLUMN gate_limit INTEGER;")
+            # Remove old constraint columns if they exist (moved to puzzle-level)
+            if "max_gate_count" in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases DROP COLUMN max_gate_count;")
+            if "min_cycles" in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases DROP COLUMN min_cycles;")
+            if "max_cycles" in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases DROP COLUMN max_cycles;")
+        except Exception:
+            pass
 
     def create(self, puzzle: Puzzle) -> Puzzle:
         cur = self.conn.execute("""
@@ -60,8 +90,9 @@ class PuzzleRepo:
                 name, creator_user_id, description, status,
                 budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, avg_difficulty, avg_fun, avg_clearness,
+                total_gate_count, min_cycles, max_cycles,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
@@ -75,6 +106,9 @@ class PuzzleRepo:
             puzzle.avg_difficulty,
             puzzle.avg_fun,
             puzzle.avg_clearness,
+            puzzle.total_gate_count,
+            puzzle.min_cycles,
+            puzzle.max_cycles,
             puzzle.created_at.isoformat(),
         ))
         puzzle.id = int(cur.lastrowid)
@@ -90,6 +124,7 @@ class PuzzleRepo:
                 name=?,
                 creator_user_id=?,
                 description=?,
+                instructions=?,
                 status=?,
                 budget=?,
                 time_limit_seconds=?,
@@ -98,12 +133,16 @@ class PuzzleRepo:
                 rating_count=?,
                 avg_difficulty=?,
                 avg_fun=?,
-                avg_clearness=?
+                avg_clearness=?,
+                total_gate_count=?,
+                min_cycles=?,
+                max_cycles=?
             WHERE id=?
         """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
+            puzzle.instructions,
             puzzle.status.value,
             puzzle.budget,
             puzzle.time_limit_seconds,
@@ -113,6 +152,9 @@ class PuzzleRepo:
             float(puzzle.avg_difficulty),
             float(puzzle.avg_fun),
             float(puzzle.avg_clearness),
+            puzzle.total_gate_count,
+            puzzle.min_cycles,
+            puzzle.max_cycles,
             puzzle.id
         ))
 
@@ -394,8 +436,8 @@ class PuzzleRepo:
 
     def add_test_case(self, tc: PuzzleTestCase) -> PuzzleTestCase:
         cur = self.conn.execute("""
-            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, created_at)
-            VALUES(?,?,?,?,?,?,?)
+            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, gate_limit, max_gate_count, min_cycles, max_cycles, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             tc.puzzle_id,
             tc.kind.value,
@@ -403,6 +445,11 @@ class PuzzleRepo:
             json.dumps(tc.expected_outputs) if tc.expected_outputs else json.dumps({}),
             json.dumps(tc.input_stream) if tc.input_stream else None,
             json.dumps(tc.expected_output_stream) if tc.expected_output_stream else None,
+            tc.gate_name,
+            tc.gate_limit,
+            tc.max_gate_count,
+            tc.min_cycles,
+            tc.max_cycles,
             tc.created_at.isoformat(),
         ))
         tc.id = int(cur.lastrowid)
@@ -421,6 +468,11 @@ class PuzzleRepo:
                 "expected_outputs": json.loads(r["expected_outputs"]) if r["expected_outputs"] else {},
                 "input_stream": json.loads(r["input_stream"]) if r["input_stream"] else [],
                 "expected_output_stream": json.loads(r["expected_output_stream"]) if r["expected_output_stream"] else {},
+                "gate_name": r["gate_name"],
+                "gate_limit": r["gate_limit"],
+                "max_gate_count": r["max_gate_count"],
+                "min_cycles": r["min_cycles"],
+                "max_cycles": r["max_cycles"],
                 "created_at": r["created_at"],
             })
             for r in rows
@@ -562,16 +614,38 @@ class PuzzleRepo:
             diff_val = row["difficulty"]
         except (IndexError, KeyError):
             diff_val = "EASY"
+        # Safely read instructions — may be missing in old DBs
+        try:
+            instructions_val = row["instructions"]
+        except (IndexError, KeyError):
+            instructions_val = None
+        # Safely read constraint fields — may be missing in old DBs
+        try:
+            total_gate_count = row["total_gate_count"]
+        except (IndexError, KeyError):
+            total_gate_count = None
+        try:
+            min_cycles = row["min_cycles"]
+        except (IndexError, KeyError):
+            min_cycles = None
+        try:
+            max_cycles = row["max_cycles"]
+        except (IndexError, KeyError):
+            max_cycles = None
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
             "creator_user_id": int(row["creator_user_id"]),
             "description": row["description"],
+            "instructions": instructions_val,
             "status": row["status"],
             "budget": int(row["budget"]),
             "time_limit_seconds": row["time_limit_seconds"],
             "difficulty": diff_val or "EASY",
             "default_gate_set": gate_values,
+            "total_gate_count": total_gate_count,
+            "min_cycles": min_cycles,
+            "max_cycles": max_cycles,
             "rating_count": int(row["rating_count"]),
             "avg_difficulty": float(row["avg_difficulty"]),
             "avg_fun": float(row["avg_fun"]),

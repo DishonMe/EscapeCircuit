@@ -1,0 +1,69 @@
+\section*{Sequential Binary Adder Quiz Instructions}
+
+\subsection*{Objective}
+Design a sequential digital circuit that implements a \textbf{bit-serial binary adder} using only the following gate types:
+\begin{itemize}
+  \item AND gate
+  \item NAND gate
+  \item DFF gate
+\end{itemize}
+
+\subsection*{What is a Sequential Binary Adder?}
+This is a Mealy machine that adds binary numbers one bit at a time over multiple clock cycles. Each cycle:
+\begin{itemize}
+  \item Receives one input bit $X$
+  \item Uses two DFFs to store state: $D_1$ (previous bit) and $D_2$ (two cycles ago)
+  \item Produces two outputs: OUT (sum bit) and $C_{\text{out}}$ (carry bit)
+\end{itemize}
+
+\subsection*{Circuit Structure}
+\textbf{State Elements (DFFs):}
+\begin{itemize}
+  \item $D_1$: Stores the previous input bit ($X[t-1]$)
+  \item $D_2$: Stores the input bit from two cycles ago ($X[t-2]$)
+\end{itemize}
+
+\textbf{Combinational Logic (each cycle):}
+\begin{itemize}
+  \item $A = X$ (current input)
+  \item $B = D_1$ (previous input)
+  \item $C_{\text{in}} = D_2$ (input from two cycles ago)
+\end{itemize}
+
+\textbf{Logic Equations:}
+\begin{itemize}
+  \item $U = A \lor B$
+  \item OUT $= U \oplus C_{\text{in}}$
+  \item $C_{\text{out}} = U \land C_{\text{in}}$
+\end{itemize}
+
+\textbf{State Updates (each clock cycle):}
+\begin{itemize}
+  \item $D_{1_{\text{next}}} = X$
+  \item $D_{2_{\text{next}}} = D_1$
+\end{itemize}
+
+\subsection*{Gate Descriptions}
+\begin{itemize}
+  \item \textbf{AND}: Outputs 1 only if both inputs are 1
+  \item \textbf{NAND}: Outputs 0 only if both inputs are 1 (NOT of AND)
+  \item \textbf{DFF}: D Flip-Flop that stores input value with one clock cycle delay
+\end{itemize}
+
+\subsection*{Mealy Machine Truth Table}
+The circuit behavior is defined by the Mealy map over ($X$, $D_1$, $D_2$):
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+$X$ & $D_1$ & $D_2$ & OUT & $C_{\text{out}}$ & $D_{1_{\text{next}}}$ & $D_{2_{\text{next}}}$ \\
+\hline
+0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+1 & 0 & 0 & 1 & 0 & 1 & 0 \\
+0 & 0 & 1 & 1 & 0 & 0 & 0 \\
+1 & 0 & 1 & 0 & 1 & 1 & 0 \\
+0 & 1 & 0 & 1 & 0 & 0 & 1 \\
+1 & 1 & 0 & 1 & 0 & 1 & 1 \\
+0 & 1 & 1 & 0 & 1 & 0 & 1 \\
+\hline
+\end{tabular}
+\end{center}

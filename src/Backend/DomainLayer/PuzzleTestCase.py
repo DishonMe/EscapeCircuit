@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 
 from .Enums import TestCaseKind
 from .Exceptions import ValidationError
@@ -16,6 +16,11 @@ class PuzzleTestCase:
     expected_outputs: Dict[str, int]
     input_stream: list = field(default_factory=list)
     expected_output_stream: dict = field(default_factory=dict)
+    gate_name: Optional[str] = None  # For GATE_LIMIT test cases: which gate type (e.g., "AND")
+    gate_limit: Optional[int] = None  # For GATE_LIMIT test cases: max count allowed for that gate
+    max_gate_count: Optional[int] = None  # For GATE_COUNT_LIMIT: total gate count limit
+    min_cycles: Optional[int] = None  # For LATENCY_LIMIT: minimum cycles required
+    max_cycles: Optional[int] = None  # For LATENCY_LIMIT: maximum cycles allowed
     created_at: datetime = field(default_factory=utcnow)
 
     def set_puzzle_id(self, value: int) -> None:
@@ -25,7 +30,31 @@ class PuzzleTestCase:
         self.id = ensure_non_negative_int("PuzzleTestCase.id", self.id)
         self.puzzle_id = ensure_non_negative_int("PuzzleTestCase.puzzle_id", self.puzzle_id)
         
-        # Either combinatorial (inputs/expected_outputs) or sequential (input_stream/expected_output_stream)
+        # Gate limit type validation (GATE_LIMIT with gate_name and gate_limit)
+        if self.kind == TestCaseKind.GATE_LIMIT:
+            if not self.gate_name or not self.gate_limit:
+                raise ValidationError("GATE_LIMIT test case must have gate_name and gate_limit specified")
+            if self.gate_limit < 0:
+                raise ValidationError(f"Gate limit for '{self.gate_name}' must be non-negative integer")
+            return
+        
+        if self.kind == TestCaseKind.GATE_COUNT_LIMIT:
+            if self.max_gate_count is None or self.max_gate_count <= 0:
+                raise ValidationError("GATE_COUNT_LIMIT test case must have max_gate_count > 0")
+            return
+        
+        if self.kind == TestCaseKind.LATENCY_LIMIT:
+            if self.min_cycles is None and self.max_cycles is None:
+                raise ValidationError("LATENCY_LIMIT test case must have min_cycles and/or max_cycles specified")
+            if self.min_cycles is not None and self.min_cycles < 1:
+                raise ValidationError("min_cycles must be >= 1")
+            if self.max_cycles is not None and self.max_cycles < 1:
+                raise ValidationError("max_cycles must be >= 1")
+            if self.min_cycles is not None and self.max_cycles is not None and self.min_cycles > self.max_cycles:
+                raise ValidationError("min_cycles cannot be greater than max_cycles")
+            return
+        
+        # Blackbox/Whitebox validation
         is_combinatorial = self.inputs or self.expected_outputs
         is_sequential = self.input_stream or self.expected_output_stream
         
@@ -84,6 +113,11 @@ class PuzzleTestCase:
             "expected_outputs": dict(self.expected_outputs),
             "input_stream": self.input_stream,
             "expected_output_stream": self.expected_output_stream,
+            "gate_name": self.gate_name,
+            "gate_limit": self.gate_limit,
+            "max_gate_count": self.max_gate_count,
+            "min_cycles": self.min_cycles,
+            "max_cycles": self.max_cycles,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -98,6 +132,11 @@ class PuzzleTestCase:
             expected_outputs=dict(d.get("expected_outputs", {})),
             input_stream=d.get("input_stream", []),
             expected_output_stream=d.get("expected_output_stream", {}),
+            gate_name=d.get("gate_name"),
+            gate_limit=d.get("gate_limit"),
+            max_gate_count=d.get("max_gate_count"),
+            min_cycles=d.get("min_cycles"),
+            max_cycles=d.get("max_cycles"),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
         )
 

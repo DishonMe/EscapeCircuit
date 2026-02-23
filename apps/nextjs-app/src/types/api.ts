@@ -52,6 +52,7 @@ export type Puzzle = Entity<{
   title: string;
   name?: string; // Backend compat
   description: string;
+  instructions?: string; // Markdown instructions
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   timeLimit: number; // in seconds
   budgetLimit: number;

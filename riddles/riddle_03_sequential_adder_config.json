@@ -4,6 +4,7 @@
     "description": "Design a sequential circuit that adds binary numbers bit by bit over multiple clock cycles using DFF gates for state. Each cycle receives one input bit X, and produces sum (OUT) and carry (C_out) outputs.",
     "budget": 15,
     "time_limit_seconds": null,
+    "difficulty": "MEDIUM",
     "default_gate_set": [
       "AND",
       "XOR",
@@ -26,10 +27,14 @@
       "D1": 0,
       "D2": 0
     },
-    "type": "sequential_riddle"
+    "type": "sequential_riddle",
+    "total_gate_count": null,
+    "min_cycles": 3,
+    "max_cycles": 3
   },
   "test_cases": [
     {
+      "kind": "blackbox",
       "input_stream": [
         1,
         1,
@@ -49,6 +54,7 @@
       }
     },
     {
+      "kind": "blackbox",
       "input_stream": [
         0,
         0,
@@ -68,6 +74,7 @@
       }
     },
     {
+      "kind": "blackbox",
       "input_stream": [
         1,
         0,
