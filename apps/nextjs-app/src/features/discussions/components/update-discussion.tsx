@@ -7,8 +7,7 @@ import {
   Form,
   FormDrawer,
   Input,
-  Label,
-  Switch,
+  Select,
   Textarea,
 } from '@/components/ui/form';
 import { useNotifications } from '@/components/ui/notifications';
@@ -20,6 +19,16 @@ import {
   updateDiscussionInputSchema,
   useUpdateDiscussion,
 } from '../api/update-discussion';
+
+const categoryOptions = [
+  { label: 'General', value: 'general' },
+  { label: 'Puzzle Help', value: 'puzzle_help' },
+  { label: 'Tips & Tricks', value: 'puzzle_tips' },
+  { label: 'Solutions', value: 'solutions' },
+  { label: 'Bug Report', value: 'bug_report' },
+  { label: 'Feature Request', value: 'feature_request' },
+  { label: 'Showcase', value: 'showcase' },
+];
 
 type UpdateDiscussionProps = {
   discussionId: string;
@@ -40,12 +49,11 @@ export const UpdateDiscussion = ({ discussionId }: UpdateDiscussionProps) => {
   });
 
   const user = useUser();
+  const discussion = discussionQuery.data;
 
-  if (!canUpdateDiscussion(user?.data)) {
+  if (!canUpdateDiscussion(user?.data, discussion ?? undefined)) {
     return null;
   }
-
-  const discussion = discussionQuery.data?.data;
 
   return (
     <FormDrawer
@@ -79,34 +87,29 @@ export const UpdateDiscussion = ({ discussionId }: UpdateDiscussionProps) => {
           defaultValues: {
             title: discussion?.title ?? '',
             body: discussion?.body ?? '',
-            public: discussion?.public ?? false,
+            category: discussion?.category ?? 'general',
           },
         }}
         schema={updateDiscussionInputSchema}
       >
-        {({ register, formState, setValue, watch }) => (
+        {({ register, formState }) => (
           <>
             <Input
               label="Title"
               error={formState.errors['title']}
               registration={register('title')}
             />
+            <Select
+              label="Category"
+              error={formState.errors['category']}
+              registration={register('category')}
+              options={categoryOptions}
+            />
             <Textarea
               label="Body"
               error={formState.errors['body']}
               registration={register('body')}
             />
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                name="public"
-                onCheckedChange={(value) => setValue('public', value)}
-                checked={watch('public')}
-                className={` relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2`}
-                id="public"
-              />
-              <Label htmlFor="airplane-mode">Public</Label>
-            </div>
           </>
         )}
       </Form>

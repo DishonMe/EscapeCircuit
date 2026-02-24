@@ -56,7 +56,7 @@ export const PuzzleDetailsDialog = ({
               </div>
               <div>
                 <span className="font-medium text-gray-900">Tight budget:</span>{' '}
-                {puzzle.tightBudgetLimit ?? '—'}
+                {(puzzle as any).tightBudgetLimit ?? '—'}
               </div>
             </div>
 
@@ -65,18 +65,18 @@ export const PuzzleDetailsDialog = ({
                 Additional constraints (optional)
               </div>
               <div className="mt-1 space-y-1">
-                {Array.isArray(puzzle.additionalConstraints) ? (
-                  puzzle.additionalConstraints.length > 0 ? (
+                {Array.isArray((puzzle as any).additionalConstraints) ? (
+                  (puzzle as any).additionalConstraints.length > 0 ? (
                     <ul className="list-disc space-y-1 pl-5">
-                      {puzzle.additionalConstraints.map((c) => (
+                      {(puzzle as any).additionalConstraints.map((c: string) => (
                         <li key={c}>{c}</li>
                       ))}
                     </ul>
                   ) : (
                     <div className="text-gray-500">None provided.</div>
                   )
-                ) : puzzle.additionalConstraints ? (
-                  <div>{puzzle.additionalConstraints}</div>
+                ) : (puzzle as any).additionalConstraints ? (
+                  <div>{(puzzle as any).additionalConstraints}</div>
                 ) : (
                   <div className="text-gray-500">None provided.</div>
                 )}

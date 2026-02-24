@@ -34,13 +34,75 @@ export type Team = Entity<{
   description: string;
 }>;
 
+export type ThreadCategory =
+  | 'general'
+  | 'puzzle_help'
+  | 'puzzle_tips'
+  | 'solutions'
+  | 'bug_report'
+  | 'feature_request'
+  | 'showcase';
+
 export type Discussion = Entity<{
   title: string;
   body: string;
-  teamId: string;
   author: User;
-  public: boolean;
+  author_id: number;
+  puzzle_id: number | null;
+  category: ThreadCategory;
+  is_pinned: boolean;
+  is_locked: boolean;
+  view_count: number;
+  reply_count: number;
+  upvotes: number;
+  accepted_reply_id: number | null;
+  updated_at: string;
+  engagement?: DiscussionEngagement;
 }>;
+
+export type Reply = Entity<{
+  discussion_id: number;
+  parent_reply_id: number | null;
+  author: User;
+  author_id: number;
+  body: string;
+  upvotes: number;
+  downvotes: number;
+  is_accepted: boolean;
+  updated_at: string;
+  children?: Reply[];
+  engagement?: ReplyEngagement;
+}>;
+
+export type ReactionType =
+  | 'insightful'
+  | 'helpful'
+  | 'genius'
+  | 'spot_on'
+  | 'thinking';
+
+export type ReactionCount = {
+  type: ReactionType;
+  count: number;
+};
+
+export type DiscussionEngagement = {
+  upvotes: number;
+  downvotes: number;
+  user_vote: number | null;
+  reactions: ReactionCount[];
+  user_reactions: ReactionType[];
+  is_following: boolean;
+  is_bookmarked: boolean;
+};
+
+export type ReplyEngagement = {
+  upvotes: number;
+  downvotes: number;
+  user_vote: number | null;
+  reactions: ReactionCount[];
+  user_reactions: ReactionType[];
+};
 
 export type Comment = Entity<{
   body: string;
