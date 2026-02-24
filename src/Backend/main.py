@@ -145,6 +145,7 @@ def create_app() -> FastAPI:
         xp_service=xp_service,
         engagement_repo=engagement_repo,
         report_repo=report_repo,
+        notification_repo=notification_repo,
     )
 
     # Reply Service

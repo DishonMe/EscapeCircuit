@@ -7,6 +7,7 @@ from Backend.DomainLayer.Utils import utcnow
 from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
+from Backend.PersistantLayer.NotificationRepo import NotificationRepo
 from Backend.PersistantLayer.ReportRepo import ReportRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -31,6 +32,7 @@ class DiscussionService:
         xp_service: XPService,
         engagement_repo: Optional[EngagementRepo] = None,
         report_repo: Optional[ReportRepo] = None,
+        notification_repo: Optional[NotificationRepo] = None,
     ):
         self.discussion_repo = discussion_repo
         self.reply_repo = reply_repo
@@ -39,9 +41,13 @@ class DiscussionService:
         self.xp = xp_service
         self.engagement = engagement_repo
         self.report_repo = report_repo
+        self.notification_repo = notification_repo
 
     def create_discussion(self, token: str, payload: dict) -> dict:
         user_id = self.auth.require_user_id(token)
+        user = self.user_repo.get_by_id(user_id)
+        if user and user.is_discussion_banned:
+            raise ValidationError("you are banned from creating discussions")
         title = (payload.get("title") or "").strip()
         body = (payload.get("body") or "").strip()
         category_str = payload.get("category", "general")
@@ -406,6 +412,25 @@ class DiscussionService:
 
         reports = self.report_repo.list_all(status=status, limit=limit, offset=offset)
         total = self.report_repo.count(status=status)
+
+        # Enrich with usernames
+        for report in reports:
+            reporter = self.user_repo.get_by_id(report["reporter_id"])
+            report["reporter_username"] = reporter.username if reporter else "Unknown"
+            # Get target author
+            if report["target_type"] == "discussion":
+                disc = self.discussion_repo.get_by_id(report["target_id"])
+                if disc:
+                    author = self.user_repo.get_by_id(disc.author_id)
+                    report["target_author_id"] = disc.author_id
+                    report["target_author_username"] = author.username if author else "Unknown"
+            elif report["target_type"] == "reply":
+                reply = self.reply_repo.get_by_id(report["target_id"])
+                if reply:
+                    author = self.user_repo.get_by_id(reply.author_id)
+                    report["target_author_id"] = reply.author_id
+                    report["target_author_username"] = author.username if author else "Unknown"
+
         return {"reports": reports, "total": total, "limit": limit, "offset": offset}
 
     def update_report_status(self, token: str, report_id: int, status: str) -> dict:
@@ -425,3 +450,117 @@ class DiscussionService:
             raise ValidationError("report not found")
 
         return self.report_repo.update_status(report_id, status)
+
+    def _require_admin(self, token: str) -> int:
+        user_id = self.auth.require_user_id(token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user or user.role != UserRole.ADMIN:
+            raise ValidationError("admin only")
+        return user_id
+
+    def _get_report_target_author_id(self, report: dict) -> int:
+        if report["target_type"] == "discussion":
+            disc = self.discussion_repo.get_by_id(report["target_id"])
+            if not disc:
+                raise ValidationError("reported discussion not found")
+            return disc.author_id
+        elif report["target_type"] == "reply":
+            reply = self.reply_repo.get_by_id(report["target_id"])
+            if not reply:
+                raise ValidationError("reported reply not found")
+            return reply.author_id
+        raise ValidationError("unknown target type")
+
+    def warn_user_for_report(self, token: str, report_id: int) -> dict:
+        self._require_admin(token)
+        if not self.report_repo:
+            raise ValidationError("reporting not available")
+
+        report = self.report_repo.get_by_id(report_id)
+        if not report:
+            raise ValidationError("report not found")
+
+        target_author_id = self._get_report_target_author_id(report)
+
+        # Send warning notification
+        if self.notification_repo:
+            msg = f"You have received a warning for your {report['target_type']} (reason: {report['reason']}). Please follow the community guidelines."
+            self.notification_repo.create(
+                user_id=target_author_id,
+                notif_type="warning",
+                message=msg,
+            )
+
+        # Mark report as reviewed
+        self.report_repo.update_status(report_id, "reviewed")
+        return {"action": "warned", "report_id": report_id, "warned_user_id": target_author_id}
+
+    def ban_user_for_report(self, token: str, report_id: int) -> dict:
+        self._require_admin(token)
+        if not self.report_repo:
+            raise ValidationError("reporting not available")
+
+        report = self.report_repo.get_by_id(report_id)
+        if not report:
+            raise ValidationError("report not found")
+
+        target_author_id = self._get_report_target_author_id(report)
+
+        # Ban the user from discussions
+        self.user_repo.ban_from_discussions(target_author_id)
+
+        # Send ban notification
+        if self.notification_repo:
+            msg = f"You have been banned from the discussions forum due to a violation (reason: {report['reason']}). You can no longer create discussions or replies."
+            self.notification_repo.create(
+                user_id=target_author_id,
+                notif_type="ban",
+                message=msg,
+            )
+
+        # Mark report as reviewed
+        self.report_repo.update_status(report_id, "reviewed")
+        return {"action": "banned", "report_id": report_id, "banned_user_id": target_author_id}
+
+    def delete_reported_content(self, token: str, report_id: int) -> dict:
+        self._require_admin(token)
+        if not self.report_repo:
+            raise ValidationError("reporting not available")
+
+        report = self.report_repo.get_by_id(report_id)
+        if not report:
+            raise ValidationError("report not found")
+
+        if report["target_type"] == "discussion":
+            self.discussion_repo.delete(report["target_id"])
+        elif report["target_type"] == "reply":
+            reply = self.reply_repo.get_by_id(report["target_id"])
+            if reply:
+                self.reply_repo.delete(report["target_id"])
+                self.discussion_repo.increment_reply_count(reply.discussion_id, -1)
+
+        # Mark report as reviewed
+        self.report_repo.update_status(report_id, "reviewed")
+        return {"action": "deleted", "report_id": report_id, "target_type": report["target_type"], "target_id": report["target_id"]}
+
+    def lock_reported_discussion(self, token: str, report_id: int) -> dict:
+        self._require_admin(token)
+        if not self.report_repo:
+            raise ValidationError("reporting not available")
+
+        report = self.report_repo.get_by_id(report_id)
+        if not report:
+            raise ValidationError("report not found")
+
+        if report["target_type"] != "discussion":
+            raise ValidationError("can only lock discussions, not replies")
+
+        discussion = self.discussion_repo.get_by_id(report["target_id"])
+        if not discussion:
+            raise ValidationError("discussion not found")
+
+        self.discussion_repo.update(report["target_id"], {"is_locked": True})
+
+        # Mark report as reviewed
+        self.report_repo.update_status(report_id, "reviewed")
+        return {"action": "locked", "report_id": report_id, "discussion_id": report["target_id"]}

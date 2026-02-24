@@ -38,6 +38,9 @@ class ReplyService:
 
     def create_reply(self, token: str, discussion_id: int, payload: dict) -> dict:
         user_id = self.auth.require_user_id(token)
+        user = self.user_repo.get_by_id(user_id)
+        if user and user.is_discussion_banned:
+            raise ValidationError("you are banned from creating replies")
         discussion = self.discussion_repo.get_by_id(discussion_id)
         if not discussion:
             raise ValidationError("discussion not found")

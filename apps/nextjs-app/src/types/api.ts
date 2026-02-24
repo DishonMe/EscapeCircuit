@@ -228,6 +228,20 @@ export type AuditLogEntry = {
   created_at: string;
 };
 
+export type Report = {
+  id: number;
+  reporter_id: number;
+  reporter_username?: string;
+  target_type: 'discussion' | 'reply';
+  target_id: number;
+  target_author_id?: number;
+  target_author_username?: string;
+  reason: string;
+  details: string;
+  status: 'pending' | 'reviewed' | 'dismissed';
+  created_at: string;
+};
+
 export type AdminPuzzle = Puzzle & {
   flags: string[]; // 'low_fun', 'low_clearness', 'unrated'
   status: 'draft' | 'published' | 'unpublished';

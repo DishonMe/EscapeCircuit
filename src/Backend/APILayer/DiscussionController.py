@@ -275,6 +275,38 @@ def build_discussion_router(
             code = 403 if "admin" in str(e).lower() else 400
             raise HTTPException(status_code=code, detail=str(e))
 
+    @report_router.post("/{report_id}/warn")
+    def warn_report_author(report_id: int, token: str = Depends(verify_token)):
+        try:
+            return discussion_service.warn_user_for_report(token, report_id)
+        except ValidationError as e:
+            code = 403 if "admin" in str(e).lower() else 400
+            raise HTTPException(status_code=code, detail=str(e))
+
+    @report_router.post("/{report_id}/ban")
+    def ban_report_author(report_id: int, token: str = Depends(verify_token)):
+        try:
+            return discussion_service.ban_user_for_report(token, report_id)
+        except ValidationError as e:
+            code = 403 if "admin" in str(e).lower() else 400
+            raise HTTPException(status_code=code, detail=str(e))
+
+    @report_router.post("/{report_id}/delete-content")
+    def delete_reported_content(report_id: int, token: str = Depends(verify_token)):
+        try:
+            return discussion_service.delete_reported_content(token, report_id)
+        except ValidationError as e:
+            code = 403 if "admin" in str(e).lower() else 400
+            raise HTTPException(status_code=code, detail=str(e))
+
+    @report_router.post("/{report_id}/lock")
+    def lock_reported_discussion(report_id: int, token: str = Depends(verify_token)):
+        try:
+            return discussion_service.lock_reported_discussion(token, report_id)
+        except ValidationError as e:
+            code = 403 if "admin" in str(e).lower() else 400
+            raise HTTPException(status_code=code, detail=str(e))
+
     # Puzzle discussions endpoint
     puzzle_router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 

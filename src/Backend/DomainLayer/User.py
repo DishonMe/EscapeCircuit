@@ -8,12 +8,13 @@ from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int
 
 @dataclass(slots=True)
 class User:
-    id: int 
+    id: int
     username: str
     email: str = ""
     role: UserRole = UserRole.SOLVER
     bio: str = ""
     xp: int = 0
+    is_discussion_banned: bool = False
     created_at: datetime = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
@@ -46,6 +47,7 @@ class User:
             "bio": self.bio,
             "xp": self.xp,
             "level": self.level,
+            "is_discussion_banned": self.is_discussion_banned,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
         }
@@ -60,6 +62,7 @@ class User:
             role=UserRole(d.get("role", UserRole.SOLVER.value)),
             bio=d.get("bio", ""),
             xp=int(d.get("xp", 0)),
+            is_discussion_banned=bool(d.get("is_discussion_banned", False)),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
         )
 
