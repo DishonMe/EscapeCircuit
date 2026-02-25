@@ -1,3 +1,4 @@
+import sqlite3
 from typing import Optional, List
 
 from Backend.DomainLayer.Discussion import Discussion
@@ -383,7 +384,10 @@ class DiscussionService:
         if self.report_repo.has_reported(user_id, "discussion", discussion_id):
             raise ValidationError("you have already reported this discussion")
 
-        return self.report_repo.create(user_id, "discussion", discussion_id, reason, details)
+        try:
+            return self.report_repo.create(user_id, "discussion", discussion_id, reason, details)
+        except sqlite3.IntegrityError:
+            raise ValidationError("you have already reported this discussion")
 
     def report_reply(self, token: str, reply_id: int, reason: str, details: str = "") -> dict:
         user_id = self.auth.require_user_id(token)
@@ -399,7 +403,10 @@ class DiscussionService:
         if self.report_repo.has_reported(user_id, "reply", reply_id):
             raise ValidationError("you have already reported this reply")
 
-        return self.report_repo.create(user_id, "reply", reply_id, reason, details)
+        try:
+            return self.report_repo.create(user_id, "reply", reply_id, reason, details)
+        except sqlite3.IntegrityError:
+            raise ValidationError("you have already reported this reply")
 
     def list_reports(self, token: str, status: Optional[str] = None, limit: int = 50, offset: int = 0) -> dict:
         user_id = self.auth.require_user_id(token)
@@ -430,6 +437,7 @@ class DiscussionService:
                     author = self.user_repo.get_by_id(reply.author_id)
                     report["target_author_id"] = reply.author_id
                     report["target_author_username"] = author.username if author else "Unknown"
+                    report["discussion_id"] = reply.discussion_id
 
         return {"reports": reports, "total": total, "limit": limit, "offset": offset}
 
@@ -532,12 +540,16 @@ class DiscussionService:
             raise ValidationError("report not found")
 
         if report["target_type"] == "discussion":
+            disc = self.discussion_repo.get_by_id(report["target_id"])
+            if not disc:
+                raise ValidationError("reported discussion has already been deleted")
             self.discussion_repo.delete(report["target_id"])
         elif report["target_type"] == "reply":
             reply = self.reply_repo.get_by_id(report["target_id"])
-            if reply:
-                self.reply_repo.delete(report["target_id"])
-                self.discussion_repo.increment_reply_count(reply.discussion_id, -1)
+            if not reply:
+                raise ValidationError("reported reply has already been deleted")
+            self.reply_repo.delete(report["target_id"])
+            self.discussion_repo.increment_reply_count(reply.discussion_id, -1)
 
         # Mark report as reviewed
         self.report_repo.update_status(report_id, "reviewed")

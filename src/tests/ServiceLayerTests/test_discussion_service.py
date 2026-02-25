@@ -51,18 +51,21 @@ class TestCreateDiscussion:
     def test_missing_title(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         with pytest.raises(ValidationError, match="title"):
             svc.create_discussion("token", {"title": "", "body": "Body"})
 
     def test_missing_body(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         with pytest.raises(ValidationError, match="body"):
             svc.create_discussion("token", {"title": "Title", "body": ""})
 
     def test_invalid_category(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         with pytest.raises(ValidationError, match="category"):
             svc.create_discussion("token", {"title": "T", "body": "B", "category": "invalid"})
 
@@ -208,3 +211,274 @@ class TestLockDiscussion:
 
         with pytest.raises(ValidationError, match="admin"):
             svc.lock_discussion("token", 1)
+
+
+# ---------------------------------------------------------------------------
+# Full-service factory (includes engagement, report, notification repos)
+# ---------------------------------------------------------------------------
+
+def make_full_service():
+    """Service with engagement, report, and notification repos."""
+    discussion_repo = Mock()
+    reply_repo = Mock()
+    user_repo = Mock()
+    auth_service = Mock()
+    xp_service = Mock()
+    engagement_repo = Mock()
+    report_repo = Mock()
+    notification_repo = Mock()
+    service = DiscussionService(
+        discussion_repo=discussion_repo,
+        reply_repo=reply_repo,
+        user_repo=user_repo,
+        auth_service=auth_service,
+        xp_service=xp_service,
+        engagement_repo=engagement_repo,
+        report_repo=report_repo,
+        notification_repo=notification_repo,
+    )
+    return service
+
+
+# ---------------------------------------------------------------------------
+# Engagement tests
+# ---------------------------------------------------------------------------
+
+class TestVoteDiscussion:
+    def test_upvote_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.get_discussion_vote.return_value = None
+        svc.engagement.set_discussion_vote.return_value = 1
+        svc.engagement.count_discussion_votes.return_value = {"upvotes": 1, "downvotes": 0}
+
+        result = svc.vote_discussion("token", 1, 1)
+
+        assert result["upvotes"] == 1
+        assert result["user_vote"] == 1
+        svc.xp._apply_xp.assert_called_once_with(1, 3)
+
+    def test_downvote_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.get_discussion_vote.return_value = None
+        svc.engagement.set_discussion_vote.return_value = -1
+        svc.engagement.count_discussion_votes.return_value = {"upvotes": 0, "downvotes": 1}
+
+        result = svc.vote_discussion("token", 1, -1)
+
+        assert result["downvotes"] == 1
+        svc.xp._apply_xp.assert_not_called()
+
+    def test_toggle_removes_vote(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.get_discussion_vote.return_value = 1
+        svc.engagement.set_discussion_vote.return_value = None
+        svc.engagement.count_discussion_votes.return_value = {"upvotes": 0, "downvotes": 0}
+
+        result = svc.vote_discussion("token", 1, 1)
+
+        assert result["user_vote"] is None
+        svc.xp._apply_xp.assert_not_called()
+
+
+class TestReactToDiscussion:
+    def test_add_reaction_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_discussion_reaction.return_value = True
+        svc.engagement.get_discussion_reactions.return_value = [{"type": "insightful", "count": 1}]
+        svc.engagement.get_user_discussion_reactions.return_value = ["insightful"]
+
+        result = svc.react_to_discussion("token", 1, "insightful")
+
+        assert result["is_active"] is True
+        svc.xp._apply_xp.assert_called_once_with(1, 1)
+
+    def test_remove_reaction_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_discussion_reaction.return_value = False
+        svc.engagement.get_discussion_reactions.return_value = []
+        svc.engagement.get_user_discussion_reactions.return_value = []
+
+        result = svc.react_to_discussion("token", 1, "insightful")
+
+        assert result["is_active"] is False
+        svc.xp._apply_xp.assert_not_called()
+
+    def test_invalid_reaction_type(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+
+        with pytest.raises(ValidationError, match="invalid reaction"):
+            svc.react_to_discussion("token", 1, "invalid_type")
+
+
+class TestFollowDiscussion:
+    def test_follow_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_follow.return_value = True
+
+        result = svc.follow_discussion("token", 1)
+
+        assert result["is_following"] is True
+
+    def test_unfollow_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_follow.return_value = False
+
+        result = svc.follow_discussion("token", 1)
+
+        assert result["is_following"] is False
+
+
+class TestBookmarkDiscussion:
+    def test_bookmark_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_bookmark.return_value = True
+
+        result = svc.bookmark_discussion("token", 1)
+
+        assert result["is_bookmarked"] is True
+
+    def test_unbookmark_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.engagement.toggle_bookmark.return_value = False
+
+        result = svc.bookmark_discussion("token", 1)
+
+        assert result["is_bookmarked"] is False
+
+
+# ---------------------------------------------------------------------------
+# Report tests
+# ---------------------------------------------------------------------------
+
+class TestReportDiscussion:
+    def test_report_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.report_repo.has_reported.return_value = False
+        svc.report_repo.create.return_value = {"id": 1, "reporter_id": 2, "target_type": "discussion", "target_id": 1, "reason": "spam"}
+
+        result = svc.report_discussion("token", 1, "spam")
+
+        svc.report_repo.create.assert_called_once()
+
+    def test_duplicate_report_rejected(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
+        svc.report_repo.has_reported.return_value = True
+
+        with pytest.raises(ValidationError, match="already reported"):
+            svc.report_discussion("token", 1, "spam")
+
+
+# ---------------------------------------------------------------------------
+# Admin moderation tests
+# ---------------------------------------------------------------------------
+
+class TestAdminModeration:
+    def test_warn_author_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 10
+        svc.user_repo.get_by_id.return_value = make_user(user_id=10, role=UserRole.ADMIN)
+        svc.report_repo.get_by_id.return_value = {
+            "id": 1, "target_type": "discussion", "target_id": 1, "reason": "spam",
+        }
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=5)
+
+        result = svc.warn_user_for_report("token", 1)
+
+        svc.notification_repo.create.assert_called_once()
+        call_kwargs = svc.notification_repo.create.call_args[1]
+        assert call_kwargs["user_id"] == 5
+        assert call_kwargs["notif_type"] == "warning"
+        svc.report_repo.update_status.assert_called_once_with(1, "reviewed")
+
+    def test_ban_author_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 10
+        svc.user_repo.get_by_id.return_value = make_user(user_id=10, role=UserRole.ADMIN)
+        svc.report_repo.get_by_id.return_value = {
+            "id": 1, "target_type": "discussion", "target_id": 1, "reason": "spam",
+        }
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=5)
+
+        result = svc.ban_user_for_report("token", 1)
+
+        svc.user_repo.ban_from_discussions.assert_called_once_with(5)
+        svc.notification_repo.create.assert_called_once()
+        call_kwargs = svc.notification_repo.create.call_args[1]
+        assert call_kwargs["notif_type"] == "ban"
+        svc.report_repo.update_status.assert_called_once_with(1, "reviewed")
+
+    def test_delete_content_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 10
+        svc.user_repo.get_by_id.return_value = make_user(user_id=10, role=UserRole.ADMIN)
+        svc.report_repo.get_by_id.return_value = {
+            "id": 1, "target_type": "discussion", "target_id": 1, "reason": "spam",
+        }
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=5)
+
+        result = svc.delete_reported_content("token", 1)
+
+        svc.discussion_repo.delete.assert_called_once_with(1)
+        svc.report_repo.update_status.assert_called_once_with(1, "reviewed")
+
+    def test_lock_discussion_from_report_success(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 10
+        svc.user_repo.get_by_id.return_value = make_user(user_id=10, role=UserRole.ADMIN)
+        svc.report_repo.get_by_id.return_value = {
+            "id": 1, "target_type": "discussion", "target_id": 1, "reason": "spam",
+        }
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=5)
+
+        result = svc.lock_reported_discussion("token", 1)
+
+        svc.discussion_repo.update.assert_called_once_with(1, {"is_locked": True})
+        svc.report_repo.update_status.assert_called_once_with(1, "reviewed")
+
+    def test_non_admin_cannot_moderate(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 2
+        svc.user_repo.get_by_id.return_value = make_user(user_id=2, role=UserRole.SOLVER)
+
+        with pytest.raises(ValidationError, match="admin"):
+            svc.warn_user_for_report("token", 1)
+
+
+# ---------------------------------------------------------------------------
+# Ban enforcement tests
+# ---------------------------------------------------------------------------
+
+class TestBanEnforcement:
+    def test_banned_user_cannot_create_discussion(self):
+        svc = make_full_service()
+        svc.auth.require_user_id.return_value = 1
+        user = make_user(user_id=1, role=UserRole.SOLVER)
+        user.is_discussion_banned = True
+        svc.user_repo.get_by_id.return_value = user
+
+        with pytest.raises(ValidationError, match="banned"):
+            svc.create_discussion("token", {"title": "Test", "body": "Body"})

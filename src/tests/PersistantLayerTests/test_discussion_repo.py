@@ -181,3 +181,26 @@ def test_list_sort_by_most_replies(repo):
     items = repo.list_all(sort_by="most_replies")
     # Pinned first (both unpinned), then by reply count
     assert items[0].title == "Many"
+
+
+def test_search_with_percent_wildcard(repo):
+    repo.create(make_discussion(title="100% Complete"))
+    repo.create(make_discussion(title="Normal Discussion"))
+    repo.create(make_discussion(title="50% Done"))
+
+    results = repo.list_all(search="100%")
+    assert len(results) == 1
+    assert results[0].title == "100% Complete"
+
+    assert repo.count(search="100%") == 1
+
+
+def test_search_with_underscore_wildcard(repo):
+    repo.create(make_discussion(title="test_case_one"))
+    repo.create(make_discussion(title="testing something"))
+    repo.create(make_discussion(title="test_case_two"))
+
+    results = repo.list_all(search="test_case")
+    assert len(results) == 2
+    titles = {r.title for r in results}
+    assert titles == {"test_case_one", "test_case_two"}

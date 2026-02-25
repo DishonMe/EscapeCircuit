@@ -86,8 +86,10 @@ class DiscussionRepo:
             where_clauses.append("author_id = ?")
             params.append(int(author_id))
         if search:
-            where_clauses.append("(title LIKE ? OR body LIKE ?)")
-            pattern = f"%{search}%"
+            # Escape SQL wildcard characters in the user's search term
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            where_clauses.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
+            pattern = f"%{escaped}%"
             params.extend([pattern, pattern])
 
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
@@ -131,8 +133,10 @@ class DiscussionRepo:
             where_clauses.append("author_id = ?")
             params.append(int(author_id))
         if search:
-            where_clauses.append("(title LIKE ? OR body LIKE ?)")
-            pattern = f"%{search}%"
+            # Escape SQL wildcard characters in the user's search term
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            where_clauses.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
+            pattern = f"%{escaped}%"
             params.extend([pattern, pattern])
 
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""

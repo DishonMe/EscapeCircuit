@@ -185,7 +185,7 @@ export const ReportsList = () => {
                   {report.target_type}
                 </span>
                 <Link
-                  href={`/app/discussions/${report.target_type === 'discussion' ? report.target_id : ''}`}
+                  href={`/app/discussions/${report.target_type === 'discussion' ? report.target_id : report.discussion_id || ''}`}
                   className="text-blue-600 hover:underline"
                 >
                   #{report.target_id}

@@ -236,6 +236,7 @@ export type Report = {
   target_id: number;
   target_author_id?: number;
   target_author_username?: string;
+  discussion_id?: number;
   reason: string;
   details: string;
   status: 'pending' | 'reviewed' | 'dismissed';

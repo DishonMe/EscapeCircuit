@@ -20,6 +20,8 @@ import { useBookmarkDiscussion } from '../api/bookmark-discussion';
 import { useDeleteDiscussion } from '../api/delete-discussion';
 import { useFollowDiscussion } from '../api/follow-discussion';
 import { useDiscussion } from '../api/get-discussion';
+import { useLockDiscussion } from '../api/lock-discussion';
+import { usePinDiscussion } from '../api/pin-discussion';
 import { useReactToDiscussion } from '../api/react-discussion';
 import { useReportDiscussion } from '../api/report-discussion';
 import { useVoteDiscussion } from '../api/vote-discussion';
@@ -63,10 +65,36 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
 
   const reportMutation = useReportDiscussion();
 
+  const pinMutation = usePinDiscussion({
+    discussionId,
+  });
+
+  const lockMutation = useLockDiscussion({
+    discussionId,
+  });
+
   if (discussionQuery.isLoading) {
     return (
       <div className="flex h-48 w-full items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (discussionQuery.isError) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm text-red-700">
+          Failed to load discussion. It may have been deleted or you may not
+          have permission to view it.
+        </p>
+        <NextLink
+          href={paths.app.discussions.getHref()}
+          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Discussions
+        </NextLink>
       </div>
     );
   }
@@ -205,13 +233,23 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
           <div className="flex-1" />
 
           {canPinDiscussion(user.data) && (
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pinMutation.mutate({ discussionId })}
+              isLoading={pinMutation.isPending}
+            >
               <Pin className="mr-1 size-3" />
               {discussion.is_pinned ? 'Unpin' : 'Pin'}
             </Button>
           )}
           {canLockDiscussion(user.data) && (
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => lockMutation.mutate({ discussionId })}
+              isLoading={lockMutation.isPending}
+            >
               <Lock className="mr-1 size-3" />
               {discussion.is_locked ? 'Unlock' : 'Lock'}
             </Button>

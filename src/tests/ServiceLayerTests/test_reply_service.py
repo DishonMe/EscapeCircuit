@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import Mock
 
-from Backend.ServiceLayer.ReplyService import ReplyService, REPLY_CREATE_XP, REPLY_ACCEPTED_XP, ACCEPT_SOLUTION_XP
+from Backend.ServiceLayer.ReplyService import ReplyService, REPLY_CREATE_XP, REPLY_ACCEPTED_XP, ACCEPT_SOLUTION_XP, REPLY_UPVOTE_XP, REPLY_REACTION_XP
 from Backend.DomainLayer.Discussion import Discussion
 from Backend.DomainLayer.Reply import Reply
 from Backend.DomainLayer.User import User
-from Backend.DomainLayer.Enums import UserRole, ThreadCategory
+from Backend.DomainLayer.Enums import UserRole, ThreadCategory, ReactionType
 from Backend.DomainLayer.Exceptions import ValidationError
 
 
@@ -59,6 +59,7 @@ class TestCreateReply:
     def test_locked_discussion(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         svc.discussion_repo.get_by_id.return_value = make_discussion(is_locked=True)
 
         with pytest.raises(ValidationError, match="locked"):
@@ -67,6 +68,7 @@ class TestCreateReply:
     def test_missing_body(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         svc.discussion_repo.get_by_id.return_value = make_discussion()
 
         with pytest.raises(ValidationError, match="body"):
@@ -75,6 +77,7 @@ class TestCreateReply:
     def test_discussion_not_found(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         svc.discussion_repo.get_by_id.return_value = None
 
         with pytest.raises(ValidationError, match="not found"):
@@ -97,6 +100,7 @@ class TestCreateReply:
     def test_invalid_parent_reply(self):
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user()
         svc.discussion_repo.get_by_id.return_value = make_discussion()
         svc.reply_repo.get_by_id.return_value = None
 
@@ -204,3 +208,105 @@ class TestAcceptReply:
         assert result["is_accepted"] is False
         # No XP should be awarded for unaccepting
         svc.xp._apply_xp.assert_not_called()
+
+
+def make_service_with_engagement():
+    """Service with engagement repo for vote/react tests."""
+    reply_repo = Mock()
+    discussion_repo = Mock()
+    user_repo = Mock()
+    auth_service = Mock()
+    xp_service = Mock()
+    engagement_repo = Mock()
+    return ReplyService(
+        reply_repo=reply_repo,
+        discussion_repo=discussion_repo,
+        user_repo=user_repo,
+        auth_service=auth_service,
+        xp_service=xp_service,
+        engagement_repo=engagement_repo,
+    )
+
+
+class TestVoteReply:
+    def test_upvote_success(self):
+        svc = make_service_with_engagement()
+        svc.auth.require_user_id.return_value = 2
+        svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
+        svc.engagement.get_reply_vote.return_value = None
+        svc.engagement.set_reply_vote.return_value = 1
+        svc.engagement.count_reply_votes.return_value = {"upvotes": 1, "downvotes": 0}
+
+        result = svc.vote_reply("token", 1, 1)
+
+        assert result["upvotes"] == 1
+        svc.xp._apply_xp.assert_called_once_with(1, REPLY_UPVOTE_XP)
+        svc.reply_repo.update_votes.assert_called_once_with(1, 1, 0)
+
+    def test_downvote_success(self):
+        svc = make_service_with_engagement()
+        svc.auth.require_user_id.return_value = 2
+        svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
+        svc.engagement.get_reply_vote.return_value = None
+        svc.engagement.set_reply_vote.return_value = -1
+        svc.engagement.count_reply_votes.return_value = {"upvotes": 0, "downvotes": 1}
+
+        result = svc.vote_reply("token", 1, -1)
+
+        assert result["downvotes"] == 1
+        svc.xp._apply_xp.assert_not_called()
+        svc.reply_repo.update_votes.assert_called_once_with(1, 0, 1)
+
+    def test_toggle_removes_vote(self):
+        svc = make_service_with_engagement()
+        svc.auth.require_user_id.return_value = 2
+        svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
+        svc.engagement.get_reply_vote.return_value = 1  # already upvoted
+        svc.engagement.set_reply_vote.return_value = None
+        svc.engagement.count_reply_votes.return_value = {"upvotes": 0, "downvotes": 0}
+
+        result = svc.vote_reply("token", 1, 1)
+
+        assert result["user_vote"] is None
+        svc.reply_repo.update_votes.assert_called_once_with(1, 0, 0)
+
+
+class TestReactToReply:
+    def test_add_reaction(self):
+        svc = make_service_with_engagement()
+        svc.auth.require_user_id.return_value = 2
+        svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
+        svc.engagement.toggle_reply_reaction.return_value = True
+        svc.engagement.get_reply_reactions.return_value = [{"type": "helpful", "count": 1}]
+        svc.engagement.get_user_reply_reactions.return_value = ["helpful"]
+
+        result = svc.react_to_reply("token", 1, "helpful")
+
+        assert result["is_active"] is True
+        svc.xp._apply_xp.assert_called_once_with(1, REPLY_REACTION_XP)
+
+    def test_remove_reaction(self):
+        svc = make_service_with_engagement()
+        svc.auth.require_user_id.return_value = 2
+        svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
+        svc.engagement.toggle_reply_reaction.return_value = False
+        svc.engagement.get_reply_reactions.return_value = []
+        svc.engagement.get_user_reply_reactions.return_value = []
+
+        result = svc.react_to_reply("token", 1, "helpful")
+
+        assert result["is_active"] is False
+        svc.xp._apply_xp.assert_not_called()
+
+
+class TestBanEnforcementReply:
+    def test_banned_user_cannot_create_reply(self):
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 1
+        user = make_user(user_id=1)
+        user.is_discussion_banned = True
+        svc.user_repo.get_by_id.return_value = user
+        svc.discussion_repo.get_by_id.return_value = make_discussion(is_locked=False)
+
+        with pytest.raises(ValidationError, match="banned"):
+            svc.create_reply("token", 1, {"body": "I am banned"})
