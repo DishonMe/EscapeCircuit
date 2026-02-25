@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
@@ -14,6 +14,13 @@ import MarkdownIt from "markdown-it";
 import markdownItKatex from "markdown-it-katex";
 import DOMPurify from "isomorphic-dompurify";
 import "katex/dist/katex.min.css";
+import {
+  WorkstationGrid,
+  type ComponentDef,
+  type PlacedGridComponent,
+  type SelectedComponentState,
+} from "@/app/app/puzzles/[id]/_components/workstation-grid";
+import type { Wire } from "@/types/api";
 
 type TabName = "basic" | "test-cases" | "instructions" | "solution";
 
@@ -23,6 +30,10 @@ interface BasicInfo {
   budget: number;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   timeLimit: number | null;
+  minCycles: number | null;
+  maxCycles: number | null;
+  totalGateCount: number | null;
+  gateQuotas: Record<string, number>;
   gateSet: string[];
   inputs: string[];
   outputs: string[];
@@ -30,9 +41,33 @@ interface BasicInfo {
 
 interface TestCase {
   id?: string;
-  inputs: Record<string, number>;
-  expectedOutputs: Record<string, number>;
+  kind?: 'blackbox' | 'stream'; // Default: 'blackbox'
+  inputs?: Record<string, number>;
+  expectedOutputs?: Record<string, number>;
+  inputStream?: Array<Record<string, number>>;
+  expectedOutputStream?: Record<string, number[]>;
 }
+
+// Helper functions for parsing binary string format
+const parseBinaryString = (str: string): number[] => {
+  const trimmed = str.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes(',')) {
+    return trimmed.split(',').map(b => {
+      const val = parseInt(b.trim(), 10);
+      return (val === 0 || val === 1) ? val : NaN;
+    }).filter(v => !isNaN(v));
+  } else {
+    return trimmed.split('').map(b => {
+      const val = parseInt(b, 10);
+      return (val === 0 || val === 1) ? val : NaN;
+    }).filter(v => !isNaN(v));
+  }
+};
+
+const arrayToBinaryString = (arr: number[]): string => {
+  return arr.join(',');
+};
 
 interface CreatePuzzleData {
   basic: BasicInfo;
@@ -182,6 +217,13 @@ export default function CreatePuzzleForm() {
     null
   );
 
+  // Workstation state for solution design
+  const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
+  const [wires, setWires] = useState<Wire[]>([]);
+  const [selectedComponent, setSelectedComponent] =
+    useState<SelectedComponentState>({ mode: 'none' });
+  const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
+
   const [data, setData] = useState<CreatePuzzleData>({
     basic: {
       name: "",
@@ -189,6 +231,10 @@ export default function CreatePuzzleForm() {
       budget: 0,
       difficulty: "EASY",
       timeLimit: null,
+      minCycles: null,
+      maxCycles: null,
+      totalGateCount: null,
+      gateQuotas: {},
       gateSet: [],
       inputs: [],
       outputs: [],
@@ -199,9 +245,16 @@ export default function CreatePuzzleForm() {
   });
 
   const [testCaseForm, setTestCaseForm] = useState<TestCase>({
+    kind: 'blackbox',
     inputs: {},
     expectedOutputs: {},
+    inputStream: [],
+    expectedOutputStream: {},
   });
+
+  // State for stream test case string representation
+  const [streamInputStrings, setStreamInputStrings] = useState<Record<string, string>>({});
+  const [streamOutputStrings, setStreamOutputStrings] = useState<Record<string, string>>({});
 
   const handleBasicChange = (
     field: keyof BasicInfo,
@@ -214,22 +267,123 @@ export default function CreatePuzzleForm() {
   };
 
   const handleAddTestCase = () => {
-    // Auto-initialize any missing inputs/outputs (shouldn't be needed, but safety check)
     const initializedForm = { ...testCaseForm };
     
-    // Ensure all required inputs are in the form
-    data.basic.inputs.forEach((inputName) => {
-      if (!(inputName in initializedForm.inputs)) {
-        initializedForm.inputs[inputName] = 0;
+    // Only initialize inputs/outputs if this is a blackbox test case
+    if (initializedForm.kind === 'blackbox' || !initializedForm.kind) {
+      if (!initializedForm.inputs) initializedForm.inputs = {};
+      if (!initializedForm.expectedOutputs) initializedForm.expectedOutputs = {};
+      
+      data.basic.inputs.forEach((inputName) => {
+        if (!(inputName in initializedForm.inputs!)) {
+          initializedForm.inputs![inputName] = 0;
+        }
+      });
+      
+      data.basic.outputs.forEach((outputName) => {
+        if (!(outputName in initializedForm.expectedOutputs!)) {
+          initializedForm.expectedOutputs![outputName] = 0;
+        }
+      });
+    } else if (initializedForm.kind === 'stream') {
+      // For stream, convert string format to JSON format
+      const inputArrays: Record<string, number[]> = {};
+      const outputArrays: Record<string, number[]> = {};
+      
+      // Parse input streams
+      data.basic.inputs.forEach((inputName) => {
+        const streamStr = streamInputStrings[inputName] || '';
+        inputArrays[inputName] = parseBinaryString(streamStr);
+      });
+      
+      // Parse output streams
+      data.basic.outputs.forEach((outputName) => {
+        const streamStr = streamOutputStrings[outputName] || '';
+        outputArrays[outputName] = parseBinaryString(streamStr);
+      });
+      
+      // Validate: at least one input stream must have values
+      const hasAnyInput = Object.values(inputArrays).some(arr => arr.length > 0);
+      if (!hasAnyInput) {
+        alert('At least one input stream must have values\nExample: "01010" or "0,1,0,1,0"');
+        return;
       }
-    });
-    
-    // Ensure all required outputs are in the form
-    data.basic.outputs.forEach((outputName) => {
-      if (!(outputName in initializedForm.expectedOutputs)) {
-        initializedForm.expectedOutputs[outputName] = 0;
+      
+      // Validate: at least one output stream must have values
+      const hasAnyOutput = Object.values(outputArrays).some(arr => arr.length > 0);
+      if (!hasAnyOutput) {
+        alert('At least one output stream must have values\nExample: "10101" or "1,0,1,0,1"');
+        return;
       }
-    });
+      
+      // Determine the number of cycles
+      const numCycles = Math.max(
+        ...Object.values(inputArrays).map(arr => arr.length),
+        ...Object.values(outputArrays).map(arr => arr.length)
+      );
+      
+      // Check min_cycles constraint
+      if (data.basic.minCycles !== null && numCycles < data.basic.minCycles) {
+        alert(`Test case has ${numCycles} cycles but minimum required is ${data.basic.minCycles}`);
+        return;
+      }
+      
+      // Check max_cycles constraint
+      if (data.basic.maxCycles !== null && numCycles > data.basic.maxCycles) {
+        alert(`Test case has ${numCycles} cycles but maximum allowed is ${data.basic.maxCycles}`);
+        return;
+      }
+      
+      // Verify all input streams have the same length
+      for (const [inputName, values] of Object.entries(inputArrays)) {
+        if (values.length > 0 && values.length !== numCycles) {
+          alert(`Input "${inputName}" length ${values.length} doesn't match other streams (${numCycles} cycles)`);
+          return;
+        }
+      }
+      
+      // Verify all output streams have the same length
+      for (const [outputName, values] of Object.entries(outputArrays)) {
+        if (values.length > 0 && values.length !== numCycles) {
+          alert(`Output "${outputName}" length ${values.length} doesn't match other streams (${numCycles} cycles)`);
+          return;
+        }
+      }
+      
+      // Fill empty inputs with zeros for the required cycles
+      data.basic.inputs.forEach((inputName) => {
+        while (inputArrays[inputName].length < numCycles) {
+          inputArrays[inputName].push(0);
+        }
+      });
+      
+      // Fill empty outputs with zeros for the required cycles
+      data.basic.outputs.forEach((outputName) => {
+        while (outputArrays[outputName].length < numCycles) {
+          outputArrays[outputName].push(0);
+        }
+      });
+      
+      // Convert to backend format: inputStream is array of dicts, expectedOutputStream is dict of arrays
+      const inputStream: Array<Record<string, number>> = [];
+      for (let i = 0; i < numCycles; i++) {
+        const cycleInputs: Record<string, number> = {};
+        data.basic.inputs.forEach((inputName) => {
+          cycleInputs[inputName] = inputArrays[inputName][i];
+        });
+        inputStream.push(cycleInputs);
+      }
+      
+      initializedForm.inputStream = inputStream;
+      initializedForm.expectedOutputStream = outputArrays;
+      
+      // Log for debugging
+      console.log('Stream test case created:', {
+        numCycles,
+        inputStream,
+        expectedOutputStream: outputArrays,
+      });
+    }
 
     setData((prev) => ({
       ...prev,
@@ -241,7 +395,17 @@ export default function CreatePuzzleForm() {
         },
       ],
     }));
-    setTestCaseForm({ inputs: {}, expectedOutputs: {} });
+    
+    // Reset form
+    setTestCaseForm({ 
+      kind: 'blackbox',
+      inputs: {}, 
+      expectedOutputs: {},
+      inputStream: [],
+      expectedOutputStream: {},
+    });
+    setStreamInputStrings({});
+    setStreamOutputStrings({});
   };
 
   const handleRemoveTestCase = (id: string | undefined) => {
@@ -252,27 +416,146 @@ export default function CreatePuzzleForm() {
     }));
   };
 
+  // Build component catalog for workstation
+  const uiCatalog = useMemo(() => {
+    const catalog: Record<string, ComponentDef> = {};
+    const gateConfigs: Record<string, { size: { w: number; h: number }; ports: any[] }> = {
+      AND: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      OR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      XOR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      NOT: {
+        size: { w: 3, h: 1 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      NAND: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      NOR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      XNOR: {
+        size: { w: 3, h: 2 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+      DFF: {
+        size: { w: 3, h: 1 },
+        ports: [
+          { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+        ],
+      },
+    };
+
+    for (const gateName of data.basic.gateSet) {
+      const config = gateConfigs[gateName] || gateConfigs.AND;
+      catalog[gateName] = {
+        id: gateName,
+        label: gateName,
+        cost: 1,
+        size: config.size,
+        ports: config.ports,
+      };
+    }
+    return catalog;
+  }, [data.basic.gateSet]);
+
+  // Export solution from workstation
+  const exportSolution = useCallback(() => {
+    // Build eval_map from test cases (mapping inputs → outputs for truth table)
+    const evalMap: Record<string, Record<string, number>> = {};
+    data.testCases.forEach((tc) => {
+      // Only process blackbox test cases for eval_map
+      if (tc.kind === 'stream' || tc.inputs === undefined || tc.expectedOutputs === undefined) {
+        return;
+      }
+      // Create consistent key by sorting input keys (no spaces to match backend)
+      const sortedInputKeys = Object.keys(tc.inputs).sort();
+      const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
+      evalMap[key] = tc.expectedOutputs;
+    });
+
+    // Export format expected by backend
+    const solution = {
+      eval_map: evalMap,
+      circuit: {
+        placed: placed.map(p => ({
+          id: p.id,
+          componentId: p.componentId,
+          origin: p.origin,
+          rotation: p.rotation,
+        })),
+        wires: wires.map(w => ({
+          id: w.id,
+          from: w.from,
+          to: w.to,
+        })),
+      },
+    };
+    setData((prev) => ({
+      ...prev,
+      solutionJSON: JSON.stringify(solution, null, 2),
+    }));
+  }, [placed, wires, data.testCases]);
+
   const handleAddInputField = () => {
     // Find the first input that hasn't been added to the form yet
     const missingInput = data.basic.inputs.find(
-      (inputName) => !(inputName in testCaseForm.inputs)
+      (inputName) => !(inputName in (testCaseForm.inputs || {}))
     );
-    const inputName = missingInput || `input_${Object.keys(testCaseForm.inputs).length}`;
+    const inputName = missingInput || `input_${Object.keys(testCaseForm.inputs || {}).length}`;
     setTestCaseForm((prev) => ({
       ...prev,
-      inputs: { ...prev.inputs, [inputName]: 0 },
+      inputs: { ...(prev.inputs || {}), [inputName]: 0 },
     }));
   };
 
   const handleAddOutputField = () => {
     // Find the first output that hasn't been added to the form yet
     const missingOutput = data.basic.outputs.find(
-      (outputName) => !(outputName in testCaseForm.expectedOutputs)
+      (outputName) => !(outputName in (testCaseForm.expectedOutputs || {}))
     );
-    const outputName = missingOutput || `output_${Object.keys(testCaseForm.expectedOutputs).length}`;
+    const outputName = missingOutput || `output_${Object.keys(testCaseForm.expectedOutputs || {}).length}`;
     setTestCaseForm((prev) => ({
       ...prev,
-      expectedOutputs: { ...prev.expectedOutputs, [outputName]: 0 },
+      expectedOutputs: { ...(prev.expectedOutputs || {}), [outputName]: 0 },
     }));
   };
 
@@ -305,6 +588,26 @@ export default function CreatePuzzleForm() {
     setIsSubmitting(true);
     try {
       const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+      
+      // Convert test cases from camelCase to snake_case for backend
+      const convertedTestCases = data.testCases.map(({ id, ...tc }) => {
+        const converted: any = {
+          kind: tc.kind,
+        };
+        
+        if (tc.kind === 'stream') {
+          // Stream test case: inputStream -> input_stream, expectedOutputStream -> expected_output_stream
+          converted.input_stream = tc.inputStream || [];
+          converted.expected_output_stream = tc.expectedOutputStream || {};
+        } else {
+          // Blackbox test case: inputs and expectedOutputs
+          converted.inputs = tc.inputs || {};
+          converted.expected_outputs = tc.expectedOutputs || {};
+        }
+        
+        return converted;
+      });
+      
       const configData = {
         puzzle: {
           name: data.basic.name,
@@ -315,8 +618,12 @@ export default function CreatePuzzleForm() {
           default_gate_set: data.basic.gateSet,
           inputs: data.basic.inputs,
           outputs: data.basic.outputs,
+          min_cycles: data.basic.minCycles,
+          max_cycles: data.basic.maxCycles,
+          total_gate_count: data.basic.totalGateCount,
+          gate_quotas: Object.keys(data.basic.gateQuotas).length > 0 ? data.basic.gateQuotas : undefined,
         },
-        test_cases: data.testCases.map(({ id, ...tc }) => tc),
+        test_cases: convertedTestCases,
       };
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
@@ -481,6 +788,51 @@ export default function CreatePuzzleForm() {
               />
             </div>
 
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block font-semibold mb-2">
+                  Min Cycles (optional)
+                </label>
+                <input
+                  type="number"
+                  value={data.basic.minCycles ?? ""}
+                  onChange={(e) =>
+                    handleBasicChange("minCycles", e.target.value ? parseInt(e.target.value) : null)
+                  }
+                  className="w-full border p-3 rounded"
+                  placeholder="For sequential circuits"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-2">
+                  Max Cycles (optional)
+                </label>
+                <input
+                  type="number"
+                  value={data.basic.maxCycles ?? ""}
+                  onChange={(e) =>
+                    handleBasicChange("maxCycles", e.target.value ? parseInt(e.target.value) : null)
+                  }
+                  className="w-full border p-3 rounded"
+                  placeholder="For sequential circuits"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-2">
+                  Gate Limit (optional)
+                </label>
+                <input
+                  type="number"
+                  value={data.basic.totalGateCount ?? ""}
+                  onChange={(e) =>
+                    handleBasicChange("totalGateCount", e.target.value ? parseInt(e.target.value) : null)
+                  }
+                  className="w-full border p-3 rounded"
+                  placeholder="Max gates allowed"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block font-semibold mb-2">Gate Set *</label>
               <div className="flex flex-wrap gap-2">
@@ -504,6 +856,37 @@ export default function CreatePuzzleForm() {
                 ))}
               </div>
             </div>
+
+            {data.basic.gateSet.length > 0 && (
+              <div>
+                <label className="block font-semibold mb-2">
+                  Per-Gate Limits (optional)
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {data.basic.gateSet.map((gate) => (
+                    <div key={gate} className="border p-2 rounded bg-gray-50">
+                      <label className="text-xs font-semibold text-gray-700">{gate}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={data.basic.gateQuotas[gate] ?? ""}
+                        onChange={(e) => {
+                          const newQuotas = { ...data.basic.gateQuotas };
+                          if (e.target.value) {
+                            newQuotas[gate] = parseInt(e.target.value);
+                          } else {
+                            delete newQuotas[gate];
+                          }
+                          handleBasicChange("gateQuotas", newQuotas);
+                        }}
+                        className="w-full border p-1 rounded text-sm mt-1"
+                        placeholder="Max count"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -600,64 +983,159 @@ export default function CreatePuzzleForm() {
             <div className="border p-4 rounded bg-gray-50">
               <h3 className="font-semibold mb-4">Add Test Case</h3>
 
-              {data.basic.inputs.length > 0 &&  (
-                <div>
-                  <label className="block font-semibold mb-2">Inputs</label>
-                  <div className="space-y-2 mb-4">
-                    {data.basic.inputs.map((inputName) => (
-                      <div key={inputName} className="flex items-center gap-2">
-                        <label className="w-32">{inputName}:</label>
-                        <select
-                          value={testCaseForm.inputs[inputName] ?? 0}
-                          onChange={(e) =>
-                            setTestCaseForm((prev) => ({
-                              ...prev,
-                              inputs: {
-                                ...prev.inputs,
-                                [inputName]: parseInt(e.target.value),
-                              },
-                            }))
-                          }
-                          className="border p-2 rounded bg-white"
-                        >
-                          <option value={0}>0</option>
-                          <option value={1}>1</option>
-                        </select>
+              <div className="mb-4">
+                <label className="block font-semibold mb-2">Test Case Type</label>
+                <select
+                  value={testCaseForm.kind || 'blackbox'}
+                  onChange={(e) =>
+                    setTestCaseForm((prev) => ({
+                      ...prev,
+                      kind: e.target.value as 'blackbox' | 'stream',
+                      inputs: {},
+                      expectedOutputs: {},
+                      inputStream: [],
+                      expectedOutputStream: {},
+                    }))
+                  }
+                  className="w-full border p-2 rounded bg-white"
+                >
+                  <option value="blackbox">Blackbox (Combinatorial)</option>
+                  <option value="stream">Stream (Sequential)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {testCaseForm.kind === 'stream'
+                    ? 'Sequential test with input/output values at each time step'
+                    : 'Single combinatorial test case with fixed inputs and outputs'}
+                </p>
+              </div>
+
+              {(testCaseForm.kind === 'blackbox' || !testCaseForm.kind) && (
+                <>
+                  {data.basic.inputs.length > 0 && (
+                    <div>
+                      <label className="block font-semibold mb-2">Inputs</label>
+                      <div className="space-y-2 mb-4">
+                        {data.basic.inputs.map((inputName) => (
+                          <div key={inputName} className="flex items-center gap-2">
+                            <label className="w-32">{inputName}:</label>
+                            <select
+                              value={testCaseForm.inputs?.[inputName] ?? 0}
+                              onChange={(e) =>
+                                setTestCaseForm((prev) => ({
+                                  ...prev,
+                                  inputs: {
+                                    ...prev.inputs,
+                                    [inputName]: parseInt(e.target.value),
+                                  },
+                                }))
+                              }
+                              className="border p-2 rounded bg-white"
+                            >
+                              <option value={0}>0</option>
+                              <option value={1}>1</option>
+                            </select>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  )}
+
+                  {data.basic.outputs.length > 0 && (
+                    <div>
+                      <label className="block font-semibold mb-2">
+                        Expected Outputs
+                      </label>
+                      <div className="space-y-2 mb-4">
+                        {data.basic.outputs.map((outputName) => (
+                          <div key={outputName} className="flex items-center gap-2">
+                            <label className="w-32">{outputName}:</label>
+                            <select
+                              value={testCaseForm.expectedOutputs?.[outputName] ?? 0}
+                              onChange={(e) =>
+                                setTestCaseForm((prev) => ({
+                                  ...prev,
+                                  expectedOutputs: {
+                                    ...prev.expectedOutputs,
+                                    [outputName]: parseInt(e.target.value),
+                                  },
+                                }))
+                              }
+                              className="border p-2 rounded bg-white"
+                            >
+                              <option value={0}>0</option>
+                              <option value={1}>1</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {data.basic.outputs.length > 0 && (
-                <div>
-                  <label className="block font-semibold mb-2">
-                    Expected Outputs
-                  </label>
-                  <div className="space-y-2 mb-4">
-                    {data.basic.outputs.map((outputName) => (
-                      <div key={outputName} className="flex items-center gap-2">
-                        <label className="w-32">{outputName}:</label>
-                        <select
-                          value={testCaseForm.expectedOutputs[outputName] ?? 0}
-                          onChange={(e) =>
-                            setTestCaseForm((prev) => ({
-                              ...prev,
-                              expectedOutputs: {
-                                ...prev.expectedOutputs,
-                                [outputName]: parseInt(e.target.value),
-                              },
-                            }))
-                          }
-                          className="border p-2 rounded bg-white"
-                        >
-                          <option value={0}>0</option>
-                          <option value={1}>1</option>
-                        </select>
-                      </div>
-                    ))}
+              {testCaseForm.kind === 'stream' && (
+                <>
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 mb-4">
+                    <p className="font-semibold">Stream Test Case (Sequential)</p>
+                    <p className="mt-1">Define input and output sequences for testing sequential circuits. Each step represents one clock cycle.</p>
                   </div>
-                </div>
+
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3">Input Streams</h4>
+                    <p className="text-xs text-gray-500 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <div className="space-y-3">
+                      {data.basic.inputs.map((inputName) => (
+                        <div key={inputName}>
+                          <label className="block text-sm font-medium mb-1">{inputName}</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 01010 or 0,1,0,1,0"
+                            value={streamInputStrings[inputName] || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Only allow 0, 1, and commas
+                              if (/^[01,]*$/.test(value)) {
+                                setStreamInputStrings(prev => ({
+                                  ...prev,
+                                  [inputName]: value,
+                                }));
+                              }
+                            }}
+                            className="w-full border p-2 rounded font-mono text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3">Expected Output Streams</h4>
+                    <p className="text-xs text-gray-500 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <div className="space-y-3">
+                      {data.basic.outputs.map((outputName) => (
+                        <div key={outputName}>
+                          <label className="block text-sm font-medium mb-1">{outputName}</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 01010 or 0,1,0,1,0"
+                            value={streamOutputStrings[outputName] || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Only allow 0, 1, and commas
+                              if (/^[01,]*$/.test(value)) {
+                                setStreamOutputStrings(prev => ({
+                                  ...prev,
+                                  [outputName]: value,
+                                }));
+                              }
+                            }}
+                            className="w-full border p-2 rounded font-mono text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               <button
@@ -677,23 +1155,29 @@ export default function CreatePuzzleForm() {
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border p-2 text-left">
-                          {data.basic.inputs.join(", ")}
-                        </th>
-                        <th className="border p-2 text-left">
-                          {data.basic.outputs.join(", ")}
-                        </th>
+                        <th className="border p-2 text-left">Type</th>
+                        <th className="border p-2 text-left">Inputs</th>
+                        <th className="border p-2 text-left">Outputs</th>
                         <th className="border p-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.testCases.map((tc) => (
                         <tr key={tc.id} className="hover:bg-gray-50">
-                          <td className="border p-2">
-                            {JSON.stringify(tc.inputs)}
+                          <td className="border p-2 font-mono text-xs">
+                            {tc.kind === 'stream' ? 'Stream' : 'Blackbox'}
                           </td>
-                          <td className="border p-2">
-                            {JSON.stringify(tc.expectedOutputs)}
+                          <td className="border p-2 font-mono text-xs">
+                            {tc.kind === 'stream' 
+                              ? `${tc.inputStream?.length || 0} cycles`
+                              : JSON.stringify(tc.inputs)
+                            }
+                          </td>
+                          <td className="border p-2 font-mono text-xs">
+                            {tc.kind === 'stream'
+                              ? Object.entries(tc.expectedOutputStream || {}).map(([k, v]) => `${k}: [${(v as number[]).join(',')}]`).join('; ')
+                              : JSON.stringify(tc.expectedOutputs)
+                            }
                           </td>
                           <td className="border p-2 text-center">
                             <button
@@ -740,67 +1224,86 @@ export default function CreatePuzzleForm() {
         )}
 
         {activeTab === "solution" && (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 p-6 rounded">
-              <h3 className="font-semibold text-blue-900 mb-4">Create Solution</h3>
-              <ol className="list-decimal list-inside space-y-3 text-blue-900 mb-6">
-                <li className="ml-2">Navigate to <span className="font-semibold">Puzzles</span> page</li>
-                <li className="ml-2">Find the puzzle you just created and click <span className="font-semibold">Solve</span></li>
-                <li className="ml-2">Design a circuit that passes all test cases using the circuit builder</li>
-                <li className="ml-2">When all tests pass, click <span className="font-semibold">Export Solution</span></li>
-                <li className="ml-2">Copy the exported JSON and paste it below</li>
-              </ol>
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded">
+              <h3 className="font-semibold text-blue-900 mb-2">Design Your Solution Circuit</h3>
+              <p className="text-sm text-blue-900 mb-3">
+                Drag gates from the palette on the left, place and wire them on the grid. Click Export when done.
+              </p>
+              <button
+                onClick={exportSolution}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"
+              >
+                📥 Export Solution
+              </button>
             </div>
 
-            <div className="space-y-4">
-              <label className="block font-semibold text-gray-900">Sample Solution (JSON) *</label>
-              <textarea
-                value={data.solutionJSON}
-                onChange={(e) =>
-                  setData((prev) => ({ ...prev, solutionJSON: e.target.value }))
-                }
-                className="w-full border p-4 rounded font-mono text-sm h-48"
-                placeholder={`{\n  "eval_map": {\n    "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},\n    "{\\"A\\": 0, \\"B\\": 1}": {"S": 1},\n    "{\\"A\\": 1, \\"B\\": 0}": {"S": 1},\n    "{\\"A\\": 1, \\"B\\": 1}": {"S": 0}\n  },\n  "used_gates": ["XOR"],\n  "inputs": ["A", "B"],\n  "outputs": ["S"]\n}`}
+            {/* Workstation Grid (with menu on left) */}
+            <div className="grid grid-cols-[240px_1fr] gap-4 border rounded bg-white h-[700px]">
+              {/* Gate Palette Sidebar */}
+              <div className="border-r p-3 overflow-y-auto bg-gray-50">
+                <div className="text-sm font-semibold text-gray-900 mb-3">Available Gates</div>
+                {data.basic.gateSet.length === 0 ? (
+                  <p className="text-xs text-gray-500">Select gates in "Basic Info" tab</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.basic.gateSet.map((gateName) => (
+                      <div
+                        key={gateName}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.dataTransfer.setData('application/x-escapecircuit-component', gateName);
+                          setDraggedPaletteComponentId(gateName);
+                        }}
+                        onDragEnd={() => setDraggedPaletteComponentId(null)}
+                        className="p-2 border border-gray-300 bg-white rounded cursor-move hover:bg-blue-50 font-medium text-sm text-gray-900 transition"
+                      >
+                        {gateName}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Workstation Grid */}
+              <WorkstationGrid
+                puzzleId="create-draft"
+                inputs={data.basic.inputs}
+                outputs={data.basic.outputs}
+                catalog={uiCatalog}
+                placed={placed}
+                wires={wires}
+                selectedComponent={selectedComponent}
+                onSelectedComponentChange={setSelectedComponent}
+                onPlacedChange={setPlaced}
+                onWiresChange={setWires}
+                draggedPaletteComponentId={draggedPaletteComponentId}
               />
-              {data.solutionJSON.trim() && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                  <p className="text-sm text-green-900 font-semibold">✓ Solution JSON loaded</p>
-                </div>
-              )}
             </div>
 
+            {/* Export Status */}
+            {data.solutionJSON.trim() && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded">
+                <p className="text-sm text-green-900 font-semibold">✓ Solution exported and ready</p>
+              </div>
+            )}
+
+            {/* Fallback: Manual JSON Input */}
             <details className="border rounded p-4 bg-gray-50">
-              <summary className="cursor-pointer font-semibold text-gray-900">Solution Format Reference</summary>
-              <div className="mt-4 space-y-4 text-sm text-gray-700">
-                <div>
-                  <p className="font-semibold text-gray-900 mb-2">eval_map (required):</p>
-                  <p>Maps input combinations to their output values. Key is a JSON string of inputs, value is an object of outputs.</p>
-                  <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-x-auto">
-{`"eval_map": {
-  "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},
-  "{\\"A\\": 0, \\"B\\": 1}": {"S": 1},
-  "{\\"A\\": 1, \\"B\\": 0}": {"S": 1},
-  "{\\"A\\": 1, \\"B\\": 1}": {"S": 0}
-}`}
-                  </pre>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-gray-900 mb-2">used_gates (recommended):</p>
-                  <p>List of gate types used in your solution.</p>
-                  <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-x-auto">
-{`"used_gates": ["AND", "OR", "NOT", "XOR"]`}
-                  </pre>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-gray-900 mb-2">inputs & outputs:</p>
-                  <p>Arrays of input and output signal names (must match puzzle definition).</p>
-                  <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-x-auto">
-{`"inputs": ["A", "B", "C_in"],
-"outputs": ["S", "C_out"]`}
-                  </pre>
-                </div>
+              <summary className="cursor-pointer font-semibold text-gray-900">OR: Paste Pre-Built Solution JSON</summary>
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-gray-700">
+                  If you have a solution from another source, paste its JSON here:
+                </p>
+                <textarea
+                  value={data.solutionJSON}
+                  onChange={(e) =>
+                    setData((prev) => ({ ...prev, solutionJSON: e.target.value }))
+                  }
+                  className="w-full border p-3 rounded font-mono text-xs h-32 bg-white"
+                  placeholder={`{\n  "placed": [\n    {"id": "g1", "componentId": "XOR", "origin": {"row": 0, "col": 0}, "rotation": 0}\n  ],\n  "wires": [],\n  "inputs": ["A", "B"],\n  "outputs": ["S"],\n  "used_gates": ["XOR"]\n}`}
+                />
               </div>
             </details>
           </div>

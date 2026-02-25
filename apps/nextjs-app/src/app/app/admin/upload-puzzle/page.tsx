@@ -2,13 +2,22 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState, ChangeEvent, FormEvent } from "react";
+import { useState, ChangeEvent, FormEvent, useEffect } from "react";
 import Cookies from "js-cookie";
 import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
+import { useUser } from "@/lib/auth";
 
 export default function UploadPuzzlePage() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const user = useUser();
+  
+  // Redirect non-admins away from upload page
+  useEffect(() => {
+    if (user.data && user.data.role !== "admin") {
+      router.push("/app/puzzles");
+    }
+  }, [user.data, router]);
   const [showInfo, setShowInfo] = useState(false);
   const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
   const [files, setFiles] = useState<{
@@ -109,12 +118,6 @@ export default function UploadPuzzlePage() {
           >
             ℹ️ File Format Guide
           </button>
-          <a
-            href="/app/create-puzzle"
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
-          >
-            ➕ Create with Form
-          </a>
         </div>
       </div>
 

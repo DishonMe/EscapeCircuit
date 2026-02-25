@@ -469,10 +469,10 @@ class PuzzleRepo:
                 "input_stream": json.loads(r["input_stream"]) if r["input_stream"] else [],
                 "expected_output_stream": json.loads(r["expected_output_stream"]) if r["expected_output_stream"] else {},
                 "gate_name": r["gate_name"],
-                "gate_limit": r["gate_limit"],
-                "max_gate_count": r["max_gate_count"],
-                "min_cycles": r["min_cycles"],
-                "max_cycles": r["max_cycles"],
+                "gate_limit": dict(r).get("gate_limit"),
+                "max_gate_count": dict(r).get("max_gate_count"),
+                "min_cycles": dict(r).get("min_cycles"),
+                "max_cycles": dict(r).get("max_cycles"),
                 "created_at": r["created_at"],
             })
             for r in rows

@@ -3,8 +3,12 @@
 import Link from 'next/link';
 
 import { PuzzlesList } from '@/features/puzzles/components/puzzles-list';
+import { useUser } from '@/lib/auth';
 
 export const Puzzles = () => {
+  const user = useUser();
+  const isAdmin = user.data?.role === 'admin';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 py-8">
@@ -18,21 +22,25 @@ export const Puzzles = () => {
           </p>
         </div>
 
-        {/* Create Puzzle Buttons */}
-        <div className="mb-6 flex gap-3">
-          <Link
-            href="/app/create-puzzle"
-            className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-          >
-            ✏️ Create with Form
-          </Link>
-          <Link
-            href="/app/admin/upload-puzzle"
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            📤 Upload from Files
-          </Link>
-        </div>
+        {/* Create Puzzle Buttons - Only for Creators and Admins */}
+        {(user.data?.role === 'creator' || isAdmin) && (
+          <div className="mb-6 flex gap-3">
+            <Link
+              href="/app/create-puzzle"
+              className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            >
+              ✏️ Create with Form
+            </Link>
+            {isAdmin && (
+              <Link
+                href="/app/admin/upload-puzzle"
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                📤 Upload from Files
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Puzzles List */}
         <PuzzlesList />

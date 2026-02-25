@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, Union, List
+import re
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.PuzzleService import PuzzleService
@@ -69,6 +70,26 @@ def get_db_conn():
         print(f"CRITICAL ERROR: Database file not found at {db_path}")
     conn = connect(str(db_path))
     return conn
+
+
+def get_next_puzzle_number(riddles_dir: pathlib.Path) -> int:
+    """Get the next puzzle number based on existing riddle_XX files."""
+    max_num = 0
+    if riddles_dir.exists():
+        for file in riddles_dir.iterdir():
+            match = re.match(r'riddle_(\d+)_', file.name)
+            if match:
+                num = int(match.group(1))
+                max_num = max(max_num, num)
+    return max_num + 1
+
+
+def sanitize_puzzle_name(name: str) -> str:
+    """Convert puzzle name to a valid filename component."""
+    # Replace spaces and special chars with underscores
+    sanitized = re.sub(r'[^\w\s-]', '', name)
+    sanitized = re.sub(r'[\s-]+', '_', sanitized)
+    return sanitized.lower()
 
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
@@ -322,16 +343,42 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 if not riddles_dir.exists():
                     riddles_dir.mkdir(parents=True)
 
-                def save_file_to_riddles(upload_file):
-                    dest_path = riddles_dir / upload_file.filename
+                # Read config first to get puzzle name
+                config_content = await config_file.read()
+                config_data = json.loads(config_content)
+                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
+                puzzle_num = get_next_puzzle_number(riddles_dir)
+                sanitized_name = sanitize_puzzle_name(puzzle_name)
+
+                temp_path = pathlib.Path(temp_dir)
+
+                # Helper to save files to TEMP directory (for validation)
+                def save_file_to_temp(upload_file, file_type):
+                    base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}_{file_type}'
+                    # Determine extension from original filename
+                    ext = pathlib.Path(upload_file.filename).suffix
+                    if not ext:
+                        # Default extensions
+                        if file_type == 'config':
+                            ext = '.json'
+                        elif file_type == 'instructions':
+                            ext = '.md'
+                        elif 'solution' in file_type:
+                            ext = '.json'
+                    dest_path = temp_path / (base_name + ext)
                     with open(dest_path, "wb") as buffer:
                         shutil.copyfileobj(upload_file.file, buffer)
                     return str(dest_path)
 
-                config_path = save_file_to_riddles(config_file)
-                instructions_path = save_file_to_riddles(instructions_file)
-                solution_path = save_file_to_riddles(sample_solution_file)
+                # Reset file pointers after reading config
+                await config_file.seek(0)
 
+                # Save to TEMP directory first
+                config_path = save_file_to_temp(config_file, 'config')
+                instructions_path = save_file_to_temp(instructions_file, 'instructions')
+                solution_path = save_file_to_temp(sample_solution_file, 'sample_solution')
+
+                # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
                     config_data = json.load(cf)
                 
@@ -363,27 +410,98 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 puzzle_outputs = puzzle_config.get('outputs', [])
                 eval_map = solution_data.get('eval_map', {})
                 
-                # Validate all functional test cases can be evaluated
+                # Get min/max cycles if set
+                min_cycles = puzzle_config.get('min_cycles')
+                max_cycles = puzzle_config.get('max_cycles')
+                
+                # Validate all test cases can be evaluated
                 logic_engine = logicEngineService()
                 for i, test_case in enumerate(test_cases):
-                    # Skip validation for constraint test cases (non-functional)
-                    kind = test_case.get('kind', 'blackbox')
-                    if kind in ('gate_limit', 'gate_count_limit', 'latency_limit'):
-                        # These are constraint specs, not functional test cases - no need to validate
-                        continue
+                    # Get test case kind
+                    tc_kind = test_case.get('kind', 'blackbox')
                     
-                    inputs = test_case.get('inputs', {})
-                    expected_outputs = test_case.get('expected_outputs', {})
-                    input_stream = test_case.get('input_stream')
-                    expected_output_stream = test_case.get('expected_output_stream')
-                    
-                    # For sequential circuits, validation is handled differently
-                    if input_stream is not None or expected_output_stream is not None:
-                        # Skip sequential test case validation for now - requires circuit evaluation
-                        continue
-                    
-                    # For combinatorial circuits, verify input/output structure matches puzzle definition
-                    if inputs and expected_outputs:
+                    if tc_kind == 'stream':
+                        # Stream test case validation
+                        input_stream = test_case.get('input_stream', [])
+                        expected_output_stream = test_case.get('expected_output_stream', {})
+                        
+                        if not input_stream:
+                            raise ValidationError(f"Stream test case {i} has empty input_stream")
+                        if not expected_output_stream:
+                            raise ValidationError(f"Stream test case {i} has empty expected_output_stream")
+                        
+                        num_cycles = len(input_stream)
+                        
+                        # Check min/max cycles constraints
+                        if min_cycles is not None and num_cycles < min_cycles:
+                            raise ValidationError(
+                                f"Stream test case {i} has {num_cycles} cycles but minimum required is {min_cycles}"
+                            )
+                        if max_cycles is not None and num_cycles > max_cycles:
+                            raise ValidationError(
+                                f"Stream test case {i} has {num_cycles} cycles but maximum allowed is {max_cycles}"
+                            )
+                        
+                        # Verify all inputs streams match puzzle inputs
+                        if input_stream and isinstance(input_stream[0], dict):
+                            tc_input_keys = set(input_stream[0].keys())
+                            puzzle_input_keys = set(puzzle_inputs)
+                            if tc_input_keys != puzzle_input_keys:
+                                raise ValidationError(
+                                    f"Stream test case {i} inputs {tc_input_keys} don't match puzzle inputs {puzzle_input_keys}"
+                                )
+                        
+                        # Verify output keys match puzzle outputs
+                        tc_output_keys = set(expected_output_stream.keys())
+                        puzzle_output_keys = set(puzzle_outputs)
+                        if tc_output_keys != puzzle_output_keys:
+                            raise ValidationError(
+                                f"Stream test case {i} outputs {tc_output_keys} don't match puzzle outputs {puzzle_output_keys}"
+                            )
+                        
+                        # Verify all output arrays have consistent length with inputs
+                        for output_name, output_values in expected_output_stream.items():
+                            if not isinstance(output_values, list):
+                                raise ValidationError(
+                                    f"Stream test case {i} output '{output_name}' must be a list"
+                                )
+                            if len(output_values) != num_cycles:
+                                raise ValidationError(
+                                    f"Stream test case {i} output '{output_name}' length {len(output_values)} "
+                                    f"doesn't match input stream length {num_cycles}"
+                                )
+                        
+                        # Validate stream test case against sample solution if eval_map available
+                        # For sequential circuits, check if each cycle's output can be evaluated
+                        try:
+                            for cycle_idx, input_dict in enumerate(input_stream):
+                                # Convert input dict to JSON key for lookup (match frontend format)
+                                if isinstance(input_dict, dict):
+                                    sorted_keys = sorted(input_dict.keys())
+                                    key = json.dumps({k: input_dict[k] for k in sorted_keys}, separators=(',', ':'))
+                                    if key in eval_map:
+                                        solution_output = eval_map[key]
+                                        for output_name, expected_values in expected_output_stream.items():
+                                            if output_name in solution_output:
+                                                expected_val = expected_values[cycle_idx]
+                                                actual_val = solution_output[output_name]
+                                                if actual_val != expected_val:
+                                                    raise ValidationError(
+                                                        f"Stream test case {i} cycle {cycle_idx}: "
+                                                        f"for input {input_dict}, expected {output_name}={expected_val} "
+                                                        f"but sample solution gives {actual_val}"
+                                                    )
+                        except ValidationError:
+                            raise
+                        except Exception as e:
+                            # If eval_map lookup fails, at least log it but don't block puzzle creation
+                            print(f"Warning: Could not fully validate stream test case {i}: {e}")
+                    else:
+                        # Blackbox test case validation
+                        inputs = test_case.get('inputs', {})
+                        expected_outputs = test_case.get('expected_outputs', {})
+                        
+                        # Verify input/output structure matches puzzle definition
                         tc_input_keys = set(inputs.keys())
                         puzzle_input_keys = set(puzzle_inputs)
                         if tc_input_keys != puzzle_input_keys:
@@ -399,7 +517,9 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             )
                         
                         # Validate solution can evaluate this test case
-                        key = json.dumps(inputs, sort_keys=True)
+                        # Match frontend's key format: no spaces in JSON (separators=(',', ':'))
+                        sorted_input_keys = sorted(inputs.keys())
+                        key = json.dumps({k: inputs[k] for k in sorted_input_keys}, separators=(',', ':'))
                         if key not in eval_map:
                             raise ValidationError(f"Sample solution missing evaluation for test case {i}: {inputs}")
                         
@@ -416,14 +536,23 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                                     f"but got {solution_output[output_name]}"
                                 )
                 
+                # Update config with difficulty if valid
                 if difficulty in ("EASY", "MEDIUM", "HARD"):
                     config_data.setdefault('puzzle', {})['difficulty'] = difficulty
                     with open(config_path, 'w', encoding='utf-8') as cf:
                         json.dump(config_data, cf, indent=2)
 
-                admin_id = 999
-                conn.execute("PRAGMA foreign_keys = OFF")
-                insert_riddle(conn, config_path, instructions_path, admin_id)
+                # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
+                # Copy validated temp files to final riddles directory
+                final_config_path = riddles_dir / pathlib.Path(config_path).name
+                final_instructions_path = riddles_dir / pathlib.Path(instructions_path).name
+                final_solution_path = riddles_dir / pathlib.Path(solution_path).name
+                
+                shutil.copy2(config_path, final_config_path)
+                shutil.copy2(instructions_path, final_instructions_path)
+                shutil.copy2(solution_path, final_solution_path)
+
+                insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id)
 
                 return {"message": "Puzzle created successfully"}
         except Exception as e:

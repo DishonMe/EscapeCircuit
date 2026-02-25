@@ -1,6 +1,6 @@
 {
   "puzzle": {
-    "name": "Full Adder Circuit1",
+    "name": "Full Adder Circuit2",
     "description": "Design a full adder circuit using AND, NAND, and DFF gates. Implement the sum and carry-out logic for two input bits and a carry-in bit.",
     "budget": 200,
     "time_limit_seconds": 30,
