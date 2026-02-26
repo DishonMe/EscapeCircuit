@@ -33,6 +33,7 @@ from Backend.APILayer.ArsenalController import build_arsenal_router
 from Backend.APILayer.PuzzleController import build_puzzle_router
 from Backend.APILayer.RatingController import build_rating_router
 from Backend.APILayer.AdminController import build_admin_router
+from Backend.APILayer.DebuggerController import build_debugger_router
 
 
 def create_app() -> FastAPI:
@@ -160,6 +161,7 @@ def create_app() -> FastAPI:
     app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service, admin_service))
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router(admin_service))
+    app.include_router(build_debugger_router(logic_engine))
 
     @app.get("/")
     def root():

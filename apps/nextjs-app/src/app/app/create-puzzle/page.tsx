@@ -497,21 +497,79 @@ export default function CreatePuzzleForm() {
   }, [data.basic.gateSet]);
 
   // Export solution from workstation
-  const exportSolution = useCallback(() => {
-    // Build eval_map from test cases (mapping inputs → outputs for truth table)
+  const exportSolution = useCallback(async () => {
+    // Build eval_map by simulating circuit on test cases
     const evalMap: Record<string, Record<string, number>> = {};
-    data.testCases.forEach((tc) => {
+    let simulationErrors: string[] = [];
+    let hasSimulationErrors = false;
+    
+    // Check if circuit exists
+    if (placed.length === 0 && wires.length === 0) {
+      alert('❌ No circuit designed! Please add gates and wires before exporting.');
+      return;
+    }
+    
+    // Simulate circuit for each test case
+    for (const tc of data.testCases) {
       // Only process blackbox test cases for eval_map
       if (tc.kind === 'stream' || tc.inputs === undefined || tc.expectedOutputs === undefined) {
-        return;
+        continue;
       }
-      // Create consistent key by sorting input keys (no spaces to match backend)
+      
       const sortedInputKeys = Object.keys(tc.inputs).sort();
       const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
-      evalMap[key] = tc.expectedOutputs;
-    });
-
-    // Export format expected by backend
+      
+      try {
+        // Call backend API to actually simulate the circuit
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
+        const baseUrl = apiUrl.replace(/\/api\/?$/, "");
+        
+        const response = await fetch(`${baseUrl}/debugger/simulate-circuit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: tc.inputs,
+            placed: placed,
+            wires: wires,
+          }),
+        });
+        
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || 'Simulation failed');
+        }
+        
+        const result = await response.json();
+        const simulatedOutputs = result.outputs || {};
+        
+        // Store the ACTUAL circuit output, not the expected output
+        evalMap[key] = simulatedOutputs;
+        
+        // Check if it matches expected
+        const matches = JSON.stringify(simulatedOutputs) === JSON.stringify(tc.expectedOutputs);
+        if (!matches) {
+          simulationErrors.push(
+            `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
+            `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(simulatedOutputs)}`
+          );
+          hasSimulationErrors = true;
+        }
+      } catch (e) {
+        simulationErrors.push(`Simulation error: ${String(e)}`);
+        hasSimulationErrors = true;
+      }
+    }
+    
+    if (hasSimulationErrors) {
+      alert(
+        '❌ Circuit output does NOT match test cases!\n\n' +
+        simulationErrors.join('\n') +
+        '\n\nPlease fix your circuit and try again.'
+      );
+      return;
+    }
+    
+    // All tests passed - create solution
     const solution = {
       eval_map: evalMap,
       circuit: {
@@ -532,6 +590,8 @@ export default function CreatePuzzleForm() {
       ...prev,
       solutionJSON: JSON.stringify(solution, null, 2),
     }));
+    
+    alert('✓ Circuit validated! All test cases passed. Solution exported.');
   }, [placed, wires, data.testCases]);
 
   const handleAddInputField = () => {
@@ -606,6 +666,26 @@ export default function CreatePuzzleForm() {
         
         return converted;
       });
+      
+      // ADD: Convert gate quotas to gate_limit test cases
+      const gateQuotasEntries = Object.entries(data.basic.gateQuotas);
+      if (gateQuotasEntries.length > 0) {
+        gateQuotasEntries.forEach(([gateName, gateLimit]) => {
+          convertedTestCases.push({
+            kind: 'gate_limit',
+            gate_name: gateName,
+            gate_limit: gateLimit,
+          });
+        });
+      }
+      
+      // ADD: Add total gate count limit test case if specified
+      if (data.basic.totalGateCount > 0) {
+        convertedTestCases.push({
+          kind: 'gate_count_limit',
+          max_gate_count: data.basic.totalGateCount,
+        });
+      }
       
       const configData = {
         puzzle: {
@@ -822,10 +902,13 @@ export default function CreatePuzzleForm() {
                 </label>
                 <input
                   type="number"
+                  min="1"
                   value={data.basic.totalGateCount ?? ""}
-                  onChange={(e) =>
-                    handleBasicChange("totalGateCount", e.target.value ? parseInt(e.target.value) : null)
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value) : null;
+                    // Only accept values > 0, treat 0 or negative as null
+                    handleBasicChange("totalGateCount", val && val > 0 ? val : null);
+                  }}
                   className="w-full border p-3 rounded"
                   placeholder="Max gates allowed"
                 />
@@ -1225,15 +1308,36 @@ export default function CreatePuzzleForm() {
         {activeTab === "solution" && (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 p-4 rounded">
-              <h3 className="font-semibold text-blue-900 mb-2">Design Your Solution Circuit</h3>
-              <p className="text-sm text-blue-900 mb-3">
-                Drag gates from the palette on the left, place and wire them on the grid. Click Export when done.
-              </p>
+              <h3 className="font-semibold text-blue-900 mb-2">⚡ Design Your Solution Circuit</h3>
+              <div className="text-sm text-blue-900 mb-3 space-y-2">
+                <p>
+                  <strong>IMPORTANT:</strong> Your circuit must correctly implement the logic for ALL test cases:
+                </p>
+                <ul className="list-disc list-inside ml-2">
+                  {data.testCases.length > 0 ? (
+                    data.testCases.map((tc, i) => {
+                      if (tc.kind === 'blackbox') {
+                        return (
+                          <li key={i}>
+                            Test {i}: Input {JSON.stringify(tc.inputs)} → Output {JSON.stringify(tc.expectedOutputs)}
+                          </li>
+                        );
+                      }
+                      return null;
+                    })
+                  ) : (
+                    <li>No test cases defined yet</li>
+                  )}
+                </ul>
+                <p className="text-orange-700 font-semibold mt-2">
+                  ⚠️ Your circuit's actual output must match the expected outputs above. Test in the Debugger to verify!
+                </p>
+              </div>
               <button
                 onClick={exportSolution}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"
               >
-                📥 Export Solution
+                📥 Export Solution (generates eval_map from circuit)
               </button>
             </div>
 

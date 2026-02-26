@@ -94,7 +94,7 @@ class SolvingService:
             raise ValidationError("puzzle has no test cases")
 
         # --- CORE VALIDATION LOGIC ---
-        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases)
+        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
         # -----------------------------
 
         attempt.passed = passed
@@ -258,7 +258,7 @@ class SolvingService:
             structure_json=json.dumps(expanded_solution)
         )
         
-        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases)
+        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p)
         
         if passed:
             cost_used = int(solution_payload.get("totalCost", 0))
@@ -460,7 +460,7 @@ class SolvingService:
             return {"solved": False, "message": fail_msg, "details": details}
 
     # ---------- Helper: Centralized Evaluation ----------
-    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any]):
+    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None):
         """
         Evaluates circuit against test cases, handling both Combinatorial (single step)
         and Sequential (streams over time/cycles) logic.
@@ -501,7 +501,10 @@ class SolvingService:
             
             # Check total gate count limit (GATE_COUNT_LIMIT test case)
             if tc_kind == "gate_count_limit":
-                max_gate_count = getattr(p, "total_gate_count", None)
+                # Try test case first, then fall back to puzzle's total_gate_count
+                max_gate_count = getattr(tc, "max_gate_count", None)
+                if max_gate_count is None and puzzle:
+                    max_gate_count = getattr(puzzle, "total_gate_count", None)
                 
                 if max_gate_count is not None:
                     total_gates = sum(actual_gates.values())
@@ -539,13 +542,15 @@ class SolvingService:
             # Handle dictionary access if tc is a dict
             if input_stream is None and isinstance(tc, dict):
                 input_stream = tc.get("input_stream")
+            
+            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
                 
             if input_stream is not None and len(input_stream) > 0:
                 # === SEQUENTIAL SIMULATION (INJECTED LOGIC) ===
                 # 'current_state' acts as our look-back history
                 current_state = {str(did): 0 for did in dff_ids}
                 
-                expected_stream = getattr(tc, "expected_output_stream", None) or tc.get("expected_output_stream", {})
+                expected_stream = getattr(tc, "expected_output_stream", None) if hasattr(tc, "expected_output_stream") else (tc.get("expected_output_stream", {}) if isinstance(tc, dict) else {})
                 if not expected_stream:
                     return False, "Sequential test case has input_stream but no expected_output_stream", [{"error": "malformed test case"}]
                     
@@ -605,20 +610,25 @@ class SolvingService:
                     }]
 
             else:
-                # === COMBINATORIAL SIMULATION ===
-                inputs = getattr(tc, "inputs", None) or tc.get("inputs")
-                expected = getattr(tc, "expected_outputs", None) or tc.get("expected_outputs")
+                # Only check inputs/outputs for BLACKBOX and WHITEBOX test cases
+                # Skip constraint-only test cases (GATE_LIMIT, GATE_COUNT_LIMIT, LATENCY_LIMIT)
+                is_logic_test = tc_kind not in ("gate_limit", "gate_count_limit", "latency_limit")
                 
-                try:
-                    out = self.logic_engine.evaluate(circuit, inputs)
-                    if out != expected:
-                        return False, "Wrong output", [{
-                            "inputs": inputs,
-                            "expected": expected,
-                            "actual": out
-                        }]
-                except Exception as e:
-                    return False, str(e), [{"error": str(e)}]
+                if is_logic_test:
+                    # === COMBINATORIAL SIMULATION ===
+                    inputs = getattr(tc, "inputs", None) if hasattr(tc, "inputs") else (tc.get("inputs") if isinstance(tc, dict) else None)
+                    expected = getattr(tc, "expected_outputs", None) if hasattr(tc, "expected_outputs") else (tc.get("expected_outputs") if isinstance(tc, dict) else None)
+                    
+                    try:
+                        out = self.logic_engine.evaluate(circuit, inputs)
+                        if out != expected:
+                            return False, "Wrong output", [{
+                                "inputs": inputs,
+                                "expected": expected,
+                                "actual": out
+                            }]
+                    except Exception as e:
+                        return False, str(e), [{"error": str(e)}]
 
         return True, None, []
 

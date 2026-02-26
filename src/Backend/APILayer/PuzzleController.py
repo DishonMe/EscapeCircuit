@@ -171,8 +171,11 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             pid = int(pid)
                         except (TypeError, ValueError):
                             pid = None
-                        # Per-user solved status
-                        if pid and pid in status_map:
+                        # Per-user solved status (but not for puzzle creator)
+                        creator_user_id = p.get("creator_user_id")
+                        is_creator = creator_user_id is not None and int(creator_user_id) == int(user_id)
+                        
+                        if pid and pid in status_map and not is_creator:
                             p["is_solved"] = True
                             p["best_time"] = status_map[pid].get("best_time")
                             p["total_xp"] = status_map[pid].get("total_xp", 0)
@@ -406,24 +409,73 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 if not isinstance(solution_data.get('eval_map'), dict):
                     raise ValidationError("Sample solution must have 'eval_map' field")
                 
+                # Check if solution has circuit structure for actual simulation
+                solution_circuit_data = solution_data.get('circuit')
+                
                 puzzle_inputs = puzzle_config.get('inputs', [])
                 puzzle_outputs = puzzle_config.get('outputs', [])
                 eval_map = solution_data.get('eval_map', {})
+                
+                # Debug: Log eval_map structure
+                print(f"\n=== VALIDATION DEBUG ===")
+                print(f"Puzzle Inputs: {puzzle_inputs}")
+                print(f"Puzzle Outputs: {puzzle_outputs}")
+                print(f"Eval Map Keys Available: {list(eval_map.keys())}")
+                print(f"Number of test cases: {len(test_cases)}")
+                print(f"Solution has circuit data: {solution_circuit_data is not None}")
+                
+                # For puzzle creation, we trust that the creator tested their circuit in the debugger.
+                # The eval_map provides the expected outputs that users' solutions will be validated against.
+                # Actual circuit correctness is verified when users solve the puzzle and their solution
+                # output must match the eval_map (which is what matters for grading).
                 
                 # Get min/max cycles if set
                 min_cycles = puzzle_config.get('min_cycles')
                 max_cycles = puzzle_config.get('max_cycles')
                 
                 # Validate all test cases can be evaluated
-                logic_engine = logicEngineService()
                 for i, test_case in enumerate(test_cases):
                     # Get test case kind
                     tc_kind = test_case.get('kind', 'blackbox')
                     
-                    if tc_kind == 'stream':
+                    if tc_kind == 'gate_limit':
+                        # Gate limit constraint (per-gate maximum)
+                        gate_name = test_case.get('gate_name')
+                        gate_limit = test_case.get('gate_limit')
+                        
+                        print(f"\n[Test Case {i}] Gate Limit Constraint")
+                        print(f"  Gate: {gate_name}, Max Count: {gate_limit}")
+                        
+                        if not gate_name:
+                            raise ValidationError(f"Gate limit test case {i} missing 'gate_name'")
+                        if gate_limit is None or gate_limit <= 0:
+                            raise ValidationError(f"Gate limit test case {i} missing or invalid 'gate_limit'")
+                        
+                        print(f"  ✓ Gate limit constraint valid")
+                        
+                    elif tc_kind == 'gate_count_limit':
+                        # Total gate count constraint
+                        max_gate_count = test_case.get('max_gate_count')
+                        
+                        print(f"\n[Test Case {i}] Total Gate Count Limit")
+                        print(f"  Max Total Gates: {max_gate_count}")
+                        
+                        # Skip if not properly set (helps with frontend default values)
+                        if max_gate_count is None or max_gate_count <= 0:
+                            print(f"  - Skipping: max_gate_count not set or invalid")
+                            continue
+                        
+                        print(f"  ✓ Total gate count limit valid")
+                    
+                    elif tc_kind == 'stream':
                         # Stream test case validation
                         input_stream = test_case.get('input_stream', [])
                         expected_output_stream = test_case.get('expected_output_stream', {})
+                        
+                        print(f"\n[Test Case {i}] Stream")
+                        print(f"  Input Stream Length: {len(input_stream)}")
+                        print(f"  Input Stream: {input_stream}")
+                        print(f"  Expected Output Stream: {expected_output_stream}")
                         
                         if not input_stream:
                             raise ValidationError(f"Stream test case {i} has empty input_stream")
@@ -471,35 +523,51 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                                     f"doesn't match input stream length {num_cycles}"
                                 )
                         
-                        # Validate stream test case against sample solution if eval_map available
-                        # For sequential circuits, check if each cycle's output can be evaluated
-                        try:
-                            for cycle_idx, input_dict in enumerate(input_stream):
-                                # Convert input dict to JSON key for lookup (match frontend format)
-                                if isinstance(input_dict, dict):
-                                    sorted_keys = sorted(input_dict.keys())
-                                    key = json.dumps({k: input_dict[k] for k in sorted_keys}, separators=(',', ':'))
-                                    if key in eval_map:
-                                        solution_output = eval_map[key]
-                                        for output_name, expected_values in expected_output_stream.items():
-                                            if output_name in solution_output:
-                                                expected_val = expected_values[cycle_idx]
-                                                actual_val = solution_output[output_name]
-                                                if actual_val != expected_val:
-                                                    raise ValidationError(
-                                                        f"Stream test case {i} cycle {cycle_idx}: "
-                                                        f"for input {input_dict}, expected {output_name}={expected_val} "
-                                                        f"but sample solution gives {actual_val}"
-                                                    )
-                        except ValidationError:
-                            raise
-                        except Exception as e:
-                            # If eval_map lookup fails, at least log it but don't block puzzle creation
-                            print(f"Warning: Could not fully validate stream test case {i}: {e}")
-                    else:
+                        # Validate stream test case against sample solution
+                        # Each cycle must have a corresponding entry in eval_map
+                        for cycle_idx, input_dict in enumerate(input_stream):
+                            if isinstance(input_dict, dict):
+                                sorted_keys = sorted(input_dict.keys())
+                                key = json.dumps({k: input_dict[k] for k in sorted_keys}, separators=(',', ':'))
+                                
+                                print(f"  Cycle {cycle_idx}: Looking for key {key}")
+                                
+                                # Key MUST exist in eval_map
+                                if key not in eval_map:
+                                    raise ValidationError(
+                                        f"Stream test case {i} cycle {cycle_idx}: "
+                                        f"no evaluation entry in sample solution for input {input_dict}"
+                                    )
+                                
+                                solution_output = eval_map[key]
+                                print(f"  Cycle {cycle_idx}: Solution output = {solution_output}")
+                                
+                                # Compare each output
+                                for output_name, expected_values in expected_output_stream.items():
+                                    if output_name not in solution_output:
+                                        raise ValidationError(
+                                            f"Stream test case {i} cycle {cycle_idx}: "
+                                            f"sample solution missing output '{output_name}'"
+                                        )
+                                    
+                                    expected_val = expected_values[cycle_idx]
+                                    actual_val = solution_output[output_name]
+                                    
+                                    if actual_val != expected_val:
+                                        raise ValidationError(
+                                            f"Stream test case {i} cycle {cycle_idx}: "
+                                            f"for input {input_dict}, expected {output_name}={expected_val} "
+                                            f"but sample solution gives {actual_val}"
+                                        )
+                        print(f"  ✓ Test case {i} PASSED")
+                    elif tc_kind == 'blackbox':
                         # Blackbox test case validation
                         inputs = test_case.get('inputs', {})
                         expected_outputs = test_case.get('expected_outputs', {})
+                        
+                        print(f"\n[Test Case {i}] Blackbox")
+                        print(f"  Inputs: {inputs}")
+                        print(f"  Expected Outputs: {expected_outputs}")
                         
                         # Verify input/output structure matches puzzle definition
                         tc_input_keys = set(inputs.keys())
@@ -520,27 +588,94 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                         # Match frontend's key format: no spaces in JSON (separators=(',', ':'))
                         sorted_input_keys = sorted(inputs.keys())
                         key = json.dumps({k: inputs[k] for k in sorted_input_keys}, separators=(',', ':'))
+                        
+                        print(f"  Looking for key: {key}")
+                        print(f"  Available keys: {list(eval_map.keys())}")
+                        
                         if key not in eval_map:
                             raise ValidationError(f"Sample solution missing evaluation for test case {i}: {inputs}")
                         
                         solution_output = eval_map[key]
+                        print(f"  Solution output: {solution_output}")
+                        print(f"  Expected outputs: {expected_outputs}")
+                        
+                        # CRITICAL: Validate outputs match
                         for output_name, expected_value in expected_outputs.items():
                             if output_name not in solution_output:
                                 raise ValidationError(
                                     f"Sample solution test case {i} missing output '{output_name}'"
                                 )
-                            if solution_output[output_name] != expected_value:
+                            actual_value = solution_output[output_name]
+                            print(f"    {output_name}: expected={expected_value}, actual={actual_value}")
+                            
+                            if actual_value != expected_value:
                                 raise ValidationError(
-                                    f"Sample solution test case {i} incorrect: "
-                                    f"for {inputs}, expected {output_name}={expected_value} "
-                                    f"but got {solution_output[output_name]}"
+                                    f"❌ VALIDATION FAILED: Test case {i} output mismatch!\n"
+                                    f"   Input: {inputs}\n"
+                                    f"   Expected: {expected_outputs}\n"
+                                    f"   But your solution produces: {solution_output}\n"
+                                    f"   This means your circuit doesn't correctly implement the required logic.\n"
+                                    f"   Make sure to test your circuit in the Debugger and verify ALL test cases pass."
                                 )
+                        print(f"  ✓ Test case {i} PASSED")
+                    else:
+                        raise ValidationError(
+                            f"Test case {i} has unknown kind '{tc_kind}'. "
+                            f"Must be one of: blackbox, stream, gate_limit, gate_count_limit"
+                        )
+                
+                print(f"\n=== ✓ ALL {len(test_cases)} TEST CASES VALIDATED SUCCESSFULLY ===")
+                
+                # CRITICAL: Verify solution actually works
+                # The eval_map should contain ALL possible input combinations being tested
+                # Check that eval_map has reasonable size (not just 1-2 entries)
+                eval_map_size = len(eval_map)
+                print(f"\n=== CRITICAL CHECK: Solution Completeness ===")
+                print(f"Solution has {eval_map_size} entries in eval_map")
+                print(f"Test cases defined: {len(test_cases)}")
+                
+                # For blackbox tests: each test case = 1 entry in eval_map
+                # For stream tests: each cycle = 1 entry in eval_map
+                blackbox_count = sum(1 for tc in test_cases if tc.get('kind', 'blackbox') == 'blackbox')
+                stream_cycles = sum(len(tc.get('input_stream', [])) for tc in test_cases if tc.get('kind') == 'stream')
+                expected_eval_map_entries = blackbox_count + stream_cycles
+                
+                print(f"Expected eval_map entries: {expected_eval_map_entries} (blackbox: {blackbox_count}, stream cycles: {stream_cycles})")
+                
+                if eval_map_size < expected_eval_map_entries:
+                    raise ValidationError(
+                        f"Solution eval_map has {eval_map_size} entries but test cases require {expected_eval_map_entries}. "
+                        f"Your circuit was not properly simulated. Make sure to test it in the Debugger first!"
+                    )
+                
+                print(f"✓ Solution completeness check passed\n")
+                
+                # IMPORTANT: Filter out invalid constraint test cases before saving
+                # This prevents PuzzleTestCase validation errors when loading the puzzle
+                valid_test_cases = []
+                for tc in test_cases:
+                    tc_kind = tc.get('kind', 'blackbox')
+                    
+                    # Remove gate_count_limit if invalid
+                    if tc_kind == 'gate_count_limit':
+                        max_gate_count = tc.get('max_gate_count')
+                        if max_gate_count is None or max_gate_count <= 0:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (max_gate_count={max_gate_count})")
+                            continue
+                    
+                    valid_test_cases.append(tc)
+                
+                # Update test_cases in config to only include valid ones
+                config_data['test_cases'] = valid_test_cases
+                print(f"[FILTER] Keeping {len(valid_test_cases)} valid test cases (removed {len(test_cases) - len(valid_test_cases)})\n")
                 
                 # Update config with difficulty if valid
                 if difficulty in ("EASY", "MEDIUM", "HARD"):
                     config_data.setdefault('puzzle', {})['difficulty'] = difficulty
-                    with open(config_path, 'w', encoding='utf-8') as cf:
-                        json.dump(config_data, cf, indent=2)
+                
+                # IMPORTANT: Always write the filtered config to file (with or without difficulty)
+                with open(config_path, 'w', encoding='utf-8') as cf:
+                    json.dump(config_data, cf, indent=2)
 
                 # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
                 # Copy validated temp files to final riddles directory

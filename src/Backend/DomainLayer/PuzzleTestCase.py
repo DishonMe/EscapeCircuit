@@ -39,8 +39,10 @@ class PuzzleTestCase:
             return
         
         if self.kind == TestCaseKind.GATE_COUNT_LIMIT:
-            if self.max_gate_count is None or self.max_gate_count <= 0:
-                raise ValidationError("GATE_COUNT_LIMIT test case must have max_gate_count > 0")
+            # max_gate_count can be None (falls back to puzzle's total_gate_count)
+            # but if provided, must be > 0
+            if self.max_gate_count is not None and self.max_gate_count <= 0:
+                raise ValidationError("GATE_COUNT_LIMIT test case max_gate_count must be > 0 if provided")
             return
         
         if self.kind == TestCaseKind.LATENCY_LIMIT:
