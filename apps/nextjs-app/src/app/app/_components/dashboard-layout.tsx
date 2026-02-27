@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, PanelLeft, Folder, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
+import { Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -49,7 +49,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const navigation = [
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
     { name: 'Arsenal', to: paths.app.arsenal.root.getHref(), icon: Zap },
-    { name: 'Discussions', to: paths.app.discussions.getHref(), icon: Folder },
+    {
+      name: 'Discussions',
+      to: paths.app.discussions.getHref(),
+      icon: MessageSquare,
+    },
     (userRole === 'creator' || userRole === 'admin') && {
       name: 'Notifications',
       to: paths.app.notifications.getHref(),

@@ -12,6 +12,10 @@ from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
+from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
+from Backend.PersistantLayer.ReplyRepo import ReplyRepo
+from Backend.PersistantLayer.EngagementRepo import EngagementRepo
+from Backend.PersistantLayer.ReportRepo import ReportRepo
 
 def init_db():
     # DB in project root (src/..)
@@ -28,7 +32,11 @@ def init_db():
     PuzzleRepo(conn)
     RatingRepo(conn)
     SolveRepo(conn)
-    
+    DiscussionRepo(conn)
+    ReplyRepo(conn)
+    EngagementRepo(conn)
+    ReportRepo(conn)
+
     conn.commit()
     conn.close()
     print("Database initialized successfully.")

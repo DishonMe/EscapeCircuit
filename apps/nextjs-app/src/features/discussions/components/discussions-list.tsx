@@ -1,95 +1,144 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
 
-import { Link } from '@/components/ui/link';
 import { Spinner } from '@/components/ui/spinner';
-import { Table } from '@/components/ui/table';
-import { paths } from '@/config/paths';
-import { formatDate } from '@/utils/format';
+import { ThreadCategory } from '@/types/api';
+import { cn } from '@/utils/cn';
 
-import { getDiscussionQueryOptions } from '../api/get-discussion';
-import { useDiscussions } from '../api/get-discussions';
+import { useDiscussions, DiscussionFilters } from '../api/get-discussions';
+import { CATEGORY_OPTIONS } from './category-badge';
+import { DiscussionCard } from './discussion-card';
 
-import { DeleteDiscussion } from './delete-discussion';
-
-export type DiscussionsListProps = {
-  onDiscussionPrefetch?: (id: string) => void;
-};
-
-export const DiscussionsList = ({
-  onDiscussionPrefetch,
-}: DiscussionsListProps) => {
-  const searchParams = useSearchParams();
-  const page = searchParams?.get('page') ? Number(searchParams.get('page')) : 1;
-
-  const discussionsQuery = useDiscussions({
-    page: page,
+export const DiscussionsList = () => {
+  const [filters, setFilters] = useState<DiscussionFilters>({
+    limit: 20,
+    offset: 0,
+    sort: 'newest',
   });
-  const queryClient = useQueryClient();
+  const [searchInput, setSearchInput] = useState('');
 
-  if (discussionsQuery.isLoading) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters((prev) => ({
+        ...prev,
+        search: searchInput || undefined,
+        offset: 0,
+      }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  const discussions = discussionsQuery.data?.data;
-  const meta = discussionsQuery.data?.meta;
+  const discussionsQuery = useDiscussions({ filters });
 
-  if (!discussions) return null;
+  const discussions = discussionsQuery.data?.discussions;
+  const total = discussionsQuery.data?.total ?? 0;
+  const limit = filters.limit ?? 20;
+  const offset = filters.offset ?? 0;
+  const currentPage = Math.floor(offset / limit) + 1;
+  const totalPages = Math.ceil(total / limit);
 
   return (
-    <Table
-      data={discussions}
-      columns={[
-        {
-          title: 'Title',
-          field: 'title',
-        },
-        {
-          title: 'Created At',
-          field: 'createdAt',
-          Cell({ entry: { createdAt } }) {
-            return <span>{formatDate(createdAt)}</span>;
-          },
-        },
-        {
-          title: '',
-          field: 'id',
-          Cell({ entry: { id } }) {
-            return (
-              <Link
-                onMouseEnter={() => {
-                  // Prefetch the discussion data when the user hovers over the link
-                  queryClient.prefetchQuery(getDiscussionQueryOptions(id));
-                  onDiscussionPrefetch?.(id);
-                }}
-                href={paths.app.discussion.getHref(id)}
-              >
-                View
-              </Link>
-            );
-          },
-        },
-        {
-          title: '',
-          field: 'id',
-          Cell({ entry: { id } }) {
-            return <DeleteDiscussion id={id} />;
-          },
-        },
-      ]}
-      pagination={
-        meta && {
-          totalPages: meta.totalPages,
-          currentPage: meta.page,
-          rootUrl: '',
-        }
-      }
-    />
+    <div className="space-y-4">
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search discussions..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        {CATEGORY_OPTIONS.map((opt) => (
+          <button
+            key={opt.value || 'all'}
+            onClick={() =>
+              setFilters((prev) => ({
+                ...prev,
+                category: opt.value ? (opt.value as ThreadCategory) : undefined,
+                offset: 0,
+              }))
+            }
+            className={cn(
+              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              filters.category === opt.value || (!filters.category && !opt.value)
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+
+        <select
+          value={filters.sort ?? 'newest'}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              sort: e.target.value as DiscussionFilters['sort'],
+              offset: 0,
+            }))
+          }
+          className="ml-auto rounded-md border border-gray-300 px-2 py-1 text-xs"
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="most_replies">Most Replies</option>
+          <option value="most_upvotes">Most Upvotes</option>
+          <option value="trending">Trending</option>
+        </select>
+      </div>
+
+      {discussionsQuery.isLoading ? (
+        <div className="flex h-48 items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      ) : !discussions || discussions.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">
+          {searchInput
+            ? 'No discussions match your search.'
+            : 'No discussions found. Start the conversation!'}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {discussions.map((d) => (
+            <DiscussionCard key={d.id} discussion={d} />
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            disabled={currentPage <= 1}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, offset: (currentPage - 2) * limit }))
+            }
+            className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-500">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            disabled={currentPage >= totalPages}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, offset: currentPage * limit }))
+            }
+            className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
   );
 };

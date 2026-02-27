@@ -1,18 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Users, Gamepad2, ClipboardList } from 'lucide-react';
+import { Users, Gamepad2, ClipboardList, Flag } from 'lucide-react';
 
 import { UsersList } from '@/features/users/components/users-list';
 import { AdminPuzzlesList } from '@/features/admin/components/admin-puzzles-list';
 import { AuditLogList } from '@/features/admin/components/audit-log-list';
+import { ReportsList } from '@/features/admin/components/reports-list';
 import { cn } from '@/utils/cn';
 
-type Tab = 'users' | 'puzzles' | 'audit';
+type Tab = 'users' | 'puzzles' | 'audit' | 'reports';
 
 const tabs: { id: Tab; label: string; icon: any }[] = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'puzzles', label: 'Puzzles', icon: Gamepad2 },
+  { id: 'reports', label: 'Reports', icon: Flag },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
 ];
 
@@ -46,6 +48,7 @@ export const AdminPanel = () => {
       {/* Tab Content */}
       {activeTab === 'users' && <UsersList />}
       {activeTab === 'puzzles' && <AdminPuzzlesList />}
+      {activeTab === 'reports' && <ReportsList />}
       {activeTab === 'audit' && <AuditLogList />}
     </div>
   );

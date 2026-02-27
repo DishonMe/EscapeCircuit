@@ -29,6 +29,23 @@ class UserRepo:
             pw_hash BLOB
         );
         """)
+        # Migration: add is_discussion_banned column if missing
+        cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "is_discussion_banned" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN is_discussion_banned INTEGER NOT NULL DEFAULT 0")
+
+    @staticmethod
+    def _row_to_user(row) -> User:
+        return User.from_dict({
+            "id": int(row["id"]),
+            "username": row["username"],
+            "email": row["email"],
+            "role": row["role"],
+            "bio": row["bio"],
+            "xp": int(row["xp"]),
+            "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in row.keys() else False,
+            "created_at": row["created_at"],
+        })
 
     @staticmethod
     def _hash_password(password: str, salt: bytes) -> bytes:
@@ -51,39 +68,15 @@ class UserRepo:
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-        return User.from_dict({
-            "id": int(row["id"]),
-            "username": row["username"],
-            "email": row["email"],
-            "role": row["role"],
-            "bio": row["bio"],
-            "xp": int(row["xp"]),
-            "created_at": row["created_at"],
-        }) if row else None
+        return self._row_to_user(row) if row else None
 
     def get_by_username(self, username: str) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-        return User.from_dict({
-            "id": int(row["id"]),
-            "username": row["username"],
-            "email": row["email"],
-            "role": row["role"],
-            "bio": row["bio"],
-            "xp": int(row["xp"]),
-            "created_at": row["created_at"],
-        }) if row else None
+        return self._row_to_user(row) if row else None
 
     def get_by_email(self, email: str) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-        return User.from_dict({
-            "id": int(row["id"]),
-            "username": row["username"],
-            "email": row["email"],
-            "role": row["role"],
-            "bio": row["bio"],
-            "xp": int(row["xp"]),
-            "created_at": row["created_at"],
-        }) if row else None
+        return self._row_to_user(row) if row else None
 
     def verify_login(self, username: str, password: str) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
@@ -92,15 +85,7 @@ class UserRepo:
         got = self._hash_password(password, row["pw_salt"])
         if got != row["pw_hash"]:
             return None
-        return User.from_dict({
-            "id": int(row["id"]),
-            "username": row["username"],
-            "email": row["email"],
-            "role": row["role"],
-            "bio": row["bio"],
-            "xp": int(row["xp"]),
-            "created_at": row["created_at"],
-        })
+        return self._row_to_user(row)
 
     def update_xp(self, user_id: int, xp: int) -> None:
         if xp < 0:
@@ -197,18 +182,7 @@ class UserRepo:
         params.extend([limit, offset])
         
         rows = self.conn.execute(query, params).fetchall()
-        return [
-            User.from_dict({
-                "id": int(r["id"]),
-                "username": r["username"],
-                "email": r["email"],
-                "role": r["role"],
-                "bio": r["bio"],
-                "xp": int(r["xp"]),
-                "created_at": r["created_at"],
-            })
-            for r in rows
-        ]
+        return [self._row_to_user(r) for r in rows]
     
     def count_all(
         self,
@@ -264,3 +238,11 @@ class UserRepo:
         cur = self.conn.execute(f"SELECT COUNT(*) FROM users {where_sql}", params)
         row = cur.fetchone()
         return row[0] if row else 0
+
+    def ban_from_discussions(self, user_id: int) -> None:
+        self.conn.execute("UPDATE users SET is_discussion_banned=1 WHERE id=?", (int(user_id),))
+        self.conn.commit()
+
+    def unban_from_discussions(self, user_id: int) -> None:
+        self.conn.execute("UPDATE users SET is_discussion_banned=0 WHERE id=?", (int(user_id),))
+        self.conn.commit()

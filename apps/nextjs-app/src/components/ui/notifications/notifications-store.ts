@@ -6,6 +6,7 @@ export type Notification = {
   type: 'info' | 'warning' | 'success' | 'error';
   title: string;
   message?: string;
+  persistent?: boolean;
 };
 
 type NotificationsStore = {

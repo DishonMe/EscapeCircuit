@@ -1,14 +1,30 @@
-import { Comment, User } from '@/types/api';
+import { Comment, Discussion, User } from '@/types/api';
 
 const normalizeRole = (role: string | undefined) => (role || '').toLowerCase();
 
 export const canCreateDiscussion = (user: User | null | undefined) => {
+  return !!user;
+};
+export const canDeleteDiscussion = (
+  user: User | null | undefined,
+  discussion?: Discussion,
+) => {
+  if (!user) return false;
+  if (normalizeRole(user.role) === 'admin') return true;
+  return discussion?.author_id?.toString() === user.id;
+};
+export const canUpdateDiscussion = (
+  user: User | null | undefined,
+  discussion?: Discussion,
+) => {
+  if (!user) return false;
+  if (normalizeRole(user.role) === 'admin') return true;
+  return discussion?.author_id?.toString() === user.id;
+};
+export const canPinDiscussion = (user: User | null | undefined) => {
   return normalizeRole(user?.role) === 'admin';
 };
-export const canDeleteDiscussion = (user: User | null | undefined) => {
-  return normalizeRole(user?.role) === 'admin';
-};
-export const canUpdateDiscussion = (user: User | null | undefined) => {
+export const canLockDiscussion = (user: User | null | undefined) => {
   return normalizeRole(user?.role) === 'admin';
 };
 
@@ -37,7 +53,7 @@ export const canDeleteComment = (
     return true;
   }
 
-  if (userRole === 'user' && comment.author?.id === user.id) {
+  if (userRole === 'user' && comment.author?.id === user?.id) {
     return true;
   }
 
