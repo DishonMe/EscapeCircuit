@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { useCreatorNotifications, useMarkNotificationsRead } from '@/features/notifications/api';
 import { useNotifications } from '@/components/ui/notifications';
 import { useUser } from '@/lib/auth';
-import { Button } from '@/components/ui/button';
 
 const SHOWN_NOTIFICATIONS_KEY = 'escapecircuit_shown_notifications';
 
@@ -22,7 +20,6 @@ const CreatorNotificationsPopup = () => {
   const markRead = useMarkNotificationsRead();
   const { addNotification } = useNotifications();
   const shownRef = useRef(false);
-  const [activeToastIds, setActiveToastIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     // Only fire once per mount, only when data is ready, only when we have a user
@@ -56,37 +53,32 @@ const CreatorNotificationsPopup = () => {
     const allNotificationIds = notifications.map((n) => n.id);
     localStorage.setItem(SHOWN_NOTIFICATIONS_KEY, JSON.stringify(allNotificationIds));
 
-    // Track which toasts are currently active
-    const toastIds = new Set<number>();
-
     // Show each notification as a toast (stagger slightly for UX)
     newNotifications.forEach((n, i) => {
       setTimeout(() => {
-        toastIds.add(n.id);
-        setActiveToastIds(new Set(toastIds));
+        let title = 'Notification';
+        let type: 'success' | 'info' | 'warning' | 'error' = 'info';
+        if (n.type === 'solve') {
+          title = 'Puzzle Solved!';
+          type = 'success';
+        } else if (n.type === 'rating') {
+          title = 'New Rating!';
+          type = 'info';
+        } else if (n.type === 'warning') {
+          title = 'Warning';
+          type = 'warning';
+        } else if (n.type === 'ban') {
+          title = 'Account Restriction';
+          type = 'error';
+        }
 
-        const title = n.type === 'solve' ? 'Puzzle Solved!' : 'New Rating!';
-        const type = n.type === 'solve' ? 'success' : 'info';
+        const persistent = n.type === 'warning' || n.type === 'ban';
 
         addNotification({
           type,
           title,
           message: n.message,
-          // For multiple notifications, add a close all action hint
-          ...(newNotifications.length > 1 && {
-            action: (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  // Clear all toasts
-                  setActiveToastIds(new Set());
-                }}
-              >
-                <X className="size-4" />
-              </Button>
-            ),
-          }),
+          persistent,
         });
       }, i * 600); // 600ms apart so they don't all pop at once
     });

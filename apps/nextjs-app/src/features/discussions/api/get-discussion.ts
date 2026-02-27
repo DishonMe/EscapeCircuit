@@ -2,13 +2,17 @@ import { useQuery, queryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
-import { Discussion } from '@/types/api';
+import { Discussion, Reply } from '@/types/api';
+
+type DiscussionWithReplies = Discussion & {
+  replies: (Reply & { children?: Reply[] })[];
+};
 
 export const getDiscussion = ({
   discussionId,
 }: {
   discussionId: string;
-}): Promise<{ data: Discussion }> => {
+}): Promise<DiscussionWithReplies> => {
   return api.get(`/discussions/${discussionId}`);
 };
 

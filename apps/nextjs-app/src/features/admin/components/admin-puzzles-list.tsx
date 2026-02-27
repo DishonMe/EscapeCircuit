@@ -105,7 +105,7 @@ export const AdminPuzzlesList = () => {
           },
           {
             title: 'Creator',
-            field: 'creator_user_id',
+            field: 'creator' as any,
             Cell({ entry }: { entry: any }) {
               return (
                 <span>{entry.creator?.username || 'Unknown'}</span>
@@ -140,7 +140,7 @@ export const AdminPuzzlesList = () => {
           },
           {
             title: 'Created',
-            field: 'created_at',
+            field: 'createdAt',
             Cell({ entry }: { entry: any }) {
               const ts = entry.created_at || entry.createdAt;
               return (

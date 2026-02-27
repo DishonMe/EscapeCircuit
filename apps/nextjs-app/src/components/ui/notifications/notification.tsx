@@ -18,21 +18,23 @@ export type NotificationProps = {
     type: keyof typeof icons;
     title: string;
     message?: string;
+    persistent?: boolean;
   };
   onDismiss: (id: string) => void;
 };
 
 export const Notification = ({
-  notification: { id, type, title, message },
+  notification: { id, type, title, message, persistent },
   onDismiss,
 }: NotificationProps) => {
   useEffect(() => {
+    if (persistent) return;
     const timer = setTimeout(() => {
       onDismiss(id);
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [id, onDismiss]);
+  }, [id, onDismiss, persistent]);
 
   return (
     <div className="flex w-full flex-col items-center space-y-4 sm:items-end">

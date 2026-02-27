@@ -5,7 +5,7 @@ import { QueryConfig } from '@/lib/react-query';
 
 export type CreatorNotification = {
   id: number;
-  type: 'solve' | 'rating';
+  type: 'solve' | 'rating' | 'warning' | 'ban';
   message: string;
   xp_amount: number;
   puzzle_name: string;
@@ -14,7 +14,7 @@ export type CreatorNotification = {
 };
 
 export interface NotificationFilters {
-  notifType?: 'solve' | 'rating';
+  notifType?: 'solve' | 'rating' | 'warning' | 'ban';
   puzzleName?: string;
   actorUsername?: string;
   dateFrom?: string;

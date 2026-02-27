@@ -55,4 +55,21 @@ class GateType(str, Enum):
 
     # Special gate types - flip flop
     DFF = "DFF"
-    
+
+
+class ThreadCategory(str, Enum):
+    GENERAL = "general"
+    PUZZLE_HELP = "puzzle_help"
+    PUZZLE_TIPS = "puzzle_tips"
+    SOLUTIONS = "solutions"
+    BUG_REPORT = "bug_report"
+    FEATURE_REQUEST = "feature_request"
+    SHOWCASE = "showcase"
+
+
+class ReactionType(str, Enum):
+    INSIGHTFUL = "insightful"
+    HELPFUL = "helpful"
+    GENIUS = "genius"
+    SPOT_ON = "spot_on"
+    THINKING = "thinking"

@@ -1,59 +1,13 @@
-import {
-  dehydrate,
-  HydrationBoundary,
-  QueryClient,
-} from '@tanstack/react-query';
+'use client';
 
-import { Discussion } from '@/app/app/discussions/[discussionId]/_components/discussion';
-import { getInfiniteCommentsQueryOptions } from '@/features/comments/api/get-comments';
-import {
-  getDiscussion,
-  getDiscussionQueryOptions,
-} from '@/features/discussions/api/get-discussion';
+import { useParams } from 'next/navigation';
 
-export const generateMetadata = async ({
-  params,
-}: {
-  params: Promise<{ discussionId: string }>;
-}) => {
-  const discussionId = (await params).discussionId;
+import { DiscussionView } from '@/features/discussions/components/discussion-view';
 
-  const discussion = await getDiscussion({ discussionId });
+const PublicDiscussionPage = () => {
+  const params = useParams<{ discussionId: string }>();
 
-  return {
-    title: discussion.data?.title,
-    description: discussion.data?.title,
-  };
-};
-
-const preloadData = async (discussionId: string) => {
-  const queryClient = new QueryClient();
-
-  await Promise.all([
-    queryClient.prefetchQuery(getDiscussionQueryOptions(discussionId)),
-    queryClient.prefetchInfiniteQuery(
-      getInfiniteCommentsQueryOptions(discussionId),
-    ),
-  ]);
-
-  return {
-    dehydratedState: dehydrate(queryClient),
-  };
-};
-
-const PublicDiscussionPage = async ({
-  params: { discussionId },
-}: {
-  params: {
-    discussionId: string;
-  };
-}) => {
-  const { dehydratedState } = await preloadData(discussionId);
-  return (
-    <HydrationBoundary state={dehydratedState}>
-      <Discussion discussionId={discussionId} />
-    </HydrationBoundary>
-  );
+  return <DiscussionView discussionId={params.discussionId} />;
 };
 
 export default PublicDiscussionPage;

@@ -12,6 +12,10 @@ from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.PersistantLayer.NotificationRepo import NotificationRepo
 from Backend.PersistantLayer.AuditLogRepo import AuditLogRepo
+from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
+from Backend.PersistantLayer.ReplyRepo import ReplyRepo
+from Backend.PersistantLayer.EngagementRepo import EngagementRepo
+from Backend.PersistantLayer.ReportRepo import ReportRepo
 
 # Services
 from Backend.ServiceLayer.AuthService import AuthService
@@ -25,6 +29,8 @@ from Backend.ServiceLayer.RatingService import RatingService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
 from Backend.ServiceLayer.NotificationService import NotificationService
 from Backend.ServiceLayer.AdminService import AdminService
+from Backend.ServiceLayer.DiscussionService import DiscussionService
+from Backend.ServiceLayer.ReplyService import ReplyService
 
 # Controllers
 from Backend.APILayer.UserController import build_user_router
@@ -34,6 +40,7 @@ from Backend.APILayer.PuzzleController import build_puzzle_router
 from Backend.APILayer.RatingController import build_rating_router
 from Backend.APILayer.AdminController import build_admin_router
 from Backend.APILayer.DebuggerController import build_debugger_router
+from Backend.APILayer.DiscussionController import build_discussion_router
 
 
 def create_app() -> FastAPI:
@@ -57,6 +64,10 @@ def create_app() -> FastAPI:
     solve_repo = SolveRepo(conn)
     notification_repo = NotificationRepo(conn)
     audit_log_repo = AuditLogRepo(conn)
+    discussion_repo = DiscussionRepo(conn)
+    reply_repo = ReplyRepo(conn)
+    engagement_repo = EngagementRepo(conn)
+    report_repo = ReportRepo(conn)
 
     # 3. Services
     # logic engine (stateless)
@@ -126,6 +137,28 @@ def create_app() -> FastAPI:
         notification_service,
     )
 
+    # Discussion Service
+    discussion_service = DiscussionService(
+        discussion_repo=discussion_repo,
+        reply_repo=reply_repo,
+        user_repo=user_repo,
+        auth_service=auth_service,
+        xp_service=xp_service,
+        engagement_repo=engagement_repo,
+        report_repo=report_repo,
+        notification_repo=notification_repo,
+    )
+
+    # Reply Service
+    reply_service = ReplyService(
+        reply_repo=reply_repo,
+        discussion_repo=discussion_repo,
+        user_repo=user_repo,
+        auth_service=auth_service,
+        xp_service=xp_service,
+        engagement_repo=engagement_repo,
+    )
+
     # Admin Service
     admin_service = AdminService(
         user_repo=user_repo,
@@ -162,6 +195,15 @@ def create_app() -> FastAPI:
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router(admin_service))
     app.include_router(build_debugger_router(logic_engine))
+
+    # Discussion & Reply routers
+    disc_router, reply_router, puzzle_disc_router, report_router = build_discussion_router(
+        discussion_service, reply_service
+    )
+    app.include_router(disc_router)
+    app.include_router(reply_router)
+    app.include_router(puzzle_disc_router)
+    app.include_router(report_router)
 
     @app.get("/")
     def root():
