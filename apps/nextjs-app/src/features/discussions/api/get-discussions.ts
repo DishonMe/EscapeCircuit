@@ -39,6 +39,7 @@ export const getDiscussionsQueryOptions = (filters: DiscussionFilters = {}) => {
   return queryOptions({
     queryKey: ['discussions', filters],
     queryFn: () => getDiscussions(filters),
+    staleTime: 0, // Always refetch so view counts and other stats are fresh
   });
 };
 
