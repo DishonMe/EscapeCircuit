@@ -92,6 +92,15 @@ class UserRepo:
             raise ValidationError("xp cannot be negative")
         self.conn.execute("UPDATE users SET xp=? WHERE id=?", (int(xp), int(user_id)))
 
+    def increment_xp(self, user_id: int, delta: int) -> None:
+        """Atomically increment user XP by delta. Uses SQL arithmetic to avoid read-modify-write races."""
+        if delta <= 0:
+            return
+        self.conn.execute(
+            "UPDATE users SET xp = xp + ? WHERE id = ?",
+            (int(delta), int(user_id)),
+        )
+
     def delete(self, user_id: int) -> bool:
         """Delete a user by ID. Returns True if a row was actually deleted."""
         cur = self.conn.execute("DELETE FROM users WHERE id=?", (int(user_id),))
@@ -99,6 +108,15 @@ class UserRepo:
 
     def update_role(self, user_id: int, role: UserRole) -> None:
         self.conn.execute("UPDATE users SET role=? WHERE id=?", (role.value, int(user_id)))
+
+    def update_role_if(self, user_id: int, new_role: UserRole, expected_role: UserRole) -> bool:
+        """Atomically update role only if current role matches expected_role.
+        Returns True if the update happened (exactly one row changed)."""
+        cur = self.conn.execute(
+            "UPDATE users SET role=? WHERE id=? AND role=?",
+            (new_role.value, int(user_id), expected_role.value),
+        )
+        return cur.rowcount > 0
 
     def list_all(
         self, 
@@ -160,10 +178,10 @@ class UserRepo:
         # 'all' requires no additional filter
         
         # Build order by clause
-        valid_order_fields = ["created_at", "level", "role", "xp"]
+        valid_order_fields = ["created_at", "level", "role", "xp", "id"]
         if order_by not in valid_order_fields:
             order_by = "created_at"
-        
+
         if order_by == "level":
             # Level is calculated from XP, so we order by xp
             order_clause = f"xp {order_direction}"
@@ -171,6 +189,8 @@ class UserRepo:
             order_clause = f"role {order_direction}"
         elif order_by == "xp":
             order_clause = f"xp {order_direction}"
+        elif order_by == "id":
+            order_clause = f"id {order_direction}"
         else:
             order_clause = f"created_at {order_direction}"
         

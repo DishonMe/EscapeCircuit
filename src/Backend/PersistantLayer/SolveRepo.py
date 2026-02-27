@@ -16,6 +16,7 @@ class PuzzleProgress:
     max_xp_reached: bool = False
     best_xp: int = 0
     total_xp_awarded: int = 0  # Sum of all deltas awarded (not raw xp_earned)
+    xp_applied: int = 0  # How much of total_xp_awarded has been applied to users.xp
 
 
 class SolveRepo:
@@ -80,11 +81,34 @@ class SolveRepo:
             "max_xp_reached INTEGER NOT NULL DEFAULT 0",
             "best_xp INTEGER NOT NULL DEFAULT 0",
             "total_xp_awarded INTEGER NOT NULL DEFAULT 0",
+            "xp_applied INTEGER NOT NULL DEFAULT 0",
         ]:
             col = coldef.split()[0]
             pp_cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzle_progress);").fetchall()}
             if col not in pp_cols:
                 self.conn.execute(f"ALTER TABLE puzzle_progress ADD COLUMN {coldef};")
+
+        # Dedup table: ensures creator only gets XP once per (puzzle, solver) pair
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS creator_solve_xp_awarded (
+            puzzle_id INTEGER NOT NULL,
+            solver_user_id INTEGER NOT NULL,
+            UNIQUE(puzzle_id, solver_user_id)
+        );
+        """)
+
+    def try_award_creator_solve_xp(self, puzzle_id: int, solver_user_id: int) -> bool:
+        """Atomically mark creator-solve-XP as awarded for this (puzzle, solver) pair.
+        Returns True if first time (XP should be awarded), False if already awarded."""
+        try:
+            self.conn.execute(
+                "INSERT INTO creator_solve_xp_awarded(puzzle_id, solver_user_id) VALUES(?,?)",
+                (int(puzzle_id), int(solver_user_id)),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
 
     # --- attempts ---
     def create_attempt(self, attempt: SolveAttempt) -> SolveAttempt:
@@ -221,6 +245,7 @@ class SolveRepo:
             max_xp_reached=bool(int(row["max_xp_reached"])) if "max_xp_reached" in row.keys() else False,
             best_xp=int(row["best_xp"]) if "best_xp" in row.keys() else 0,
             total_xp_awarded=int(row["total_xp_awarded"]) if "total_xp_awarded" in row.keys() else 0,
+            xp_applied=int(row["xp_applied"]) if "xp_applied" in row.keys() else 0,
         )
 
     # --- solve status map ---
@@ -297,9 +322,10 @@ class SolveRepo:
         return int(cur.lastrowid)
 
     def delete_by_puzzle(self, puzzle_id: int) -> None:
-        """Delete all solve attempts and progress for a puzzle."""
+        """Delete all solve attempts, progress, and creator XP dedup records for a puzzle."""
         self.conn.execute("DELETE FROM solve_attempts WHERE puzzle_id=?", (int(puzzle_id),))
         self.conn.execute("DELETE FROM puzzle_progress WHERE puzzle_id=?", (int(puzzle_id),))
+        self.conn.execute("DELETE FROM creator_solve_xp_awarded WHERE puzzle_id=?", (int(puzzle_id),))
 
     def delete_by_puzzle_ids(self, puzzle_ids: list) -> None:
         """Delete all solve attempts and progress for a list of puzzles."""
@@ -309,19 +335,48 @@ class SolveRepo:
         self.conn.execute(f"DELETE FROM solve_attempts WHERE puzzle_id IN ({placeholders})", puzzle_ids)
         self.conn.execute(f"DELETE FROM puzzle_progress WHERE puzzle_id IN ({placeholders})", puzzle_ids)
 
-    def upsert_progress(self, progress: PuzzleProgress) -> None:
+    def claim_xp_delta(self, user_id: int, puzzle_id: int) -> int:
+        """Atomically claim unapplied XP from puzzle_progress.
+        Sets xp_applied = total_xp_awarded (only if xp_applied < total_xp_awarded).
+        Returns the delta that was claimed (0 if nothing to claim or lost the race)."""
+        # Read current state
+        progress = self.get_progress(user_id, puzzle_id)
+        if not progress:
+            return 0
+        unapplied = progress.total_xp_awarded - progress.xp_applied
+        if unapplied <= 0:
+            return 0
+        # Atomically claim the delta — only one concurrent request can win
+        cur = self.conn.execute(
+            """
+            UPDATE puzzle_progress
+            SET xp_applied = xp_applied + ?
+            WHERE user_id = ? AND puzzle_id = ?
+              AND xp_applied + ? <= total_xp_awarded
+            """,
+            (unapplied, int(user_id), int(puzzle_id), unapplied),
+        )
+        if cur.rowcount > 0:
+            return unapplied
+        return 0
+
+    def upsert_progress(self, progress: PuzzleProgress, xp_delta: int = 0) -> None:
+        """Upsert puzzle progress. Uses SQL-level MAX for best_xp and best_medal.
+        For total_xp_awarded, computes the delta atomically from SQL:
+        delta = MAX(0, new_best_xp - current_best_xp).
+        This prevents concurrent solves from over-awarding XP."""
         self.conn.execute(
             """
             INSERT INTO puzzle_progress(user_id, puzzle_id, best_medal, timer_upgraded, tight_upgraded, first_solved_at, max_xp_reached, best_xp, total_xp_awarded)
             VALUES(?,?,?,?,?,?,?,?,?)
             ON CONFLICT(user_id, puzzle_id) DO UPDATE SET
-                best_medal=excluded.best_medal,
-                timer_upgraded=excluded.timer_upgraded,
-                tight_upgraded=excluded.tight_upgraded,
+                best_medal=MAX(puzzle_progress.best_medal, excluded.best_medal),
+                timer_upgraded=MAX(puzzle_progress.timer_upgraded, excluded.timer_upgraded),
+                tight_upgraded=MAX(puzzle_progress.tight_upgraded, excluded.tight_upgraded),
                 first_solved_at=COALESCE(puzzle_progress.first_solved_at, excluded.first_solved_at),
-                max_xp_reached=excluded.max_xp_reached,
-                best_xp=excluded.best_xp,
-                total_xp_awarded=excluded.total_xp_awarded
+                max_xp_reached=MAX(puzzle_progress.max_xp_reached, excluded.max_xp_reached),
+                total_xp_awarded=puzzle_progress.total_xp_awarded + MAX(0, excluded.best_xp - puzzle_progress.best_xp),
+                best_xp=MAX(puzzle_progress.best_xp, excluded.best_xp)
             """,
             (
                 int(progress.user_id),
@@ -332,6 +387,6 @@ class SolveRepo:
                 progress.first_solved_at,
                 1 if progress.max_xp_reached else 0,
                 int(progress.best_xp),
-                int(progress.total_xp_awarded),
+                int(progress.best_xp),  # for INSERT case, total_xp_awarded = best_xp
             ),
         )

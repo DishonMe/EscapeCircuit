@@ -1,8 +1,10 @@
 from typing import Dict, Any, List
 
+from Backend import settings
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
@@ -31,9 +33,9 @@ class PuzzleService:
         return p_dict
 
     def browse(
-        self, 
-        session_token: str, 
-        limit: int = 50, 
+        self,
+        session_token: str,
+        limit: int = settings.BROWSE_PUZZLES_DEFAULT_LIMIT,
         offset: int = 0,
         search: str = None,
         creator_id: int = None,
@@ -108,7 +110,7 @@ class PuzzleService:
     def list_my_puzzles(
         self,
         session_token: str,
-        limit: int = 50,
+        limit: int = settings.LIST_MY_PUZZLES_DEFAULT_LIMIT,
         offset: int = 0,
         search: str = None,
         order_by: str = "created_at",
@@ -242,6 +244,7 @@ class PuzzleService:
             difficulty=difficulty,
         )
         created = self.repo.create(p)
+        self.repo.conn.commit()
         return self._enrich_puzzle(created.to_dict())
 
     def publish(self, session_token: str, puzzle_id: int) -> dict:
@@ -257,12 +260,6 @@ class PuzzleService:
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
-        # Check 10 puzzle limit for non-admin creators
-        if user.role != UserRole.ADMIN:
-            published_count = self.repo.count_published(creator_id=user_id)
-            if published_count >= 10:
-                raise ValidationError("You have reached the maximum of 10 published puzzles. Unpublish a puzzle before publishing a new one.")
-
         # Publish preconditions (ADD/ARD):
         # 1) at least one test case
         if not self.repo.list_test_cases(puzzle_id):
@@ -274,11 +271,36 @@ class PuzzleService:
             if not self.solve_repo.has_passed(user_id, puzzle_id):
                 raise ValidationError("You must solve this puzzle yourself before publishing it. This ensures the puzzle is actually solvable.")
 
-        # treat created_at as upload datetime
-        p.created_at = utcnow()
+        # Atomic publish with per-user limit check inside IMMEDIATE transaction
+        now_iso = utcnow().isoformat()
+        _max_pub = settings.PUZZLE_MAX_PUBLISHED_PER_USER
+        with transaction(self.repo.conn):
+            if user.role != UserRole.ADMIN:
+                cur = self.repo.conn.execute(
+                    f"""
+                    UPDATE puzzles
+                    SET status = 'published', created_at = ?
+                    WHERE id = ? AND status != 'published'
+                      AND (SELECT COUNT(*) FROM puzzles
+                           WHERE creator_user_id = ? AND status = 'published') < {_max_pub}
+                    """,
+                    (now_iso, int(puzzle_id), int(user_id)),
+                )
+                if cur.rowcount == 0:
+                    # Either already published or hit the limit — check which
+                    published_count = self.repo.count_published(creator_id=user_id)
+                    if published_count >= _max_pub:
+                        raise ValidationError(f"You have reached the maximum of {_max_pub} published puzzles. Unpublish a puzzle before publishing a new one.")
+                    raise ValidationError("Puzzle is already published or could not be updated.")
+            else:
+                # Admins bypass the 10-puzzle limit
+                self.repo.conn.execute(
+                    "UPDATE puzzles SET status = 'published', created_at = ? WHERE id = ?",
+                    (now_iso, int(puzzle_id)),
+                )
 
-        p.publish()
-        self.repo.update(p)
+        # Re-read for return value
+        p = self.repo.get_by_id(puzzle_id)
         return self._enrich_puzzle(p.to_dict())
 
     def unpublish(self, session_token: str, puzzle_id: int) -> dict:
@@ -294,8 +316,14 @@ class PuzzleService:
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
-        p.unpublish()
-        self.repo.update(p)
+        # Targeted SQL — only change status, don't clobber rating aggregates or other fields
+        self.repo.conn.execute(
+            "UPDATE puzzles SET status = 'unpublished' WHERE id = ? AND status = 'published'",
+            (int(puzzle_id),),
+        )
+        self.repo.conn.commit()
+
+        p = self.repo.get_by_id(puzzle_id)
         return self._enrich_puzzle(p.to_dict())
 
     def delete_puzzle(self, session_token: str, puzzle_id: int) -> dict:
@@ -312,6 +340,7 @@ class PuzzleService:
             raise ValidationError("not allowed")
 
         deleted = self.repo.delete(puzzle_id)
+        self.repo.conn.commit()
         if not deleted:
             raise ValidationError("Failed to delete puzzle")
         return {"success": True, "message": "Puzzle deleted successfully"}
@@ -329,19 +358,35 @@ class PuzzleService:
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
-        # Update allowed fields
-        if "name" in payload:
-            p.name = (payload.get("name") or "").strip()
-            if not p.name:
-                raise ValidationError("Puzzle name cannot be empty")
-        
-        if "description" in payload:
-            p.description = payload.get("description", "") or ""
-        
-        if "instructions" in payload:
-            p.instructions = payload.get("instructions", "") or ""
+        # Build targeted SQL update — only write the fields actually being changed
+        # to avoid clobbering concurrent rating recalculations or status changes
+        set_clauses = []
+        params = []
 
-        self.repo.update(p)
+        if "name" in payload:
+            name = (payload.get("name") or "").strip()
+            if not name:
+                raise ValidationError("Puzzle name cannot be empty")
+            set_clauses.append("name = ?")
+            params.append(name)
+
+        if "description" in payload:
+            set_clauses.append("description = ?")
+            params.append(payload.get("description", "") or "")
+
+        if "instructions" in payload:
+            set_clauses.append("instructions = ?")
+            params.append(payload.get("instructions", "") or "")
+
+        if set_clauses:
+            params.append(int(puzzle_id))
+            self.repo.conn.execute(
+                f"UPDATE puzzles SET {', '.join(set_clauses)} WHERE id = ?",
+                params,
+            )
+            self.repo.conn.commit()
+
+        p = self.repo.get_by_id(puzzle_id)
         return self._enrich_puzzle(p.to_dict())
 
     def add_test_case(self, session_token: str, puzzle_id: int, payload: Dict[str, Any]) -> dict:
@@ -368,6 +413,7 @@ class PuzzleService:
             expected_outputs=payload.get("expected_outputs"),
         )
         saved = self.repo.add_test_case(tc)
+        self.repo.conn.commit()
         return saved.to_dict()
 
     def list_test_cases(self, session_token: str, puzzle_id: int) -> List[dict]:

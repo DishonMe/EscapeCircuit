@@ -280,7 +280,7 @@ class TestCircuitSerialization:
         structure = json.dumps({"gates": ["XOR"]})
         circuit = Circuit(id=7, user_id=8, name="Complex", cost=15, structure_json=structure)
         d = circuit.to_dict()
-        assert set(d.keys()) == {"id", "user_id", "name", "cost", "structure_json"}
+        assert set(d.keys()) == {"id", "user_id", "name", "cost", "structure_json", "num_inputs", "num_outputs", "is_arsenal", "truth_table", "basic_gates"}
 
     def test_from_dict_missing_field_raises_error(self):
         d = {"id": 1, "user_id": 2, "name": "Test"}  # Missing cost and structure_json

@@ -23,14 +23,26 @@ class TestSolvingServiceExtended:
         self.mock_logic = Mock(spec=logicEngineService)
         self.mock_xp = Mock(spec=XPService)
         self.mock_conn = Mock()
-        
+
+        from Backend.PersistantLayer.SolveRepo import PuzzleProgress
+        # validate_solution calls get_progress 3 times: old_progress_for_xp, old_progress, new_progress
+        # For a passing test: old returns None/None, new returns progress with XP
+        self._progress_after = PuzzleProgress(user_id=1, puzzle_id=1, best_medal=1, timer_upgraded=False, tight_upgraded=False, first_solved_at=None, best_xp=50, total_xp_awarded=50)
         self.mock_repo.get_progress.return_value = None
         self.mock_xp.tier_from_avg_difficulty.return_value = PuzzleDifficulty.EASY
         self.mock_xp.calculate_medal.return_value = Medal.BRONZE
         self.mock_xp.calculate_solve_xp.return_value = 50
         self.mock_xp.award_creator_solve_xp.return_value = 0
+        self.mock_xp.BASE_XP = {PuzzleDifficulty.EASY: 50, PuzzleDifficulty.MEDIUM: 100, PuzzleDifficulty.HARD: 200}
+        self.mock_xp.MEDAL_BONUS = {Medal.NONE: 0, Medal.BRONZE: 0, Medal.SILVER: 25, Medal.GOLD: 50}
         self.mock_repo.get_best_xp_for_puzzle.return_value = 0
-        
+        # Provide conn on solve_repo so validate_solution can do raw SQL queries
+        self.mock_repo.conn = self.mock_conn
+        # Make the raw SQL query return empty results by default
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = []
+        self.mock_conn.execute.return_value = mock_cursor
+
         self.service = SolvingService(
             self.mock_conn,
             self.mock_repo,
@@ -47,20 +59,24 @@ class TestSolvingServiceExtended:
             id=1, creator_user_id=1, avg_difficulty=2.0,
             time_limit_seconds=None, budget=0,
         )
-        
+
         tc = PuzzleTestCase(id=1, puzzle_id=1, kind=TestCaseKind.BLACKBOX, inputs={"A": 0}, expected_outputs={"O": 1})
         self.mock_puzzle_repo.list_test_cases.return_value = [tc]
-        
+
         self.mock_logic.evaluate.return_value = {"O": 1}
-        
+        # get_progress is called 2 times: old_progress (for medal tracking), new_progress
+        self.mock_repo.get_progress.side_effect = [None, None, self._progress_after]
+        # claim_xp_delta returns claimed XP amount (atomic XP claim pattern)
+        self.mock_repo.claim_xp_delta.return_value = 50
+
         payload = {
             "totalCost": 10,
             "components": [],
             "wires": []
         }
-        
+
         result = self.service.validate_solution("token", 1, payload)
-        
+
         assert result["solved"] is True
         assert result["message"] == "All test cases passed!"
         assert self.mock_logic.evaluate.call_count == 1

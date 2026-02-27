@@ -2,6 +2,7 @@ import sqlite3
 from typing import Optional, List, Dict
 
 from Backend.DomainLayer.Utils import utcnow
+from Backend.PersistantLayer._db import transaction
 
 
 class EngagementRepo:
@@ -66,7 +67,32 @@ class EngagementRepo:
             created_at TEXT NOT NULL,
             UNIQUE(discussion_id, user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS engagement_xp_awarded (
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            actor_user_id INTEGER NOT NULL,
+            xp_type TEXT NOT NULL,
+            UNIQUE(target_type, target_id, actor_user_id, xp_type)
+        );
         """)
+
+    # ---- Engagement XP Guard ----
+
+    def try_award_engagement_xp(self, target_type: str, target_id: int, actor_user_id: int, xp_type: str, commit: bool = True) -> bool:
+        """Atomically mark XP as awarded for an engagement action.
+        Returns True if this is the first time (XP should be awarded).
+        Returns False if XP was already awarded (e.g. upvote toggle cycling)."""
+        try:
+            self.conn.execute(
+                "INSERT INTO engagement_xp_awarded(target_type, target_id, actor_user_id, xp_type) VALUES(?,?,?,?)",
+                (target_type, int(target_id), int(actor_user_id), xp_type),
+            )
+            if commit:
+                self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
 
     # ---- Discussion Votes ----
 
@@ -78,32 +104,26 @@ class EngagementRepo:
         return int(row["value"]) if row else None
 
     def set_discussion_vote(self, discussion_id: int, user_id: int, value: int) -> Optional[int]:
-        """Set vote (+1 or -1). Returns the new value, or None if removed (toggle)."""
-        existing = self.get_discussion_vote(discussion_id, user_id)
+        """Set vote (+1 or -1). Returns the new value, or None if removed (toggle).
+        Wrapped in BEGIN IMMEDIATE to make DELETE→check→UPSERT atomic."""
         now = utcnow().isoformat()
+        did, uid = int(discussion_id), int(user_id)
 
-        if existing == value:
-            # Same vote again -> remove it
-            self.conn.execute(
-                "DELETE FROM discussion_votes WHERE discussion_id=? AND user_id=?",
-                (int(discussion_id), int(user_id)),
+        with transaction(self.conn):
+            # Try to delete the exact same vote (toggle off)
+            cur = self.conn.execute(
+                "DELETE FROM discussion_votes WHERE discussion_id=? AND user_id=? AND value=?",
+                (did, uid, value),
             )
-            self.conn.commit()
-            return None
-        elif existing is not None:
-            # Different vote -> update
-            self.conn.execute(
-                "UPDATE discussion_votes SET value=?, created_at=? WHERE discussion_id=? AND user_id=?",
-                (value, now, int(discussion_id), int(user_id)),
-            )
-        else:
-            # No existing vote -> insert
-            self.conn.execute(
-                "INSERT INTO discussion_votes(discussion_id, user_id, value, created_at) VALUES(?,?,?,?)",
-                (int(discussion_id), int(user_id), value, now),
-            )
-        self.conn.commit()
-        return value
+            if cur.rowcount > 0:
+                return None
+
+            # Upsert: insert or update to the new value
+            self.conn.execute("""
+                INSERT INTO discussion_votes(discussion_id, user_id, value, created_at) VALUES(?,?,?,?)
+                ON CONFLICT(discussion_id, user_id) DO UPDATE SET value=excluded.value, created_at=excluded.created_at
+            """, (did, uid, value, now))
+            return value
 
     def count_discussion_votes(self, discussion_id: int) -> Dict[str, int]:
         row = self.conn.execute("""
@@ -124,29 +144,26 @@ class EngagementRepo:
         return int(row["value"]) if row else None
 
     def set_reply_vote(self, reply_id: int, user_id: int, value: int) -> Optional[int]:
-        """Set vote (+1 or -1). Returns the new value, or None if removed (toggle)."""
-        existing = self.get_reply_vote(reply_id, user_id)
+        """Set vote (+1 or -1). Returns the new value, or None if removed (toggle).
+        Wrapped in BEGIN IMMEDIATE to make DELETE→check→UPSERT atomic."""
         now = utcnow().isoformat()
+        rid, uid = int(reply_id), int(user_id)
 
-        if existing == value:
-            self.conn.execute(
-                "DELETE FROM reply_votes WHERE reply_id=? AND user_id=?",
-                (int(reply_id), int(user_id)),
+        with transaction(self.conn):
+            # Try to delete the exact same vote (toggle off)
+            cur = self.conn.execute(
+                "DELETE FROM reply_votes WHERE reply_id=? AND user_id=? AND value=?",
+                (rid, uid, value),
             )
-            self.conn.commit()
-            return None
-        elif existing is not None:
-            self.conn.execute(
-                "UPDATE reply_votes SET value=?, created_at=? WHERE reply_id=? AND user_id=?",
-                (value, now, int(reply_id), int(user_id)),
-            )
-        else:
-            self.conn.execute(
-                "INSERT INTO reply_votes(reply_id, user_id, value, created_at) VALUES(?,?,?,?)",
-                (int(reply_id), int(user_id), value, now),
-            )
-        self.conn.commit()
-        return value
+            if cur.rowcount > 0:
+                return None
+
+            # Upsert: insert or update to the new value
+            self.conn.execute("""
+                INSERT INTO reply_votes(reply_id, user_id, value, created_at) VALUES(?,?,?,?)
+                ON CONFLICT(reply_id, user_id) DO UPDATE SET value=excluded.value, created_at=excluded.created_at
+            """, (rid, uid, value, now))
+            return value
 
     def count_reply_votes(self, reply_id: int) -> Dict[str, int]:
         row = self.conn.execute("""
@@ -159,39 +176,22 @@ class EngagementRepo:
 
     # ---- Discussion Reactions ----
 
-    def add_discussion_reaction(self, discussion_id: int, user_id: int, reaction_type: str) -> bool:
-        """Add a reaction. Returns True if added, False if already exists."""
+    def toggle_discussion_reaction(self, discussion_id: int, user_id: int, reaction_type: str) -> bool:
+        """Toggle a reaction. Returns True if now active, False if removed.
+        Wrapped in BEGIN IMMEDIATE — no IntegrityError fallback needed."""
+        did, uid = int(discussion_id), int(user_id)
         now = utcnow().isoformat()
-        try:
+        with transaction(self.conn):
+            cur = self.conn.execute(
+                "DELETE FROM discussion_reactions WHERE discussion_id=? AND user_id=? AND reaction_type=?",
+                (did, uid, reaction_type),
+            )
+            if cur.rowcount > 0:
+                return False
             self.conn.execute(
                 "INSERT INTO discussion_reactions(discussion_id, user_id, reaction_type, created_at) VALUES(?,?,?,?)",
-                (int(discussion_id), int(user_id), reaction_type, now),
+                (did, uid, reaction_type, now),
             )
-            self.conn.commit()
-            return True
-        except sqlite3.IntegrityError:
-            return False
-
-    def remove_discussion_reaction(self, discussion_id: int, user_id: int, reaction_type: str) -> bool:
-        """Remove a reaction. Returns True if removed."""
-        cur = self.conn.execute(
-            "DELETE FROM discussion_reactions WHERE discussion_id=? AND user_id=? AND reaction_type=?",
-            (int(discussion_id), int(user_id), reaction_type),
-        )
-        self.conn.commit()
-        return cur.rowcount > 0
-
-    def toggle_discussion_reaction(self, discussion_id: int, user_id: int, reaction_type: str) -> bool:
-        """Toggle a reaction. Returns True if now active, False if removed."""
-        exists = self.conn.execute(
-            "SELECT 1 FROM discussion_reactions WHERE discussion_id=? AND user_id=? AND reaction_type=?",
-            (int(discussion_id), int(user_id), reaction_type),
-        ).fetchone()
-        if exists:
-            self.remove_discussion_reaction(discussion_id, user_id, reaction_type)
-            return False
-        else:
-            self.add_discussion_reaction(discussion_id, user_id, reaction_type)
             return True
 
     def get_discussion_reactions(self, discussion_id: int) -> List[Dict]:
@@ -214,29 +214,22 @@ class EngagementRepo:
     # ---- Reply Reactions ----
 
     def toggle_reply_reaction(self, reply_id: int, user_id: int, reaction_type: str) -> bool:
-        """Toggle a reaction on a reply. Returns True if now active, False if removed."""
-        exists = self.conn.execute(
-            "SELECT 1 FROM reply_reactions WHERE reply_id=? AND user_id=? AND reaction_type=?",
-            (int(reply_id), int(user_id), reaction_type),
-        ).fetchone()
+        """Toggle a reaction on a reply. Returns True if now active, False if removed.
+        Wrapped in BEGIN IMMEDIATE — no IntegrityError fallback needed."""
+        rid, uid = int(reply_id), int(user_id)
         now = utcnow().isoformat()
-        if exists:
-            self.conn.execute(
+        with transaction(self.conn):
+            cur = self.conn.execute(
                 "DELETE FROM reply_reactions WHERE reply_id=? AND user_id=? AND reaction_type=?",
-                (int(reply_id), int(user_id), reaction_type),
+                (rid, uid, reaction_type),
             )
-            self.conn.commit()
-            return False
-        else:
-            try:
-                self.conn.execute(
-                    "INSERT INTO reply_reactions(reply_id, user_id, reaction_type, created_at) VALUES(?,?,?,?)",
-                    (int(reply_id), int(user_id), reaction_type, now),
-                )
-                self.conn.commit()
-                return True
-            except sqlite3.IntegrityError:
+            if cur.rowcount > 0:
                 return False
+            self.conn.execute(
+                "INSERT INTO reply_reactions(reply_id, user_id, reaction_type, created_at) VALUES(?,?,?,?)",
+                (rid, uid, reaction_type, now),
+            )
+            return True
 
     def get_reply_reactions(self, reply_id: int) -> List[Dict]:
         rows = self.conn.execute("""
@@ -256,25 +249,21 @@ class EngagementRepo:
     # ---- Discussion Follows ----
 
     def toggle_follow(self, discussion_id: int, user_id: int) -> bool:
-        """Toggle follow. Returns True if now following, False if unfollowed."""
-        exists = self.conn.execute(
-            "SELECT 1 FROM discussion_follows WHERE discussion_id=? AND user_id=?",
-            (int(discussion_id), int(user_id)),
-        ).fetchone()
-        if exists:
-            self.conn.execute(
+        """Toggle follow. Returns True if now following, False if unfollowed.
+        Wrapped in BEGIN IMMEDIATE — no IntegrityError fallback needed."""
+        did, uid = int(discussion_id), int(user_id)
+        now = utcnow().isoformat()
+        with transaction(self.conn):
+            cur = self.conn.execute(
                 "DELETE FROM discussion_follows WHERE discussion_id=? AND user_id=?",
-                (int(discussion_id), int(user_id)),
+                (did, uid),
             )
-            self.conn.commit()
-            return False
-        else:
-            now = utcnow().isoformat()
+            if cur.rowcount > 0:
+                return False
             self.conn.execute(
                 "INSERT INTO discussion_follows(discussion_id, user_id, created_at) VALUES(?,?,?)",
-                (int(discussion_id), int(user_id), now),
+                (did, uid, now),
             )
-            self.conn.commit()
             return True
 
     def is_following(self, discussion_id: int, user_id: int) -> bool:
@@ -294,25 +283,21 @@ class EngagementRepo:
     # ---- Discussion Bookmarks ----
 
     def toggle_bookmark(self, discussion_id: int, user_id: int) -> bool:
-        """Toggle bookmark. Returns True if now bookmarked, False if removed."""
-        exists = self.conn.execute(
-            "SELECT 1 FROM discussion_bookmarks WHERE discussion_id=? AND user_id=?",
-            (int(discussion_id), int(user_id)),
-        ).fetchone()
-        if exists:
-            self.conn.execute(
+        """Toggle bookmark. Returns True if now bookmarked, False if removed.
+        Wrapped in BEGIN IMMEDIATE — no IntegrityError fallback needed."""
+        did, uid = int(discussion_id), int(user_id)
+        now = utcnow().isoformat()
+        with transaction(self.conn):
+            cur = self.conn.execute(
                 "DELETE FROM discussion_bookmarks WHERE discussion_id=? AND user_id=?",
-                (int(discussion_id), int(user_id)),
+                (did, uid),
             )
-            self.conn.commit()
-            return False
-        else:
-            now = utcnow().isoformat()
+            if cur.rowcount > 0:
+                return False
             self.conn.execute(
                 "INSERT INTO discussion_bookmarks(discussion_id, user_id, created_at) VALUES(?,?,?)",
-                (int(discussion_id), int(user_id), now),
+                (did, uid, now),
             )
-            self.conn.commit()
             return True
 
     def is_bookmarked(self, discussion_id: int, user_id: int) -> bool:

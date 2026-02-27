@@ -1,6 +1,9 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from Backend import settings
+from Backend.APILayer.middleware import ContentionMonitorMiddleware
 from pathlib import Path
 
 # Persistence
@@ -16,6 +19,7 @@ from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReportRepo import ReportRepo
+from Backend.PersistantLayer.DraftRepo import DraftRepo
 
 # Services
 from Backend.ServiceLayer.AuthService import AuthService
@@ -41,6 +45,7 @@ from Backend.APILayer.RatingController import build_rating_router
 from Backend.APILayer.AdminController import build_admin_router
 from Backend.APILayer.DebuggerController import build_debugger_router
 from Backend.APILayer.DiscussionController import build_discussion_router
+from Backend.APILayer.DraftController import build_draft_router
 
 
 def create_app() -> FastAPI:
@@ -68,6 +73,7 @@ def create_app() -> FastAPI:
     reply_repo = ReplyRepo(conn)
     engagement_repo = EngagementRepo(conn)
     report_repo = ReportRepo(conn)
+    draft_repo = DraftRepo(conn)
 
     # 3. Services
     # logic engine (stateless)
@@ -176,16 +182,14 @@ def create_app() -> FastAPI:
     # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:3001"
-        ],
+        allow_origins=settings.CORS_ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # DB contention monitoring (logs warnings when requests stall on write-lock)
+    app.add_middleware(ContentionMonitorMiddleware)
 
     # 5. Routers
     app.include_router(build_user_router(user_service, notification_service))
@@ -204,6 +208,7 @@ def create_app() -> FastAPI:
     app.include_router(reply_router)
     app.include_router(puzzle_disc_router)
     app.include_router(report_router)
+    app.include_router(build_draft_router(draft_repo, auth_service))
 
     @app.get("/")
     def root():

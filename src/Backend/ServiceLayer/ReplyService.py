@@ -1,8 +1,11 @@
+import sqlite3
 from typing import Optional
 
+from Backend import settings
 from Backend.DomainLayer.Reply import Reply
 from Backend.DomainLayer.Enums import ReactionType, UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
@@ -11,12 +14,12 @@ from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 
 
-# XP constants for forum actions
-REPLY_CREATE_XP = 2
-REPLY_ACCEPTED_XP = 25
-ACCEPT_SOLUTION_XP = 5
-REPLY_UPVOTE_XP = 3
-REPLY_REACTION_XP = 1
+# XP constants for forum actions (aliases into settings)
+REPLY_CREATE_XP = settings.XP_REPLY_CREATE
+REPLY_ACCEPTED_XP = settings.XP_REPLY_ACCEPTED
+ACCEPT_SOLUTION_XP = settings.XP_ACCEPT_SOLUTION
+REPLY_UPVOTE_XP = settings.XP_REPLY_UPVOTE
+REPLY_REACTION_XP = settings.XP_REPLY_REACTION
 
 
 class ReplyService:
@@ -65,13 +68,15 @@ class ReplyService:
             body=body,
             parent_reply_id=parent_reply_id,
         )
-        created = self.reply_repo.create(reply)
-
-        # Update reply count on discussion
-        self.discussion_repo.increment_reply_count(discussion_id, 1)
-
-        # Award XP for creating a reply
-        self.xp._apply_xp(user_id, REPLY_CREATE_XP)
+        # Wrap insert + reply_count increment + XP in one transaction
+        # to prevent counter drift on concurrent create/delete (C4).
+        try:
+            with transaction(self.reply_repo.conn):
+                created = self.reply_repo.create(reply, commit=False)
+                self.discussion_repo.increment_reply_count(discussion_id, 1, commit=False)
+                self.xp._apply_xp(user_id, REPLY_CREATE_XP)
+        except sqlite3.IntegrityError:
+            raise ValidationError("discussion was deleted")
 
         result = created.to_dict()
         author = self.user_repo.get_by_id(user_id)
@@ -144,10 +149,11 @@ class ReplyService:
             raise ValidationError("not allowed to delete this reply")
 
         discussion_id = reply.discussion_id
-        self.reply_repo.delete(reply_id)
-
-        # Decrement reply count on discussion
-        self.discussion_repo.increment_reply_count(discussion_id, -1)
+        # Wrap delete + reply_count decrement in one transaction (C4).
+        with transaction(self.reply_repo.conn):
+            deleted = self.reply_repo.delete(reply_id, commit=False)
+            if deleted:
+                self.discussion_repo.increment_reply_count(discussion_id, -1, commit=False)
 
         return {"deleted": True, "id": reply_id}
 
@@ -168,32 +174,64 @@ class ReplyService:
         if not is_admin and not is_owner:
             raise ValidationError("only the thread author or admin can accept a solution")
 
-        # If this reply is already accepted, unaccept it
-        if reply.is_accepted:
-            self.reply_repo.update(reply_id, {"is_accepted": False})
-            self.discussion_repo.set_accepted_reply(discussion.id, None)
-            updated = self.reply_repo.get_by_id(reply_id)
-            result = updated.to_dict()
-            author = self.user_repo.get_by_id(updated.author_id)
-            if author:
-                result["author"] = author.to_dict()
-            return result
+        conn = self.reply_repo.conn
 
-        # Clear any previously accepted reply
-        self.reply_repo.clear_accepted_for_discussion(discussion.id)
+        # Wrap the entire accept/unaccept + XP award in one IMMEDIATE
+        # transaction to prevent TOCTOU on is_accepted state (C5).
+        with transaction(conn) as txn:
+            # Re-read is_accepted under the write lock to get fresh state
+            fresh = txn.execute(
+                "SELECT is_accepted FROM replies WHERE id = ?", (reply_id,)
+            ).fetchone()
+            if not fresh:
+                raise ValidationError("reply not found")
 
-        # Accept this reply
-        self.reply_repo.update(reply_id, {"is_accepted": True})
-        self.discussion_repo.set_accepted_reply(discussion.id, reply_id)
+            if fresh["is_accepted"]:
+                # Unaccept
+                txn.execute(
+                    "UPDATE discussions SET accepted_reply_id = NULL WHERE id = ?",
+                    (discussion.id,),
+                )
+                txn.execute(
+                    "UPDATE replies SET is_accepted = 0 WHERE id = ?",
+                    (reply_id,),
+                )
+                # COMMIT at context-manager exit
 
-        # Award XP: +25 to reply author, +5 to thread author for accepting
-        if reply.author_id != user_id:
-            self.xp._apply_xp(reply.author_id, REPLY_ACCEPTED_XP)
-        self.xp._apply_xp(user_id, ACCEPT_SOLUTION_XP)
+                updated = self.reply_repo.get_by_id(reply_id)
+                result = updated.to_dict()
+                author = self.user_repo.get_by_id(updated.author_id)
+                if author:
+                    result["author"] = author.to_dict()
+                return result
+
+            # Accept: atomically set is_accepted=1 only if still 0
+            cur = txn.execute(
+                "UPDATE replies SET is_accepted = 1 WHERE id = ? AND is_accepted = 0",
+                (reply_id,),
+            )
+            newly_accepted = cur.rowcount > 0
+
+            # Update discussion and clear other accepted replies
+            txn.execute(
+                "UPDATE discussions SET accepted_reply_id = ? WHERE id = ?",
+                (reply_id, discussion.id),
+            )
+            txn.execute(
+                "UPDATE replies SET is_accepted = 0 WHERE discussion_id = ? AND id != ?",
+                (discussion.id, reply_id),
+            )
+
+            # Award XP inside the same transaction so dedup + award are atomic
+            if newly_accepted:
+                if reply.author_id != user_id:
+                    self.xp._apply_xp(reply.author_id, REPLY_ACCEPTED_XP)
+                self.xp._apply_xp(user_id, ACCEPT_SOLUTION_XP)
+            # COMMIT at context-manager exit
 
         updated = self.reply_repo.get_by_id(reply_id)
-        result = updated.to_dict()
-        author = self.user_repo.get_by_id(updated.author_id)
+        result = updated.to_dict() if updated else reply.to_dict()
+        author = self.user_repo.get_by_id(reply.author_id)
         if author:
             result["author"] = author.to_dict()
         return result
@@ -214,13 +252,14 @@ class ReplyService:
         old_vote = self.engagement.get_reply_vote(reply_id, user_id)
         new_vote = self.engagement.set_reply_vote(reply_id, user_id, value)
 
-        # Award XP on upvote (only when newly upvoting)
+        # Award XP on upvote (only once per user per reply, prevents toggle farming)
         if value == 1 and old_vote != 1 and reply.author_id != user_id:
-            self.xp._apply_xp(reply.author_id, REPLY_UPVOTE_XP)
+            if self.engagement.try_award_engagement_xp("reply", reply_id, user_id, "upvote"):
+                self.xp._apply_xp(reply.author_id, REPLY_UPVOTE_XP)
 
+        # Atomically sync cached vote counts from authoritative vote table
+        self.reply_repo.sync_votes_from_votes(reply_id)
         votes = self.engagement.count_reply_votes(reply_id)
-        # Update cached vote counts on the reply
-        self.reply_repo.update_votes(reply_id, votes["upvotes"], votes["downvotes"])
 
         return {
             "reply_id": reply_id,
@@ -245,9 +284,10 @@ class ReplyService:
 
         is_active = self.engagement.toggle_reply_reaction(reply_id, user_id, reaction_type)
 
-        # Award XP when reaction added (not removed)
+        # Award XP when reaction added (only once per user per reply per reaction type)
         if is_active and reply.author_id != user_id:
-            self.xp._apply_xp(reply.author_id, REPLY_REACTION_XP)
+            if self.engagement.try_award_engagement_xp("reply", reply_id, user_id, f"reaction_{reaction_type}"):
+                self.xp._apply_xp(reply.author_id, REPLY_REACTION_XP)
 
         reactions = self.engagement.get_reply_reactions(reply_id)
         user_reactions = self.engagement.get_user_reply_reactions(reply_id, user_id)

@@ -45,13 +45,14 @@ class CircuitRepo:
         except Exception:
             pass
 
-    def create(self, circuit: Circuit) -> Circuit:
+    def create(self, circuit: Circuit, commit: bool = True) -> Circuit:
         cur = self.conn.execute("""
             INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs)
             VALUES(?,?,?,?,?,?,?,?,?)
         """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs))
         circuit.id = int(cur.lastrowid)
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return circuit
 
     def get_by_id(self, circuit_id: int) -> Optional[Circuit]:

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import List
 
+from Backend import settings
+
 def _parse_iso(iso_str: str) -> datetime:
     dt = datetime.fromisoformat(iso_str)
     if dt.tzinfo is None:
@@ -9,6 +11,7 @@ def _parse_iso(iso_str: str) -> datetime:
 
 from Backend.DomainLayer.Rating import Rating
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
@@ -58,7 +61,7 @@ class RatingService:
 
         total_time = self.solve_repo.get_total_time_on_puzzle(user_id, puzzle_id)
         effective_time = max(total_time, client_elapsed)
-        return effective_time >= 300  # 5 minutes
+        return effective_time >= settings.RATING_MIN_ATTEMPT_SECONDS
 
     def rate_puzzle(self, token: str, puzzle_id: int, difficulty: int, fun: int, clearness: int, client_elapsed: int | None = None) -> Rating:
         user_id = self.auth.require_user_id(token)
@@ -68,10 +71,6 @@ class RatingService:
 
         if not self._can_rate(user_id, int(puzzle_id), client_elapsed=int(client_elapsed or 0)):
             raise ValidationError("You must solve the puzzle or attempt it for at least 5 minutes to rate.")
-
-        # Check if first-time rating BEFORE upsert (for XP logic)
-        existing_rating = self.rating_repo.get_by_puzzle_user(int(puzzle_id), int(user_id))
-        first_time_rating = existing_rating is None
 
         # Snapshot experienced status at rating time
         user = self.auth.user_repo.get_by_id(user_id)
@@ -87,16 +86,20 @@ class RatingService:
             is_experienced_at_rating=bool(is_experienced),
         )
 
-        # upsert + recalc
-        saved = self.rating_repo.upsert(r)
-        self._recalculate_and_store(puzzle.id)
-
-        # XP: only award on first-time rating
-        self.xp_service.award_rating_xp(
-            rater_user_id=int(user_id),
-            creator_user_id=int(puzzle.creator_user_id),
-            first_time_rating=first_time_rating,
-        )
+        # Wrap upsert + recalc + XP award in a single IMMEDIATE transaction.
+        # This prevents concurrent raters from computing stale aggregates (C3)
+        # and ensures XP-mark + XP-award are atomic (H3).
+        with transaction(self.rating_repo.conn) as conn:
+            saved = self.rating_repo.upsert(r, commit=False)
+            self._recalculate_and_store(puzzle.id)
+            first_time_rating = self.rating_repo.try_mark_xp_awarded(int(puzzle_id), int(user_id))
+            if first_time_rating:
+                self.xp_service.award_rating_xp(
+                    rater_user_id=int(user_id),
+                    creator_user_id=int(puzzle.creator_user_id),
+                    first_time_rating=True,
+                )
+            # COMMIT happens here at context-manager exit
 
         # Notify creator about the rating (only first time, only if creator != rater)
         if first_time_rating and int(puzzle.creator_user_id) != int(user_id) and self.notification_service:
@@ -116,9 +119,14 @@ class RatingService:
 
     def remove_rating(self, token: str, puzzle_id: int) -> bool:
         user_id = self.auth.require_user_id(token)
-        ok = self.rating_repo.delete(int(puzzle_id), int(user_id))
-        if ok:
-            self._recalculate_and_store(int(puzzle_id))
+        with transaction(self.rating_repo.conn) as conn:
+            cur = conn.execute(
+                "DELETE FROM ratings WHERE puzzle_id=? AND user_id=?",
+                (int(puzzle_id), int(user_id)),
+            )
+            ok = cur.rowcount > 0
+            if ok:
+                self._recalculate_and_store(int(puzzle_id))
         return ok
 
     def list_ratings_for_puzzle(self, token: str, puzzle_id: int) -> List[dict]:
@@ -130,7 +138,7 @@ class RatingService:
         r = self.rating_repo.get_by_puzzle_user(int(puzzle_id), int(user_id))
         return r.to_dict() if r else None
 
-    _DIFFICULTY_MAP = {"EASY": 1, "MEDIUM": 3, "HARD": 5}
+    _DIFFICULTY_MAP = settings.RATING_DIFFICULTY_MAP
 
     def get_puzzle_metrics(self, puzzle_id: int) -> dict:
         """Compute aggregated rating metrics for a puzzle."""
@@ -150,10 +158,12 @@ class RatingService:
 
         # Weighted difficulty (blends creator label with user ratings)
         users_avg = avg_difficulty if avg_difficulty is not None else 0.0
-        if count < 10:
-            weighted_difficulty = (0.8 * creator_diff) + (0.2 * users_avg)
+        _w_few  = settings.RATING_DIFF_WEIGHT_FEW_RATINGS
+        _w_many = settings.RATING_DIFF_WEIGHT_MANY_RATINGS
+        if count < settings.RATING_USER_COUNT_THRESHOLD:
+            weighted_difficulty = (_w_few[0] * creator_diff) + (_w_few[1] * users_avg)
         else:
-            weighted_difficulty = (0.4 * creator_diff) + (0.6 * users_avg)
+            weighted_difficulty = (_w_many[0] * creator_diff) + (_w_many[1] * users_avg)
 
         # Fun & clearness: always compute when ratings exist
         if count > 0:
@@ -196,7 +206,7 @@ class RatingService:
             return
 
         ratings = self.rating_repo.list_by_puzzle(int(puzzle_id))
-        puzzle.rating_count = len(ratings)
+        rating_count = len(ratings)
 
         # Creator vs non-creator split
         creator_id = int(puzzle.creator_user_id)
@@ -211,44 +221,27 @@ class RatingService:
             users_difficulty_avg = 0.0
 
         if creator_r is not None:
-            alpha = 0.8 if user_count < 10 else 0.4
-            puzzle.avg_difficulty = alpha * float(creator_r.difficulty) + (1 - alpha) * float(users_difficulty_avg)
+            _w = (settings.RATING_DIFF_WEIGHT_FEW_RATINGS
+                  if user_count < settings.RATING_USER_COUNT_THRESHOLD
+                  else settings.RATING_DIFF_WEIGHT_MANY_RATINGS)
+            avg_difficulty = _w[0] * float(creator_r.difficulty) + _w[1] * float(users_difficulty_avg)
         else:
-            puzzle.avg_difficulty = float(users_difficulty_avg)
+            avg_difficulty = float(users_difficulty_avg)
 
-        # Fun & clearness undecided until 10 USER ratings (excluding creator)
-        if user_count < 10:
-            puzzle.fun_decided = False
-            puzzle.clearness_decided = False
-            puzzle.avg_fun = 0.0
-            puzzle.avg_clearness = 0.0
+        # Fun & clearness undecided until enough USER ratings (excluding creator)
+        if user_count < settings.RATING_USER_COUNT_THRESHOLD:
+            avg_fun = 0.0
+            avg_clearness = 0.0
         else:
-            puzzle.fun_decided = True
-            puzzle.clearness_decided = True
-            puzzle.avg_fun = float(sum(x.fun for x in user_rs) / user_count)
-            puzzle.avg_clearness = float(sum(x.clearness for x in user_rs) / user_count)
+            avg_fun = float(sum(x.fun for x in user_rs) / user_count)
+            avg_clearness = float(sum(x.clearness for x in user_rs) / user_count)
 
-        # Experienced-only aggregates (ratings snapshot already stored)
-        exp_rs = [x for x in ratings if bool(x.is_experienced_at_rating)]
-        puzzle.rating_count_exp = len(exp_rs)
-        if exp_rs:
-            puzzle.avg_difficulty_exp = float(sum(x.difficulty for x in exp_rs) / len(exp_rs))
-            if user_count >= 10:
-                # still gate "decided" by the global 10-user rule
-                puzzle.fun_decided_exp = True
-                puzzle.clearness_decided_exp = True
-                puzzle.avg_fun_exp = float(sum(x.fun for x in exp_rs) / len(exp_rs))
-                puzzle.avg_clearness_exp = float(sum(x.clearness for x in exp_rs) / len(exp_rs))
-            else:
-                puzzle.fun_decided_exp = False
-                puzzle.clearness_decided_exp = False
-                puzzle.avg_fun_exp = 0.0
-                puzzle.avg_clearness_exp = 0.0
-        else:
-            puzzle.avg_difficulty_exp = 0.0
-            puzzle.avg_fun_exp = 0.0
-            puzzle.avg_clearness_exp = 0.0
-            puzzle.fun_decided_exp = False
-            puzzle.clearness_decided_exp = False
-
-        self.puzzle_repo.update(puzzle)
+        # Use targeted update — only writes rating columns, won't clobber
+        # concurrent changes to name, status, description, budget, etc.
+        self.puzzle_repo.update_rating_aggregates(
+            puzzle_id,
+            rating_count=rating_count,
+            avg_difficulty=avg_difficulty,
+            avg_fun=avg_fun,
+            avg_clearness=avg_clearness,
+        )
