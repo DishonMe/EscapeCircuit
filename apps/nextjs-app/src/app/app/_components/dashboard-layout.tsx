@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
+import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
