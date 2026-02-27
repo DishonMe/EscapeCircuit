@@ -503,62 +503,166 @@ export default function CreatePuzzleForm() {
     let simulationErrors: string[] = [];
     let hasSimulationErrors = false;
     
+    console.log('[EXPORT] Starting solution export...');
+    console.log('[EXPORT] Test cases:', data.testCases);
+    
     // Check if circuit exists
     if (placed.length === 0 && wires.length === 0) {
       alert('❌ No circuit designed! Please add gates and wires before exporting.');
       return;
     }
     
+    console.log('[EXPORT] Circuit has', placed.length, 'components and', wires.length, 'wires');
+    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
+    const baseUrl = apiUrl.replace(/\/api\/?$/, "");
+    
     // Simulate circuit for each test case
     for (const tc of data.testCases) {
-      // Only process blackbox test cases for eval_map
-      if (tc.kind === 'stream' || tc.inputs === undefined || tc.expectedOutputs === undefined) {
-        continue;
-      }
+      console.log('[EXPORT] Processing test case:', tc.kind, tc);
       
-      const sortedInputKeys = Object.keys(tc.inputs).sort();
-      const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
-      
-      try {
-        // Call backend API to actually simulate the circuit
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
-        const baseUrl = apiUrl.replace(/\/api\/?$/, "");
-        
-        const response = await fetch(`${baseUrl}/debugger/simulate-circuit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inputs: tc.inputs,
-            placed: placed,
-            wires: wires,
-          }),
-        });
-        
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.detail || 'Simulation failed');
+      if (tc.kind === 'stream') {
+        // === STREAM TEST CASE: Simulate entire sequence, then extract eval_map entries ===
+        if (!tc.inputStream || !tc.expectedOutputStream) {
+          simulationErrors.push(`Stream test case is missing inputStream or expectedOutputStream`);
+          hasSimulationErrors = true;
+          continue;
         }
         
-        const result = await response.json();
-        const simulatedOutputs = result.outputs || {};
+        console.log('[EXPORT-STREAM] Found stream test case with', tc.inputStream.length, 'cycles');
+        console.log('[EXPORT-STREAM] Input stream:', tc.inputStream);
+        console.log('[EXPORT-STREAM] Expected output:', tc.expectedOutputStream);
         
-        // Store the ACTUAL circuit output, not the expected output
-        evalMap[key] = simulatedOutputs;
-        
-        // Check if it matches expected
-        const matches = JSON.stringify(simulatedOutputs) === JSON.stringify(tc.expectedOutputs);
-        if (!matches) {
-          simulationErrors.push(
-            `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
-            `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(simulatedOutputs)}`
-          );
+        try {
+          // Simulate the entire sequence at once to preserve state
+          const response = await fetch(`${baseUrl}/debugger/simulate-sequence`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              input_stream: tc.inputStream,
+              placed: placed,
+              wires: wires,
+            }),
+          });
+          
+          console.log('[EXPORT-STREAM] Response status:', response.status);
+          
+          if (!response.ok) {
+            const err = await response.json();
+            console.error('[EXPORT-STREAM] API Error:', err);
+            throw new Error(err.detail || 'Sequence simulation failed');
+          }
+          
+          const result = await response.json();
+          const cycleOutputs = result.cycle_outputs || {};
+          
+          console.log('[EXPORT-STREAM] Cycle outputs:', cycleOutputs);
+          
+          // Extract outputs for each cycle and build eval_map
+          for (let cycleIdx = 0; cycleIdx < tc.inputStream.length; cycleIdx++) {
+            const cycleInput = tc.inputStream[cycleIdx];
+            
+            // Get expected outputs for this cycle
+            const cycleExpectedOutputs = Object.fromEntries(
+              Object.entries(tc.expectedOutputStream).map(([outName, outValues]: [string, any]) => [
+                outName,
+                Array.isArray(outValues) ? outValues[cycleIdx] : outValues,
+              ])
+            );
+            
+            // Get actual outputs for this cycle from the sequence simulation
+            const cycleKey = `cycle_${cycleIdx}`;
+            const cycleActualOutputs = cycleOutputs[cycleKey] || {};
+            
+            console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(cycleActualOutputs)}`);
+            
+            // Create eval_map key for this input
+            const sortedInputKeys = Object.keys(cycleInput).sort();
+            const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, cycleInput[k]])), undefined, '');
+            
+            // For sequential circuits, the same input can appear in different cycles
+            // with different outputs due to state. We'll use the first occurrence.
+            if (!(evalKey in evalMap)) {
+              evalMap[evalKey] = cycleActualOutputs;
+              console.log('[EXPORT-STREAM] Added eval_map entry:', evalKey, '->', cycleActualOutputs);
+            } else {
+              console.log('[EXPORT-STREAM] Skipped duplicate eval_map entry for:', evalKey);
+            }
+            
+            // Check if this cycle matches expected output
+            const cycleMatches = JSON.stringify(cycleActualOutputs) === JSON.stringify(cycleExpectedOutputs);
+            if (!cycleMatches) {
+              simulationErrors.push(
+                `Stream test cycle ${cycleIdx} ${JSON.stringify(cycleInput)}: ` +
+                `Expected ${JSON.stringify(cycleExpectedOutputs)} but got ${JSON.stringify(cycleActualOutputs)}`
+              );
+              hasSimulationErrors = true;
+            }
+          }
+        } catch (e) {
+          console.error('[EXPORT-STREAM] Error:', e);
+          simulationErrors.push(`Stream test case simulation error: ${String(e)}`);
           hasSimulationErrors = true;
         }
-      } catch (e) {
-        simulationErrors.push(`Simulation error: ${String(e)}`);
-        hasSimulationErrors = true;
+      } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
+        // === BLACKBOX TEST CASE ===
+        console.log('[EXPORT-BLACKBOX] Processing blackbox test case:', tc);
+        
+        const sortedInputKeys = Object.keys(tc.inputs).sort();
+        const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
+        
+        console.log('[EXPORT-BLACKBOX] Eval key:', key);
+        
+        try {
+          // Call backend API to actually simulate the circuit
+          const response = await fetch(`${baseUrl}/debugger/simulate-circuit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: tc.inputs,
+              placed: placed,
+              wires: wires,
+            }),
+          });
+          
+          console.log('[EXPORT-BLACKBOX] Response status:', response.status);
+          
+          if (!response.ok) {
+            const err = await response.json();
+            console.error('[EXPORT-BLACKBOX] API Error:', err);
+            throw new Error(err.detail || 'Simulation failed');
+          }
+          
+          const result = await response.json();
+          const simulatedOutputs = result.outputs || {};
+          
+          console.log('[EXPORT-BLACKBOX] Simulated outputs:', simulatedOutputs);
+          
+          // Store the ACTUAL circuit output, not the expected output
+          evalMap[key] = simulatedOutputs;
+          
+          // Check if it matches expected
+          const matches = JSON.stringify(simulatedOutputs) === JSON.stringify(tc.expectedOutputs);
+          console.log('[EXPORT-BLACKBOX] Expected:', tc.expectedOutputs, 'Actual:', simulatedOutputs, 'Match:', matches);
+          
+          if (!matches) {
+            simulationErrors.push(
+              `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
+              `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(simulatedOutputs)}`
+            );
+            hasSimulationErrors = true;
+          }
+        } catch (e) {
+          console.error('[EXPORT-BLACKBOX] Error:', e);
+          simulationErrors.push(`Simulation error: ${String(e)}`);
+          hasSimulationErrors = true;
+        }
       }
     }
+    
+    console.log('[EXPORT] Final eval_map:', evalMap);
+    console.log('[EXPORT] Simulation errors:', simulationErrors);
+    console.log('[EXPORT] Has errors:', hasSimulationErrors);
     
     if (hasSimulationErrors) {
       alert(
@@ -586,6 +690,9 @@ export default function CreatePuzzleForm() {
         })),
       },
     };
+    
+    console.log('[EXPORT] Generated solution:', solution);
+    
     setData((prev) => ({
       ...prev,
       solutionJSON: JSON.stringify(solution, null, 2),

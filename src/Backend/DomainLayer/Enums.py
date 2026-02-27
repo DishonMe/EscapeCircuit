@@ -30,6 +30,7 @@ class Medal(int, Enum):
 class TestCaseKind(str, Enum):
     BLACKBOX = "blackbox"
     WHITEBOX = "whitebox"
+    STREAM = "stream"  # Sequential/stream test cases for circuits with state
     GATE_LIMIT = "gate_limit"  # Per-gate usage limits (e.g., max 3 ANDs)
     GATE_COUNT_LIMIT = "gate_count_limit"  # Total gate count limit (e.g., max 10 gates total)
     LATENCY_LIMIT = "latency_limit"  # Sequential circuit cycle limits (e.g., min 2, max 5 cycles)

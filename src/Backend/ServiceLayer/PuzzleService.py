@@ -126,8 +126,22 @@ class PuzzleService:
         if tcs:
             # Assume all test cases have same inputs/outputs keys. Take the first one.
             first_tc = tcs[0]
-            d["inputs"] = list(first_tc.inputs.keys())
-            d["outputs"] = list(first_tc.expected_outputs.keys())
+            # For stream test cases, inputs/expected_outputs are empty, so check if we have them from config
+            if first_tc.inputs:
+                d["inputs"] = list(first_tc.inputs.keys())
+            if first_tc.expected_outputs:
+                d["outputs"] = list(first_tc.expected_outputs.keys())
+            
+            # For stream test cases, extract from input_stream/expected_output_stream structure
+            if not d.get("inputs") and first_tc.input_stream:
+                # input_stream is a list of dicts, extract keys from first dict
+                if isinstance(first_tc.input_stream, list) and len(first_tc.input_stream) > 0:
+                    if isinstance(first_tc.input_stream[0], dict):
+                        d["inputs"] = list(first_tc.input_stream[0].keys())
+            
+            if not d.get("outputs") and first_tc.expected_output_stream:
+                # expected_output_stream is a dict of lists, extract keys directly
+                d["outputs"] = list(first_tc.expected_output_stream.keys())
         
         # Add available arsenal pieces if arsenal service is available
         if self.arsenal_service:

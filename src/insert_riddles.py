@@ -238,22 +238,46 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
         input_stream = tc.get('input_stream')
         expected_output_stream = tc.get('expected_output_stream')
         
-        # For backward compatibility: convert input_stream to inputs if needed
-        if inputs is None and input_stream is not None:
-            # It's a stream (list), map it to input names if possible
-            # Get input names from puzzle config
-            # Config might have "inputs" or "input"
-            input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
-            if len(input_names) == 1:
-                # Single input case (e.g. "X")
-                inputs = {input_names[0]: input_stream}
-            else:
-                # Fallback if multiple inputs or unknown structure
-                inputs = {"IN": input_stream}
+        # Handle test case data based on kind
+        inputs = tc.get('inputs')
+        expected_outputs = tc.get('expected_outputs')
+        input_stream = tc.get('input_stream')
+        expected_output_stream = tc.get('expected_output_stream')
         
-        # Map expected_output_stream to expected_outputs if needed
-        if expected_outputs is None:
-            expected_outputs = expected_output_stream
+        # IMPORTANT: For stream test cases, normalize input_stream to dict format
+        # Puzzle 3 uses: [1, 1, 1] (list of ints)
+        # Puzzle 7 uses: [{"input_0": 0}, ...] (list of dicts)
+        # We need both to be converted to the dict format for consistency
+        
+        if kind == 'stream' and input_stream:
+            # Normalize input_stream to list of dicts if it's currently list of ints
+            if input_stream and isinstance(input_stream[0], (int, float)):
+                # Convert [1, 1, 1] to [{"X": 1}, {"X": 1}, {"X": 1}]
+                input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
+                input_name = input_names[0] if input_names else 'input_0'
+                input_stream = [{input_name: val} for val in input_stream]
+            
+            # For stream: use input_stream and expected_output_stream directly
+            # Leave inputs and expected_outputs empty
+            inputs = {}
+            expected_outputs = {}
+        else:
+            # For blackbox/other kinds: try to use inputs/expected_outputs
+            # Fallback conversion only for backward compatibility
+            if inputs is None and input_stream is not None:
+                # It's a stream (list), map it to input names if possible
+                # Get input names from puzzle config
+                input_names = puzzle_data.get('inputs') or puzzle_data.get('input') or []
+                if len(input_names) == 1:
+                    # Single input case (e.g. "X")
+                    inputs = {input_names[0]: input_stream}
+                else:
+                    # Fallback if multiple inputs or unknown structure
+                    inputs = {"IN": input_stream}
+            
+            # Map expected_output_stream to expected_outputs if needed
+            if expected_outputs is None and expected_output_stream is not None:
+                expected_outputs = expected_output_stream
             
         inputs_json = json.dumps(inputs or {})
         expected_outputs_json = json.dumps(expected_outputs or {})

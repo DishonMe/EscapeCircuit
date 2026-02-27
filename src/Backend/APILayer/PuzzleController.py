@@ -524,41 +524,95 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                                 )
                         
                         # Validate stream test case against sample solution
-                        # Each cycle must have a corresponding entry in eval_map
+                        # For sequential circuits, simulate the stream to verify outputs
+                        # (Can't use simple eval_map lookup because same input can have different outputs based on state)
+                        
+                        print(f"  Simulating stream from sample solution circuit...")
+                        if not solution_circuit_data:
+                            raise ValidationError(
+                                f"Stream test case {i} requires sample solution to have circuit data for validation"
+                            )
+                        
+                        # Use the logic engine from solving_service to simulate the stream
+                        from Backend.DomainLayer.Circuit import Circuit as CircuitModel
+                        
+                        # Normalize the circuit structure: ensure it has placedComponents
+                        normalized_circuit_data = solution_circuit_data.copy()
+                        if "placed" in normalized_circuit_data and "placedComponents" not in normalized_circuit_data:
+                            normalized_circuit_data["placedComponents"] = normalized_circuit_data["placed"]
+                        
+                        # Create a temporary circuit from solution data
+                        temp_circuit = CircuitModel(
+                            id=0,
+                            user_id=0,
+                            name="temp-validate",
+                            cost=0,
+                            structure_json=json.dumps(normalized_circuit_data),
+                            is_arsenal=False,
+                        )
+                        
+                        print(f"  Circuit structure keys: {list(normalized_circuit_data.keys())}")
+                        
+                        # Extract DFF IDs from solution circuit to track state
+                        placed_components = normalized_circuit_data.get("placedComponents", []) or normalized_circuit_data.get("components", [])
+                        dff_ids = []
+                        for comp in placed_components:
+                            if comp.get("componentId") == "DFF" or comp.get("type") == "DFF":
+                                dff_ids.append(comp["id"])
+                        
+                        print(f"  DFFs in solution: {dff_ids}")
+                        
+                        # Simulate the stream, tracking state
+                        current_state = {str(did): 0 for did in dff_ids}
+                        actual_stream = {k: [] for k in expected_output_stream.keys()}
+                        
                         for cycle_idx, input_dict in enumerate(input_stream):
                             if isinstance(input_dict, dict):
-                                sorted_keys = sorted(input_dict.keys())
-                                key = json.dumps({k: input_dict[k] for k in sorted_keys}, separators=(',', ':'))
+                                # Merge inputs with current DFF state
+                                full_inputs = input_dict.copy()
+                                full_inputs.update(current_state)
                                 
-                                print(f"  Cycle {cycle_idx}: Looking for key {key}")
+                                print(f"  Cycle {cycle_idx}: inputs={input_dict}, state={current_state}")
                                 
-                                # Key MUST exist in eval_map
-                                if key not in eval_map:
+                                try:
+                                    # Simulate this cycle using solving_service's logic engine
+                                    cycle_outputs = solving_service.engine.evaluate(temp_circuit, full_inputs)
+                                    print(f"    Outputs: {cycle_outputs}")
+                                    
+                                    # Record outputs for each puzzle output
+                                    for output_name in expected_output_stream.keys():
+                                        actual_stream[output_name].append(cycle_outputs.get(output_name, 0))
+                                    
+                                    # Update state for next cycle
+                                    for did in dff_ids:
+                                        next_val = cycle_outputs.get(f"{did}_next")
+                                        current_state[str(did)] = next_val if next_val is not None else 0
+                                        print(f"    DFF {did}_next = {next_val}")
+                                    
+                                except Exception as e:
+                                    print(f"    Simulation error: {str(e)}")
+                                    import traceback
+                                    traceback.print_exc()
                                     raise ValidationError(
                                         f"Stream test case {i} cycle {cycle_idx}: "
-                                        f"no evaluation entry in sample solution for input {input_dict}"
+                                        f"Failed to simulate circuit: {str(e)}"
                                     )
-                                
-                                solution_output = eval_map[key]
-                                print(f"  Cycle {cycle_idx}: Solution output = {solution_output}")
-                                
-                                # Compare each output
-                                for output_name, expected_values in expected_output_stream.items():
-                                    if output_name not in solution_output:
+                        
+                        # Compare actual stream with expected stream
+                        print(f"  Expected stream: {expected_output_stream}")
+                        print(f"  Actual stream: {actual_stream}")
+                        
+                        if actual_stream != expected_output_stream:
+                            # Find which cycle mismatched
+                            for output_name in expected_output_stream.keys():
+                                for cycle_idx in range(len(input_stream)):
+                                    if actual_stream[output_name][cycle_idx] != expected_output_stream[output_name][cycle_idx]:
                                         raise ValidationError(
                                             f"Stream test case {i} cycle {cycle_idx}: "
-                                            f"sample solution missing output '{output_name}'"
+                                            f"expected {output_name}={expected_output_stream[output_name][cycle_idx]} "
+                                            f"but simulation gives {actual_stream[output_name][cycle_idx]}"
                                         )
-                                    
-                                    expected_val = expected_values[cycle_idx]
-                                    actual_val = solution_output[output_name]
-                                    
-                                    if actual_val != expected_val:
-                                        raise ValidationError(
-                                            f"Stream test case {i} cycle {cycle_idx}: "
-                                            f"for input {input_dict}, expected {output_name}={expected_val} "
-                                            f"but sample solution gives {actual_val}"
-                                        )
+                        
                         print(f"  ✓ Test case {i} PASSED")
                     elif tc_kind == 'blackbox':
                         # Blackbox test case validation
@@ -627,28 +681,32 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 print(f"\n=== ✓ ALL {len(test_cases)} TEST CASES VALIDATED SUCCESSFULLY ===")
                 
                 # CRITICAL: Verify solution actually works
-                # The eval_map should contain ALL possible input combinations being tested
-                # Check that eval_map has reasonable size (not just 1-2 entries)
+                # For blackbox tests: eval_map should contain input -> output mappings
+                # For stream tests: we validate by simulating the circuit (not by eval_map lookup)
                 eval_map_size = len(eval_map)
                 print(f"\n=== CRITICAL CHECK: Solution Completeness ===")
                 print(f"Solution has {eval_map_size} entries in eval_map")
                 print(f"Test cases defined: {len(test_cases)}")
                 
-                # For blackbox tests: each test case = 1 entry in eval_map
-                # For stream tests: each cycle = 1 entry in eval_map
+                # Only require eval_map entries for blackbox tests
+                # Stream tests are validated by full circuit simulation (already done above)
                 blackbox_count = sum(1 for tc in test_cases if tc.get('kind', 'blackbox') == 'blackbox')
-                stream_cycles = sum(len(tc.get('input_stream', [])) for tc in test_cases if tc.get('kind') == 'stream')
-                expected_eval_map_entries = blackbox_count + stream_cycles
+                stream_count = sum(1 for tc in test_cases if tc.get('kind') == 'stream')
                 
-                print(f"Expected eval_map entries: {expected_eval_map_entries} (blackbox: {blackbox_count}, stream cycles: {stream_cycles})")
+                print(f"Blackbox tests: {blackbox_count}, Stream tests: {stream_count}")
                 
-                if eval_map_size < expected_eval_map_entries:
+                # Only check eval_map size if there are blackbox tests
+                if blackbox_count > 0 and eval_map_size < blackbox_count:
                     raise ValidationError(
-                        f"Solution eval_map has {eval_map_size} entries but test cases require {expected_eval_map_entries}. "
+                        f"Solution eval_map has {eval_map_size} entries but {blackbox_count} blackbox tests require entries. "
                         f"Your circuit was not properly simulated. Make sure to test it in the Debugger first!"
                     )
                 
-                print(f"✓ Solution completeness check passed\n")
+                if blackbox_count == 0 and stream_count > 0:
+                    print(f"✓ No blackbox tests to validate via eval_map (only stream tests, validated by simulation)")
+                else:
+                    print(f"✓ Solution completeness check passed\n")
+
                 
                 # IMPORTANT: Filter out invalid constraint test cases before saving
                 # This prevents PuzzleTestCase validation errors when loading the puzzle

@@ -34,7 +34,7 @@
   },
   "test_cases": [
     {
-      "kind": "blackbox",
+      "kind": "stream",
       "input_stream": [
         1,
         1,
@@ -54,7 +54,7 @@
       }
     },
     {
-      "kind": "blackbox",
+      "kind": "stream",
       "input_stream": [
         0,
         0,
@@ -74,7 +74,7 @@
       }
     },
     {
-      "kind": "blackbox",
+      "kind": "stream",
       "input_stream": [
         1,
         0,
