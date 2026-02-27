@@ -95,6 +95,13 @@ def build_discussion_router(
         except ValidationError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
+    @router.post("/{discussion_id}/view")
+    def view_discussion(discussion_id: int, token: str = Depends(verify_token)):
+        try:
+            return discussion_service.view_discussion(token, discussion_id)
+        except ValidationError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
     @router.patch("/{discussion_id}")
     def update_discussion(
         discussion_id: int,

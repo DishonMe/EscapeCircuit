@@ -83,6 +83,24 @@ class TestCreateDiscussion:
         assert result["title"] == "Help!"
 
 
+class TestViewDiscussion:
+    def test_increments_view_count(self):
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 1
+        svc.discussion_repo.get_by_id.return_value = make_discussion()
+
+        result = svc.view_discussion("token", 1)
+        svc.discussion_repo.increment_view_count.assert_called_once_with(1)
+        assert result["view_count"] == 1
+
+    def test_not_found(self):
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 1
+        svc.discussion_repo.get_by_id.return_value = None
+        with pytest.raises(ValidationError, match="not found"):
+            svc.view_discussion("token", 999)
+
+
 class TestGetDiscussion:
     def test_success(self):
         svc = make_service()
@@ -93,7 +111,8 @@ class TestGetDiscussion:
 
         result = svc.get_discussion("token", 1)
         assert result["title"] == "Test"
-        svc.discussion_repo.increment_view_count.assert_called_once_with(1)
+        # get_discussion should NOT increment view count
+        svc.discussion_repo.increment_view_count.assert_not_called()
 
     def test_not_found(self):
         svc = make_service()

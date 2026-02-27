@@ -93,15 +93,20 @@ class DiscussionService:
             reply_dict["engagement"] = self.engagement.get_reply_engagement(reply.id, user_id)
         return reply_dict
 
+    def view_discussion(self, token: str, discussion_id: int) -> dict:
+        """Increment view count once per visit. Called separately from get_discussion."""
+        self.auth.require_user_id(token)
+        discussion = self.discussion_repo.get_by_id(discussion_id)
+        if not discussion:
+            raise ValidationError("discussion not found")
+        self.discussion_repo.increment_view_count(discussion_id)
+        return {"view_count": discussion.view_count + 1}
+
     def get_discussion(self, token: str, discussion_id: int) -> dict:
         user_id = self.auth.require_user_id(token)
         discussion = self.discussion_repo.get_by_id(discussion_id)
         if not discussion:
             raise ValidationError("discussion not found")
-
-        # Increment view count
-        self.discussion_repo.increment_view_count(discussion_id)
-        discussion.view_count += 1
 
         result = discussion.to_dict()
 

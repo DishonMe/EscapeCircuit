@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Pin, Lock, ArrowLeft, Bell, BellOff, Bookmark } from 'lucide-react';
 import NextLink from 'next/link';
 
@@ -24,6 +25,7 @@ import { useLockDiscussion } from '../api/lock-discussion';
 import { usePinDiscussion } from '../api/pin-discussion';
 import { useReactToDiscussion } from '../api/react-discussion';
 import { useReportDiscussion } from '../api/report-discussion';
+import { useViewDiscussion } from '../api/view-discussion';
 import { useVoteDiscussion } from '../api/vote-discussion';
 import { CategoryBadge } from './category-badge';
 import { ReactionPicker } from './reaction-picker';
@@ -72,6 +74,16 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
   const lockMutation = useLockDiscussion({
     discussionId,
   });
+
+  // Track view once per visit (not on refetches from mutations)
+  const viewMutation = useViewDiscussion({ discussionId });
+  const viewedRef = useRef(false);
+  useEffect(() => {
+    if (!viewedRef.current && discussionQuery.data) {
+      viewedRef.current = true;
+      viewMutation.mutate({ discussionId });
+    }
+  }, [discussionQuery.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (discussionQuery.isLoading) {
     return (
