@@ -1,0 +1,23 @@
+\section*{2-Bit Comparator Instructions}
+
+\subsection*{Objective}
+Design a circuit that compares two 2-bit binary numbers, $\mathbf{A}$ and $\mathbf{B}$.
+\begin{itemize}
+  \item $A$ is represented by bits $A_1$ (MSB) and $A_0$ (LSB)
+  \item $B$ is represented by bits $B_1$ (MSB) and $B_0$ (LSB)
+\end{itemize}
+
+\subsection*{Outputs}
+Evaluate the magnitude of the binary numbers:
+\begin{enumerate}
+  \item \textbf{GT} (Greater Than): High (1) if $A > B$
+  \item \textbf{EQ} (Equal): High (1) if $A = B$
+  \item \textbf{LT} (Less Than): High (1) if $A < B$
+\end{enumerate}
+
+\subsection*{Logic Hint}
+\begin{itemize}
+  \item \textbf{Equality}: $A = B$ if ($A_1 = B_1$) AND ($A_0 = B_0$)
+  \item \textbf{Greater}: Compare MSBs first. If $A_1 > B_1$, then $A > B$. If $A_1 = B_1$, check if $A_0 > B_0$
+  \item \textbf{Less}: Similar logic, or can be derived from NOT (GT or EQ)
+\end{itemize}

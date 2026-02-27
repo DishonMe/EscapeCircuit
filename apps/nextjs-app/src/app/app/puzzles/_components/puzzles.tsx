@@ -3,8 +3,11 @@
 import Link from 'next/link';
 
 import { PuzzlesList } from '@/features/puzzles/components/puzzles-list';
+import { useUser } from '@/lib/auth';
 
 export const Puzzles = () => {
+  const user = useUser();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 py-8">
@@ -16,16 +19,6 @@ export const Puzzles = () => {
           <p className="text-gray-600">
             Browse and solve challenging circuit design puzzles
           </p>
-        </div>
-
-        {/* Create Puzzle Button */}
-        <div className="mb-6">
-          <Link
-            href="/app/admin/upload-puzzle"
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Create New Puzzle
-          </Link>
         </div>
 
         {/* Puzzles List */}

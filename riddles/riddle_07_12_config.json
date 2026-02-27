@@ -1,0 +1,92 @@
+{
+  "puzzle": {
+    "name": "12",
+    "description": "12",
+    "budget": 123,
+    "time_limit_seconds": 123,
+    "difficulty": "EASY",
+    "default_gate_set": [
+      "DFF",
+      "NOT"
+    ],
+    "inputs": [
+      "input_0"
+    ],
+    "outputs": [
+      "output_0"
+    ],
+    "min_cycles": 2,
+    "max_cycles": 2,
+    "total_gate_count": null
+  },
+  "test_cases": [
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "input_0": 0
+        },
+        {
+          "input_0": 0
+        }
+      ],
+      "expected_output_stream": {
+        "output_0": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "input_0": 0
+        },
+        {
+          "input_0": 1
+        }
+      ],
+      "expected_output_stream": {
+        "output_0": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "input_0": 1
+        },
+        {
+          "input_0": 0
+        }
+      ],
+      "expected_output_stream": {
+        "output_0": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "input_0": 1
+        },
+        {
+          "input_0": 1
+        }
+      ],
+      "expected_output_stream": {
+        "output_0": [
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

@@ -55,6 +55,29 @@ export const PuzzlesList = () => {
   const puzzles = puzzlesQuery.data?.data;
   const meta = puzzlesQuery.data?.meta;
 
+  // Filter puzzles based on medal filter (client-side, based on best_medal)
+  const filteredPuzzles = useMemo(() => {
+    if (!puzzles) return puzzles;
+    if (filters.medalFilter && filters.medalFilter !== 'all') {
+      return puzzles.filter((p) => {
+        const medal = p.best_medal ?? 0;
+        switch (filters.medalFilter) {
+          case 'unsolved':
+            return medal === 0 || !p.is_solved;
+          case 'bronze':
+            return medal === 1;
+          case 'silver':
+            return medal === 2;
+          case 'gold':
+            return medal === 3;
+          default:
+            return true;
+        }
+      });
+    }
+    return puzzles;
+  }, [puzzles, filters.medalFilter]);
+
   const selectedPuzzle: Puzzle | undefined = useMemo(() => {
     if (!detailsPuzzleId || !puzzles) return undefined;
     return puzzles.find((p) => p.id === detailsPuzzleId);
@@ -65,7 +88,7 @@ export const PuzzlesList = () => {
     return puzzles.find((p) => p.id === commentPuzzleId);
   }, [commentPuzzleId, puzzles]);
 
-  const isEmpty = !puzzles || puzzles.length === 0;
+  const isEmpty = !filteredPuzzles || filteredPuzzles.length === 0;
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -248,7 +271,7 @@ export const PuzzlesList = () => {
             </div>
           </div>
 
-          {/* Last Level: direction, experienced/inexperienced/all */}
+          {/* Last Level: direction, experienced/inexperienced/all, and medal filter */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {/* Direction */}
             <div>
@@ -276,6 +299,22 @@ export const PuzzlesList = () => {
                 <option value="inexperienced">Inexperienced</option>
               </select>
             </div>
+
+            {/* Medal Filter */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Medal</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.medalFilter || 'all'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, medalFilter: e.target.value as any, page: 1 })}
+              >
+                <option value="all">All Puzzles</option>
+                <option value="unsolved">Unsolved</option>
+                <option value="bronze">Bronze 🥉</option>
+                <option value="silver">Silver 🥈</option>
+                <option value="gold">Gold 🥇</option>
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -297,7 +336,7 @@ export const PuzzlesList = () => {
       {/* Puzzle Grid */}
       {!puzzlesQuery.isLoading && !isEmpty && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {puzzles!.map((puzzle) => (
+        {filteredPuzzles!.map((puzzle) => (
           <div
             key={puzzle.id}
             className={`relative cursor-pointer rounded-lg border-2 bg-white p-5 transition-all hover:shadow-lg ${

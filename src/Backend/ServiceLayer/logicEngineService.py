@@ -376,6 +376,46 @@ class logicEngineService:
         # fallback: no info
         return set()
 
+    def extract_gate_counts(self, structure_json: str) -> dict:
+        """
+        Extract actual gate counts from circuit structure.
+        Returns dict like {"AND": 3, "OR": 2, "NOT": 1}
+        
+        Supported shapes:
+        - {"gates_counts": {"AND":3,"NOT":2}}
+        - {"components":[{"type":"AND"}, {"type":"AND"}, ...]}
+        - {"placedComponents":[{"componentId":"AND"}, ...]}
+        """
+        data = self._load(structure_json)
+        counts = {}
+        
+        # Priority 1: Direct gates_counts field
+        if isinstance(data.get("gates_counts"), dict):
+            for gate_name, count in data["gates_counts"].items():
+                counts[str(gate_name)] = int(count)
+            return counts
+        
+        # Priority 2: Count from components array
+        if isinstance(data.get("components"), list):
+            for c in data["components"]:
+                if isinstance(c, dict) and "type" in c:
+                    gate_type = str(c["type"])
+                    counts[gate_type] = counts.get(gate_type, 0) + 1
+            return counts
+        
+        # Priority 3: Count from placedComponents (user circuit)
+        if isinstance(data.get("placedComponents"), list):
+            for c in data["placedComponents"]:
+                if isinstance(c, dict):
+                    gate_type = c.get("componentId") or c.get("type")
+                    if gate_type:
+                        gate_type = str(gate_type)
+                        counts[gate_type] = counts.get(gate_type, 0) + 1
+            return counts
+        
+        # fallback: empty counts
+        return {}
+
     def compute_cost(self, structure_json: str) -> int:
         """
         ARD: cost = sum of basic gate counts + nested circuit full cost. :contentReference[oaicite:3]{index=3}

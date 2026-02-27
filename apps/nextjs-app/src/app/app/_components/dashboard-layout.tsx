@@ -48,6 +48,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const userRole = user.data?.role?.toLowerCase() || '';
   const navigation = [
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
+    (userRole === 'creator' || userRole === 'admin') && {
+      name: 'My Puzzles',
+      to: paths.app.myPuzzles.getHref(),
+      icon: Folder,
+    },
     { name: 'Arsenal', to: paths.app.arsenal.root.getHref(), icon: Zap },
     {
       name: 'Discussions',

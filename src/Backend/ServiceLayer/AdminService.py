@@ -44,6 +44,14 @@ class AdminService:
             raise ValidationError("admin required")
         return admin_id
 
+    def _require_admin_or_creator(self, session_token: str) -> int:
+        """Validate session and ensure user is admin or creator. Returns user_id."""
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user or user.role not in (UserRole.ADMIN, UserRole.CREATOR, UserRole.PENDING_CREATOR):
+            raise ValidationError("admin or creator required")
+        return user_id
+
     # ------------------------------------------------------------------ #
     #  REQ 7.2 + 1.2  —  Assign Creator Role (pending invitation)
     # ------------------------------------------------------------------ #

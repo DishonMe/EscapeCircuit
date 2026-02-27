@@ -94,7 +94,7 @@ class SolvingService:
             raise ValidationError("puzzle has no test cases")
 
         # --- CORE VALIDATION LOGIC ---
-        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases)
+        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
         # -----------------------------
 
         attempt.passed = passed
@@ -173,9 +173,11 @@ class SolvingService:
                 pass
 
         # Budget Check
-        if hasattr(p, 'budget') and int(circuit.cost) > int(getattr(p, 'budget', 999999)):
+        puzzle_budget = int(getattr(p, 'budget', 999999))
+        circuit_cost = int(circuit.cost)
+        if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
             attempt.passed = False
-            attempt.fail_reason = "over budget"
+            attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
             attempt.circuit_id = int(circuit_id)
             self.solve_repo.update_attempt(attempt)
             return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
@@ -256,7 +258,7 @@ class SolvingService:
             structure_json=json.dumps(expanded_solution)
         )
         
-        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases)
+        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p)
         
         if passed:
             cost_used = int(solution_payload.get("totalCost", 0))
@@ -458,16 +460,64 @@ class SolvingService:
             return {"solved": False, "message": fail_msg, "details": details}
 
     # ---------- Helper: Centralized Evaluation ----------
-    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any]):
+    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None):
         """
         Evaluates circuit against test cases, handling both Combinatorial (single step)
         and Sequential (streams over time/cycles) logic.
+        Also validates gate limit constraints before testing logic.
         """
         try:
             structure = json.loads(circuit.structure_json)
         except:
             structure = {}
+
+        # --- GATE LIMIT VALIDATION (Check before logic tests) ---
+        # Extract actual gate counts from circuit
+        actual_gates = self.logic_engine.extract_gate_counts(circuit.structure_json)
+        
+        for i, tc in enumerate(test_cases):
+            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
             
+            # Check per-gate limits (GATE_LIMIT test case)
+            if tc_kind == "gate_limit":
+                gate_name = getattr(tc, "gate_name", None)
+                if gate_name is None and isinstance(tc, dict):
+                    gate_name = tc.get("gate_name")
+                
+                gate_limit = getattr(tc, "gate_limit", None)
+                if gate_limit is None and isinstance(tc, dict):
+                    gate_limit = tc.get("gate_limit")
+                
+                if gate_name and gate_limit is not None:
+                    actual_count = actual_gates.get(gate_name, 0)
+                    if actual_count > gate_limit:
+                        return False, f"Gate limit exceeded: Used {actual_count} {gate_name} gates but limit is {gate_limit}", [{
+                            "test_case_index": i,
+                            "gate_name": gate_name,
+                            "limit": gate_limit,
+                            "actual": actual_count,
+                            "error_type": "gate_limit_exceeded"
+                        }]
+            
+            # Check total gate count limit (GATE_COUNT_LIMIT test case)
+            if tc_kind == "gate_count_limit":
+                # Try test case first, then fall back to puzzle's total_gate_count
+                max_gate_count = getattr(tc, "max_gate_count", None)
+                if max_gate_count is None and puzzle:
+                    max_gate_count = getattr(puzzle, "total_gate_count", None)
+                
+                if max_gate_count is not None:
+                    total_gates = sum(actual_gates.values())
+                    if total_gates > max_gate_count:
+                        return False, f"Total gate count exceeded: Used {total_gates} gates but limit is {max_gate_count}", [{
+                            "test_case_index": i,
+                            "gate_limit": max_gate_count,
+                            "actual_total": total_gates,
+                            "gate_breakdown": actual_gates,
+                            "error_type": "gate_count_limit_exceeded"
+                        }]
+        
+        # --- LOGIC VALIDATION (Inputs/Outputs) ---
         placed = structure.get("placedComponents", [])
         if not placed:
             placed = structure.get("components", [])
@@ -492,17 +542,42 @@ class SolvingService:
             # Handle dictionary access if tc is a dict
             if input_stream is None and isinstance(tc, dict):
                 input_stream = tc.get("input_stream")
+            
+            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
                 
             if input_stream is not None and len(input_stream) > 0:
                 # === SEQUENTIAL SIMULATION (INJECTED LOGIC) ===
                 # 'current_state' acts as our look-back history
                 current_state = {str(did): 0 for did in dff_ids}
                 
-                expected_stream = getattr(tc, "expected_output_stream", None) or tc.get("expected_output_stream", {})
+                expected_stream = getattr(tc, "expected_output_stream", None) if hasattr(tc, "expected_output_stream") else (tc.get("expected_output_stream", {}) if isinstance(tc, dict) else {})
                 if not expected_stream:
                     return False, "Sequential test case has input_stream but no expected_output_stream", [{"error": "malformed test case"}]
                     
                 actual_stream = {k: [] for k in expected_stream.keys()}
+                actual_cycles = len(input_stream)
+                
+                # Check latency limits BEFORE simulation
+                tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
+                if tc_kind == "latency_limit":
+                    min_cycles = getattr(tc, "min_cycles", None) or (tc.get("min_cycles") if isinstance(tc, dict) else None)
+                    max_cycles = getattr(tc, "max_cycles", None) or (tc.get("max_cycles") if isinstance(tc, dict) else None)
+                    
+                    if min_cycles is not None and actual_cycles < min_cycles:
+                        return False, f"Insufficient cycles: Circuit uses {actual_cycles} cycles but minimum is {min_cycles}", [{
+                            "test_case_index": i,
+                            "actual_cycles": actual_cycles,
+                            "min_cycles": min_cycles,
+                            "error_type": "insufficient_cycles"
+                        }]
+                    
+                    if max_cycles is not None and actual_cycles > max_cycles:
+                        return False, f"Too many cycles: Circuit uses {actual_cycles} cycles but maximum is {max_cycles}", [{
+                            "test_case_index": i,
+                            "actual_cycles": actual_cycles,
+                            "max_cycles": max_cycles,
+                            "error_type": "excessive_cycles"
+                        }]
                 
                 # Loop through discrete time steps (cycles)
                 for step_idx, val in enumerate(input_stream):
@@ -535,20 +610,25 @@ class SolvingService:
                     }]
 
             else:
-                # === COMBINATORIAL SIMULATION ===
-                inputs = getattr(tc, "inputs", None) or tc.get("inputs")
-                expected = getattr(tc, "expected_outputs", None) or tc.get("expected_outputs")
+                # Only check inputs/outputs for BLACKBOX and WHITEBOX test cases
+                # Skip constraint-only test cases (GATE_LIMIT, GATE_COUNT_LIMIT, LATENCY_LIMIT)
+                is_logic_test = tc_kind not in ("gate_limit", "gate_count_limit", "latency_limit")
                 
-                try:
-                    out = self.logic_engine.evaluate(circuit, inputs)
-                    if out != expected:
-                        return False, "Wrong output", [{
-                            "inputs": inputs,
-                            "expected": expected,
-                            "actual": out
-                        }]
-                except Exception as e:
-                    return False, str(e), [{"error": str(e)}]
+                if is_logic_test:
+                    # === COMBINATORIAL SIMULATION ===
+                    inputs = getattr(tc, "inputs", None) if hasattr(tc, "inputs") else (tc.get("inputs") if isinstance(tc, dict) else None)
+                    expected = getattr(tc, "expected_outputs", None) if hasattr(tc, "expected_outputs") else (tc.get("expected_outputs") if isinstance(tc, dict) else None)
+                    
+                    try:
+                        out = self.logic_engine.evaluate(circuit, inputs)
+                        if out != expected:
+                            return False, "Wrong output", [{
+                                "inputs": inputs,
+                                "expected": expected,
+                                "actual": out
+                            }]
+                    except Exception as e:
+                        return False, str(e), [{"error": str(e)}]
 
         return True, None, []
 

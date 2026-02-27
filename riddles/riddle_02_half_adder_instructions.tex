@@ -1,0 +1,41 @@
+\section*{Half Adder Quiz Instructions}
+
+\subsection*{Objective}
+Design a digital circuit that implements a \textbf{half adder} using the provided gate set.
+
+\subsection*{What is a Half Adder?}
+A half adder is a digital circuit that adds two binary digits: inputs $A$ and $B$. It produces two outputs:
+\begin{itemize}
+  \item Sum ($S$): The least significant bit of the sum
+  \item Carry-out ($C_{\text{out}}$): The carry bit to the next higher position
+\end{itemize}
+
+The truth table for a half adder is:
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$A$ & $B$ & $S$ & $C_{\text{out}}$ \\
+\hline
+0 & 0 & 0 & 0 \\
+0 & 1 & 1 & 0 \\
+1 & 0 & 1 & 0 \\
+1 & 1 & 0 & 1 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Requirements}
+\begin{itemize}
+  \item Implement XOR logic for the sum ($S = A \oplus B$)
+  \item Implement AND logic for the carry ($C_{\text{out}} = A \land B$)
+  \item Pass all 4 test cases
+  \item Inputs: $A$, $B$
+  \item Outputs: $S$, $C_{\text{out}}$
+\end{itemize}
+
+\subsection*{Hints}
+\begin{itemize}
+  \item XOR can be implemented using AND, OR, and NOT gates
+  \item A half adder is simpler than a full adder (no carry-in input)
+  \item Consider the Boolean expressions for sum and carry
+\end{itemize}

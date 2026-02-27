@@ -12,12 +12,18 @@ class Puzzle:
     name: str
     creator_user_id: int
     description: str = ""
+    instructions: Optional[str] = None
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
     budget: int = 0
     time_limit_seconds: Optional[int] = None
     difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
+
+    # Constraint fields
+    total_gate_count: Optional[int] = None
+    min_cycles: Optional[int] = None
+    max_cycles: Optional[int] = None
 
     rating_count: int = 0
     avg_difficulty: float = 0.0
@@ -67,6 +73,7 @@ class Puzzle:
             "title": self.name, # Alias for frontend
             "creator_user_id": int(self.creator_user_id),
             "description": self.description,
+            "instructions": self.instructions,
             "status": self.status.value,
             "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
@@ -76,6 +83,9 @@ class Puzzle:
             "difficulty": self.difficulty.value, # Creator-set difficulty
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
+            "total_gate_count": self.total_gate_count,
+            "min_cycles": self.min_cycles,
+            "max_cycles": self.max_cycles,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "solvedCount": 0, # Placeholder
@@ -96,11 +106,15 @@ class Puzzle:
             name=d["name"],
             creator_user_id=int(d["creator_user_id"]),
             description=d.get("description", ""),
+            instructions=d.get("instructions"),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
             time_limit_seconds=d.get("time_limit_seconds", None),
             difficulty=PuzzleDifficulty(d["difficulty"]) if "difficulty" in d else PuzzleDifficulty.EASY,
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
+            total_gate_count=d.get("total_gate_count"),
+            min_cycles=d.get("min_cycles"),
+            max_cycles=d.get("max_cycles"),
             rating_count=int(d.get("rating_count", 0)),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
             avg_fun=float(d.get("avg_fun", 0.0)),
