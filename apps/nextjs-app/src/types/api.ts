@@ -70,6 +70,8 @@ export type Puzzle = Entity<{
   solvedCount: number;
   isPublic: boolean;
   solution?: CircuitSolution;
+  status?: 'draft' | 'published' | 'unpublished'; // Puzzle publication status
+  isPublished?: boolean; // Alias for frontend compat
 
   // Solve tracking (injected per-user by browse endpoint)
   is_solved?: boolean;

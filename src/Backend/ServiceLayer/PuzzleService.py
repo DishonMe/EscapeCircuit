@@ -105,6 +105,54 @@ class PuzzleService:
             }
         }
 
+    def list_my_puzzles(
+        self,
+        session_token: str,
+        limit: int = 50,
+        offset: int = 0,
+        search: str = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC"
+    ) -> dict:
+        user_id = self.auth.require_user_id(session_token)
+        
+        # Get all puzzles created by the user (both published and unpublished)
+        where_clauses = ["creator_user_id=?"]
+        params = [user_id]
+        
+        if search:
+            where_clauses.append("name LIKE ?")
+            params.append(f"%{search}%")
+        
+        where_clause = " AND ".join(where_clauses)
+        
+        # Query for puzzles
+        puzzles = self.repo.conn.execute(f"""
+            SELECT * FROM puzzles 
+            WHERE {where_clause}
+            ORDER BY {order_by} {order_direction}
+            LIMIT ? OFFSET ?
+        """, params + [limit, offset]).fetchall()
+        
+        puzzles = [self.repo._row_to_puzzle(row) for row in puzzles]
+        
+        # Count total
+        total = self.repo.conn.execute(f"""
+            SELECT COUNT(*) FROM puzzles WHERE {where_clause}
+        """, params).fetchone()[0]
+        
+        limit = max(1, limit)
+        total_pages = (total + limit - 1) // limit
+        
+        return {
+            "data": [self._enrich_puzzle(p.to_dict()) for p in puzzles],
+            "meta": {
+                "page": (offset // limit) + 1,
+                "total": total,
+                "totalPages": total_pages
+            }
+        }
+
     def search(self, session_token: str, q: str, only_published: bool = True) -> List[dict]:
         _ = self.auth.require_user_id(session_token)
         puzzles = self.repo.search_by_name(q, only_published=only_published)
@@ -209,6 +257,12 @@ class PuzzleService:
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
+        # Check 10 puzzle limit for non-admin creators
+        if user.role != UserRole.ADMIN:
+            published_count = self.repo.count_published(creator_id=user_id)
+            if published_count >= 10:
+                raise ValidationError("You have reached the maximum of 10 published puzzles. Unpublish a puzzle before publishing a new one.")
+
         # Publish preconditions (ADD/ARD):
         # 1) at least one test case
         if not self.repo.list_test_cases(puzzle_id):
@@ -241,6 +295,52 @@ class PuzzleService:
             raise ValidationError("not allowed")
 
         p.unpublish()
+        self.repo.update(p)
+        return self._enrich_puzzle(p.to_dict())
+
+    def delete_puzzle(self, session_token: str, puzzle_id: int) -> dict:
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+
+        p = self.repo.get_by_id(puzzle_id)
+        if not p:
+            raise ValidationError("puzzle not found")
+
+        if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
+            raise ValidationError("not allowed")
+
+        deleted = self.repo.delete(puzzle_id)
+        if not deleted:
+            raise ValidationError("Failed to delete puzzle")
+        return {"success": True, "message": "Puzzle deleted successfully"}
+
+    def update_puzzle(self, session_token: str, puzzle_id: int, payload: Dict[str, Any]) -> dict:
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+
+        p = self.repo.get_by_id(puzzle_id)
+        if not p:
+            raise ValidationError("puzzle not found")
+
+        if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
+            raise ValidationError("not allowed")
+
+        # Update allowed fields
+        if "name" in payload:
+            p.name = (payload.get("name") or "").strip()
+            if not p.name:
+                raise ValidationError("Puzzle name cannot be empty")
+        
+        if "description" in payload:
+            p.description = payload.get("description", "") or ""
+        
+        if "instructions" in payload:
+            p.instructions = payload.get("instructions", "") or ""
+
         self.repo.update(p)
         return self._enrich_puzzle(p.to_dict())
 

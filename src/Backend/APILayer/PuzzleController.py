@@ -40,6 +40,12 @@ class CreatePuzzleReq(BaseModel):
         }
 
 
+class UpdatePuzzleReq(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+
+
 class AddTestCaseReq(BaseModel):
     kind: str
     inputs: Dict[str, int]
@@ -202,6 +208,31 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 
+    @router.get("/my-puzzles/list")
+    def list_my_puzzles(
+        limit: int = 50,
+        offset: int = 0,
+        page: Optional[int] = None,
+        search: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        token: str = Depends(verify_token)
+    ):
+        try:
+            if page is not None and page > 0:
+                offset = (page - 1) * limit
+            
+            return puzzle_service.list_my_puzzles(
+                token,
+                limit=limit,
+                offset=offset,
+                search=search,
+                order_by=order_by,
+                order_direction=order_direction
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
     @router.get("/search")
     def search(q: str, token: str = Depends(verify_token)):
         try:
@@ -265,6 +296,27 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     def unpublish(puzzle_id: int, token: str = Depends(verify_token)):
         try:
             return puzzle_service.unpublish(token, puzzle_id)
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.delete("/{puzzle_id}")
+    def delete_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            return puzzle_service.delete_puzzle(token, puzzle_id)
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.patch("/{puzzle_id}")
+    def update_puzzle(puzzle_id: int, req: UpdatePuzzleReq, token: str = Depends(verify_token)):
+        try:
+            payload = {}
+            if req.name is not None:
+                payload["name"] = req.name
+            if req.description is not None:
+                payload["description"] = req.description
+            if req.instructions is not None:
+                payload["instructions"] = req.instructions
+            return puzzle_service.update_puzzle(token, puzzle_id, payload)
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
 

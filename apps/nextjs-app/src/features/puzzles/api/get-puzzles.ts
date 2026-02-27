@@ -22,6 +22,8 @@ export interface PuzzleFilters {
   orderDirection?: 'ASC' | 'DESC';
   orderOnlyExperienced?: boolean;
   experienceLevel?: 'all' | 'experienced' | 'inexperienced';
+  medalFilter?: 'all' | 'unsolved' | 'bronze' | 'silver' | 'gold';
+  creator_id?: number;
 }
 
 export const getPuzzles = (
@@ -38,6 +40,7 @@ export const getPuzzles = (
   if (filters.search !== undefined) params.search = filters.search;
   if (filters.minDifficulty !== undefined) params.min_difficulty = filters.minDifficulty;
   if (filters.maxDifficulty !== undefined) params.max_difficulty = filters.maxDifficulty;
+  if (filters.creator_id !== undefined) params.creator_id = filters.creator_id;
   if (filters.experienceLevel === 'experienced') {
     params.only_experienced_difficulty = true;
     params.only_experienced_clearness = true;
