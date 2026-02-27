@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { MutationConfig } from '@/lib/react-query';
 
-export const acceptCreatorRole = () => {
+export const acceptCreatorRole = (_?: void) => {
   return api.post('/users/me/accept-creator');
 };
 
@@ -28,7 +28,7 @@ export const useAcceptCreator = ({
   });
 };
 
-export const declineCreatorRole = () => {
+export const declineCreatorRole = (_?: void) => {
   return api.post('/users/me/decline-creator');
 };
 

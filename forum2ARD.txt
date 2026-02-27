@@ -1,0 +1,657 @@
+# Discussion Forum Feature — Summaries for ARD & ADD
+
+## Context
+
+This document provides two detailed summaries of **everything implemented** for the Discussion Forum feature across Phases 1–3 plus the Admin Reports enhancement. The first summary is written for the **Application Requirements Document (ARD)** and the second for the **Application Design Document (ADD)**.
+
+---
+
+# PART 1 — APPLICATION REQUIREMENTS DOCUMENT (ARD) SUMMARY
+
+## 1. Feature Overview
+
+The Discussion Forum is a community-driven feature within EscapeCircuit that allows users to create, browse, and engage with discussion threads related to circuit puzzles and the platform in general. It includes threaded replies, user engagement tools, content discovery, content reporting, and admin moderation capabilities.
+
+## 2. Functional Requirements
+
+### 2.1 Discussion Management (Phase 1 — Core Forum)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-D01 | Create Discussion | Authenticated users can create a discussion with a title (3–200 chars), body (10–10,000 chars), category, and optional linked puzzle. Awards 5 XP to the author. |
+| FR-D02 | View Discussion | Any authenticated user can view a discussion. Viewing increments the view counter by 1. Returns the discussion enriched with author info, engagement data, and nested replies (3 levels deep). |
+| FR-D03 | List Discussions | Paginated listing with support for filtering by category, puzzle, author, and search term. Results are sortable by newest, oldest, most replies, most upvotes, and trending. Pinned discussions always appear first. |
+| FR-D04 | Update Discussion | Only the discussion author or an admin can update the title, body, or category. |
+| FR-D05 | Delete Discussion | Only the discussion author or an admin can delete. Cascading deletes remove all associated replies, votes, reactions, follows, and bookmarks. |
+| FR-D06 | Discussion Categories | Seven predefined categories: General, Puzzle Help, Tips & Tricks, Solutions, Bug Report, Feature Request, Showcase. |
+| FR-D07 | Ban Enforcement | Users with `is_discussion_banned = true` are blocked from creating discussions. They receive an error: "you are banned from creating discussions". |
+
+### 2.2 Reply Management (Phase 1 — Core Forum)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-R01 | Create Reply | Authenticated users can reply to a discussion. Supports nested threading via optional `parent_reply_id`. Awards 2 XP to the author. Blocked if discussion is locked or user is banned. |
+| FR-R02 | Update Reply | Only the reply author or an admin can update the body. |
+| FR-R03 | Delete Reply | Only the reply author or an admin can delete. Decrements the discussion's reply counter. |
+| FR-R04 | Accept Reply (Mark as Solution) | Only the discussion author or an admin can accept a reply. Clears any previously accepted reply. Awards 25 XP to the reply author and 5 XP to the discussion author. |
+| FR-R05 | Nested Threading | Replies support a parent–child hierarchy via `parent_reply_id`. The UI renders up to 3 levels of nesting. |
+| FR-R06 | Ban Enforcement | Users with `is_discussion_banned = true` are blocked from creating replies. |
+
+### 2.3 User Engagement (Phase 2 — Engagement)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-E01 | Vote on Discussion | Users can upvote (+1) or downvote (−1) a discussion. Re-voting with the same value removes the vote (toggle). Awards 3 XP to the discussion author on upvote (not self-upvote). |
+| FR-E02 | Vote on Reply | Same behavior as discussion voting but for replies. Awards 3 XP to the reply author on upvote. |
+| FR-E03 | React to Discussion | Users can add reactions (insightful, helpful, genius, spot_on, thinking). Each reaction type is independently toggle-able. Awards 1 XP to the discussion author on add (not self-react). |
+| FR-E04 | React to Reply | Same behavior as discussion reactions but for replies. |
+| FR-E05 | Follow Discussion | Users can toggle following a discussion. Followers may receive notifications on new replies (future enhancement). |
+| FR-E06 | Bookmark Discussion | Users can toggle bookmarking a discussion for quick access. |
+| FR-E07 | User Badge | Discussions and replies display the author's username, level, and experience information. Experienced users (level ≥ 5) are visually distinguished. |
+
+### 2.4 Discovery & Search (Phase 3 — Discovery)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-S01 | Full-Text Search | Users can search discussions by title and body content. Search is applied as a filter on the list endpoint. |
+| FR-S02 | Category Filtering | Users can filter the discussion list by category using filter buttons. |
+| FR-S03 | Trending Sort | A "trending" sort algorithm prioritizes discussions with high engagement relative to recency: `score = upvotes + (reply_count × 2) + (view_count × 0.1) + recency_bonus`. Recency bonus is 50 points for posts < 1 day old, decaying to 0 over 7 days. |
+
+### 2.5 Content Reporting (Phase 3 — Moderation)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-M01 | Report Discussion | Authenticated users can report a discussion for: spam, harassment, off_topic, inappropriate, or other. Optional details text. A user cannot report the same content twice (unique constraint). |
+| FR-M02 | Report Reply | Same behavior as discussion reporting but for replies. |
+| FR-M03 | Report De-duplication | A unique constraint on (reporter_id, target_type, target_id) prevents the same user from reporting the same content multiple times. |
+
+### 2.6 Admin Moderation (Admin Reports Enhancement)
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-A01 | View Reports | Admins can view all content reports in the Admin Panel → Reports tab. Reports display: reason badge, status badge, date, target type with clickable link, target author username, reporter username, and details. |
+| FR-A02 | Filter Reports by Status | Admins can filter reports by: All, Pending, Reviewed, Dismissed. |
+| FR-A03 | Update Report Status | Admins can manually change a report's status to reviewed or dismissed. |
+| FR-A04 | Warn Author | Admins can warn the author of reported content. This creates a persistent "warning" notification for the author visible on their next login, and marks the report as reviewed. |
+| FR-A05 | Ban Author from Discussions | Admins can ban the author of reported content from the discussions forum. This sets `is_discussion_banned = true`, creates a persistent "ban" notification for the user, and marks the report as reviewed. The user can no longer create discussions or replies. |
+| FR-A06 | Delete Reported Content | Admins can permanently delete the reported discussion or reply. Requires a confirmation dialog. Marks the report as reviewed. |
+| FR-A07 | Lock Reported Discussion | Admins can lock a reported discussion (only available for discussion-type targets). Prevents new replies. Marks the report as reviewed. |
+| FR-A08 | Pin Discussion | Admins can toggle the pinned status of a discussion. Pinned discussions appear first in all list views. |
+| FR-A09 | Lock Discussion (Direct) | Admins can toggle the locked status of a discussion from the discussion detail view. Locked discussions block new replies. |
+
+### 2.7 Notification Requirements
+
+| ID | Requirement | Details |
+|----|-------------|---------|
+| FR-N01 | Warning Notification | When an admin warns a user, a notification of type "warning" is created. The title shows "Warning" with a yellow icon. The notification is persistent — it does not auto-dismiss and requires the user to manually close it. |
+| FR-N02 | Ban Notification | When an admin bans a user, a notification of type "ban" is created. The title shows "Account Restriction" with a red error icon. The notification is persistent. |
+| FR-N03 | Offline Notification Delivery | Notifications are stored server-side and fetched when the user logs in. If a user was offline when warned/banned, they see the notification on next login. |
+| FR-N04 | Notification De-duplication | Shown notification IDs are tracked in localStorage to prevent re-showing on page refresh. |
+
+### 2.8 XP Reward Table
+
+| Action | XP Awarded | Recipient |
+|--------|-----------|-----------|
+| Create Discussion | +5 | Author |
+| Create Reply | +2 | Author |
+| Receive Upvote (Discussion) | +3 | Discussion Author |
+| Receive Upvote (Reply) | +3 | Reply Author |
+| Receive Reaction (Discussion) | +1 | Discussion Author |
+| Receive Reaction (Reply) | +1 | Reply Author |
+| Reply Accepted as Solution | +25 | Reply Author |
+| Accept a Solution | +5 | Discussion Author |
+
+### 2.9 Non-Functional Requirements
+
+- All discussion list queries support pagination (limit/offset)
+- Search is case-insensitive substring matching on title and body
+- Report creation validates reason against allowed enum values
+- Admin-only endpoints verify user role = admin before processing
+- Ban checks occur at discussion/reply creation time, not at login
+- Cascade deletes ensure no orphaned data when discussions are removed
+
+## 3. API Endpoints Summary
+
+### Discussion Endpoints
+- `GET /discussions` — List (with filters, search, sort, pagination)
+- `POST /discussions` — Create
+- `GET /discussions/{id}` — Get single (with nested replies + engagement)
+- `PATCH /discussions/{id}` — Update
+- `DELETE /discussions/{id}` — Delete
+- `POST /discussions/{id}/pin` — Toggle pin (admin)
+- `POST /discussions/{id}/lock` — Toggle lock (admin)
+
+### Discussion Engagement Endpoints
+- `POST /discussions/{id}/vote` — Vote (+1/−1)
+- `POST /discussions/{id}/react` — React (insightful, helpful, etc.)
+- `POST /discussions/{id}/follow` — Toggle follow
+- `POST /discussions/{id}/bookmark` — Toggle bookmark
+- `POST /discussions/{id}/report` — Report content
+
+### Reply Endpoints
+- `GET /discussions/{id}/replies` — List replies
+- `POST /discussions/{id}/replies` — Create reply
+- `PATCH /replies/{id}` — Update reply
+- `DELETE /replies/{id}` — Delete reply
+- `POST /replies/{id}/accept` — Accept as solution
+
+### Reply Engagement Endpoints
+- `POST /replies/{id}/vote` — Vote
+- `POST /replies/{id}/react` — React
+- `POST /replies/{id}/report` — Report reply
+
+### Admin Report Endpoints
+- `GET /reports` — List reports (with status filter)
+- `PATCH /reports/{id}` — Update report status
+- `POST /reports/{id}/warn` — Warn content author
+- `POST /reports/{id}/ban` — Ban content author from discussions
+- `POST /reports/{id}/delete-content` — Delete reported content
+- `POST /reports/{id}/lock` — Lock reported discussion
+
+## 4. User Roles & Permissions
+
+| Action | Solver | Creator | Admin |
+|--------|--------|---------|-------|
+| Create Discussion | ✅ | ✅ | ✅ |
+| Create Reply | ✅ | ✅ | ✅ |
+| Edit Own Discussion/Reply | ✅ | ✅ | ✅ |
+| Edit Others' Discussion/Reply | ❌ | ❌ | ✅ |
+| Delete Own Discussion/Reply | ✅ | ✅ | ✅ |
+| Delete Others' Discussion/Reply | ❌ | ❌ | ✅ |
+| Vote / React / Follow / Bookmark | ✅ | ✅ | ✅ |
+| Accept Solution (own thread) | ✅ | ✅ | ✅ |
+| Accept Solution (any thread) | ❌ | ❌ | ✅ |
+| Report Content | ✅ | ✅ | ✅ |
+| View Reports | ❌ | ❌ | ✅ |
+| Warn / Ban / Delete / Lock (moderation) | ❌ | ❌ | ✅ |
+| Pin / Lock Discussion (direct) | ❌ | ❌ | ✅ |
+
+## 5. Frontend Pages
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Discussions List | `/app/discussions` | Browse, search, filter, sort discussions |
+| Discussion Detail | `/app/discussions/{id}` | View discussion with nested replies, engagement |
+| Create Discussion | `/app/discussions/new` | Form to create a new discussion |
+| Public Discussion | `/public/discussions/{id}` | Public-facing read-only discussion view |
+| Admin Panel → Reports | `/app/users` (Reports tab) | Admin reports management with moderation actions |
+
+---
+
+# PART 2 — APPLICATION DESIGN DOCUMENT (ADD) SUMMARY
+
+## 1. Architecture Overview
+
+The Discussion Forum follows the existing EscapeCircuit layered architecture:
+
+```
+Frontend (Next.js 14 App Router)
+    ↕ HTTP/JSON (REST API)
+Backend (Python FastAPI)
+    ├── API Layer (Controllers / Routers)
+    ├── Service Layer (Business Logic / Validation / Authorization)
+    ├── Persistence Layer (Repositories / SQLite)
+    └── Domain Layer (Dataclasses / Enums)
+```
+
+### Key Architectural Decisions
+- **4 separate FastAPI routers** returned from `build_discussion_router()`: `disc_router`, `reply_router`, `puzzle_router`, `report_router` — each mounted on different prefixes in `main.py`
+- **Feature-based frontend structure**: All discussion code lives under `src/features/discussions/` following the existing `import/no-restricted-paths` ESLint rule preventing cross-feature imports
+- **React Query (TanStack Query)** for server state management with optimistic updates on engagement actions
+- **Zustand** for the notification toast store
+
+## 2. Database Design
+
+### 2.1 Entity-Relationship Diagram (Textual)
+
+```
+users (existing)
+  ├── 1:N → discussions (author_id)
+  ├── 1:N → replies (author_id)
+  ├── 1:N → discussion_votes (user_id)
+  ├── 1:N → reply_votes (user_id)
+  ├── 1:N → discussion_reactions (user_id)
+  ├── 1:N → reply_reactions (user_id)
+  ├── 1:N → discussion_follows (user_id)
+  ├── 1:N → discussion_bookmarks (user_id)
+  ├── 1:N → content_reports (reporter_id)
+  └── 1:N → creator_notifications (user_id)
+
+discussions
+  ├── 1:N → replies (discussion_id, CASCADE)
+  ├── 1:N → discussion_votes (discussion_id, CASCADE)
+  ├── 1:N → discussion_reactions (discussion_id, CASCADE)
+  ├── 1:N → discussion_follows (discussion_id, CASCADE)
+  ├── 1:N → discussion_bookmarks (discussion_id, CASCADE)
+  └── 1:1 → replies (accepted_reply_id, optional)
+
+replies
+  ├── 1:N → replies (parent_reply_id, self-reference, CASCADE)
+  ├── 1:N → reply_votes (reply_id, CASCADE)
+  └── 1:N → reply_reactions (reply_id, CASCADE)
+```
+
+### 2.2 Table Schemas
+
+**discussions**
+```sql
+CREATE TABLE discussions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    author_id INTEGER NOT NULL REFERENCES users(id),
+    puzzle_id INTEGER REFERENCES puzzles(id),
+    category TEXT NOT NULL DEFAULT 'general',
+    is_pinned INTEGER NOT NULL DEFAULT 0,
+    is_locked INTEGER NOT NULL DEFAULT 0,
+    view_count INTEGER NOT NULL DEFAULT 0,
+    reply_count INTEGER NOT NULL DEFAULT 0,
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    accepted_reply_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+**replies**
+```sql
+CREATE TABLE replies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+    parent_reply_id INTEGER REFERENCES replies(id) ON DELETE CASCADE,
+    author_id INTEGER NOT NULL REFERENCES users(id),
+    body TEXT NOT NULL,
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    downvotes INTEGER NOT NULL DEFAULT 0,
+    is_accepted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+**discussion_votes**
+```sql
+CREATE TABLE discussion_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    value INTEGER NOT NULL,  -- +1 or -1
+    created_at TEXT NOT NULL,
+    UNIQUE(discussion_id, user_id)
+);
+```
+
+**reply_votes**
+```sql
+CREATE TABLE reply_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reply_id INTEGER NOT NULL REFERENCES replies(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    value INTEGER NOT NULL,  -- +1 or -1
+    created_at TEXT NOT NULL,
+    UNIQUE(reply_id, user_id)
+);
+```
+
+**discussion_reactions**
+```sql
+CREATE TABLE discussion_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    reaction_type TEXT NOT NULL,  -- insightful, helpful, genius, spot_on, thinking
+    created_at TEXT NOT NULL,
+    UNIQUE(discussion_id, user_id, reaction_type)
+);
+```
+
+**reply_reactions**
+```sql
+CREATE TABLE reply_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reply_id INTEGER NOT NULL REFERENCES replies(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    reaction_type TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(reply_id, user_id, reaction_type)
+);
+```
+
+**discussion_follows**
+```sql
+CREATE TABLE discussion_follows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(discussion_id, user_id)
+);
+```
+
+**discussion_bookmarks**
+```sql
+CREATE TABLE discussion_bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(discussion_id, user_id)
+);
+```
+
+**content_reports**
+```sql
+CREATE TABLE content_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL REFERENCES users(id),
+    target_type TEXT NOT NULL,     -- 'discussion' or 'reply'
+    target_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,          -- spam, harassment, off_topic, inappropriate, other
+    details TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, reviewed, dismissed
+    created_at TEXT NOT NULL,
+    UNIQUE(reporter_id, target_type, target_id)
+);
+```
+
+**Users table extension (ALTER TABLE migration)**
+```sql
+ALTER TABLE users ADD COLUMN is_discussion_banned INTEGER NOT NULL DEFAULT 0;
+```
+
+**creator_notifications (existing table, reused for warnings/bans)**
+```sql
+CREATE TABLE creator_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,           -- solve, rating, creator_invite, role_change, warning, ban
+    message TEXT NOT NULL,
+    xp_amount INTEGER NOT NULL DEFAULT 0,
+    puzzle_name TEXT NOT NULL DEFAULT '',
+    actor_username TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_notif_user_unread ON creator_notifications(user_id, is_read);
+```
+
+## 3. Backend Design
+
+### 3.1 Domain Layer
+
+**Files:**
+- `src/Backend/DomainLayer/Discussion.py` — `Discussion` dataclass
+- `src/Backend/DomainLayer/Reply.py` — `Reply` dataclass
+- `src/Backend/DomainLayer/Enums.py` — `ThreadCategory`, `ReactionType` enums
+- `src/Backend/DomainLayer/User.py` — Extended with `is_discussion_banned: bool`
+
+### 3.2 Persistence Layer (Repositories)
+
+| Repository | File | Tables Managed | Key Methods |
+|------------|------|----------------|-------------|
+| DiscussionRepo | `PersistantLayer/DiscussionRepo.py` | discussions | CRUD, list with filters/sort/search, increment counters, set accepted reply |
+| ReplyRepo | `PersistantLayer/ReplyRepo.py` | replies | CRUD, list by discussion, list children, update votes, clear accepted |
+| EngagementRepo | `PersistantLayer/EngagementRepo.py` | discussion_votes, reply_votes, discussion_reactions, reply_reactions, discussion_follows, discussion_bookmarks | Vote toggling, reaction toggling, follow/bookmark toggling, bulk engagement queries |
+| ReportRepo | `PersistantLayer/ReportRepo.py` | content_reports | Create, list, count, update status, has_reported check |
+| UserRepo (extended) | `PersistantLayer/UserRepo.py` | users (is_discussion_banned column) | `ban_from_discussions()`, `unban_from_discussions()`, `_row_to_user()` helper |
+| NotificationRepo (reused) | `PersistantLayer/NotificationRepo.py` | creator_notifications | `create()` for warning/ban notifications |
+
+**Design patterns:**
+- Each repo calls `_ensure_schema()` in `__init__` to auto-create tables
+- UserRepo uses ALTER TABLE migration to add the `is_discussion_banned` column if missing
+- `_row_to_user()` static helper DRYs up row-to-model mapping across 5 query methods
+- All repos share the same SQLite connection passed in from `main.py`
+
+### 3.3 Service Layer (Business Logic)
+
+| Service | File | Responsibilities |
+|---------|------|-----------------|
+| DiscussionService | `ServiceLayer/DiscussionService.py` (~567 lines) | Discussion CRUD, engagement (vote/react/follow/bookmark), moderation (pin/lock), reporting, admin moderation actions (warn/ban/delete/lock) |
+| ReplyService | `ServiceLayer/ReplyService.py` (~261 lines) | Reply CRUD, accept solution, engagement (vote/react), ban check |
+
+**Key service dependencies:**
+- `DiscussionService` takes: `discussion_repo`, `reply_repo`, `engagement_repo`, `report_repo`, `user_repo`, `xp_service`, `notification_repo`
+- `ReplyService` takes: `reply_repo`, `discussion_repo`, `engagement_repo`, `user_repo`, `xp_service`
+
+**Admin moderation flow (DiscussionService):**
+1. `_require_admin(token)` — Validates JWT and checks role = admin
+2. `_get_report_target_author_id(report)` — Resolves the author of the reported content
+3. Action method (warn/ban/delete/lock) — Performs the action + marks report as reviewed
+
+**Enrichment pattern for `list_reports()`:**
+- Fetches reports from ReportRepo
+- For each report, fetches reporter user → adds `reporter_username`
+- For each report, resolves target author → adds `target_author_id`, `target_author_username`
+
+### 3.4 API Layer (Controllers)
+
+**File:** `src/Backend/APILayer/DiscussionController.py`
+
+**Router architecture:**
+- `build_discussion_router(discussion_service, reply_service)` returns 4 routers:
+  - `disc_router` — mounted at `/discussions`
+  - `reply_router` — mounted at `/replies`
+  - `puzzle_router` — mounted at `/puzzles/{id}/discussions`
+  - `report_router` — mounted at `/reports`
+
+**Request validation models (Pydantic):**
+- `CreateDiscussionReq`: title, body, category, puzzle_id
+- `UpdateDiscussionReq`: title (opt), body (opt), category (opt)
+- `CreateReplyReq`: body, parent_reply_id (opt)
+- `UpdateReplyReq`: body
+- `VoteReq`: value (+1 or −1)
+- `ReactionReq`: reaction_type
+- `ReportReq`: reason, details (opt)
+- `UpdateReportStatusReq`: status
+
+### 3.5 Wiring in main.py
+
+```python
+# Repos
+discussion_repo = DiscussionRepo(conn)
+reply_repo = ReplyRepo(conn)
+engagement_repo = EngagementRepo(conn)
+report_repo = ReportRepo(conn)
+
+# Services
+discussion_service = DiscussionService(
+    discussion_repo, reply_repo, engagement_repo,
+    report_repo, user_repo, xp_service,
+    notification_repo=notification_repo
+)
+reply_service = ReplyService(
+    reply_repo, discussion_repo, engagement_repo,
+    user_repo, xp_service
+)
+
+# Routers
+disc_router, reply_router, puzzle_router, report_router = build_discussion_router(
+    discussion_service, reply_service
+)
+app.include_router(disc_router)
+app.include_router(reply_router)
+app.include_router(puzzle_router)
+app.include_router(report_router)
+```
+
+## 4. Frontend Design
+
+### 4.1 Feature Structure
+
+```
+src/features/discussions/
+├── api/
+│   ├── get-discussions.ts       # useDiscussions() query hook
+│   ├── get-discussion.ts        # useDiscussion(id) query hook
+│   ├── create-discussion.ts     # useCreateDiscussion() mutation
+│   ├── update-discussion.ts     # useUpdateDiscussion() mutation
+│   ├── delete-discussion.ts     # useDeleteDiscussion() mutation
+│   ├── vote-discussion.ts       # useVoteDiscussion() mutation
+│   ├── react-discussion.ts      # useReactDiscussion() mutation
+│   ├── follow-discussion.ts     # useFollowDiscussion() mutation
+│   ├── bookmark-discussion.ts   # useBookmarkDiscussion() mutation
+│   ├── report-discussion.ts     # useReportDiscussion() mutation
+│   ├── create-reply.ts          # useCreateReply() mutation
+│   ├── delete-reply.ts          # useDeleteReply() mutation
+│   ├── accept-reply.ts          # useAcceptReply() mutation
+│   ├── vote-reply.ts            # useVoteReply() mutation
+│   ├── react-reply.ts           # useReactReply() mutation
+│   └── report-reply.ts          # useReportReply() mutation
+└── components/
+    ├── discussion-view.tsx       # Full discussion detail view
+    ├── discussions-list.tsx      # Paginated list with filters
+    ├── discussion-card.tsx       # Card in list view
+    ├── create-discussion.tsx     # Create form
+    ├── update-discussion.tsx     # Edit form
+    ├── delete-discussion.tsx     # Delete confirmation dialog
+    ├── reply-tree.tsx            # Nested reply rendering (3 levels)
+    ├── reply-item.tsx            # Single reply with engagement
+    ├── reply-composer.tsx        # Reply creation form
+    ├── vote-buttons.tsx          # Upvote/downvote UI
+    ├── reaction-picker.tsx       # Reaction emoji picker
+    ├── report-dialog.tsx         # Report form dialog
+    ├── category-badge.tsx        # Category label badge
+    └── user-badge.tsx            # Author info badge (username, level)
+```
+
+### 4.2 Admin Feature Structure
+
+```
+src/features/admin/
+├── api/
+│   ├── get-reports.ts            # useReports({ status }) query hook
+│   ├── update-report-status.ts   # useUpdateReportStatus() mutation
+│   └── report-actions.ts         # useWarnReportAuthor(), useBanReportAuthor(),
+│                                 # useDeleteReportedContent(), useLockReportedDiscussion()
+└── components/
+    └── reports-list.tsx           # Reports tab with status filters + action buttons
+```
+
+### 4.3 Page Routes
+
+```
+src/app/app/discussions/
+├── page.tsx                      # /app/discussions — List page
+├── new/page.tsx                  # /app/discussions/new — Create page
+└── [id]/page.tsx                 # /app/discussions/{id} — Detail page
+
+src/app/app/users/
+└── _components/admin-panel.tsx   # Admin panel with Reports tab (Tab type includes 'reports')
+
+src/app/public/discussions/
+└── [discussionId]/page.tsx       # Public discussion view
+```
+
+### 4.4 TypeScript Types
+
+**In `src/types/api.ts`:**
+```typescript
+type Discussion = Entity & {
+  title: string; body: string; author_id: number; puzzle_id?: number;
+  category: ThreadCategory; is_pinned: boolean; is_locked: boolean;
+  view_count: number; reply_count: number; upvotes: number;
+  accepted_reply_id?: number; author?: User; engagement?: DiscussionEngagement;
+  replies?: Reply[];
+};
+
+type Reply = Entity & {
+  discussion_id: number; author_id: number; body: string;
+  parent_reply_id?: number; upvotes: number; downvotes: number;
+  is_accepted: boolean; author?: User; engagement?: ReplyEngagement;
+  children?: Reply[];
+};
+
+type DiscussionEngagement = {
+  upvotes: number; downvotes: number; user_vote: number | null;
+  reactions: ReactionCount[]; user_reactions: string[];
+  is_following: boolean; is_bookmarked: boolean;
+};
+
+type ReplyEngagement = {
+  upvotes: number; downvotes: number; user_vote: number | null;
+  reactions: ReactionCount[]; user_reactions: string[];
+};
+
+type Report = {
+  id: number; reporter_id: number; reporter_username?: string;
+  target_type: 'discussion' | 'reply'; target_id: number;
+  target_author_id?: number; target_author_username?: string;
+  reason: string; details: string;
+  status: 'pending' | 'reviewed' | 'dismissed'; created_at: string;
+};
+
+type ThreadCategory = 'general' | 'puzzle_help' | 'puzzle_tips' | 'solutions' |
+  'bug_report' | 'feature_request' | 'showcase';
+
+type ReactionType = 'insightful' | 'helpful' | 'genius' | 'spot_on' | 'thinking';
+```
+
+### 4.5 Notification System Design
+
+**Store (`notifications-store.ts`):**
+- Zustand store with `Notification` type including optional `persistent?: boolean` flag
+- `addNotification()` — adds to array with nanoid
+- `dismissNotification()` — removes by id
+
+**Toast Component (`notification.tsx`):**
+- Auto-dismiss after 5 seconds by default
+- If `persistent: true` — skips the auto-dismiss timer; requires manual X button click
+
+**Creator Notifications Popup (`creator-notifications-popup.tsx`):**
+- Mounts via `AuthGate` on all authenticated pages
+- On mount: fetches `GET /users/me/notifications` (unread)
+- De-duplicates using `localStorage` key `escapecircuit_shown_notifications`
+- Maps notification types to toast styles:
+  - `'solve'` → "Puzzle Solved!" / success / auto-dismiss
+  - `'rating'` → "New Rating!" / info / auto-dismiss
+  - `'warning'` → "Warning" / warning (yellow icon) / **persistent**
+  - `'ban'` → "Account Restriction" / error (red icon) / **persistent**
+- Marks all as read after displaying via `PATCH /users/me/notifications/read`
+- Staggers multiple toasts by 600ms
+
+### 4.6 Admin Reports UI Design
+
+**Reports List Component (`reports-list.tsx`):**
+- Status filter tabs: All | Pending | Reviewed | Dismissed
+- Each report card shows:
+  - Reason badge (color-coded: spam=red, harassment=dark red, off_topic=yellow, inappropriate=orange, other=gray)
+  - Status badge (pending=yellow, reviewed=green, dismissed=gray)
+  - Timestamp
+  - Target type + clickable `<Link>` to `/app/discussions/{target_id}`
+  - Author username and Reporter username
+  - Details text
+- **For pending reports only**, action buttons:
+  - "Mark Reviewed" / "Dismiss" — status change buttons
+  - Separator line
+  - "Warn Author" — amber button with AlertTriangle icon, fires immediately
+  - "Lock" — blue button with Lock icon (only visible for discussion-type targets)
+  - "Delete Content" — red button with Trash2 icon, wrapped in `ConfirmationDialog`
+  - "Ban Author" — red button with Ban icon, wrapped in `ConfirmationDialog`
+- All action mutations invalidate `['admin-reports']` query key on success
+- Success notifications via Zustand toast store
+
+## 5. Test Coverage
+
+**107 tests across 7 test files:**
+
+| Test File | Layer | Coverage |
+|-----------|-------|----------|
+| `test_discussion_repo.py` | Persistence | CRUD, filtering, sorting, pagination, search |
+| `test_reply_repo.py` | Persistence | CRUD, threading, vote updates, accepted replies |
+| `test_engagement_repo.py` | Persistence | All engagement operations (votes, reactions, follows, bookmarks) |
+| `test_report_repo.py` | Persistence | Report creation, uniqueness constraint, status updates |
+| `test_discussion_search.py` | Persistence | Full-text search edge cases |
+| `test_discussion_service.py` | Service | Discussion CRUD + engagement + reporting + admin moderation |
+| `test_reply_service.py` | Service | Reply CRUD + solution acceptance + engagement |
+
+## 6. Integration Points with Existing System
+
+| Integration | How |
+|-------------|-----|
+| XP/Leveling System | `XPService.award_xp()` called on create, vote, react, accept solution |
+| User Authentication | JWT token validation via existing `UserService.get_current_user()` |
+| Admin Authorization | Role check via `user.role == UserRole.ADMIN` |
+| Notification System | Reuses existing `creator_notifications` table and `NotificationRepo` |
+| User Profiles | `user-badge.tsx` displays author info using User type from auth system |
+| Admin Panel | Reports tab added alongside existing Users, Puzzles, Audit Log tabs |
+| Navigation | Discussion link added to main app sidebar/navigation |

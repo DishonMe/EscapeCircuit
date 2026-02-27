@@ -1,34 +1,45 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import NextLink from 'next/link';
 
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormDrawer,
-  Input,
-  Label,
-  Switch,
-  Textarea,
-} from '@/components/ui/form';
+import { Form, Input, Select, Textarea } from '@/components/ui/form';
 import { useNotifications } from '@/components/ui/notifications';
+import { paths } from '@/config/paths';
 import { useUser } from '@/lib/auth';
 import { canCreateDiscussion } from '@/lib/authorization';
+import { Discussion } from '@/types/api';
 
 import {
   createDiscussionInputSchema,
   useCreateDiscussion,
 } from '../api/create-discussion';
 
-export const CreateDiscussion = () => {
+const categoryOptions = [
+  { label: 'General', value: 'general' },
+  { label: 'Puzzle Help', value: 'puzzle_help' },
+  { label: 'Tips & Tricks', value: 'puzzle_tips' },
+  { label: 'Solutions', value: 'solutions' },
+  { label: 'Bug Report', value: 'bug_report' },
+  { label: 'Feature Request', value: 'feature_request' },
+  { label: 'Showcase', value: 'showcase' },
+];
+
+type CreateDiscussionProps = {
+  onSuccess?: (discussion: Discussion) => void;
+};
+
+export const CreateDiscussion = ({ onSuccess }: CreateDiscussionProps) => {
   const { addNotification } = useNotifications();
   const createDiscussionMutation = useCreateDiscussion({
     mutationConfig: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         addNotification({
           type: 'success',
           title: 'Discussion Created',
         });
+        onSuccess?.(data);
       },
     },
   });
@@ -40,66 +51,72 @@ export const CreateDiscussion = () => {
   }
 
   return (
-    <FormDrawer
-      isDone={createDiscussionMutation.isSuccess}
-      triggerButton={
-        <Button size="sm" icon={<Plus className="size-4" />}>
-          Create Discussion
-        </Button>
-      }
-      title="Create Discussion"
-      submitButton={
-        <Button
-          form="create-discussion"
-          type="submit"
-          size="sm"
-          isLoading={createDiscussionMutation.isPending}
-        >
-          Submit
-        </Button>
-      }
-    >
-      <Form
-        id="create-discussion"
-        onSubmit={(values) => {
-          createDiscussionMutation.mutate({ data: values });
-        }}
-        schema={createDiscussionInputSchema}
-        options={{
-          defaultValues: {
-            title: '',
-            body: '',
-            public: false,
-          },
-        }}
+    <div className="space-y-4">
+      <NextLink
+        href={paths.app.discussions.getHref()}
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
       >
-        {({ register, formState, setValue, watch }) => (
-          <>
-            <Input
-              label="Title"
-              error={formState.errors['title']}
-              registration={register('title')}
-            />
+        <ArrowLeft className="size-4" />
+        Back to Discussions
+      </NextLink>
 
-            <Textarea
-              label="Body"
-              error={formState.errors['body']}
-              registration={register('body')}
-            />
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <h1 className="mb-6 text-xl font-bold text-gray-900">New Discussion</h1>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                name="public"
-                onCheckedChange={(value) => setValue('public', value)}
-                checked={watch('public')}
-                className={` relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2`}
-                id="public"
+        <Form
+          id="create-discussion"
+          onSubmit={(values) => {
+            createDiscussionMutation.mutate({ data: values });
+          }}
+          schema={createDiscussionInputSchema}
+          options={{
+            defaultValues: {
+              title: '',
+              body: '',
+              category: 'general',
+              puzzle_id: null,
+            },
+          }}
+        >
+          {({ register, formState }) => (
+            <div className="space-y-4">
+              <Input
+                label="Title"
+                error={formState.errors['title']}
+                registration={register('title')}
               />
-              <Label htmlFor="airplane-mode">Public</Label>
+
+              <Select
+                label="Category"
+                error={formState.errors['category']}
+                registration={register('category')}
+                options={categoryOptions}
+                defaultValue="general"
+              />
+
+              <Textarea
+                label="Body"
+                error={formState.errors['body']}
+                registration={register('body')}
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <NextLink href={paths.app.discussions.getHref()}>
+                  <Button variant="outline" type="button">
+                    Cancel
+                  </Button>
+                </NextLink>
+                <Button
+                  type="submit"
+                  isLoading={createDiscussionMutation.isPending}
+                >
+                  Create Discussion
+                </Button>
+              </div>
             </div>
-          </>
-        )}
-      </Form>
-    </FormDrawer>
+          )}
+        </Form>
+      </div>
+    </div>
   );
 };

@@ -70,11 +70,13 @@ const NotificationsPage = () => {
               <select
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 value={filters.notifType || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, notifType: (e.target.value || undefined) as 'solve' | 'rating' | undefined })}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, notifType: (e.target.value || undefined) as 'solve' | 'rating' | 'warning' | 'ban' | undefined })}
               >
                 <option value="">All Types</option>
                 <option value="solve">Puzzle Solved</option>
                 <option value="rating">Rating</option>
+                <option value="warning">Warning</option>
+                <option value="ban">Ban</option>
               </select>
             </div>
 
@@ -168,10 +170,14 @@ const NotificationsPage = () => {
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
                           notification.type === 'solve'
                             ? 'bg-green-100 text-green-800'
+                            : notification.type === 'warning'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : notification.type === 'ban'
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-blue-100 text-blue-800'
                         }`}
                       >
-                        {notification.type === 'solve' ? 'Puzzle Solved' : 'Rating'}
+                        {notification.type === 'solve' ? 'Puzzle Solved' : notification.type === 'warning' ? 'Warning' : notification.type === 'ban' ? 'Account Restriction' : 'Rating'}
                       </span>
                       <span className="text-sm font-medium text-gray-700">
                         {notification.puzzle_name}

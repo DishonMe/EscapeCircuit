@@ -8,9 +8,10 @@ import { Discussion } from '@/types/api';
 import { getDiscussionsQueryOptions } from './get-discussions';
 
 export const createDiscussionInputSchema = z.object({
-  title: z.string().min(1, 'Required'),
-  body: z.string().min(1, 'Required'),
-  public: z.boolean(),
+  title: z.string().min(1, 'Title is required'),
+  body: z.string().min(1, 'Body is required'),
+  category: z.string().default('general'),
+  puzzle_id: z.number().nullable().optional(),
 });
 
 export type CreateDiscussionInput = z.infer<typeof createDiscussionInputSchema>;
