@@ -53,7 +53,7 @@ class TestCreateReply:
         result = svc.create_reply("token", 1, {"body": "My reply"})
         assert result["body"] == "Reply body"
         svc.reply_repo.create.assert_called_once()
-        svc.discussion_repo.increment_reply_count.assert_called_once_with(1, 1)
+        svc.discussion_repo.increment_reply_count.assert_called_once_with(1, 1, commit=False)
         svc.xp._apply_xp.assert_called_once_with(1, REPLY_CREATE_XP)
 
     def test_locked_discussion(self):
@@ -139,7 +139,7 @@ class TestDeleteReply:
 
         result = svc.delete_reply("token", 1)
         assert result["deleted"] is True
-        svc.discussion_repo.increment_reply_count.assert_called_once_with(1, -1)
+        svc.discussion_repo.increment_reply_count.assert_called_once_with(1, -1, commit=False)
 
 
 class TestAcceptReply:
@@ -159,6 +159,13 @@ class TestAcceptReply:
         user2 = make_user(2)
         svc.user_repo.get_by_id.side_effect = [make_user(1), user2]
         svc.xp._apply_xp.return_value = 0
+
+        # Mock conn.execute to return cursor with rowcount=1 and subscriptable fetchone
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        mock_cursor.fetchone.return_value = {"is_accepted": 0}  # not yet accepted
+        svc.reply_repo.conn = Mock()
+        svc.reply_repo.conn.execute.return_value = mock_cursor
 
         result = svc.accept_reply("token", 5)
         assert result["is_accepted"] is True
@@ -189,6 +196,13 @@ class TestAcceptReply:
         svc.user_repo.get_by_id.side_effect = [make_user(3, role=UserRole.ADMIN), make_user(2)]
         svc.xp._apply_xp.return_value = 0
 
+        # Mock conn.execute to return cursor with rowcount=1 and subscriptable fetchone
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        mock_cursor.fetchone.return_value = {"is_accepted": 0}  # not yet accepted
+        svc.reply_repo.conn = Mock()
+        svc.reply_repo.conn.execute.return_value = mock_cursor
+
         result = svc.accept_reply("token", 5)
         assert result["is_accepted"] is True
 
@@ -203,6 +217,12 @@ class TestAcceptReply:
         unaccepted = make_reply(reply_id=5, author_id=2, is_accepted=False)
         svc.reply_repo.get_by_id.side_effect = [reply, unaccepted]
         svc.user_repo.get_by_id.side_effect = [make_user(1), make_user(2)]
+
+        # Mock conn with fetchone returning is_accepted=1 (already accepted)
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = {"is_accepted": 1}
+        svc.reply_repo.conn = Mock()
+        svc.reply_repo.conn.execute.return_value = mock_cursor
 
         result = svc.accept_reply("token", 5)
         assert result["is_accepted"] is False
@@ -241,7 +261,7 @@ class TestVoteReply:
 
         assert result["upvotes"] == 1
         svc.xp._apply_xp.assert_called_once_with(1, REPLY_UPVOTE_XP)
-        svc.reply_repo.update_votes.assert_called_once_with(1, 1, 0)
+        svc.reply_repo.sync_votes_from_votes.assert_called_once_with(1)
 
     def test_downvote_success(self):
         svc = make_service_with_engagement()
@@ -255,7 +275,7 @@ class TestVoteReply:
 
         assert result["downvotes"] == 1
         svc.xp._apply_xp.assert_not_called()
-        svc.reply_repo.update_votes.assert_called_once_with(1, 0, 1)
+        svc.reply_repo.sync_votes_from_votes.assert_called_once_with(1)
 
     def test_toggle_removes_vote(self):
         svc = make_service_with_engagement()
@@ -268,7 +288,7 @@ class TestVoteReply:
         result = svc.vote_reply("token", 1, 1)
 
         assert result["user_vote"] is None
-        svc.reply_repo.update_votes.assert_called_once_with(1, 0, 0)
+        svc.reply_repo.sync_votes_from_votes.assert_called_once_with(1)
 
 
 class TestReactToReply:

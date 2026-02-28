@@ -1,10 +1,12 @@
 import sqlite3
 from typing import Optional, List
 
+from Backend import settings
 from Backend.DomainLayer.Discussion import Discussion
 from Backend.DomainLayer.Enums import ReactionType, ThreadCategory, UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Utils import utcnow
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
@@ -14,13 +16,13 @@ from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 
-VALID_REPORT_REASONS = {"spam", "harassment", "off_topic", "inappropriate", "other"}
-
+# Aliases so the rest of the module is unchanged
+VALID_REPORT_REASONS = settings.MODERATION_VALID_REPORT_REASONS
 
 # XP constants for forum actions
-DISCUSSION_CREATE_XP = 5
-UPVOTE_XP = 3
-REACTION_XP = 1
+DISCUSSION_CREATE_XP = settings.XP_DISCUSSION_CREATE
+UPVOTE_XP = settings.XP_DISCUSSION_UPVOTE
+REACTION_XP = settings.XP_DISCUSSION_REACTION
 
 
 class DiscussionService:
@@ -145,7 +147,7 @@ class DiscussionService:
     def list_discussions(
         self,
         token: str,
-        limit: int = 20,
+        limit: int = settings.LIST_DISCUSSIONS_DEFAULT_LIMIT,
         offset: int = 0,
         category: Optional[str] = None,
         puzzle_id: Optional[int] = None,
@@ -256,8 +258,14 @@ class DiscussionService:
         if not discussion:
             raise ValidationError("discussion not found")
 
-        new_pinned = not discussion.is_pinned
-        updated = self.discussion_repo.update(discussion_id, {"is_pinned": new_pinned})
+        # Atomic SQL-level toggle inside an IMMEDIATE transaction
+        with transaction(self.discussion_repo.conn):
+            self.discussion_repo.conn.execute(
+                "UPDATE discussions SET is_pinned = 1 - is_pinned WHERE id = ?",
+                (int(discussion_id),),
+            )
+
+        updated = self.discussion_repo.get_by_id(discussion_id)
         result = updated.to_dict()
         author = self.user_repo.get_by_id(updated.author_id)
         if author:
@@ -274,8 +282,14 @@ class DiscussionService:
         if not discussion:
             raise ValidationError("discussion not found")
 
-        new_locked = not discussion.is_locked
-        updated = self.discussion_repo.update(discussion_id, {"is_locked": new_locked})
+        # Atomic SQL-level toggle inside an IMMEDIATE transaction
+        with transaction(self.discussion_repo.conn):
+            self.discussion_repo.conn.execute(
+                "UPDATE discussions SET is_locked = 1 - is_locked WHERE id = ?",
+                (int(discussion_id),),
+            )
+
+        updated = self.discussion_repo.get_by_id(discussion_id)
         result = updated.to_dict()
         author = self.user_repo.get_by_id(updated.author_id)
         if author:
@@ -298,13 +312,14 @@ class DiscussionService:
         old_vote = self.engagement.get_discussion_vote(discussion_id, user_id)
         new_vote = self.engagement.set_discussion_vote(discussion_id, user_id, value)
 
-        # Award XP on upvote (only when newly upvoting, not when toggling off)
+        # Award XP on upvote (only once per user per discussion, prevents toggle farming)
         if value == 1 and old_vote != 1 and discussion.author_id != user_id:
-            self.xp._apply_xp(discussion.author_id, UPVOTE_XP)
+            if self.engagement.try_award_engagement_xp("discussion", discussion_id, user_id, "upvote"):
+                self.xp._apply_xp(discussion.author_id, UPVOTE_XP)
 
+        # Atomically sync cached upvotes from authoritative vote table
+        self.discussion_repo.sync_upvotes_from_votes(discussion_id)
         votes = self.engagement.count_discussion_votes(discussion_id)
-        # Update the cached upvotes on the discussion
-        self.discussion_repo.update(discussion_id, {"upvotes": votes["upvotes"]})
 
         return {
             "discussion_id": discussion_id,
@@ -329,9 +344,10 @@ class DiscussionService:
 
         is_active = self.engagement.toggle_discussion_reaction(discussion_id, user_id, reaction_type)
 
-        # Award XP when reaction added (not removed)
+        # Award XP when reaction added (only once per user per discussion per reaction type)
         if is_active and discussion.author_id != user_id:
-            self.xp._apply_xp(discussion.author_id, REACTION_XP)
+            if self.engagement.try_award_engagement_xp("discussion", discussion_id, user_id, f"reaction_{reaction_type}"):
+                self.xp._apply_xp(discussion.author_id, REACTION_XP)
 
         reactions = self.engagement.get_discussion_reactions(discussion_id)
         user_reactions = self.engagement.get_user_discussion_reactions(discussion_id, user_id)
@@ -553,8 +569,10 @@ class DiscussionService:
             reply = self.reply_repo.get_by_id(report["target_id"])
             if not reply:
                 raise ValidationError("reported reply has already been deleted")
-            self.reply_repo.delete(report["target_id"])
-            self.discussion_repo.increment_reply_count(reply.discussion_id, -1)
+            deleted = self.reply_repo.delete(report["target_id"])
+            # Only decrement if the delete actually removed a row (prevents double-decrement race)
+            if deleted:
+                self.discussion_repo.increment_reply_count(reply.discussion_id, -1)
 
         # Mark report as reviewed
         self.report_repo.update_status(report_id, "reviewed")

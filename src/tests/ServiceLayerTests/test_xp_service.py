@@ -113,39 +113,28 @@ class TestXPServiceApplyXP:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_apply_xp_success(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
-
         delta = self.service._apply_xp(1, 50)
 
         assert delta == 50
-        assert user.xp == 150
-        self.mock_user_repo.update_xp.assert_called_once_with(1, 150)
+        self.mock_user_repo.increment_xp.assert_called_once_with(1, 50)
 
     def test_apply_xp_zero(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
-
         delta = self.service._apply_xp(1, 0)
 
         assert delta == 0
-        self.mock_user_repo.update_xp.assert_not_called()
+        self.mock_user_repo.increment_xp.assert_not_called()
 
     def test_apply_xp_negative(self):
-        user = User(id=1, username="user", xp=100)
-        self.mock_user_repo.get_by_id.return_value = user
-
         delta = self.service._apply_xp(1, -10)
 
         assert delta == 0
-        self.mock_user_repo.update_xp.assert_not_called()
+        self.mock_user_repo.increment_xp.assert_not_called()
 
     def test_apply_xp_user_not_found(self):
-        self.mock_user_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValidationError) as exc_info:
-            self.service._apply_xp(999, 50)
-        assert "user not found" in str(exc_info.value)
+        # increment_xp is a no-op for non-existent users (UPDATE affects 0 rows)
+        delta = self.service._apply_xp(999, 50)
+        assert delta == 50
+        self.mock_user_repo.increment_xp.assert_called_once_with(999, 50)
 
 
 class TestXPServiceAwardSolveXP:
@@ -202,21 +191,12 @@ class TestXPServiceAwardRatingXP:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_award_rating_xp_first_time(self):
-        rater = User(id=1, username="user", xp=0)
-        creator = User(id=2, username="creator", xp=0)
-        def get_by_id_side_effect(uid):
-            if uid == 1:
-                return rater
-            elif uid == 2:
-                return creator
-            return None
-        self.mock_user_repo.get_by_id.side_effect = get_by_id_side_effect
-
         xp_awarded = self.service.award_rating_xp(rater_user_id=1, creator_user_id=2, first_time_rating=True)
 
         assert xp_awarded == 6  # 5 for rater, 1 for creator
-        assert rater.xp == 5
-        assert creator.xp == 1
+        # Verify atomic increments were called
+        self.mock_user_repo.increment_xp.assert_any_call(1, 5)  # rater
+        self.mock_user_repo.increment_xp.assert_any_call(2, 1)  # creator
 
     def test_award_rating_xp_not_first_time(self):
         rater = User(id=1, username="user", xp=100)

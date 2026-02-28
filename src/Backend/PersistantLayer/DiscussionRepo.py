@@ -186,12 +186,24 @@ class DiscussionRepo:
         )
         self.conn.commit()
 
-    def increment_reply_count(self, discussion_id: int, delta: int = 1) -> None:
+    def increment_reply_count(self, discussion_id: int, delta: int = 1, commit: bool = True) -> None:
         self.conn.execute(
-            "UPDATE discussions SET reply_count = reply_count + ? WHERE id = ?",
+            "UPDATE discussions SET reply_count = MAX(0, reply_count + ?) WHERE id = ?",
             (delta, int(discussion_id)),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
+
+    def sync_upvotes_from_votes(self, discussion_id: int, commit: bool = True) -> None:
+        """Atomically update cached upvotes from the authoritative discussion_votes table."""
+        self.conn.execute("""
+            UPDATE discussions SET upvotes = (
+                SELECT COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0)
+                FROM discussion_votes WHERE discussion_id = ?
+            ) WHERE id = ?
+        """, (int(discussion_id), int(discussion_id)))
+        if commit:
+            self.conn.commit()
 
     def set_accepted_reply(self, discussion_id: int, reply_id: Optional[int]) -> None:
         self.conn.execute(

@@ -3,7 +3,7 @@ import { UseMutationOptions, DefaultOptions } from '@tanstack/react-query';
 export const queryConfig = {
   queries: {
     // throwOnError: true,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     retry: false,
     staleTime: 1000 * 60,
   },

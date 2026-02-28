@@ -78,17 +78,17 @@ class TestAuthServiceLogin:
     def test_login_missing_username(self):
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("", "password123")
-        assert "username and password required" in str(exc_info.value)
+        assert "password are required" in str(exc_info.value)
 
     def test_login_missing_password(self):
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("testuser", "")
-        assert "username and password required" in str(exc_info.value)
+        assert "password are required" in str(exc_info.value)
 
     def test_login_whitespace_username(self):
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("   ", "password123")
-        assert "username and password required" in str(exc_info.value)
+        assert "password are required" in str(exc_info.value)
 
     def test_login_multiple_sessions(self):
         user = User(id=1, username="testuser")
@@ -375,13 +375,13 @@ class TestAuthServiceNoneInputs:
         """Test login with None password"""
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("testuser", None)
-        assert "username and password required" in str(exc_info.value)
+        assert "password are required" in str(exc_info.value)
 
     def test_login_with_none_username(self):
         """Test login with None username"""
         with pytest.raises(ValidationError) as exc_info:
             self.service.login(None, "password")
-        assert "username and password required" in str(exc_info.value)
+        assert "password are required" in str(exc_info.value)
 
     def test_logout_with_whitespace_token(self):
         """Test logout with only whitespace token"""

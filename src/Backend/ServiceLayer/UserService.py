@@ -1,4 +1,7 @@
+import sqlite3
 from typing import Dict, Any, List, Optional
+
+from Backend import settings
 
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -41,7 +44,11 @@ class UserService:
 
         # Domain objects require a truthy id; repo will replace it on insert.
         user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
-        created = self.user_repo.create(user, password=password)
+        try:
+            created = self.user_repo.create(user, password=password)
+        except sqlite3.IntegrityError:
+            # Concurrent registration with same username/email beat our check
+            raise ValidationError("username or email already exists")
         self.user_repo.conn.commit()
         
         # Auto login
@@ -81,9 +88,9 @@ class UserService:
         return d
 
     def list_users(
-        self, 
-        session_token: str, 
-        limit: int = 200, 
+        self,
+        session_token: str,
+        limit: int = settings.LIST_USERS_DEFAULT_LIMIT,
         offset: int = 0,
         username_search: Optional[str] = None,
         role: Optional[str] = None,
@@ -112,9 +119,9 @@ class UserService:
             # Assuming XPService has a way to convert level to xp
             # For now, we'll use a rough estimate: level * 100
             if min_level is not None:
-                min_xp = self.xp.calculate_xp_for_level(min_level) if hasattr(self.xp, 'calculate_xp_for_level') else (min_level - 1) * 100
+                min_xp = self.xp.calculate_xp_for_level(min_level) if hasattr(self.xp, 'calculate_xp_for_level') else (min_level - 1) * settings.LEVEL_XP_DIVISOR
             if max_level is not None:
-                max_xp = self.xp.calculate_xp_for_level(max_level + 1) - 1 if hasattr(self.xp, 'calculate_xp_for_level') else (max_level * 100) + 99
+                max_xp = self.xp.calculate_xp_for_level(max_level + 1) - 1 if hasattr(self.xp, 'calculate_xp_for_level') else (max_level * settings.LEVEL_XP_DIVISOR) + (settings.LEVEL_XP_DIVISOR - 1)
         
         users = self.user_repo.list_all(
             limit=limit,
@@ -228,7 +235,10 @@ class UserService:
 
         # Create new user with username, email, and password
         new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
-        user = self.user_repo.create(new_user, password=password)
+        try:
+            user = self.user_repo.create(new_user, password=password)
+        except sqlite3.IntegrityError:
+            raise ValidationError("username or email already exists")
         self.user_repo.conn.commit()
 
         # Log in via trusted external path
@@ -248,7 +258,10 @@ class UserService:
         if user.role != UserRole.PENDING_CREATOR:
             raise ValidationError("no pending creator invitation")
 
-        self.user_repo.update_role(user_id, UserRole.CREATOR)
+        # Atomic role update to prevent accept+decline race from two tabs
+        changed = self.user_repo.update_role_if(user_id, UserRole.CREATOR, UserRole.PENDING_CREATOR)
+        if not changed:
+            raise ValidationError("no pending creator invitation")
         self.user_repo.conn.commit()
 
         d = user.to_dict()
@@ -266,7 +279,10 @@ class UserService:
         if user.role != UserRole.PENDING_CREATOR:
             raise ValidationError("no pending creator invitation")
 
-        self.user_repo.update_role(user_id, UserRole.SOLVER)
+        # Atomic role update to prevent accept+decline race from two tabs
+        changed = self.user_repo.update_role_if(user_id, UserRole.SOLVER, UserRole.PENDING_CREATOR)
+        if not changed:
+            raise ValidationError("no pending creator invitation")
         self.user_repo.conn.commit()
 
         d = user.to_dict()
@@ -309,4 +325,5 @@ class UserService:
 
         role = UserRole(role_raw)
         self.user_repo.update_role(target_user_id, role)
+        self.user_repo.conn.commit()
         return {"ok": True}

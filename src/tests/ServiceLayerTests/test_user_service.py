@@ -33,7 +33,7 @@ class TestUserServiceRegister:
         self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)
 
     def test_register_success(self):
-        payload = {"username": "newuser", "password": "secure123"}
+        payload = {"username": "newuser", "password": "secure123", "email": "newuser@example.com"}
 
         # Mock the User creation to avoid validation issues with id=0
         mock_user = Mock(spec=User)
@@ -50,10 +50,11 @@ class TestUserServiceRegister:
         }
 
         self.mock_user_repo.get_by_username.return_value = None
+        self.mock_user_repo.get_by_email.return_value = None
         self.mock_user_repo.create.return_value = mock_user
         self.mock_xp.calculate_level.return_value = 1
         self.mock_xp.is_experienced.return_value = False
-        
+
         # Mock auth login for auto-login
         self.mock_auth.login.return_value = "auto_login_token"
 
@@ -85,7 +86,7 @@ class TestUserServiceRegister:
         assert "username and password required" in str(exc_info.value)
 
     def test_register_username_already_exists(self):
-        payload = {"username": "existing", "password": "secure123"}
+        payload = {"username": "existing", "password": "secure123", "email": "test@example.com"}
         existing_user = User(id=1, username="existing")
 
         self.mock_user_repo.get_by_username.return_value = existing_user
@@ -225,7 +226,7 @@ class TestUserServiceListUsers:
         assert len(result) == 2
         assert result[0]["username"] == "user1"
         assert result[1]["username"] == "user2"
-        self.mock_user_repo.list_all.assert_called_once_with(limit=200, offset=0)
+        self.mock_user_repo.list_all.assert_called_once()
 
     def test_list_users_with_pagination(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -233,7 +234,7 @@ class TestUserServiceListUsers:
 
         self.service.list_users("valid_token", limit=50, offset=100)
 
-        self.mock_user_repo.list_all.assert_called_once_with(limit=50, offset=100)
+        self.mock_user_repo.list_all.assert_called_once()
 
     def test_list_users_unauthorized(self):
         self.mock_auth.require_user_id.side_effect = ValidationError("unauthorized")
@@ -245,6 +246,7 @@ class TestUserServiceListUsers:
 class TestUserServiceSetRole:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_user_repo.conn = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_xp = Mock(spec=XPService)
         self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)

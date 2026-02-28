@@ -190,7 +190,7 @@ class TestSolvingServiceSubmitSolution:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_solution("valid_token", 1, payload)
-        assert "circuit not found" in str(exc_info.value)
+        assert "not found" in str(exc_info.value).lower()
 
     def test_submit_solution_puzzle_not_found(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -239,7 +239,7 @@ class TestSolvingServiceSubmitSolution:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_solution("valid_token", 1, payload)
-        assert "forbidden" in str(exc_info.value)
+        assert "permission" in str(exc_info.value).lower()
 
     def test_submit_solution_invalid_circuit_id(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -248,7 +248,7 @@ class TestSolvingServiceSubmitSolution:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_solution("valid_token", 1, payload)
-        assert "circuit_id required" in str(exc_info.value)
+        assert "circuit id is required" in str(exc_info.value).lower()
 
 class TestSolvingServiceCreateAttemptBranches:
     def setup_method(self):

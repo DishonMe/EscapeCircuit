@@ -30,7 +30,7 @@ class NotificationRepo:
 
     def create(self, user_id: int, notif_type: str, message: str,
                xp_amount: int = 0, puzzle_name: str = "",
-               actor_username: str = "") -> int:
+               actor_username: str = "", commit: bool = True) -> int:
         """Insert a notification and return its id."""
         now = datetime.now(timezone.utc).isoformat()
         cur = self.conn.execute(
@@ -40,7 +40,8 @@ class NotificationRepo:
             (int(user_id), notif_type, message, int(xp_amount),
              puzzle_name, actor_username, now),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return cur.lastrowid
 
     def get_unread(

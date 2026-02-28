@@ -1,7 +1,9 @@
 from typing import List, Optional
 
+from Backend import settings
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus, AuditActionType
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.PersistantLayer._db import transaction
 
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
@@ -68,8 +70,10 @@ class AdminService:
         if target.role == UserRole.PENDING_CREATOR:
             raise ValidationError("user already has a pending creator invitation")
 
-        # Set to pending_creator — user must accept (req 1.2)
-        self.user_repo.update_role(target_user_id, UserRole.PENDING_CREATOR)
+        # Atomically set to pending_creator only if still SOLVER (prevents duplicate notifications)
+        changed = self.user_repo.update_role_if(target_user_id, UserRole.PENDING_CREATOR, target.role)
+        if not changed:
+            raise ValidationError("user role was changed by another admin")
         self.user_repo.conn.commit()
 
         # Notify the target user
@@ -106,32 +110,33 @@ class AdminService:
         previous_role = target.role.value
         draft_count = 0
 
-        # If actual creator: permanently delete draft puzzles, keep published/unpublished
-        if target.role == UserRole.CREATOR:
-            draft_puzzles = self.puzzle_repo.get_by_creator_and_status(
-                target_user_id, PuzzleStatus.DRAFT
-            )
-            draft_ids = [p.id for p in draft_puzzles]
-            draft_count = len(draft_ids)
-            if draft_ids:
-                self.solve_repo.delete_by_puzzle_ids(draft_ids)
-                for pid in draft_ids:
-                    self.rating_repo.delete_by_puzzle(pid)
-                # Record deletions so insert_riddles.py won't re-import
-                conn = self.puzzle_repo.conn
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
+        # Wrap the entire read-draft-IDs + delete + role-demote in one
+        # IMMEDIATE transaction to prevent TOCTOU (C6).
+        with transaction(self.user_repo.conn) as txn:
+            if target.role == UserRole.CREATOR:
+                draft_puzzles = self.puzzle_repo.get_by_creator_and_status(
+                    target_user_id, PuzzleStatus.DRAFT
                 )
-                for p in draft_puzzles:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
-                        (p.name,),
+                draft_ids = [p.id for p in draft_puzzles]
+                draft_count = len(draft_ids)
+                if draft_ids:
+                    self.solve_repo.delete_by_puzzle_ids(draft_ids)
+                    for pid in draft_ids:
+                        self.rating_repo.delete_by_puzzle(pid)
+                    txn.execute(
+                        "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
                     )
-                self.puzzle_repo.delete_by_ids(draft_ids)
+                    for p in draft_puzzles:
+                        txn.execute(
+                            "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
+                            (p.name,),
+                        )
+                    self.puzzle_repo.delete_by_ids(draft_ids)
 
-        # Demote to solver
-        self.user_repo.update_role(target_user_id, UserRole.SOLVER)
-        self.user_repo.conn.commit()
+            changed = self.user_repo.update_role_if(target_user_id, UserRole.SOLVER, target.role)
+            if not changed:
+                raise ValidationError("user role was changed by another admin")
+            # COMMIT at context-manager exit
 
         # Notify user
         self.notification_repo.create(
@@ -167,24 +172,20 @@ class AdminService:
         creator_id = puzzle.creator_user_id
         status = puzzle.status.value
 
-        # Clean up related data (no FK cascade for these)
-        self.solve_repo.delete_by_puzzle(puzzle_id)
-        self.rating_repo.delete_by_puzzle(puzzle_id)
-        # test_cases cascade via FK on puzzles table
-
-        self.puzzle_repo.delete(puzzle_id)
-
-        # Record deletion so insert_riddles.py won't re-import this puzzle on restart
-        conn = self.puzzle_repo.conn
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
-            (puzzle_name,),
-        )
-
-        conn.commit()
+        # Wrap cleanup + delete in one IMMEDIATE transaction so no
+        # concurrent solve/rating can be inserted mid-delete (H5).
+        with transaction(self.puzzle_repo.conn) as txn:
+            self.solve_repo.delete_by_puzzle(puzzle_id)
+            self.rating_repo.delete_by_puzzle(puzzle_id)
+            self.puzzle_repo.delete(puzzle_id)
+            txn.execute(
+                "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
+            )
+            txn.execute(
+                "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
+                (puzzle_name,),
+            )
+            # COMMIT at context-manager exit
 
         # Audit log (req 7.5)
         self.audit_log.create(
@@ -248,9 +249,9 @@ class AdminService:
             # Add moderation flags
             d["flags"] = []
             if p.status == PuzzleStatus.PUBLISHED:
-                if p.avg_fun > 0 and p.avg_fun < 2.0:
+                if p.avg_fun > 0 and p.avg_fun < settings.MODERATION_LOW_FUN_THRESHOLD:
                     d["flags"].append("low_fun")
-                if p.avg_clearness > 0 and p.avg_clearness < 2.0:
+                if p.avg_clearness > 0 and p.avg_clearness < settings.MODERATION_LOW_CLEARNESS_THRESHOLD:
                     d["flags"].append("low_clearness")
                 if p.rating_count == 0:
                     d["flags"].append("unrated")

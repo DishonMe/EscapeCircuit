@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Set
 from Backend.DomainLayer.Circuit import Circuit
 from Backend.DomainLayer.Enums import GateType
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend import settings
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -23,11 +25,11 @@ class ArsenalService:
     - Cascading gate resolution (if arsenal piece uses another arsenal piece, flatten to basic gates)
     """
 
-    MAX_ARSENAL_SIZE = 10  # Can be increased later with mechanics
-    MAX_INPUTS = 5
-    MAX_OUTPUTS = 3
-    MIN_INPUTS = 1
-    MIN_OUTPUTS = 1
+    MAX_ARSENAL_SIZE = settings.ARSENAL_DEFAULT_MAX_SIZE
+    MAX_INPUTS = settings.ARSENAL_MAX_INPUTS
+    MAX_OUTPUTS = settings.ARSENAL_MAX_OUTPUTS
+    MIN_INPUTS = settings.ARSENAL_MIN_INPUTS
+    MIN_OUTPUTS = settings.ARSENAL_MIN_OUTPUTS
 
     def __init__(
         self,
@@ -60,35 +62,30 @@ class ArsenalService:
         if not name:
             raise ValidationError("Arsenal piece name is required. Please provide a name for your custom component.")
         
-        # Check arsenal capacity
-        current_arsenal = self.repo.list_arsenal_by_user(user_id)
-        if len(current_arsenal) >= self.MAX_ARSENAL_SIZE:
-            raise ValidationError(f"You have reached the maximum number of arsenal pieces ({self.MAX_ARSENAL_SIZE}). You can create more by earning XP or delete existing pieces.")
-        
         # Validate user exists
         user = self.user_repo.get_by_id(user_id)
         if not user:
             raise ValidationError("Your user account could not be found. Please log in again.")
-        
+
         # Validate structure_json
         structure_json = payload.get("structure_json") or ""
         if not isinstance(structure_json, str) or not structure_json.strip():
             raise ValidationError("Circuit structure (JSON) is required. Please provide a valid circuit structure.")
-        
+
         try:
             structure = json.loads(structure_json)
         except (json.JSONDecodeError, ValueError):
             raise ValidationError("Invalid circuit structure. Please ensure you provide valid JSON that represents your circuit.")
-        
+
         # Validate inputs and outputs
         num_inputs = payload.get("num_inputs", 0)
         num_outputs = payload.get("num_outputs", 0)
-        
+
         if not isinstance(num_inputs, int) or num_inputs < self.MIN_INPUTS or num_inputs > self.MAX_INPUTS:
             raise ValidationError(f"Number of inputs must be between {self.MIN_INPUTS} and {self.MAX_INPUTS}. Adjust your circuit accordingly.")
         if not isinstance(num_outputs, int) or num_outputs < self.MIN_OUTPUTS or num_outputs > self.MAX_OUTPUTS:
             raise ValidationError(f"Number of outputs must be between {self.MIN_OUTPUTS} and {self.MAX_OUTPUTS}. Adjust your circuit accordingly.")
-        
+
         # Extract and validate gates - no DFF allowed in arsenal pieces
         # Use provided basic_gates if available, otherwise extract from structure
         basic_gates_str = payload.get("basic_gates", "")
@@ -101,21 +98,21 @@ class ArsenalService:
                 basic_gates = []
         else:
             basic_gates = self._extract_basic_gates(structure_json)
-        
+
         if GateType.DFF.value in basic_gates:
             raise ValidationError("DFF (Dynamic Flip-Flop) gates are not allowed in custom arsenal pieces. Design your circuit using other available gates.")
-        
+
         # Get or calculate truth table
         truth_table = payload.get("truth_table")
         if truth_table is None or (isinstance(truth_table, dict) and len(truth_table) == 0):
             truth_table = self._calculate_truth_table(num_inputs, num_outputs, structure)
-        
+
         if not isinstance(truth_table, dict):
             raise ValidationError("truth_table must be a dictionary")
-        
+
         # Calculate cost (sum of costs of basic gates used)
         cost = self._calculate_arsenal_cost(basic_gates)
-        
+
         # Create and save circuit
         arsenal_piece = Circuit(
             id=0,
@@ -129,13 +126,21 @@ class ArsenalService:
             num_inputs=num_inputs,
             num_outputs=num_outputs,
         )
-        
+
+        # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU
         try:
-            saved = self.repo.create(arsenal_piece)
+            with transaction(self.repo.conn):
+                count_row = self.repo.conn.execute(
+                    "SELECT COUNT(*) FROM circuits WHERE user_id = ? AND is_arsenal = 1", (int(user_id),)
+                ).fetchone()
+                current_count = count_row[0] if count_row else 0
+                if current_count >= self.MAX_ARSENAL_SIZE:
+                    raise ValidationError(f"You have reached the maximum number of arsenal pieces ({self.MAX_ARSENAL_SIZE}). You can create more by earning XP or delete existing pieces.")
+                saved = self.repo.create(arsenal_piece, commit=False)
         except sqlite3.IntegrityError:
             # UNIQUE(user_id, name) constraint violated
             raise ValidationError("arsenal piece name already exists for this user")
-        
+
         return saved.to_dict()
 
     def list_my_arsenal(self, session_token: str) -> List[dict]:

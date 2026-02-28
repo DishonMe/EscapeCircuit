@@ -158,6 +158,23 @@ class PuzzleRepo:
             puzzle.id
         ))
 
+    def update_rating_aggregates(self, puzzle_id: int, **kwargs) -> None:
+        """Update only rating-related columns on a puzzle. Avoids clobbering
+        non-rating fields that might be modified concurrently (status, name, etc.).
+        Accepted keys: rating_count, avg_difficulty, avg_fun, avg_clearness,
+        and any future rating aggregate columns."""
+        allowed = {
+            "rating_count", "avg_difficulty", "avg_fun", "avg_clearness",
+        }
+        to_set = {k: v for k, v in kwargs.items() if k in allowed}
+        if not to_set:
+            return
+        set_clause = ", ".join(f"{k}=?" for k in to_set)
+        vals = list(to_set.values()) + [int(puzzle_id)]
+        self.conn.execute(
+            f"UPDATE puzzles SET {set_clause} WHERE id=?", vals
+        )
+
     def list_published(
         self, 
         limit: int = 50, 
@@ -436,8 +453,8 @@ class PuzzleRepo:
 
     def add_test_case(self, tc: PuzzleTestCase) -> PuzzleTestCase:
         cur = self.conn.execute("""
-            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, gate_limit, max_gate_count, min_cycles, max_cycles, created_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, gate_limit, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?)
         """, (
             tc.puzzle_id,
             tc.kind.value,
@@ -447,9 +464,6 @@ class PuzzleRepo:
             json.dumps(tc.expected_output_stream) if tc.expected_output_stream else None,
             tc.gate_name,
             tc.gate_limit,
-            tc.max_gate_count,
-            tc.min_cycles,
-            tc.max_cycles,
             tc.created_at.isoformat(),
         ))
         tc.id = int(cur.lastrowid)
@@ -470,9 +484,6 @@ class PuzzleRepo:
                 "expected_output_stream": json.loads(r["expected_output_stream"]) if r["expected_output_stream"] else {},
                 "gate_name": r["gate_name"],
                 "gate_limit": dict(r).get("gate_limit"),
-                "max_gate_count": dict(r).get("max_gate_count"),
-                "min_cycles": dict(r).get("min_cycles"),
-                "max_cycles": dict(r).get("max_cycles"),
                 "created_at": r["created_at"],
             })
             for r in rows

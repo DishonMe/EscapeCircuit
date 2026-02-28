@@ -193,10 +193,13 @@ class TestPinDiscussion:
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
         svc.user_repo.get_by_id.return_value = make_user(1, role=UserRole.ADMIN)
-        svc.discussion_repo.get_by_id.return_value = make_discussion()
+        disc = make_discussion()
+        svc.discussion_repo.get_by_id.return_value = disc
+        svc.discussion_repo.conn = Mock()
+        # After SQL toggle, get_by_id is called again to return updated state
         pinned = make_discussion()
         pinned.is_pinned = True
-        svc.discussion_repo.update.return_value = pinned
+        svc.discussion_repo.get_by_id.side_effect = [disc, pinned]
 
         result = svc.pin_discussion("token", 1)
         assert result["is_pinned"] is True
@@ -215,10 +218,13 @@ class TestLockDiscussion:
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
         svc.user_repo.get_by_id.return_value = make_user(1, role=UserRole.ADMIN)
-        svc.discussion_repo.get_by_id.return_value = make_discussion()
+        disc = make_discussion()
+        svc.discussion_repo.get_by_id.return_value = disc
+        svc.discussion_repo.conn = Mock()
+        # After SQL toggle, get_by_id is called again to return updated state
         locked = make_discussion()
         locked.is_locked = True
-        svc.discussion_repo.update.return_value = locked
+        svc.discussion_repo.get_by_id.side_effect = [disc, locked]
 
         result = svc.lock_discussion("token", 1)
         assert result["is_locked"] is True

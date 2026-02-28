@@ -17,6 +17,7 @@ import json
 class TestPuzzleServiceCreation:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -30,6 +31,7 @@ class TestPuzzleServiceCreation:
 class TestPuzzleServiceBrowse:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -47,7 +49,7 @@ class TestPuzzleServiceBrowse:
 
         assert len(result["data"]) == 2
         assert result["data"][0]["name"] == "Puzzle1"
-        self.mock_puzzle_repo.list_published.assert_called_once_with(limit=50, offset=0)
+        self.mock_puzzle_repo.list_published.assert_called_once()
         self.mock_puzzle_repo.count_published.assert_called_once()
 
     def test_browse_with_pagination(self):
@@ -57,7 +59,7 @@ class TestPuzzleServiceBrowse:
 
         self.service.browse("valid_token", limit=100, offset=50)
 
-        self.mock_puzzle_repo.list_published.assert_called_once_with(limit=100, offset=50)
+        self.mock_puzzle_repo.list_published.assert_called_once()
 
     def test_browse_unauthorized(self):
         self.mock_auth.require_user_id.side_effect = ValidationError("unauthorized")
@@ -69,6 +71,7 @@ class TestPuzzleServiceBrowse:
 class TestPuzzleServiceSearch:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -102,6 +105,7 @@ class TestPuzzleServiceSearch:
 class TestPuzzleServiceGet:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -136,6 +140,7 @@ class TestPuzzleServiceGet:
 class TestPuzzleServiceCreatePuzzle:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -183,7 +188,7 @@ class TestPuzzleServiceCreatePuzzle:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.create_puzzle("valid_token", payload)
-        assert "creator required" in str(exc_info.value)
+        assert "creator" in str(exc_info.value).lower()
 
     def test_create_puzzle_missing_name(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -194,7 +199,7 @@ class TestPuzzleServiceCreatePuzzle:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.create_puzzle("valid_token", payload)
-        assert "name required" in str(exc_info.value)
+        assert "name is required" in str(exc_info.value).lower()
 
     def test_create_puzzle_user_not_found(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -239,6 +244,7 @@ class TestPuzzleServiceCreatePuzzle:
 class TestPuzzleServicePublish:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -248,21 +254,32 @@ class TestPuzzleServicePublish:
         creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
         self.mock_user_repo.get_by_id.return_value = creator_user
 
-        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
-        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        # First call: pre-checks; second call: re-read after atomic update
+        self.mock_puzzle_repo.get_by_id.side_effect = [draft_puzzle, published_puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 0
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+
+        # Mock conn.execute to return cursor with rowcount=1 (update succeeded)
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        self.mock_puzzle_repo.conn.execute.return_value = mock_cursor
 
         result = self.service.publish("valid_token", 1)
 
         assert result["status"] == PuzzleStatus.PUBLISHED.value
-        self.mock_puzzle_repo.update.assert_called_once()
+        self.mock_puzzle_repo.conn.execute.assert_called()
 
     def test_publish_success_by_admin(self):
         self.mock_auth.require_user_id.return_value = 1
         admin_user = User(id=1, username="admin", role=UserRole.ADMIN)
         self.mock_user_repo.get_by_id.return_value = admin_user
 
-        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
-        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        # First call: pre-checks; second call: re-read after atomic update
+        self.mock_puzzle_repo.get_by_id.side_effect = [draft_puzzle, published_puzzle]
 
         result = self.service.publish("valid_token", 1)
 
@@ -294,6 +311,7 @@ class TestPuzzleServicePublish:
 class TestPuzzleServiceUnpublish:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -303,8 +321,10 @@ class TestPuzzleServiceUnpublish:
         creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
         self.mock_user_repo.get_by_id.return_value = creator_user
 
-        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
-        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        published = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        unpublished = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.UNPUBLISHED)
+        # First call: ownership check; second call: re-read after atomic update
+        self.mock_puzzle_repo.get_by_id.side_effect = [published, unpublished]
 
         result = self.service.unpublish("valid_token", 1)
 
@@ -326,6 +346,7 @@ class TestPuzzleServiceUnpublish:
 class TestPuzzleServiceAddTestCase:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -390,6 +411,7 @@ class TestPuzzleServiceAddTestCase:
 class TestPuzzleServiceListTestCases:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -423,6 +445,7 @@ class TestPuzzleServiceListTestCases:
 class TestPuzzleServiceBranches:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)

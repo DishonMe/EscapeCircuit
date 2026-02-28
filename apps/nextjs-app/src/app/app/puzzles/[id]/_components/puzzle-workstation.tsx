@@ -19,6 +19,7 @@ import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
+import { api } from '@/lib/api-client';
 import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 
@@ -74,6 +75,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
   );
+
+  // Draft version tracking for optimistic concurrency control
+  const draftUpdatedAtRef = useRef<number | null>(null);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -407,43 +411,72 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return holes;
   }, [placed, uiCatalog]);
 
-  // Load state
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STATE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as any;
-      if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
-      if (Array.isArray(parsed?.wires)) {
-        const migratedWires = parsed.wires.map((w: any) => {
-          const migrateEndpoint = (ep: any) => {
-            if (ep.portId) return ep;
-            if (ep.componentId.startsWith('IO:')) {
-              return { ...ep, portId: 'P0' };
-            }
-            const placedInst = parsed.placed.find(
-              (p: any) => p.id === ep.componentId,
-            );
-            if (!placedInst) return ep;
-            const def = uiCatalog[placedInst.componentId];
-            if (!def) return ep;
-            const port = def.ports[ep.pinIndex];
-            return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
-          };
-          return {
-            ...w,
-            from: migrateEndpoint(w.from),
-            to: migrateEndpoint(w.to),
-          };
-        });
-        setWires(migratedWires);
-      }
-    } catch {
-      // ignore
+  const applyParsedState = useCallback((parsed: any) => {
+    if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
+    if (Array.isArray(parsed?.wires)) {
+      const migratedWires = parsed.wires.map((w: any) => {
+        const migrateEndpoint = (ep: any) => {
+          if (ep.portId) return ep;
+          if (ep.componentId.startsWith('IO:')) {
+            return { ...ep, portId: 'P0' };
+          }
+          const placedInst = parsed.placed.find(
+            (p: any) => p.id === ep.componentId,
+          );
+          if (!placedInst) return ep;
+          const def = uiCatalog[placedInst.componentId];
+          if (!def) return ep;
+          const port = def.ports[ep.pinIndex];
+          return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
+        };
+        return {
+          ...w,
+          from: migrateEndpoint(w.from),
+          to: migrateEndpoint(w.to),
+        };
+      });
+      setWires(migratedWires);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STATE_KEY, uiCatalog]);
+  }, [uiCatalog]);
 
+  // Load state: try backend first, fall back to localStorage
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadState = async () => {
+      // Try backend draft first
+      try {
+        const draft = await api.get<{ state_json: string | null; updated_at: number | null }>(`/puzzles/${puzzleId}/draft`, {
+          suppressErrorNotification: true,
+        });
+        if (!cancelled && draft.state_json) {
+          const parsed = JSON.parse(draft.state_json);
+          applyParsedState(parsed);
+          draftUpdatedAtRef.current = draft.updated_at;
+          return;
+        }
+      } catch {
+        // Backend unavailable, fall through to localStorage
+      }
+
+      // Fall back to localStorage
+      if (cancelled) return;
+      try {
+        const raw = window.localStorage.getItem(STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        applyParsedState(parsed);
+      } catch {
+        // ignore
+      }
+    };
+
+    loadState();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [STATE_KEY, puzzleId, applyParsedState]);
+
+  // Save to localStorage (immediate)
   useEffect(() => {
     try {
       window.localStorage.setItem(
@@ -459,6 +492,54 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       // ignore
     }
   }, [STATE_KEY, placed, wires, buildHoleState]);
+
+  // Auto-save to backend (debounced, 2s after last change)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialLoadDone = useRef(false);
+
+  useEffect(() => {
+    // Skip the first render (initial load sets placed/wires)
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      return;
+    }
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    saveTimerRef.current = setTimeout(async () => {
+      const stateJson = JSON.stringify({
+        grid: { rows: 10, cols: 14 },
+        placed,
+        wires,
+        holes: buildHoleState(),
+      });
+      try {
+        const res = await api.put<{ ok: boolean; updated_at: number }>(
+          `/puzzles/${puzzleId}/draft`,
+          {
+            state_json: stateJson,
+            expected_updated_at: draftUpdatedAtRef.current,
+          },
+          { suppressErrorNotification: true },
+        );
+        // Track the new version for the next save
+        draftUpdatedAtRef.current = res.updated_at;
+      } catch (err: any) {
+        if (err?.response?.status === 409) {
+          notifications.addNotification({
+            type: 'warning',
+            title: 'Draft Conflict',
+            message: 'Your draft was modified in another session. Reload to get the latest version.',
+          });
+        }
+        // Other errors silently ignored — localStorage is the fallback
+      }
+    }, 2000);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [placed, wires, puzzleId, buildHoleState]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

@@ -28,7 +28,7 @@ class ReplyRepo:
         );
         """)
 
-    def create(self, reply: Reply) -> Reply:
+    def create(self, reply: Reply, commit: bool = True) -> Reply:
         cur = self.conn.execute("""
             INSERT INTO replies(discussion_id, parent_reply_id, author_id, body,
                 upvotes, downvotes, is_accepted, created_at, updated_at)
@@ -44,7 +44,8 @@ class ReplyRepo:
             reply.created_at.isoformat(),
             reply.updated_at.isoformat(),
         ))
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         reply.id = int(cur.lastrowid)
         return reply
 
@@ -87,7 +88,7 @@ class ReplyRepo:
         ).fetchone()
         return row[0] if row else 0
 
-    def update(self, reply_id: int, fields: dict) -> Optional[Reply]:
+    def update(self, reply_id: int, fields: dict, commit: bool = True) -> Optional[Reply]:
         allowed = {"body", "is_accepted", "updated_at"}
         set_clauses = []
         params: list = []
@@ -110,29 +111,44 @@ class ReplyRepo:
         self.conn.execute(
             f"UPDATE replies SET {', '.join(set_clauses)} WHERE id = ?", params
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return self.get_by_id(reply_id)
 
-    def delete(self, reply_id: int) -> bool:
+    def delete(self, reply_id: int, commit: bool = True) -> bool:
         cur = self.conn.execute(
             "DELETE FROM replies WHERE id=?", (int(reply_id),)
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return cur.rowcount > 0
 
-    def update_votes(self, reply_id: int, upvotes: int, downvotes: int) -> None:
+    def update_votes(self, reply_id: int, upvotes: int, downvotes: int, commit: bool = True) -> None:
         self.conn.execute(
             "UPDATE replies SET upvotes=?, downvotes=? WHERE id=?",
             (upvotes, downvotes, int(reply_id)),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
 
-    def clear_accepted_for_discussion(self, discussion_id: int) -> None:
+    def sync_votes_from_votes(self, reply_id: int, commit: bool = True) -> None:
+        """Atomically update cached upvotes/downvotes from the authoritative reply_votes table."""
+        self.conn.execute("""
+            UPDATE replies SET
+                upvotes = (SELECT COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) FROM reply_votes WHERE reply_id = ?),
+                downvotes = (SELECT COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) FROM reply_votes WHERE reply_id = ?)
+            WHERE id = ?
+        """, (int(reply_id), int(reply_id), int(reply_id)))
+        if commit:
+            self.conn.commit()
+
+    def clear_accepted_for_discussion(self, discussion_id: int, commit: bool = True) -> None:
         self.conn.execute(
             "UPDATE replies SET is_accepted=0 WHERE discussion_id=?",
             (int(discussion_id),),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
 
     @staticmethod
     def _row_to_reply(row: sqlite3.Row) -> Reply:

@@ -3,6 +3,7 @@ import json
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
+from Backend.PersistantLayer._db import transaction
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
@@ -222,6 +223,9 @@ class SolvingService:
                     self.conn.execute("ROLLBACK")
                 raise
 
+        # Commit all writes (attempts, progress, xp) in this legacy path
+        self.conn.commit()
+
         return {
             "attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt),
             "passed": True,
@@ -287,148 +291,105 @@ class SolvingService:
                     budget=getattr(p, 'budget', 0),
                 )
 
-            # --- Relative XP: only award improvement over previous best ---
-            # Get the ACTUAL previous best XP from solve_attempts (most reliable source)
-            all_attempts = self.solve_repo.conn.execute("""
-                SELECT id, xp_earned FROM solve_attempts
-                WHERE user_id = ? AND puzzle_id = ? AND passed = 1
-                ORDER BY id DESC
-            """, (int(user_id), int(puzzle_id))).fetchall()
-            
-            previous_best_xp = 0
-            if all_attempts:
-                previous_best_xp = max([int(row['xp_earned']) for row in all_attempts])
-            
-            # DEBUG: Log all attempts found
-            import sys
-            print(f"\n[DEBUG XP] === SOLVE ATTEMPT ===", file=sys.stderr)
-            print(f"[DEBUG XP] user={user_id}, puzzle={puzzle_id}", file=sys.stderr)
-            print(f"[DEBUG XP] Found {len(all_attempts)} previous passed attempts:", file=sys.stderr)
-            for row in all_attempts:
-                print(f"[DEBUG XP]   - attempt id={row['id']}, xp_earned={row['xp_earned']}", file=sys.stderr)
-            print(f"[DEBUG XP] previous_best_xp={previous_best_xp}", file=sys.stderr)
-
-            if previous_best_xp >= (self.xp_service.BASE_XP.get(difficulty, 100) + self.xp_service.MEDAL_BONUS.get(Medal.GOLD, 50)):
-                # Already earned maximum XP for this puzzle (gold medal on this difficulty)
-                raw_xp = 0
-                xp_earned = 0
-                print(f"[DEBUG XP] MAX XP REACHED ({previous_best_xp}), no more XP awarded", file=sys.stderr)
+            # --- Compute raw XP for this solve (base + medal bonus, no delta) ---
+            raw_xp = 0
+            if hasattr(self.xp_service, 'calculate_solve_xp'):
+                raw_xp = self.xp_service.calculate_solve_xp(
+                    difficulty=difficulty,
+                    medal=medal,
+                    previous_best_xp=0,  # pass 0 to get the raw (base+bonus) value
+                )
             else:
-                # Step 1: Compute raw XP potential for this attempt (no delta subtraction)
-                raw_xp = 0
-                if hasattr(self.xp_service, 'calculate_solve_xp'):
-                    raw_xp = self.xp_service.calculate_solve_xp(
-                        difficulty=difficulty,
-                        medal=medal,
-                        previous_best_xp=0,  # pass 0 to get the raw (base+bonus) value
-                    )
-                else:
-                    raw_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
+                raw_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
 
-                # Step 2: Delta = improvement only
-                xp_earned = max(0, raw_xp - previous_best_xp)
-                
-                # DEBUG: Log XP calculation
-                print(f"[DEBUG XP] difficulty={difficulty.name}, medal={medal.name}", file=sys.stderr)
-                print(f"[DEBUG XP] raw_xp={raw_xp}, previous_best={previous_best_xp}, delta={xp_earned}", file=sys.stderr)
+            # --- Read current progress for medal/upgrade tracking and max XP check ---
+            from Backend.PersistantLayer.SolveRepo import PuzzleProgress
+            from Backend.DomainLayer.Utils import utcnow
+            old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
 
             # --- Compute max possible XP for this puzzle's difficulty (Gold medal) ---
-            max_possible_xp = 0
             base_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
             gold_bonus = getattr(self.xp_service, 'MEDAL_BONUS', {}).get(Medal.GOLD, 50)
             max_possible_xp = base_xp + gold_bonus
 
-            # Determine new best_xp and whether max has been reached
-            new_best_xp = max(previous_best_xp, raw_xp)
-            new_max_xp_reached = (new_best_xp >= max_possible_xp)
+            # Determine whether max has been reached (SQL will handle best_xp via MAX)
+            old_best_xp = old_progress.best_xp if old_progress else 0
+            new_max_xp_reached = (max(old_best_xp, raw_xp) >= max_possible_xp)
 
-            # --- Persist the solve attempt (store RAW xp, not delta, so future
-            #     lookups via get_best_xp_for_puzzle return the correct baseline) ---
-            if hasattr(self.solve_repo, 'add_solve'):
-                self.solve_repo.add_solve(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    time_taken_seconds=time_taken_s,
-                    xp_earned=raw_xp,
-                    medal=medal.value if isinstance(medal, Medal) else int(medal),
-                )
-
-            # --- Get current progress for updating medal and upgrades ---
-            from Backend.PersistantLayer.SolveRepo import PuzzleProgress
-            from Backend.DomainLayer.Utils import utcnow
-            old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
-            
-            # --- Calculate cumulative XP awarded (sum of deltas) ---
-            new_total_xp_awarded = (old_progress.total_xp_awarded if old_progress else 0) + xp_earned
-            
-            # --- Update puzzle_progress with best medal, best_xp, max_xp_reached, and total_xp_awarded ---
-            if hasattr(self.solve_repo, 'upsert_progress'):
-                new_best_medal = max(
-                    getattr(old_progress, 'best_medal', 0),
-                    medal.value if isinstance(medal, Medal) else int(medal),
-                )
-                timer_upgraded = getattr(old_progress, 'timer_upgraded', False)
-                tight_upgraded = getattr(old_progress, 'tight_upgraded', False)
-                # Track bonus conditions
-                if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
-                    timer_upgraded = True
-                if p.budget > 0 and cost_used <= p.budget:
-                    tight_upgraded = True
-                self.solve_repo.upsert_progress(PuzzleProgress(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    best_medal=new_best_medal,
-                    timer_upgraded=timer_upgraded,
-                    tight_upgraded=tight_upgraded,
-                    first_solved_at=old_progress.first_solved_at if old_progress and old_progress.first_solved_at else utcnow().isoformat(),
-                    max_xp_reached=new_max_xp_reached,
-                    best_xp=new_best_xp,
-                    total_xp_awarded=new_total_xp_awarded,
-                ))
-
-            # --- Accumulate XP on the User entity (only the delta) ---
-            if self.user_repo is not None and xp_earned > 0:
-                user = self.user_repo.get_by_id(user_id)
-                if user:
-                    old_xp = int(user.xp)
-                    new_xp = old_xp + int(xp_earned)
-                    self.user_repo.update_xp(user_id, new_xp)
-                    import sys
-                    print(f"[DEBUG XP] USER XP UPDATE: {old_xp} + {xp_earned} = {new_xp}", file=sys.stderr)
-
-            # --- Award creator XP (wrapped in try/except so a missing creator
-            #     cannot prevent the solve from being committed) ---
-            creator_id = int(p.creator_user_id)
-            if hasattr(self.xp_service, 'award_creator_solve_xp'):
-                try:
-                    xp_awarded_creator = self.xp_service.award_creator_solve_xp(
-                        creator_user_id=creator_id,
-                        solver_user_id=user_id,
+            # --- Wrap the entire persist + XP pipeline in one IMMEDIATE
+            #     transaction (C2).  This prevents two concurrent solves of the
+            #     same puzzle from both reading stale progress and double-awarding XP.
+            with transaction(self.conn):
+                if hasattr(self.solve_repo, 'add_solve'):
+                    self.solve_repo.add_solve(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        time_taken_seconds=time_taken_s,
+                        xp_earned=raw_xp,
+                        medal=medal.value if isinstance(medal, Medal) else int(medal),
                     )
-                    # Notify creator about the solve
-                    if xp_awarded_creator > 0 and self.notification_service:
-                        solver = self.user_repo.get_by_id(user_id) if self.user_repo else None
-                        solver_name = solver.username if solver else f"User #{user_id}"
-                        self.notification_service.notify_creator_solve(
-                            creator_user_id=creator_id,
-                            solver_username=solver_name,
-                            puzzle_name=p.name,
-                            xp_amount=xp_awarded_creator,
-                        )
-                except Exception:
-                    pass  # creator XP is best-effort; solve must still commit
 
-            self.conn.commit()
+                if hasattr(self.solve_repo, 'upsert_progress'):
+                    new_best_medal = medal.value if isinstance(medal, Medal) else int(medal)
+                    timer_upgraded = getattr(old_progress, 'timer_upgraded', False)
+                    tight_upgraded = getattr(old_progress, 'tight_upgraded', False)
+                    if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
+                        timer_upgraded = True
+                    if p.budget > 0 and cost_used <= p.budget:
+                        tight_upgraded = True
+                    self.solve_repo.upsert_progress(PuzzleProgress(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        best_medal=new_best_medal,
+                        timer_upgraded=timer_upgraded,
+                        tight_upgraded=tight_upgraded,
+                        first_solved_at=old_progress.first_solved_at if old_progress and old_progress.first_solved_at else utcnow().isoformat(),
+                        max_xp_reached=new_max_xp_reached,
+                        best_xp=raw_xp,
+                        total_xp_awarded=0,
+                    ))
+
+                xp_earned = 0
+                if hasattr(self.solve_repo, 'claim_xp_delta'):
+                    xp_earned = self.solve_repo.claim_xp_delta(user_id, puzzle_id)
+                else:
+                    new_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+                    xp_earned = new_progress.total_xp_awarded if new_progress else 0
+                xp_earned = max(0, xp_earned)
+
+                if self.user_repo is not None and xp_earned > 0:
+                    self.user_repo.increment_xp(user_id, int(xp_earned))
+
+                creator_id = int(p.creator_user_id)
+                if hasattr(self.xp_service, 'award_creator_solve_xp'):
+                    try:
+                        should_award = True
+                        if hasattr(self.solve_repo, 'try_award_creator_solve_xp'):
+                            should_award = self.solve_repo.try_award_creator_solve_xp(puzzle_id, user_id)
+
+                        if should_award:
+                            xp_awarded_creator = self.xp_service.award_creator_solve_xp(
+                                creator_user_id=creator_id,
+                                solver_user_id=user_id,
+                            )
+                            if xp_awarded_creator > 0 and self.notification_service:
+                                solver = self.user_repo.get_by_id(user_id) if self.user_repo else None
+                                solver_name = solver.username if solver else f"User #{user_id}"
+                                self.notification_service.notify_creator_solve(
+                                    creator_user_id=creator_id,
+                                    solver_username=solver_name,
+                                    puzzle_name=p.name,
+                                    xp_amount=xp_awarded_creator,
+                                )
+                    except Exception:
+                        pass  # creator XP is best-effort
+                # COMMIT at context-manager exit
 
             medal_name = medal.name if isinstance(medal, Medal) else ["NONE", "BRONZE", "SILVER", "GOLD"][int(medal)]
             msg = "All test cases passed!"
             if xp_earned == 0:
                 msg += " No XP improvement this time."
 
-            # DEBUG: Log what's being returned
-            import sys
-            print(f"[DEBUG XP] RESPONSE: xp_earned={xp_earned}, raw_xp={raw_xp}, medal={medal_name}", file=sys.stderr)
-            
             return {
                 "solved": True,
                 "message": msg,

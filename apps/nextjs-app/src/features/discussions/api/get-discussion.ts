@@ -20,6 +20,7 @@ export const getDiscussionQueryOptions = (discussionId: string) => {
   return queryOptions({
     queryKey: ['discussions', discussionId],
     queryFn: () => getDiscussion({ discussionId }),
+    refetchInterval: 1000 * 15, // poll every 15s for new replies
   });
 };
 

@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from math import floor, sqrt
 from typing import Optional
 
+from Backend import settings
 from Backend.DomainLayer.Enums import PuzzleDifficulty, Medal
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
@@ -15,39 +16,39 @@ class XPService:
     - Medal bonuses (Bronze/Silver/Gold)
     - Delta XP: only awards improvement over previous best
     - Creator reward when someone solves their puzzle
-    - Level = floor(sqrt(xp / 100)) + 1
+    - Level = floor(sqrt(xp / settings.LEVEL_XP_DIVISOR)) + 1
     """
     user_repo: UserRepo
 
     # --- Base XP per difficulty ---
     BASE_XP: dict = field(default_factory=lambda: {
-        PuzzleDifficulty.EASY: 50,
-        PuzzleDifficulty.MEDIUM: 100,
-        PuzzleDifficulty.HARD: 200,
+        PuzzleDifficulty.EASY:   settings.XP_SOLVE_EASY,
+        PuzzleDifficulty.MEDIUM: settings.XP_SOLVE_MEDIUM,
+        PuzzleDifficulty.HARD:   settings.XP_SOLVE_HARD,
     })
 
     # --- Medal bonus (added on top of base) ---
     MEDAL_BONUS: dict = field(default_factory=lambda: {
-        Medal.NONE: 0,
-        Medal.BRONZE: 0,
-        Medal.SILVER: 25,
-        Medal.GOLD: 50,
+        Medal.NONE:   settings.XP_MEDAL_BONUS_NONE,
+        Medal.BRONZE: settings.XP_MEDAL_BONUS_BRONZE,
+        Medal.SILVER: settings.XP_MEDAL_BONUS_SILVER,
+        Medal.GOLD:   settings.XP_MEDAL_BONUS_GOLD,
     })
 
     # Creator gets this much XP each time someone solves their puzzle
-    SOLVE_REWARD_CREATOR: int = 10
+    SOLVE_REWARD_CREATOR: int = settings.XP_SOLVE_REWARD_CREATOR
 
-    # Rating XP (ADD): rater gets 5 XP, puzzle creator gets 1 XP.
-    rating_rater_xp: int = 5
-    rating_creator_xp: int = 1
+    # Rating XP: rater and puzzle creator each receive a small award
+    rating_rater_xp: int = settings.XP_RATING_RATER
+    rating_creator_xp: int = settings.XP_RATING_CREATOR
 
     # ---- Level calculation ----
     def calculate_level(self, xp_total: int) -> int:
         xp_total = max(0, int(xp_total))
-        return floor(sqrt(xp_total / 100)) + 1
+        return floor(sqrt(xp_total / settings.LEVEL_XP_DIVISOR)) + 1
 
     def is_experienced(self, xp_total: int) -> bool:
-        return self.calculate_level(xp_total) >= 5
+        return self.calculate_level(xp_total) >= settings.EXPERIENCED_LEVEL_MIN
 
     # ---- Difficulty tier helpers ----
     def tier_from_avg_difficulty(self, avg_difficulty: float) -> PuzzleDifficulty:
@@ -56,9 +57,9 @@ class XPService:
             d = float(avg_difficulty)
         except Exception:
             d = 1.0
-        if d >= 7.0:
+        if d >= settings.DIFFICULTY_HARD_THRESHOLD:
             return PuzzleDifficulty.HARD
-        if d >= 4.0:
+        if d >= settings.DIFFICULTY_MEDIUM_THRESHOLD:
             return PuzzleDifficulty.MEDIUM
         return PuzzleDifficulty.EASY
 
@@ -115,25 +116,16 @@ class XPService:
     # ---- Arsenal capacity ----
     def get_arsenal_limit(self, xp_total: int) -> int:
         lvl = self.calculate_level(int(xp_total))
-        if lvl <= 2:
-            return 5
-        if lvl <= 4:
-            return 10
-        if lvl <= 6:
-            return 20
-        if lvl <= 8:
-            return 35
-        return 50
+        for max_level, slots in settings.ARSENAL_XP_LEVEL_TIERS:
+            if lvl <= max_level:
+                return slots
+        return settings.ARSENAL_XP_MAX_SLOTS
 
     # ---- Internal: apply XP delta to user ----
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:
             return 0
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            raise ValidationError("user not found")
-        user.add_xp(delta)
-        self.user_repo.update_xp(user_id, user.xp)
+        self.user_repo.increment_xp(user_id, delta)
         return delta
 
     # ---- Public award methods ----

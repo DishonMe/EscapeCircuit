@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from Backend.DomainLayer.Circuit import Circuit
 from Backend.DomainLayer.Enums import GateType
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -46,14 +47,11 @@ class CircuitService:
         if not isinstance(structure_json, str) or not structure_json.strip():
             raise ValidationError("Circuit structure (JSON) is required. Please provide a valid circuit structure.")
 
-        # Enforce arsenal limit based on XP/level.
+        # Enforce arsenal limit based on XP/level using SQL COUNT to prevent TOCTOU bypass.
         user = self.user_repo.get_by_id(user_id)
         if not user:
             raise ValidationError("Your user account could not be found. Please log in again.")
         limit = self.xp.get_arsenal_limit(user.xp)
-        current = self.repo.list_by_user(user_id)
-        if len(current) >= limit:
-            raise ValidationError(f"You have reached the maximum number of arsenal pieces ({limit}). You can create more by earning XP or manage existing pieces.")
 
         # Validate gate usage & compute cost server-side.
         allowed_basic = {g.value for g in GateType}
@@ -68,8 +66,16 @@ class CircuitService:
             structure_json=structure_json,
         )
 
+        # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU
         try:
-            saved = self.repo.create(c)
+            with transaction(self.repo.conn):
+                count_row = self.repo.conn.execute(
+                    "SELECT COUNT(*) FROM circuits WHERE user_id = ?", (int(user_id),)
+                ).fetchone()
+                current_count = count_row[0] if count_row else 0
+                if current_count >= limit:
+                    raise ValidationError(f"You have reached the maximum number of arsenal pieces ({limit}). You can create more by earning XP or manage existing pieces.")
+                saved = self.repo.create(c, commit=False)
         except sqlite3.IntegrityError:
             # UNIQUE(user_id, name)
             raise ValidationError("A circuit with this name already exists. Please choose a different name or delete the existing one.")

@@ -50,7 +50,8 @@ export const creatorNotificationsQueryOptions = (filters: NotificationFilters = 
     queryKey: ['creator-notifications', filters],
     queryFn: () => getCreatorNotifications(filters),
     retry: false,
-    staleTime: 1000 * 60, // 1 min
+    staleTime: 1000 * 30, // 30s
+    refetchInterval: 1000 * 30, // poll every 30s
   });
 
 type UseCreatorNotificationsOptions = {
@@ -74,7 +75,9 @@ export const useMarkNotificationsRead = () => {
   return useMutation({
     mutationFn: markNotificationsRead,
     onSuccess: () => {
-      queryClient.setQueryData(['creator-notifications'], []);
+      // Invalidate all queries whose key starts with 'creator-notifications'
+      // (the actual key is ['creator-notifications', filters], not ['creator-notifications'])
+      queryClient.invalidateQueries({ queryKey: ['creator-notifications'] });
     },
   });
 };

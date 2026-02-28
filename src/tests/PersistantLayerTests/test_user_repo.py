@@ -129,12 +129,12 @@ def test_list_all_order_and_pagination(repo):
     for i in range(5):
         repo.create(make_user(f"u{i}", xp=i), password="pw")
 
-    all_users = repo.list_all(limit=100, offset=0)
+    all_users = repo.list_all(limit=100, offset=0, order_by="id", order_direction="ASC")
     assert len(all_users) == 5
     ids = [u.id for u in all_users]
     assert ids == sorted(ids)  # ORDER BY id ASC
 
-    page = repo.list_all(limit=2, offset=1)
+    page = repo.list_all(limit=2, offset=1, order_by="id", order_direction="ASC")
     assert len(page) == 2
     assert page[0].id == all_users[1].id
     assert page[1].id == all_users[2].id
