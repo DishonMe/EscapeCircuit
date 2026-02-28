@@ -106,11 +106,12 @@ class TestGetDiscussion:
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
         svc.discussion_repo.get_by_id.return_value = make_discussion()
-        svc.user_repo.get_by_id.return_value = make_user()
-        svc.reply_repo.list_top_level.return_value = []
+        svc.user_repo.get_by_ids.return_value = {1: make_user()}
+        svc.reply_repo.list_by_discussion.return_value = []
 
         result = svc.get_discussion("token", 1)
         assert result["title"] == "Test"
+        assert result["author"]["username"] == "user1"
         # get_discussion should NOT increment view count
         svc.discussion_repo.increment_view_count.assert_not_called()
 
@@ -128,11 +129,13 @@ class TestListDiscussions:
         svc.auth.require_user_id.return_value = 1
         svc.discussion_repo.list_all.return_value = [make_discussion(), make_discussion(discussion_id=2, title="T2")]
         svc.discussion_repo.count.return_value = 2
-        svc.user_repo.get_by_id.return_value = make_user()
+        svc.user_repo.get_by_ids.return_value = {1: make_user()}
 
         result = svc.list_discussions("token")
         assert len(result["discussions"]) == 2
         assert result["total"] == 2
+        # Verify authors are enriched via batch fetch
+        assert result["discussions"][0]["author"]["username"] == "user1"
 
 
 class TestUpdateDiscussion:
@@ -276,7 +279,7 @@ class TestVoteDiscussion:
         svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
         svc.engagement.get_discussion_vote.return_value = None
         svc.engagement.set_discussion_vote.return_value = 1
-        svc.engagement.count_discussion_votes.return_value = {"upvotes": 1, "downvotes": 0}
+        svc.discussion_repo.sync_upvotes_from_votes.return_value = {"upvotes": 1, "downvotes": 0}
 
         result = svc.vote_discussion("token", 1, 1)
 
@@ -290,7 +293,7 @@ class TestVoteDiscussion:
         svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
         svc.engagement.get_discussion_vote.return_value = None
         svc.engagement.set_discussion_vote.return_value = -1
-        svc.engagement.count_discussion_votes.return_value = {"upvotes": 0, "downvotes": 1}
+        svc.discussion_repo.sync_upvotes_from_votes.return_value = {"upvotes": 0, "downvotes": 1}
 
         result = svc.vote_discussion("token", 1, -1)
 
@@ -303,7 +306,7 @@ class TestVoteDiscussion:
         svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
         svc.engagement.get_discussion_vote.return_value = 1
         svc.engagement.set_discussion_vote.return_value = None
-        svc.engagement.count_discussion_votes.return_value = {"upvotes": 0, "downvotes": 0}
+        svc.discussion_repo.sync_upvotes_from_votes.return_value = {"upvotes": 0, "downvotes": 0}
 
         result = svc.vote_discussion("token", 1, 1)
 

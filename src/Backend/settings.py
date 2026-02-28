@@ -113,7 +113,7 @@ DRAFT_TIMESTAMP_TOLERANCE_S: float = 0.001
 # ── Pagination defaults ────────────────────────────────────────────────────────
 BROWSE_PUZZLES_DEFAULT_LIMIT: int = 50
 LIST_MY_PUZZLES_DEFAULT_LIMIT: int = 50
-LIST_USERS_DEFAULT_LIMIT: int = 200
+LIST_USERS_DEFAULT_LIMIT: int = 50
 LIST_DISCUSSIONS_DEFAULT_LIMIT: int = 20
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

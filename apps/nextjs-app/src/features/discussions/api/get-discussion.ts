@@ -20,7 +20,8 @@ export const getDiscussionQueryOptions = (discussionId: string) => {
   return queryOptions({
     queryKey: ['discussions', discussionId],
     queryFn: () => getDiscussion({ discussionId }),
-    refetchInterval: 1000 * 15, // poll every 15s for new replies
+    refetchInterval: 1000 * 60, // poll every 60s; mutations already invalidate on success
+    refetchIntervalInBackground: false, // inactive tabs stop polling
   });
 };
 

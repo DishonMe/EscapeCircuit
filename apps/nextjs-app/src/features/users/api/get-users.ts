@@ -18,7 +18,12 @@ export interface UserFilters {
   offset?: number;
 }
 
-export const getUsers = (filters: UserFilters = {}): Promise<{ data: User[] }> => {
+export const getUsers = (filters: UserFilters = {}): Promise<{
+  data: User[];
+  total: number;
+  limit: number;
+  offset: number;
+}> => {
   const params: Record<string, any> = {};
   
   if (filters.usernameSearch) params.username_search = filters.usernameSearch;

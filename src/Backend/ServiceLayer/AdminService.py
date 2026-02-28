@@ -243,6 +243,10 @@ class AdminService:
         limit = max(1, limit)
         total_pages = (total + limit - 1) // limit
 
+        # Batch-fetch all creators in one query instead of N individual queries
+        creator_ids = list(set(p.creator_user_id for p in puzzles))
+        creators_map = self.user_repo.get_by_ids(creator_ids)
+
         enriched = []
         for p in puzzles:
             d = p.to_dict()
@@ -256,7 +260,7 @@ class AdminService:
                 if p.rating_count == 0:
                     d["flags"].append("unrated")
             # Attach creator info
-            creator = self.user_repo.get_by_id(p.creator_user_id)
+            creator = creators_map.get(p.creator_user_id)
             if creator:
                 d["creator"] = creator.to_dict()
             enriched.append(d)

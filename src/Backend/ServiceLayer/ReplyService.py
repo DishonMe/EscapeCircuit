@@ -93,10 +93,14 @@ class ReplyService:
         replies = self.reply_repo.list_by_discussion(discussion_id, limit=limit, offset=offset)
         total = self.reply_repo.count_by_discussion(discussion_id)
 
+        # Batch-fetch all authors in one query instead of N individual queries
+        author_ids = list(set(r.author_id for r in replies))
+        authors_map = self.user_repo.get_by_ids(author_ids)
+
         items = []
         for r in replies:
             item = r.to_dict()
-            author = self.user_repo.get_by_id(r.author_id)
+            author = authors_map.get(r.author_id)
             if author:
                 item["author"] = author.to_dict()
             items.append(item)
@@ -257,9 +261,8 @@ class ReplyService:
             if self.engagement.try_award_engagement_xp("reply", reply_id, user_id, "upvote"):
                 self.xp._apply_xp(reply.author_id, REPLY_UPVOTE_XP)
 
-        # Atomically sync cached vote counts from authoritative vote table
-        self.reply_repo.sync_votes_from_votes(reply_id)
-        votes = self.engagement.count_reply_votes(reply_id)
+        # Sync cache and get authoritative counts in one step (no redundant re-count)
+        votes = self.reply_repo.sync_votes_from_votes(reply_id)
 
         return {
             "reply_id": reply_id,

@@ -112,34 +112,69 @@ class DiscussionService:
 
         result = discussion.to_dict()
 
-        # Attach author info
-        author = self.user_repo.get_by_id(discussion.author_id)
+        # Fetch ALL replies in one query (created_at ASC ordering preserved)
+        all_replies = self.reply_repo.list_by_discussion(discussion_id, limit=10000)
+
+        # Batch-fetch all authors (discussion + replies) in one query
+        author_ids = list(set(
+            [discussion.author_id] + [r.author_id for r in all_replies]
+        ))
+        authors_map = self.user_repo.get_by_ids(author_ids)
+
+        # Attach discussion author
+        author = authors_map.get(discussion.author_id)
         if author:
             result["author"] = author.to_dict()
 
-        # Attach engagement data for the current user
+        # Attach discussion engagement (single discussion — still 6 sub-queries)
         if self.engagement:
             result["engagement"] = self.engagement.get_discussion_engagement(discussion_id, user_id)
 
-        # Attach replies (nested)
-        top_replies = self.reply_repo.list_top_level(discussion_id, limit=100)
+        # Bulk-fetch reply engagement (4 queries instead of 4*N)
+        reply_ids = [r.id for r in all_replies]
+        engagement_map = {}
+        if self.engagement and reply_ids:
+            engagement_map = self.engagement.get_bulk_reply_engagement(reply_ids, user_id)
+
+        # Build enriched reply dicts
+        reply_dicts: dict = {}
+        for r in all_replies:
+            rd = r.to_dict()
+            a = authors_map.get(r.author_id)
+            if a:
+                rd["author"] = a.to_dict()
+            if self.engagement:
+                rd["engagement"] = engagement_map.get(r.id, {
+                    "upvotes": 0, "downvotes": 0, "user_vote": None,
+                    "reactions": [], "user_reactions": [],
+                })
+            reply_dicts[r.id] = rd
+
+        # Build children map: parent_reply_id -> [reply_ids in creation order]
+        children_map: dict = {}
+        for r in all_replies:
+            pid = r.parent_reply_id
+            if pid not in children_map:
+                children_map[pid] = []
+            children_map[pid].append(r.id)
+
+        # Assemble 3-level nested tree (top-level capped at 100, matching original)
+        top_ids = children_map.get(None, [])[:100]
         replies_list = []
-        for reply in top_replies:
-            reply_dict = self._enrich_reply(reply, user_id)
-            children = self.reply_repo.list_children(reply.id)
+        for rid in top_ids:
+            rd = reply_dicts[rid]
             children_list = []
-            for child in children:
-                child_dict = self._enrich_reply(child, user_id)
-                grandchildren = self.reply_repo.list_children(child.id)
+            for cid in children_map.get(rid, []):
+                cd = reply_dicts[cid]
                 gc_list = []
-                for gc in grandchildren:
-                    gc_dict = self._enrich_reply(gc, user_id)
-                    gc_dict["children"] = []
-                    gc_list.append(gc_dict)
-                child_dict["children"] = gc_list
-                children_list.append(child_dict)
-            reply_dict["children"] = children_list
-            replies_list.append(reply_dict)
+                for gid in children_map.get(cid, []):
+                    gd = reply_dicts[gid]
+                    gd["children"] = []
+                    gc_list.append(gd)
+                cd["children"] = gc_list
+                children_list.append(cd)
+            rd["children"] = children_list
+            replies_list.append(rd)
 
         result["replies"] = replies_list
         return result
@@ -173,10 +208,14 @@ class DiscussionService:
             search=search,
         )
 
+        # Batch-fetch all authors in one query instead of N individual queries
+        author_ids = list(set(d.author_id for d in discussions))
+        authors_map = self.user_repo.get_by_ids(author_ids)
+
         items = []
         for d in discussions:
             item = d.to_dict()
-            author = self.user_repo.get_by_id(d.author_id)
+            author = authors_map.get(d.author_id)
             if author:
                 item["author"] = author.to_dict()
             items.append(item)
@@ -317,9 +356,8 @@ class DiscussionService:
             if self.engagement.try_award_engagement_xp("discussion", discussion_id, user_id, "upvote"):
                 self.xp._apply_xp(discussion.author_id, UPVOTE_XP)
 
-        # Atomically sync cached upvotes from authoritative vote table
-        self.discussion_repo.sync_upvotes_from_votes(discussion_id)
-        votes = self.engagement.count_discussion_votes(discussion_id)
+        # Sync cache and get authoritative counts in one step (no redundant re-count)
+        votes = self.discussion_repo.sync_upvotes_from_votes(discussion_id)
 
         return {
             "discussion_id": discussion_id,
@@ -441,21 +479,34 @@ class DiscussionService:
         reports = self.report_repo.list_all(status=status, limit=limit, offset=offset)
         total = self.report_repo.count(status=status)
 
-        # Enrich with usernames
+        # Batch-fetch all referenced entities instead of N+1 individual queries
+        disc_target_ids = [r["target_id"] for r in reports if r["target_type"] == "discussion"]
+        reply_target_ids = [r["target_id"] for r in reports if r["target_type"] == "reply"]
+        disc_map = self.discussion_repo.get_by_ids(disc_target_ids) if disc_target_ids else {}
+        reply_map = self.reply_repo.get_by_ids(reply_target_ids) if reply_target_ids else {}
+
+        # Collect all user IDs needed (reporters + target authors)
+        all_user_ids = set(r["reporter_id"] for r in reports)
+        for d in disc_map.values():
+            all_user_ids.add(d.author_id)
+        for rp in reply_map.values():
+            all_user_ids.add(rp.author_id)
+        users_map = self.user_repo.get_by_ids(list(all_user_ids))
+
+        # Enrich with usernames using lookup dicts
         for report in reports:
-            reporter = self.user_repo.get_by_id(report["reporter_id"])
+            reporter = users_map.get(report["reporter_id"])
             report["reporter_username"] = reporter.username if reporter else "Unknown"
-            # Get target author
             if report["target_type"] == "discussion":
-                disc = self.discussion_repo.get_by_id(report["target_id"])
+                disc = disc_map.get(report["target_id"])
                 if disc:
-                    author = self.user_repo.get_by_id(disc.author_id)
+                    author = users_map.get(disc.author_id)
                     report["target_author_id"] = disc.author_id
                     report["target_author_username"] = author.username if author else "Unknown"
             elif report["target_type"] == "reply":
-                reply = self.reply_repo.get_by_id(report["target_id"])
+                reply = reply_map.get(report["target_id"])
                 if reply:
-                    author = self.user_repo.get_by_id(reply.author_id)
+                    author = users_map.get(reply.author_id)
                     report["target_author_id"] = reply.author_id
                     report["target_author_username"] = author.username if author else "Unknown"
                     report["discussion_id"] = reply.discussion_id

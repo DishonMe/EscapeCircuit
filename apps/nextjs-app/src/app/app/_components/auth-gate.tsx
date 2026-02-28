@@ -17,19 +17,19 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
   const { addNotification } = useNotifications();
   const hasShownNotification = useRef(false);
 
+  const hasToken = !!Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+
   useEffect(() => {
-    // Only redirect if we're SURE the user is unauthenticated
-    // Case 1: User query succeeded but returned no user data (successfully determined no auth)
-    // Case 2: User has a valid token but the API returned 401 (unauthorized - session truly expired)
-    
+    // No cookie at all → redirect immediately without waiting for API
+    if (!hasToken) {
+      router.replace(paths.auth.login.getHref(pathname));
+      return;
+    }
+
+    // Cookie exists but API confirmed not authenticated (expired session)
     if (user.status === 'success' && !user.data) {
-      // Successfully confirmed user is not authenticated
-      // Clear the token cookie since it's invalid
-      if (Cookies.get(AUTH_TOKEN_COOKIE_NAME)) {
-        Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
-      }
-      
-      // Show notification once
+      Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+
       if (!hasShownNotification.current) {
         hasShownNotification.current = true;
         addNotification({
@@ -38,14 +38,10 @@ const AuthGate = ({ children }: { children: React.ReactNode }) => {
           message: 'Please log in to continue.',
         });
       }
-      
-      // Redirect to login with current page as redirect destination
+
       router.replace(paths.auth.login.getHref(pathname));
     }
-    
-    // For errors, we're NOT sure why it failed - could be network, server, etc
-    // Don't redirect on errors, just let the page show a loading state
-  }, [user.status, user.data, router, pathname, addNotification]);
+  }, [user.status, user.data, router, pathname, addNotification, hasToken]);
 
   return (
     <>

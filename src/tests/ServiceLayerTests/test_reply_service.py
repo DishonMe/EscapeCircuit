@@ -255,7 +255,7 @@ class TestVoteReply:
         svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
         svc.engagement.get_reply_vote.return_value = None
         svc.engagement.set_reply_vote.return_value = 1
-        svc.engagement.count_reply_votes.return_value = {"upvotes": 1, "downvotes": 0}
+        svc.reply_repo.sync_votes_from_votes.return_value = {"upvotes": 1, "downvotes": 0}
 
         result = svc.vote_reply("token", 1, 1)
 
@@ -269,7 +269,7 @@ class TestVoteReply:
         svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
         svc.engagement.get_reply_vote.return_value = None
         svc.engagement.set_reply_vote.return_value = -1
-        svc.engagement.count_reply_votes.return_value = {"upvotes": 0, "downvotes": 1}
+        svc.reply_repo.sync_votes_from_votes.return_value = {"upvotes": 0, "downvotes": 1}
 
         result = svc.vote_reply("token", 1, -1)
 
@@ -283,7 +283,7 @@ class TestVoteReply:
         svc.reply_repo.get_by_id.return_value = make_reply(reply_id=1, author_id=1)
         svc.engagement.get_reply_vote.return_value = 1  # already upvoted
         svc.engagement.set_reply_vote.return_value = None
-        svc.engagement.count_reply_votes.return_value = {"upvotes": 0, "downvotes": 0}
+        svc.reply_repo.sync_votes_from_votes.return_value = {"upvotes": 0, "downvotes": 0}
 
         result = svc.vote_reply("token", 1, 1)
 
