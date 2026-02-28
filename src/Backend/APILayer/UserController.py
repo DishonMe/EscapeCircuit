@@ -84,8 +84,8 @@ def build_user_router(user_service: UserService, notification_service: Notificat
 
     @router.get("")
     def list_users(
-        token: str = Depends(verify_token), 
-        limit: int = 200, 
+        token: str = Depends(verify_token),
+        limit: int = 50,
         offset: int = 0,
         username_search: Optional[str] = None,
         role: Optional[str] = None,
@@ -98,9 +98,9 @@ def build_user_router(user_service: UserService, notification_service: Notificat
         order_direction: str = "DESC"
     ):
         try:
-            users = user_service.list_users(
-                token, 
-                limit=limit, 
+            return user_service.list_users(
+                token,
+                limit=limit,
                 offset=offset,
                 username_search=username_search,
                 role=role,
@@ -112,7 +112,6 @@ def build_user_router(user_service: UserService, notification_service: Notificat
                 order_by=order_by,
                 order_direction=order_direction
             )
-            return {"data": users}
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
 

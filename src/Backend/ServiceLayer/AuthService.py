@@ -39,7 +39,9 @@ class AuthService:
         for t in expired:
             del self._sessions[t]
 
-    def login(self, username: str, password: str) -> str:
+    def login(self, username: str, password: str):
+        """Authenticate and return (token, user).  The caller gets the User
+        object for free, avoiding a second DB lookup."""
         username = (username or "").strip()
         password = password or ""
         if not username or not password:
@@ -63,7 +65,7 @@ class AuthService:
             self._cleanup_expired_locked()
             self._sessions[token] = SessionInfo(user_id=user.id, created_at=now, last_seen=now)
 
-        return token
+        return token, user
 
     def login_external(self, user_id: int) -> str:
         """Create a session for a user verified by an external provider (e.g. Google).

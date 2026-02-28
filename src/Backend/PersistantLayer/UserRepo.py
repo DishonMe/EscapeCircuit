@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import hashlib
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
@@ -78,6 +78,23 @@ class UserRepo:
         row = self.conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         return self._row_to_user(row) if row else None
 
+    def get_by_ids(self, user_ids: List[int]) -> Dict[int, User]:
+        """Fetch multiple users by ID in one query. Returns {id: User} dict."""
+        if not user_ids:
+            return {}
+        unique_ids = list(set(int(uid) for uid in user_ids))
+        result: Dict[int, User] = {}
+        for i in range(0, len(unique_ids), 900):
+            chunk = unique_ids[i:i + 900]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = self.conn.execute(
+                f"SELECT * FROM users WHERE id IN ({placeholders})", chunk
+            ).fetchall()
+            for row in rows:
+                user = self._row_to_user(row)
+                result[user.id] = user
+        return result
+
     def verify_login(self, username: str, password: str) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if not row or row["pw_salt"] is None or row["pw_hash"] is None:
@@ -118,9 +135,49 @@ class UserRepo:
         )
         return cur.rowcount > 0
 
+    @staticmethod
+    def _build_where(
+        username_search: Optional[str] = None,
+        role: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        min_xp: Optional[int] = None,
+        max_xp: Optional[int] = None,
+        experience_level: str = "all",
+    ) -> tuple:
+        """Build WHERE clause and params shared by list_all() and count_all()."""
+        where_clauses: list = []
+        params: list = []
+        if username_search is not None:
+            where_clauses.append("username LIKE ?")
+            params.append(f"%{username_search}%")
+        if role is not None:
+            where_clauses.append("role=?")
+            params.append(role)
+        if date_from is not None:
+            where_clauses.append("created_at>=?")
+            params.append(date_from)
+        if date_to is not None:
+            where_clauses.append("created_at<=?")
+            params.append(date_to)
+        if min_xp is not None:
+            where_clauses.append("xp>=?")
+            params.append(min_xp)
+        if max_xp is not None:
+            where_clauses.append("xp<=?")
+            params.append(max_xp)
+        if experience_level == "experienced":
+            where_clauses.append("xp>=?")
+            params.append(1600)
+        elif experience_level == "inexperienced":
+            where_clauses.append("xp<?")
+            params.append(1600)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        return where_sql, params
+
     def list_all(
-        self, 
-        limit: int = 200, 
+        self,
+        limit: int = 200,
         offset: int = 0,
         username_search: Optional[str] = None,
         role: Optional[str] = None,
@@ -132,58 +189,17 @@ class UserRepo:
         order_by: str = "created_at",
         order_direction: str = "DESC"
     ) -> List[User]:
-        """
-        List all users with optional filters and ordering.
-        
-        Args:
-            username_search: Partial username search
-            experience_level: 'all' (default), 'experienced' (level >= 5 / xp >= 1600), 'inexperienced' (level < 5 / xp < 1600)
-            order_by: 'created_at' (default), 'level' (via xp), or 'role'
-            order_direction: 'DESC' (default) or 'ASC'
-        """
-        where_clauses = []
-        params = []
-        
-        if username_search is not None:
-            where_clauses.append("username LIKE ?")
-            params.append(f"%{username_search}%")
-        
-        if role is not None:
-            where_clauses.append("role=?")
-            params.append(role)
-        
-        if date_from is not None:
-            where_clauses.append("created_at>=?")
-            params.append(date_from)
-        
-        if date_to is not None:
-            where_clauses.append("created_at<=?")
-            params.append(date_to)
-        
-        if min_xp is not None:
-            where_clauses.append("xp>=?")
-            params.append(min_xp)
-        
-        if max_xp is not None:
-            where_clauses.append("xp<=?")
-            params.append(max_xp)
-        
-        # Experience level filtering: experienced = level >= 5 (xp >= 1600), inexperienced = level < 5 (xp < 1600)
-        if experience_level == "experienced":
-            where_clauses.append("xp>=?")
-            params.append(1600)
-        elif experience_level == "inexperienced":
-            where_clauses.append("xp<?")
-            params.append(1600)
-        # 'all' requires no additional filter
-        
-        # Build order by clause
+        where_sql, params = self._build_where(
+            username_search=username_search, role=role, date_from=date_from,
+            date_to=date_to, min_xp=min_xp, max_xp=max_xp,
+            experience_level=experience_level,
+        )
+
         valid_order_fields = ["created_at", "level", "role", "xp", "id"]
         if order_by not in valid_order_fields:
             order_by = "created_at"
 
         if order_by == "level":
-            # Level is calculated from XP, so we order by xp
             order_clause = f"xp {order_direction}"
         elif order_by == "role":
             order_clause = f"role {order_direction}"
@@ -193,17 +209,12 @@ class UserRepo:
             order_clause = f"id {order_direction}"
         else:
             order_clause = f"created_at {order_direction}"
-        
-        where_sql = ""
-        if where_clauses:
-            where_sql = "WHERE " + " AND ".join(where_clauses)
-        
+
         query = f"SELECT * FROM users {where_sql} ORDER BY {order_clause} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
-        
         rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_user(r) for r in rows]
-    
+
     def count_all(
         self,
         username_search: Optional[str] = None,
@@ -214,49 +225,12 @@ class UserRepo:
         max_xp: Optional[int] = None,
         experience_level: str = "all",
     ) -> int:
-        """Count all users with optional filters."""
-        where_clauses = []
-        params = []
-        
-        if username_search is not None:
-            where_clauses.append("username LIKE ?")
-            params.append(f"%{username_search}%")
-        
-        if role is not None:
-            where_clauses.append("role=?")
-            params.append(role)
-        
-        if date_from is not None:
-            where_clauses.append("created_at>=?")
-            params.append(date_from)
-        
-        if date_to is not None:
-            where_clauses.append("created_at<=?")
-            params.append(date_to)
-        
-        if min_xp is not None:
-            where_clauses.append("xp>=?")
-            params.append(min_xp)
-        
-        if max_xp is not None:
-            where_clauses.append("xp<=?")
-            params.append(max_xp)
-        
-        # Experience level filtering: experienced = level >= 5 (xp >= 1600), inexperienced = level < 5 (xp < 1600)
-        if experience_level == "experienced":
-            where_clauses.append("xp>=?")
-            params.append(1600)
-        elif experience_level == "inexperienced":
-            where_clauses.append("xp<?")
-            params.append(1600)
-        # 'all' requires no additional filter
-        
-        where_sql = ""
-        if where_clauses:
-            where_sql = "WHERE " + " AND ".join(where_clauses)
-        
-        cur = self.conn.execute(f"SELECT COUNT(*) FROM users {where_sql}", params)
-        row = cur.fetchone()
+        where_sql, params = self._build_where(
+            username_search=username_search, role=role, date_from=date_from,
+            date_to=date_to, min_xp=min_xp, max_xp=max_xp,
+            experience_level=experience_level,
+        )
+        row = self.conn.execute(f"SELECT COUNT(*) FROM users {where_sql}", params).fetchone()
         return row[0] if row else 0
 
     def ban_from_discussions(self, user_id: int) -> None:

@@ -1,27 +1,38 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NextLink from 'next/link';
+
+import Cookies from 'js-cookie';
 
 import { Button } from '@/components/ui/button';
 import { paths } from '@/config/paths';
 import { useUser } from '@/lib/auth';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 const HomePage = () => {
   const router = useRouter();
+  // Defer cookie read to useEffect to avoid SSR/client hydration mismatch
+  const [hasToken, setHasToken] = useState(false);
   const user = useUser();
 
   useEffect(() => {
+    setHasToken(!!Cookies.get(AUTH_TOKEN_COOKIE_NAME));
+  }, []);
+
+  useEffect(() => {
+    // No cookie means definitely not logged in — stay on landing
+    if (!hasToken) return;
     // Wait for auth query to resolve, then route appropriately
     if (user.status === 'pending') return;
     if (user.data) {
       router.replace(paths.app.puzzles.getHref());
     }
-  }, [user.status, user.data, router]);
+  }, [user.status, user.data, router, hasToken]);
 
-  // Show landing content when not authenticated
-  const showLanding = user.status !== 'pending' && !user.data;
+  // No cookie → show landing immediately (no need to wait for API)
+  const showLanding = hasToken ? (user.status !== 'pending' && !user.data) : true;
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">

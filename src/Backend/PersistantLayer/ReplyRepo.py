@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from Backend.DomainLayer.Reply import Reply
 from Backend.DomainLayer.Utils import utcnow
@@ -54,6 +54,23 @@ class ReplyRepo:
             "SELECT * FROM replies WHERE id=?", (int(reply_id),)
         ).fetchone()
         return self._row_to_reply(row) if row else None
+
+    def get_by_ids(self, reply_ids: List[int]) -> Dict[int, Reply]:
+        """Fetch multiple replies by ID in one query. Returns {id: Reply} dict."""
+        if not reply_ids:
+            return {}
+        unique_ids = list(set(int(rid) for rid in reply_ids))
+        result: Dict[int, Reply] = {}
+        for i in range(0, len(unique_ids), 900):
+            chunk = unique_ids[i:i + 900]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = self.conn.execute(
+                f"SELECT * FROM replies WHERE id IN ({placeholders})", chunk
+            ).fetchall()
+            for row in rows:
+                reply = self._row_to_reply(row)
+                result[reply.id] = reply
+        return result
 
     def list_by_discussion(
         self, discussion_id: int, limit: int = 100, offset: int = 0
@@ -131,16 +148,25 @@ class ReplyRepo:
         if commit:
             self.conn.commit()
 
-    def sync_votes_from_votes(self, reply_id: int, commit: bool = True) -> None:
-        """Atomically update cached upvotes/downvotes from the authoritative reply_votes table."""
-        self.conn.execute("""
-            UPDATE replies SET
-                upvotes = (SELECT COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) FROM reply_votes WHERE reply_id = ?),
-                downvotes = (SELECT COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) FROM reply_votes WHERE reply_id = ?)
-            WHERE id = ?
-        """, (int(reply_id), int(reply_id), int(reply_id)))
+    def sync_votes_from_votes(self, reply_id: int, commit: bool = True) -> Dict[str, int]:
+        """Compute authoritative vote counts, update cache, and return counts.
+        Eliminates the need for a separate count_reply_votes() call."""
+        rid = int(reply_id)
+        row = self.conn.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) as upvotes,
+                COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) as downvotes
+            FROM reply_votes WHERE reply_id = ?
+        """, (rid,)).fetchone()
+        upvotes = int(row["upvotes"])
+        downvotes = int(row["downvotes"])
+        self.conn.execute(
+            "UPDATE replies SET upvotes = ?, downvotes = ? WHERE id = ?",
+            (upvotes, downvotes, rid),
+        )
         if commit:
             self.conn.commit()
+        return {"upvotes": upvotes, "downvotes": downvotes}
 
     def clear_accepted_for_discussion(self, discussion_id: int, commit: bool = True) -> None:
         self.conn.execute(

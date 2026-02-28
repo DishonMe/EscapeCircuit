@@ -52,7 +52,7 @@ class UserService:
         self.user_repo.conn.commit()
         
         # Auto login
-        token = self.auth.login(username, password)
+        token, _ = self.auth.login(username, password)
 
         d = created.to_dict()
         d["level"] = self.xp.calculate_level(created.xp)
@@ -62,13 +62,12 @@ class UserService:
     def login(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
-        token = self.auth.login(username, password)
-        user = self.user_repo.get_by_username(username)
-        
+        token, user = self.auth.login(username, password)
+
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
         d["is_experienced"] = self.xp.is_experienced(user.xp)
-        
+
         return {"token": token, "user": d}
 
     def logout(self, session_token: str) -> dict:
@@ -101,48 +100,41 @@ class UserService:
         experience_level: str = "all",
         order_by: str = "created_at",
         order_direction: str = "DESC"
-    ) -> List[dict]:
-        """
-        List users with optional filters and ordering.
-        
-        Note: Level-based filtering is converted to XP ranges based on XPService thresholds.
-        Args:
-            experience_level: 'all', 'experienced', 'inexperienced'
-        """
+    ) -> dict:
+        """List users with optional filters, ordering, and server-side pagination."""
         _ = self.auth.require_user_id(session_token)
-        
+
         # Convert level ranges to xp ranges
         min_xp = None
         max_xp = None
         if min_level is not None or max_level is not None:
-            # Get XP thresholds from XPService
-            # Assuming XPService has a way to convert level to xp
-            # For now, we'll use a rough estimate: level * 100
             if min_level is not None:
                 min_xp = self.xp.calculate_xp_for_level(min_level) if hasattr(self.xp, 'calculate_xp_for_level') else (min_level - 1) * settings.LEVEL_XP_DIVISOR
             if max_level is not None:
                 max_xp = self.xp.calculate_xp_for_level(max_level + 1) - 1 if hasattr(self.xp, 'calculate_xp_for_level') else (max_level * settings.LEVEL_XP_DIVISOR) + (settings.LEVEL_XP_DIVISOR - 1)
-        
-        users = self.user_repo.list_all(
-            limit=limit,
-            offset=offset,
-            username_search=username_search,
-            role=role,
-            date_from=date_from,
-            date_to=date_to,
-            min_xp=min_xp,
-            max_xp=max_xp,
+
+        filter_kwargs = dict(
+            username_search=username_search, role=role,
+            date_from=date_from, date_to=date_to,
+            min_xp=min_xp, max_xp=max_xp,
             experience_level=experience_level,
-            order_by=order_by,
-            order_direction=order_direction
         )
+
+        users = self.user_repo.list_all(
+            limit=limit, offset=offset,
+            order_by=order_by, order_direction=order_direction,
+            **filter_kwargs,
+        )
+        total = self.user_repo.count_all(**filter_kwargs)
+
         out = []
         for u in users:
             d = u.to_dict()
             d["level"] = self.xp.calculate_level(u.xp)
             d["is_experienced"] = self.xp.is_experienced(u.xp)
             out.append(d)
-        return out
+
+        return {"data": out, "total": total, "limit": limit, "offset": offset}
 
     def google_login(self, token: str) -> dict:
         """Verify a Google id_token, find-or-create the user, and return a session."""

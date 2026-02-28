@@ -61,7 +61,7 @@ class TestAuthServiceLogin:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
 
         assert isinstance(token, str)
         assert len(token) > 0
@@ -94,8 +94,8 @@ class TestAuthServiceLogin:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token1 = self.service.login("testuser", "password123")
-        token2 = self.service.login("testuser", "password123")
+        token1, _ = self.service.login("testuser", "password123")
+        token2, _ = self.service.login("testuser", "password123")
 
         assert token1 != token2
         assert len(self.service._sessions) == 2
@@ -115,7 +115,7 @@ class TestAuthServiceLogout:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
         assert token in self.service._sessions
 
         self.service.logout(token)
@@ -136,7 +136,7 @@ class TestAuthServiceLogout:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
         del self.service._sessions[token]
 
         self.service.logout(token)
@@ -158,7 +158,7 @@ class TestAuthServiceRequireUserID:
         self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
 
         user_id = self.service.require_user_id(token)
 
@@ -181,7 +181,7 @@ class TestAuthServiceRequireUserID:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
 
         # Manually expire the session
         session = self.service._sessions[token]
@@ -201,7 +201,7 @@ class TestAuthServiceRequireUserID:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
 
         # User is deleted from repo
         self.mock_user_repo.get_by_id.return_value = None
@@ -215,7 +215,7 @@ class TestAuthServiceRequireUserID:
         self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
         initial_last_seen = self.service._sessions[token].last_seen
 
         # Wait a bit and check again
@@ -242,7 +242,7 @@ class TestAuthServiceCleanupExpired:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
 
         # Manually set session as expired
         session = self.service._sessions[token]
@@ -278,7 +278,7 @@ class TestAuthServiceThreadSafety:
         tokens = []
 
         def login_task():
-            token = self.service.login("testuser", "password123")
+            token, _ = self.service.login("testuser", "password123")
             tokens.append(token)
 
         threads = [threading.Thread(target=login_task) for _ in range(5)]
@@ -301,7 +301,7 @@ class TestAuthServiceThreadSafety:
         user = User(id=1, username="testuser")
         self.mock_user_repo.get_by_username.return_value = user
 
-        tokens = [self.service.login("testuser", "password123") for _ in range(5)]
+        tokens = [self.service.login("testuser", "password123")[0] for _ in range(5)]
 
         def logout_task(token):
             self.service.logout(token)
@@ -336,7 +336,7 @@ class TestAuthServiceCleanupDuringLogout:
         self.mock_user_repo.get_by_id.return_value = user
 
         # Create a token
-        token1 = self.service.login("testuser", "password123")
+        token1, _ = self.service.login("testuser", "password123")
 
         assert len(self.service._sessions) == 1
 
@@ -407,8 +407,8 @@ class TestAuthServiceNoneInputs:
         self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token1 = self.service.login("testuser", "password123")
-        token2 = self.service.login("testuser", "password123")
+        token1, _ = self.service.login("testuser", "password123")
+        token2, _ = self.service.login("testuser", "password123")
         
         # Manually expire token1
         session = self.service._sessions[token1]
@@ -432,7 +432,7 @@ class TestAuthServiceNoneInputs:
         self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
         
         # Get the original last_seen
         original_session = self.service._sessions[token]
@@ -463,7 +463,7 @@ class TestExpiration:
         self.mock_user_repo.get_by_username.return_value = user
         self.mock_user_repo.get_by_id.return_value = user
 
-        token = self.service.login("testuser", "password123")
+        token, _ = self.service.login("testuser", "password123")
         with patch.object(self.service, '_cleanup_expired_locked'):
         # Initially valid
             user_id = self.service.require_user_id(token)

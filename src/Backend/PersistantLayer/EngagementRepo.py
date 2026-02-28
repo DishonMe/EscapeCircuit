@@ -317,22 +317,46 @@ class EngagementRepo:
     # ---- Bulk engagement data for a discussion (for get_discussion enrichment) ----
 
     def get_discussion_engagement(self, discussion_id: int, user_id: int) -> Dict:
-        """Get all engagement data for a discussion for a specific user."""
-        votes = self.count_discussion_votes(discussion_id)
-        user_vote = self.get_discussion_vote(discussion_id, user_id)
-        reactions = self.get_discussion_reactions(discussion_id)
-        user_reactions = self.get_user_discussion_reactions(discussion_id, user_id)
-        is_following = self.is_following(discussion_id, user_id)
-        is_bookmarked = self.is_bookmarked(discussion_id, user_id)
+        """Get all engagement data for a discussion in 3 queries instead of 6."""
+        did, uid = int(discussion_id), int(user_id)
+
+        # Query 1: vote counts + user's vote in one pass
+        row = self.conn.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) as upvotes,
+                COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) as downvotes,
+                MAX(CASE WHEN user_id = ? THEN value ELSE NULL END) as user_vote
+            FROM discussion_votes WHERE discussion_id = ?
+        """, (uid, did)).fetchone()
+        upvotes = int(row["upvotes"])
+        downvotes = int(row["downvotes"])
+        user_vote = int(row["user_vote"]) if row["user_vote"] is not None else None
+
+        # Query 2: reaction counts + user's reactions in one pass
+        reaction_rows = self.conn.execute("""
+            SELECT reaction_type, COUNT(*) as count,
+                MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) as user_reacted
+            FROM discussion_reactions WHERE discussion_id = ?
+            GROUP BY reaction_type
+        """, (uid, did)).fetchall()
+        reactions = [{"type": r["reaction_type"], "count": int(r["count"])} for r in reaction_rows]
+        user_reactions = [r["reaction_type"] for r in reaction_rows if int(r["user_reacted"])]
+
+        # Query 3: follow + bookmark in one pass
+        row = self.conn.execute("""
+            SELECT
+                EXISTS(SELECT 1 FROM discussion_follows WHERE discussion_id = ? AND user_id = ?) as is_following,
+                EXISTS(SELECT 1 FROM discussion_bookmarks WHERE discussion_id = ? AND user_id = ?) as is_bookmarked
+        """, (did, uid, did, uid)).fetchone()
 
         return {
-            "upvotes": votes["upvotes"],
-            "downvotes": votes["downvotes"],
+            "upvotes": upvotes,
+            "downvotes": downvotes,
             "user_vote": user_vote,
             "reactions": reactions,
             "user_reactions": user_reactions,
-            "is_following": is_following,
-            "is_bookmarked": is_bookmarked,
+            "is_following": bool(row["is_following"]),
+            "is_bookmarked": bool(row["is_bookmarked"]),
         }
 
     def get_reply_engagement(self, reply_id: int, user_id: int) -> Dict:
@@ -349,3 +373,64 @@ class EngagementRepo:
             "reactions": reactions,
             "user_reactions": user_reactions,
         }
+
+    def get_bulk_reply_engagement(self, reply_ids: List[int], user_id: int) -> Dict[int, Dict]:
+        """Get engagement data for multiple replies in 4 queries instead of 4*N.
+        Returns {reply_id: {upvotes, downvotes, user_vote, reactions, user_reactions}}."""
+        if not reply_ids:
+            return {}
+        unique_ids = list(set(int(rid) for rid in reply_ids))
+        uid = int(user_id)
+
+        result: Dict[int, Dict] = {rid: {
+            "upvotes": 0, "downvotes": 0, "user_vote": None,
+            "reactions": [], "user_reactions": [],
+        } for rid in unique_ids}
+
+        for i in range(0, len(unique_ids), 900):
+            chunk = unique_ids[i:i + 900]
+            ph = ",".join("?" for _ in chunk)
+
+            # 1. Vote counts per reply
+            rows = self.conn.execute(f"""
+                SELECT reply_id,
+                    COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) as upvotes,
+                    COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) as downvotes
+                FROM reply_votes WHERE reply_id IN ({ph})
+                GROUP BY reply_id
+            """, chunk).fetchall()
+            for row in rows:
+                rid = int(row["reply_id"])
+                result[rid]["upvotes"] = int(row["upvotes"])
+                result[rid]["downvotes"] = int(row["downvotes"])
+
+            # 2. User's votes on these replies
+            rows = self.conn.execute(f"""
+                SELECT reply_id, value FROM reply_votes
+                WHERE reply_id IN ({ph}) AND user_id = ?
+            """, chunk + [uid]).fetchall()
+            for row in rows:
+                result[int(row["reply_id"])]["user_vote"] = int(row["value"])
+
+            # 3. Reaction counts per reply grouped by type
+            rows = self.conn.execute(f"""
+                SELECT reply_id, reaction_type, COUNT(*) as count
+                FROM reply_reactions WHERE reply_id IN ({ph})
+                GROUP BY reply_id, reaction_type
+            """, chunk).fetchall()
+            for row in rows:
+                rid = int(row["reply_id"])
+                result[rid]["reactions"].append({
+                    "type": row["reaction_type"],
+                    "count": int(row["count"]),
+                })
+
+            # 4. User's reactions on these replies
+            rows = self.conn.execute(f"""
+                SELECT reply_id, reaction_type FROM reply_reactions
+                WHERE reply_id IN ({ph}) AND user_id = ?
+            """, chunk + [uid]).fetchall()
+            for row in rows:
+                result[int(row["reply_id"])]["user_reactions"].append(row["reaction_type"])
+
+        return result

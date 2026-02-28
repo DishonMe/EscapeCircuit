@@ -55,8 +55,8 @@ class TestUserServiceRegister:
         self.mock_xp.calculate_level.return_value = 1
         self.mock_xp.is_experienced.return_value = False
 
-        # Mock auth login for auto-login
-        self.mock_auth.login.return_value = "auto_login_token"
+        # Mock auth login for auto-login (returns (token, user) tuple)
+        self.mock_auth.login.return_value = ("auto_login_token", mock_user)
 
         # Patch User constructor to avoid id=0 validation error
         with patch('Backend.ServiceLayer.UserService.User', return_value=mock_user):
@@ -111,14 +111,14 @@ class TestUserServiceLogin:
 
     def test_login_success(self):
         payload = {"username": "testuser", "password": "secure123"}
-        self.mock_auth.login.return_value = "session_token_xyz"
-        
+
         user_mock = Mock(spec=User)
         user_mock.xp = 100
         # to_dict must return a REAL dictionary so we can assign to it
         user_mock.to_dict.return_value = {"username": "testuser", "xp": 100}
-        
-        self.mock_user_repo.get_by_username.return_value = user_mock
+
+        # auth.login now returns (token, user) tuple
+        self.mock_auth.login.return_value = ("session_token_xyz", user_mock)
         self.mock_xp.calculate_level.return_value = 2
         self.mock_xp.is_experienced.return_value = False
 
@@ -218,23 +218,29 @@ class TestUserServiceListUsers:
             User(id=2, username="user2", xp=200),
         ]
         self.mock_user_repo.list_all.return_value = users
+        self.mock_user_repo.count_all.return_value = 2
         self.mock_xp.calculate_level.side_effect = [2, 3]
         self.mock_xp.is_experienced.side_effect = [False, False]
 
         result = self.service.list_users("valid_token")
 
-        assert len(result) == 2
-        assert result[0]["username"] == "user1"
-        assert result[1]["username"] == "user2"
+        assert len(result["data"]) == 2
+        assert result["data"][0]["username"] == "user1"
+        assert result["data"][1]["username"] == "user2"
+        assert result["total"] == 2
         self.mock_user_repo.list_all.assert_called_once()
 
     def test_list_users_with_pagination(self):
         self.mock_auth.require_user_id.return_value = 1
         self.mock_user_repo.list_all.return_value = []
+        self.mock_user_repo.count_all.return_value = 0
 
-        self.service.list_users("valid_token", limit=50, offset=100)
+        result = self.service.list_users("valid_token", limit=50, offset=100)
 
         self.mock_user_repo.list_all.assert_called_once()
+        assert result["total"] == 0
+        assert result["limit"] == 50
+        assert result["offset"] == 100
 
     def test_list_users_unauthorized(self):
         self.mock_auth.require_user_id.side_effect = ValidationError("unauthorized")

@@ -27,10 +27,14 @@ export const getUser = async (): Promise<User> => {
 const userQueryKey = ['user'];
 
 export const getUserQueryOptions = () => {
+  const hasToken = typeof window !== 'undefined'
+    ? !!Cookies.get(AUTH_TOKEN_COOKIE_NAME)
+    : false;
   return queryOptions({
     queryKey: userQueryKey,
     queryFn: getUser,
     retry: false,
+    enabled: hasToken,
   });
 };
 
@@ -47,8 +51,6 @@ export const useLogin = ({
   return useMutation({
     mutationFn: loginWithEmailAndPassword,
     onSuccess: (data) => {
-      // Clear stale queries from any previous session before setting new user
-      queryClient.removeQueries();
       queryClient.setQueryData(userQueryKey, data.user);
       Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
       onSuccess?.();

@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from Backend.DomainLayer.Discussion import Discussion
 from Backend.DomainLayer.Utils import utcnow
@@ -63,19 +63,33 @@ class DiscussionRepo:
         ).fetchone()
         return self._row_to_discussion(row) if row else None
 
-    def list_all(
-        self,
-        limit: int = 20,
-        offset: int = 0,
+    def get_by_ids(self, discussion_ids: List[int]) -> Dict[int, Discussion]:
+        """Fetch multiple discussions by ID in one query. Returns {id: Discussion} dict."""
+        if not discussion_ids:
+            return {}
+        unique_ids = list(set(int(did) for did in discussion_ids))
+        result: Dict[int, Discussion] = {}
+        for i in range(0, len(unique_ids), 900):
+            chunk = unique_ids[i:i + 900]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = self.conn.execute(
+                f"SELECT * FROM discussions WHERE id IN ({placeholders})", chunk
+            ).fetchall()
+            for row in rows:
+                disc = self._row_to_discussion(row)
+                result[disc.id] = disc
+        return result
+
+    @staticmethod
+    def _build_where(
         category: Optional[str] = None,
         puzzle_id: Optional[int] = None,
         author_id: Optional[int] = None,
-        sort_by: str = "newest",
         search: Optional[str] = None,
-    ) -> List[Discussion]:
-        where_clauses = []
+    ) -> tuple:
+        """Build WHERE clause and params shared by list_all() and count()."""
+        where_clauses: list = []
         params: list = []
-
         if category:
             where_clauses.append("category = ?")
             params.append(category)
@@ -86,13 +100,24 @@ class DiscussionRepo:
             where_clauses.append("author_id = ?")
             params.append(int(author_id))
         if search:
-            # Escape SQL wildcard characters in the user's search term
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             where_clauses.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
             pattern = f"%{escaped}%"
             params.extend([pattern, pattern])
-
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        return where_sql, params
+
+    def list_all(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        category: Optional[str] = None,
+        puzzle_id: Optional[int] = None,
+        author_id: Optional[int] = None,
+        sort_by: str = "newest",
+        search: Optional[str] = None,
+    ) -> List[Discussion]:
+        where_sql, params = self._build_where(category=category, puzzle_id=puzzle_id, author_id=author_id, search=search)
 
         order_map = {
             "newest": "created_at DESC",
@@ -103,7 +128,6 @@ class DiscussionRepo:
         }
         order_clause = order_map.get(sort_by, "created_at DESC")
 
-        # Pinned first, then by sort order
         query = f"""
             SELECT * FROM discussions {where_sql}
             ORDER BY is_pinned DESC, {order_clause}
@@ -120,26 +144,7 @@ class DiscussionRepo:
         author_id: Optional[int] = None,
         search: Optional[str] = None,
     ) -> int:
-        where_clauses = []
-        params: list = []
-
-        if category:
-            where_clauses.append("category = ?")
-            params.append(category)
-        if puzzle_id is not None:
-            where_clauses.append("puzzle_id = ?")
-            params.append(int(puzzle_id))
-        if author_id is not None:
-            where_clauses.append("author_id = ?")
-            params.append(int(author_id))
-        if search:
-            # Escape SQL wildcard characters in the user's search term
-            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            where_clauses.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
-            pattern = f"%{escaped}%"
-            params.extend([pattern, pattern])
-
-        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        where_sql, params = self._build_where(category=category, puzzle_id=puzzle_id, author_id=author_id, search=search)
         row = self.conn.execute(
             f"SELECT COUNT(*) FROM discussions {where_sql}", params
         ).fetchone()
@@ -194,16 +199,25 @@ class DiscussionRepo:
         if commit:
             self.conn.commit()
 
-    def sync_upvotes_from_votes(self, discussion_id: int, commit: bool = True) -> None:
-        """Atomically update cached upvotes from the authoritative discussion_votes table."""
-        self.conn.execute("""
-            UPDATE discussions SET upvotes = (
-                SELECT COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0)
-                FROM discussion_votes WHERE discussion_id = ?
-            ) WHERE id = ?
-        """, (int(discussion_id), int(discussion_id)))
+    def sync_upvotes_from_votes(self, discussion_id: int, commit: bool = True) -> Dict[str, int]:
+        """Compute authoritative vote counts, update cache, and return counts.
+        Eliminates the need for a separate count_discussion_votes() call."""
+        did = int(discussion_id)
+        row = self.conn.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0) as upvotes,
+                COALESCE(SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END), 0) as downvotes
+            FROM discussion_votes WHERE discussion_id = ?
+        """, (did,)).fetchone()
+        upvotes = int(row["upvotes"])
+        downvotes = int(row["downvotes"])
+        self.conn.execute(
+            "UPDATE discussions SET upvotes = ? WHERE id = ?",
+            (upvotes, did),
+        )
         if commit:
             self.conn.commit()
+        return {"upvotes": upvotes, "downvotes": downvotes}
 
     def set_accepted_reply(self, discussion_id: int, reply_id: Optional[int]) -> None:
         self.conn.execute(

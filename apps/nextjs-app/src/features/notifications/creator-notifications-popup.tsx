@@ -14,9 +14,14 @@ const SHOWN_NOTIFICATIONS_KEY = 'escapecircuit_shown_notifications';
  * For multiple notifications with no auto-close, shows a "Close All" button.
  * Marks all as read after displaying.
  */
+const CREATOR_ROLES = ['creator', 'admin', 'pending_creator'];
+
 const CreatorNotificationsPopup = () => {
   const user = useUser();
-  const { data: notifications, status } = useCreatorNotifications();
+  const isCreatorOrAdmin = !!user.data && CREATOR_ROLES.includes(user.data.role);
+  const { data: notifications, status } = useCreatorNotifications({
+    queryConfig: { enabled: isCreatorOrAdmin },
+  });
   const markRead = useMarkNotificationsRead();
   const { addNotification } = useNotifications();
   const shownRef = useRef(false);
