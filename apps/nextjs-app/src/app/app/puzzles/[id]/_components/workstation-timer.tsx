@@ -55,9 +55,9 @@ export const WorkstationTimer = ({
   if (!label) return null;
 
   return (
-    <div className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors duration-300 ${colorClass}`}>
-      <span className="opacity-50 mr-1">Time:</span>
-      <span className="font-semibold tabular-nums">{label}</span>
+    <div className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium backdrop-blur-sm transition-colors duration-300 ${colorClass}`}>
+      <span className="opacity-60 mr-1">Time:</span>
+      <span className="font-semibold tabular-nums tracking-tight">{label}</span>
     </div>
   );
 };

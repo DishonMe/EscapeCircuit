@@ -771,16 +771,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const visibleBasics = basicComponents;
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm">
+          <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                 {puzzle.title}
               </h1>
               {isSolved && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
                   <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   Solved
                 </span>
@@ -794,19 +794,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <WorkstationTimer
               timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds}
             />
-            <Button variant="outline" onClick={() => setShowDebugger(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
               Debug
             </Button>
-            <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
-            <Button onClick={checkSolution} isLoading={isChecking}>
+            <Button size="sm" onClick={checkSolution} isLoading={isChecking}>
               Check Solution
             </Button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card p-3 text-[13px] text-foreground">
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
           <div>
             <span className="text-muted-foreground">Budget:</span> {budgetLimit}
           </div>
@@ -851,7 +851,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </div>
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
+      <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
         <WorkstationMenu
           basic={visibleBasics}
           special={specialComponents}
@@ -884,8 +884,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         />
 
         <div className="flex flex-col gap-3">
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="mb-1.5 text-[13px] font-medium text-foreground">
+          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
               Debugger
             </div>
             <div className="text-[11px] text-muted-foreground">
@@ -936,8 +936,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="mb-1.5 text-[13px] font-medium text-foreground">
+          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
               Session
             </div>
             <div className="text-[11px] text-muted-foreground">

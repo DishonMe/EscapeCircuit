@@ -128,8 +128,8 @@ export const Breadboard = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded-lg border border-border bg-card p-3">
-        <div className="mb-1 text-[13px] font-medium text-foreground">Breadboard</div>
+      <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+        <div className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">Breadboard</div>
         <div className="text-[11px] text-muted-foreground">
           Pins in the same row are inherently connected. Click two pins to add a
           wire.
@@ -138,7 +138,7 @@ export const Breadboard = ({
 
       <div
         ref={boardRef}
-        className="relative overflow-auto rounded-lg border border-border bg-card p-3"
+        className="relative overflow-auto rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm"
         style={{
           maxHeight: 'calc(100vh - 18rem)',
         }}
@@ -269,7 +269,7 @@ export const Breadboard = ({
           ))}
         </div>
 
-        <div className="mt-3 rounded-lg border border-border bg-secondary/50 p-2.5 text-xs text-muted-foreground">
+        <div className="mt-3 rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Wire instructions</div>
           <div className="mt-1">
             Click one pin (it becomes selected), then click another pin to
@@ -278,8 +278,8 @@ export const Breadboard = ({
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-3">
-        <div className="mb-2 text-[13px] font-medium text-foreground">
+      <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+        <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
           Connections
         </div>
         {wires.length === 0 ? (
@@ -289,7 +289,7 @@ export const Breadboard = ({
             {wires.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/30 px-2.5 py-1.5"
               >
                 <div className="truncate text-xs text-foreground">
                   {w.from.componentId} ({w.from.portId}) → {w.to.componentId} (

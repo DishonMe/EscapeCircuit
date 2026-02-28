@@ -122,8 +122,8 @@ const Category = ({
   children: React.ReactNode;
 }) => {
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
-      <div className="mb-2 text-[13px] font-medium text-foreground">{title}</div>
+    <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+      <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
       {children}
     </div>
   );
@@ -147,10 +147,10 @@ const DraggableItem = ({
   return (
     <div
       className={cn(
-        'group flex w-full items-center gap-2 rounded border px-2 py-2 text-left text-[13px] text-foreground',
+        'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-colors',
         isSelected
-          ? 'border-foreground/20 bg-foreground/5'
-          : 'border-border bg-secondary/50 hover:bg-secondary',
+          ? 'border-foreground/20 bg-foreground/5 shadow-subtle'
+          : 'border-border/60 bg-secondary/30 hover:bg-secondary/60',
       )}
     >
       <button
@@ -333,9 +333,9 @@ export const WorkstationMenu = ({
             <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
           </DialogHeader>
           {viewingTruthTableData ? (
-            <div className="overflow-hidden rounded border border-border">
+            <div className="overflow-hidden rounded-lg border border-border/60">
               <table className="w-full text-[13px] text-foreground">
-                <thead className="bg-secondary text-[11px] font-medium uppercase text-muted-foreground">
+                <thead className="bg-secondary/50 text-[11px] font-medium uppercase text-muted-foreground">
                   <tr>
                     {viewingTruthTableData.inputs.map((i: string) => (
                       <th key={i} className="px-3 py-2 text-center">

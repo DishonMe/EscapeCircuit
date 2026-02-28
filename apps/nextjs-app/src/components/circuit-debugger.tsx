@@ -301,7 +301,7 @@ export function CircuitDebugger({
 
           {/* Input Section */}
           <div>
-            <h3 className="text-[13px] font-medium text-foreground mb-3">
+            <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-3">
               {mode === 'single' ? 'Puzzle Inputs' : 'Input Sequences'}
             </h3>
             {mode === 'single' ? (
@@ -360,14 +360,14 @@ export function CircuitDebugger({
 
           {/* Results Section */}
           {hasRun && (
-            <div className="space-y-4 border-t border-border pt-4">
+            <div className="space-y-4 border-t border-border/60 pt-4">
               {mode === 'single' && gateOutputs.length > 0 && (
                 <>
                   {/* Gate Outputs */}
                   {gateOutputs[0].length > 0 && (
                     <div>
-                      <h3 className="text-[13px] font-medium text-foreground mb-2">Gate Outputs</h3>
-                      <div className="space-y-1.5 bg-secondary/50 p-3 rounded-lg border border-border">
+                      <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h3>
+                      <div className="space-y-1.5 bg-secondary/30 p-3 rounded-lg border border-border/60">
                         {gateOutputs[0].map((gate) => (
                           <div
                             key={gate.placedId}
@@ -383,8 +383,8 @@ export function CircuitDebugger({
 
                   {/* Puzzle Outputs */}
                   <div>
-                    <h3 className="text-[13px] font-medium text-foreground mb-2">Puzzle Outputs</h3>
-                    <div className="space-y-1.5 bg-secondary p-3 rounded-lg border border-border">
+                    <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h3>
+                    <div className="space-y-1.5 bg-secondary/30 p-3 rounded-lg border border-border/60">
                       {outputs.map((outputName) => (
                         <div
                           key={outputName}
@@ -403,12 +403,12 @@ export function CircuitDebugger({
 
               {mode === 'sequence' && gateOutputs.length > 0 && (
                 <div className="overflow-x-auto">
-                  <h3 className="text-[13px] font-medium text-foreground mb-2">Simulation Results ({stepCount} steps)</h3>
+                  <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Simulation Results ({stepCount} steps)</h3>
 
                   {/* Puzzle Outputs Table */}
                   <div className="mb-4">
-                    <h4 className="text-[13px] font-medium text-foreground mb-2">Puzzle Outputs</h4>
-                    <table className="border-collapse border border-border w-full text-[13px]">
+                    <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h4>
+                    <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
                       <thead>
                         <tr className="bg-secondary">
                           <th className="border border-border px-3 py-2 text-left text-muted-foreground">Step</th>
@@ -437,8 +437,8 @@ export function CircuitDebugger({
                   {/* Gate Outputs Table */}
                   {gateOutputs.some((step) => step.length > 0) && (
                     <div>
-                      <h4 className="text-[13px] font-medium text-foreground mb-2">Gate Outputs</h4>
-                      <table className="border-collapse border border-border w-full text-[13px]">
+                      <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h4>
+                      <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
                         <thead>
                           <tr className="bg-secondary">
                             <th className="border border-border px-3 py-2 text-left text-muted-foreground">Step</th>
