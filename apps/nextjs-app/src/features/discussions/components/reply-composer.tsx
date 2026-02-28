@@ -49,7 +49,7 @@ export const ReplyComposer = ({
         onChange={(e) => setBody(e.target.value)}
         placeholder={placeholder}
         rows={3}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-full rounded-lg border border-border px-3 py-2 text-[13px] focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
       />
       <div className="flex items-center gap-2">
         <Button

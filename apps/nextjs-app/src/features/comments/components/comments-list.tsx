@@ -39,7 +39,7 @@ export const CommentsList = ({ discussionId }: CommentsListProps) => {
       <div
         role="list"
         aria-label="comments"
-        className="flex h-40 flex-col items-center justify-center bg-white text-gray-500"
+        className="flex h-40 flex-col items-center justify-center bg-card text-muted-foreground"
       >
         <ArchiveX className="size-10" />
         <h4>No Comments Found</h4>
@@ -53,7 +53,7 @@ export const CommentsList = ({ discussionId }: CommentsListProps) => {
           <li
             aria-label={`comment-${comment.body}-${index}`}
             key={comment.id || index}
-            className="w-full bg-white p-4 shadow-sm"
+            className="w-full bg-card p-4 rounded-xl border border-border"
           >
             <div className="flex justify-between">
               <div>
@@ -61,7 +61,7 @@ export const CommentsList = ({ discussionId }: CommentsListProps) => {
                   {formatDate(comment.createdAt)}
                 </span>
                 {comment.author && (
-                  <span className="text-xs font-bold">
+                  <span className="text-xs font-semibold">
                     {' '}
                     by {comment.author.username}
                   </span>

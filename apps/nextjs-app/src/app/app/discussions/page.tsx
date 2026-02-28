@@ -15,7 +15,7 @@ const DiscussionsPage = () => {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Discussions</h1>
+        <h1 className="text-xl font-semibold text-foreground">Discussions</h1>
         {canCreateDiscussion(user.data) && (
           <NextLink href={paths.app.newDiscussion.getHref()}>
             <Button size="sm" icon={<Plus className="size-4" />}>

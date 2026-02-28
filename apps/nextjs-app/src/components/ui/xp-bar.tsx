@@ -30,16 +30,16 @@ export const XPBar = ({ currentXP }: { currentXP: number }) => {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="whitespace-nowrap text-xs font-semibold text-gray-700">
+      <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground">
         Lvl {level}
       </span>
-      <div className="relative h-2 w-24 overflow-hidden rounded-full bg-gray-200 sm:w-32">
+      <div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-secondary sm:w-28">
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-blue-600 transition-all duration-500"
+          className="absolute inset-y-0 left-0 rounded-full bg-foreground/70 transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="hidden whitespace-nowrap text-xs text-gray-500 sm:inline">
+      <span className="hidden whitespace-nowrap text-[11px] text-muted-foreground sm:inline">
         {currentXP}/{nextThreshold} XP
       </span>
     </div>

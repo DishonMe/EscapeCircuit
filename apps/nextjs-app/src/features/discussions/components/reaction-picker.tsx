@@ -41,10 +41,10 @@ export const ReactionPicker = ({
           <button
             key={r.type}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors',
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
               isActive
-                ? 'border-blue-300 bg-blue-50 text-blue-700'
-                : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300',
+                ? 'border-blue-200/60 bg-blue-50/50 text-blue-700'
+                : 'border-border bg-secondary/50 text-muted-foreground hover:border-border',
             )}
             onClick={() => onReact(r.type)}
             disabled={isLoading}
@@ -59,7 +59,7 @@ export const ReactionPicker = ({
       {/* Add reaction button */}
       <div className="relative">
         <button
-          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           onClick={() => setShowPicker(!showPicker)}
           title="Add reaction"
         >
@@ -72,14 +72,14 @@ export const ReactionPicker = ({
               className="fixed inset-0 z-10"
               onClick={() => setShowPicker(false)}
             />
-            <div className="absolute bottom-full left-0 z-20 mb-1 flex gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg">
+            <div className="absolute bottom-full left-0 z-20 mb-1 flex gap-1 rounded-xl border border-border bg-card p-1.5 shadow-elevated">
               {Object.entries(REACTION_EMOJIS).map(([type, config]) => (
                 <button
                   key={type}
                   className={cn(
-                    'rounded p-1.5 text-lg transition-colors hover:bg-gray-100',
+                    'rounded-lg p-1.5 text-lg transition-colors hover:bg-secondary',
                     userReactions.includes(type as ReactionType) &&
-                      'bg-blue-50',
+                      'bg-blue-50/50',
                   )}
                   onClick={() => {
                     onReact(type);

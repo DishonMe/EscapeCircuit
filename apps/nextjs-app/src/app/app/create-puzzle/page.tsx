@@ -165,7 +165,7 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
   }, [latex]);
   
   return (
-    <div className="w-full border p-4 rounded bg-gray-50 min-h-96 overflow-y-auto text-sm">
+    <div className="w-full rounded-xl border border-border bg-secondary/50 p-4 min-h-96 overflow-y-auto text-[13px]">
       <style>{`
         .prose .katex {
           vertical-align: baseline !important;
@@ -198,11 +198,11 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
       `}</style>
       {renderedHtml ? (
         <div
-          className="prose prose-sm max-w-none dark:prose-invert text-black [&_*]:text-black"
+          className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
       ) : (
-        <p className="text-gray-400">No instructions yet</p>
+        <p className="text-muted-foreground">No instructions yet</p>
       )}
     </div>
   );
@@ -871,7 +871,7 @@ export default function CreatePuzzleForm() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Create New Puzzle</h1>
+      <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
 
       {/* Tabs */}
       <div className="flex border-b mb-6">
@@ -880,10 +880,10 @@ export default function CreatePuzzleForm() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 font-semibold transition-colors ${
+              className={`px-6 py-2 text-[13px] font-semibold transition-colors ${
                 activeTab === tab
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "border-b-2 border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {tab === "basic"
@@ -903,24 +903,24 @@ export default function CreatePuzzleForm() {
         {activeTab === "basic" && (
           <div className="space-y-6">
             <div>
-              <label className="block font-semibold mb-2">Puzzle Name *</label>
+              <label className="block text-[13px] font-medium text-foreground mb-2">Puzzle Name *</label>
               <input
                 type="text"
                 value={data.basic.name}
                 onChange={(e) => handleBasicChange("name", e.target.value)}
-                className="w-full border p-3 rounded"
+                className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="e.g., Binary Adder"
               />
             </div>
 
             <div>
-              <label className="block font-semibold mb-2">Description *</label>
+              <label className="block text-[13px] font-medium text-foreground mb-2">Description *</label>
               <textarea
                 value={data.basic.description}
                 onChange={(e) =>
                   handleBasicChange("description", e.target.value)
                 }
-                className="w-full border p-3 rounded"
+                className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={3}
                 placeholder="Brief description of the puzzle"
               />
@@ -928,20 +928,20 @@ export default function CreatePuzzleForm() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-semibold mb-2">Budget *</label>
+                <label className="block text-[13px] font-medium text-foreground mb-2">Budget *</label>
                 <input
                   type="number"
                   value={data.basic.budget}
                   onChange={(e) =>
                     handleBasicChange("budget", parseInt(e.target.value))
                   }
-                  className="w-full border p-3 rounded"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder="e.g., 20"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold mb-2">Difficulty *</label>
+                <label className="block text-[13px] font-medium text-foreground mb-2">Difficulty *</label>
                 <select
                   value={data.basic.difficulty}
                   onChange={(e) =>
@@ -950,7 +950,7 @@ export default function CreatePuzzleForm() {
                       e.target.value as "EASY" | "MEDIUM" | "HARD"
                     )
                   }
-                  className="w-full border p-3 rounded bg-white"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="EASY">Easy</option>
                   <option value="MEDIUM">Medium</option>
@@ -960,7 +960,7 @@ export default function CreatePuzzleForm() {
             </div>
 
             <div>
-              <label className="block font-semibold mb-2">
+              <label className="block text-[13px] font-medium text-foreground mb-2">
                 Time Limit (seconds, optional)
               </label>
               <input
@@ -969,14 +969,14 @@ export default function CreatePuzzleForm() {
                 onChange={(e) =>
                   handleBasicChange("timeLimit", e.target.value ? parseInt(e.target.value) : null)
                 }
-                className="w-full border p-3 rounded"
+                className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="Leave empty for no limit"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block font-semibold mb-2">
+                <label className="block text-[13px] font-medium text-foreground mb-2">
                   Min Cycles (optional)
                 </label>
                 <input
@@ -985,12 +985,12 @@ export default function CreatePuzzleForm() {
                   onChange={(e) =>
                     handleBasicChange("minCycles", e.target.value ? parseInt(e.target.value) : null)
                   }
-                  className="w-full border p-3 rounded"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder="For sequential circuits"
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-2">
+                <label className="block text-[13px] font-medium text-foreground mb-2">
                   Max Cycles (optional)
                 </label>
                 <input
@@ -999,12 +999,12 @@ export default function CreatePuzzleForm() {
                   onChange={(e) =>
                     handleBasicChange("maxCycles", e.target.value ? parseInt(e.target.value) : null)
                   }
-                  className="w-full border p-3 rounded"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder="For sequential circuits"
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-2">
+                <label className="block text-[13px] font-medium text-foreground mb-2">
                   Gate Limit (optional)
                 </label>
                 <input
@@ -1016,14 +1016,14 @@ export default function CreatePuzzleForm() {
                     // Only accept values > 0, treat 0 or negative as null
                     handleBasicChange("totalGateCount", val && val > 0 ? val : null);
                   }}
-                  className="w-full border p-3 rounded"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder="Max gates allowed"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block font-semibold mb-2">Gate Set *</label>
+              <label className="block text-[13px] font-medium text-foreground mb-2">Gate Set *</label>
               <div className="flex flex-wrap gap-2">
                 {availableGates.map((gate) => (
                   <button
@@ -1034,10 +1034,10 @@ export default function CreatePuzzleForm() {
                         : [...data.basic.gateSet, gate];
                       handleBasicChange("gateSet", gateSet);
                     }}
-                    className={`px-4 py-2 rounded border transition-colors ${
+                    className={`px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors ${
                       data.basic.gateSet.includes(gate)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white border-gray-300 hover:border-blue-600"
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-card border-border text-foreground hover:bg-secondary"
                     }`}
                   >
                     {gate}
@@ -1048,13 +1048,13 @@ export default function CreatePuzzleForm() {
 
             {data.basic.gateSet.length > 0 && (
               <div>
-                <label className="block font-semibold mb-2">
+                <label className="block text-[13px] font-medium text-foreground mb-2">
                   Per-Gate Limits (optional)
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {data.basic.gateSet.map((gate) => (
-                    <div key={gate} className="border p-2 rounded bg-gray-50">
-                      <label className="text-xs font-semibold text-gray-700">{gate}</label>
+                    <div key={gate} className="border p-2 rounded-lg bg-secondary/50">
+                      <label className="text-[11px] font-semibold text-foreground">{gate}</label>
                       <input
                         type="number"
                         min="1"
@@ -1068,7 +1068,7 @@ export default function CreatePuzzleForm() {
                           }
                           handleBasicChange("gateQuotas", newQuotas);
                         }}
-                        className="w-full border p-1 rounded text-sm mt-1"
+                        className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
                         placeholder="Max count"
                       />
                     </div>
@@ -1079,7 +1079,7 @@ export default function CreatePuzzleForm() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-semibold mb-2">Inputs *</label>
+                <label className="block text-[13px] font-medium text-foreground mb-2">Inputs *</label>
                 <div className="space-y-2">
                   {data.basic.inputs.map((input, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -1091,7 +1091,7 @@ export default function CreatePuzzleForm() {
                           newInputs[idx] = e.target.value;
                           handleBasicChange("inputs", newInputs);
                         }}
-                        className="flex-1 border p-2 rounded"
+                        className="flex-1 rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                         placeholder={`Input ${idx + 1}`}
                       />
                       <button
@@ -1101,7 +1101,7 @@ export default function CreatePuzzleForm() {
                             data.basic.inputs.filter((_, i) => i !== idx)
                           );
                         }}
-                        className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                        className="px-3 py-2 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
                       >
                         Remove
                       </button>
@@ -1114,7 +1114,7 @@ export default function CreatePuzzleForm() {
                         `input_${data.basic.inputs.length}`,
                       ])
                     }
-                    className="w-full px-4 py-2 bg-green-100 text-green-600 rounded hover:bg-green-200"
+                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 hover:bg-emerald-100 transition-colors"
                   >
                     + Add Input
                   </button>
@@ -1122,7 +1122,7 @@ export default function CreatePuzzleForm() {
               </div>
 
               <div>
-                <label className="block font-semibold mb-2">Outputs *</label>
+                <label className="block text-[13px] font-medium text-foreground mb-2">Outputs *</label>
                 <div className="space-y-2">
                   {data.basic.outputs.map((output, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -1134,7 +1134,7 @@ export default function CreatePuzzleForm() {
                           newOutputs[idx] = e.target.value;
                           handleBasicChange("outputs", newOutputs);
                         }}
-                        className="flex-1 border p-2 rounded"
+                        className="flex-1 rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                         placeholder={`Output ${idx + 1}`}
                       />
                       <button
@@ -1144,7 +1144,7 @@ export default function CreatePuzzleForm() {
                             data.basic.outputs.filter((_, i) => i !== idx)
                           );
                         }}
-                        className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                        className="px-3 py-2 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
                       >
                         Remove
                       </button>
@@ -1157,7 +1157,7 @@ export default function CreatePuzzleForm() {
                         `output_${data.basic.outputs.length}`,
                       ])
                     }
-                    className="w-full px-4 py-2 bg-green-100 text-green-600 rounded hover:bg-green-200"
+                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 hover:bg-emerald-100 transition-colors"
                   >
                     + Add Output
                   </button>
@@ -1169,11 +1169,11 @@ export default function CreatePuzzleForm() {
 
         {activeTab === "test-cases" && (
           <div className="space-y-6">
-            <div className="border p-4 rounded bg-gray-50">
+            <div className="rounded-xl border border-border bg-secondary/50 p-4">
               <h3 className="font-semibold mb-4">Add Test Case</h3>
 
               <div className="mb-4">
-                <label className="block font-semibold mb-2">Test Case Type</label>
+                <label className="block text-[13px] font-medium text-foreground mb-2">Test Case Type</label>
                 <select
                   value={testCaseForm.kind || 'blackbox'}
                   onChange={(e) =>
@@ -1186,12 +1186,12 @@ export default function CreatePuzzleForm() {
                       expectedOutputStream: {},
                     }))
                   }
-                  className="w-full border p-2 rounded bg-white"
+                  className="w-full rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="blackbox">Blackbox (Combinatorial)</option>
                   <option value="stream">Stream (Sequential)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-[11px] text-muted-foreground mt-1">
                   {testCaseForm.kind === 'stream'
                     ? 'Sequential test with input/output values at each time step'
                     : 'Single combinatorial test case with fixed inputs and outputs'}
@@ -1202,7 +1202,7 @@ export default function CreatePuzzleForm() {
                 <>
                   {data.basic.inputs.length > 0 && (
                     <div>
-                      <label className="block font-semibold mb-2">Inputs</label>
+                      <label className="block text-[13px] font-medium text-foreground mb-2">Inputs</label>
                       <div className="space-y-2 mb-4">
                         {data.basic.inputs.map((inputName) => (
                           <div key={inputName} className="flex items-center gap-2">
@@ -1218,7 +1218,7 @@ export default function CreatePuzzleForm() {
                                   },
                                 }))
                               }
-                              className="border p-2 rounded bg-white"
+                              className="rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                             >
                               <option value={0}>0</option>
                               <option value={1}>1</option>
@@ -1231,7 +1231,7 @@ export default function CreatePuzzleForm() {
 
                   {data.basic.outputs.length > 0 && (
                     <div>
-                      <label className="block font-semibold mb-2">
+                      <label className="block text-[13px] font-medium text-foreground mb-2">
                         Expected Outputs
                       </label>
                       <div className="space-y-2 mb-4">
@@ -1249,7 +1249,7 @@ export default function CreatePuzzleForm() {
                                   },
                                 }))
                               }
-                              className="border p-2 rounded bg-white"
+                              className="rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                             >
                               <option value={0}>0</option>
                               <option value={1}>1</option>
@@ -1264,18 +1264,18 @@ export default function CreatePuzzleForm() {
 
               {testCaseForm.kind === 'stream' && (
                 <>
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 mb-4">
+                  <div className="p-3 bg-amber-50/50 border border-border rounded-lg text-[13px] text-amber-700 mb-4">
                     <p className="font-semibold">Stream Test Case (Sequential)</p>
                     <p className="mt-1">Define input and output sequences for testing sequential circuits. Each step represents one clock cycle.</p>
                   </div>
 
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3">Input Streams</h4>
-                    <p className="text-xs text-gray-500 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <p className="text-[11px] text-muted-foreground mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
                     <div className="space-y-3">
                       {data.basic.inputs.map((inputName) => (
                         <div key={inputName}>
-                          <label className="block text-sm font-medium mb-1">{inputName}</label>
+                          <label className="block text-[13px] font-medium text-foreground mb-1">{inputName}</label>
                           <input
                             type="text"
                             placeholder="e.g. 01010 or 0,1,0,1,0"
@@ -1290,7 +1290,7 @@ export default function CreatePuzzleForm() {
                                 }));
                               }
                             }}
-                            className="w-full border p-2 rounded font-mono text-sm"
+                            className="w-full rounded-lg border border-border bg-transparent p-2 font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </div>
                       ))}
@@ -1299,11 +1299,11 @@ export default function CreatePuzzleForm() {
 
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3">Expected Output Streams</h4>
-                    <p className="text-xs text-gray-500 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <p className="text-[11px] text-muted-foreground mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
                     <div className="space-y-3">
                       {data.basic.outputs.map((outputName) => (
                         <div key={outputName}>
-                          <label className="block text-sm font-medium mb-1">{outputName}</label>
+                          <label className="block text-[13px] font-medium text-foreground mb-1">{outputName}</label>
                           <input
                             type="text"
                             placeholder="e.g. 01010 or 0,1,0,1,0"
@@ -1318,7 +1318,7 @@ export default function CreatePuzzleForm() {
                                 }));
                               }
                             }}
-                            className="w-full border p-2 rounded font-mono text-sm"
+                            className="w-full rounded-lg border border-border bg-transparent p-2 font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </div>
                       ))}
@@ -1329,7 +1329,7 @@ export default function CreatePuzzleForm() {
 
               <button
                 onClick={handleAddTestCase}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
               >
                 Add Test Case
               </button>
@@ -1341,9 +1341,9 @@ export default function CreatePuzzleForm() {
                   Test Cases ({data.testCases.length})
                 </h3>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="w-full border-collapse text-[13px]">
                     <thead>
-                      <tr className="bg-gray-100">
+                      <tr className="bg-secondary">
                         <th className="border p-2 text-left">Type</th>
                         <th className="border p-2 text-left">Inputs</th>
                         <th className="border p-2 text-left">Outputs</th>
@@ -1352,17 +1352,17 @@ export default function CreatePuzzleForm() {
                     </thead>
                     <tbody>
                       {data.testCases.map((tc) => (
-                        <tr key={tc.id} className="hover:bg-gray-50">
-                          <td className="border p-2 font-mono text-xs">
+                        <tr key={tc.id} className="hover:bg-secondary/50">
+                          <td className="border p-2 font-mono text-[11px]">
                             {tc.kind === 'stream' ? 'Stream' : 'Blackbox'}
                           </td>
-                          <td className="border p-2 font-mono text-xs">
+                          <td className="border p-2 font-mono text-[11px]">
                             {tc.kind === 'stream' 
                               ? `${tc.inputStream?.length || 0} cycles`
                               : JSON.stringify(tc.inputs)
                             }
                           </td>
-                          <td className="border p-2 font-mono text-xs">
+                          <td className="border p-2 font-mono text-[11px]">
                             {tc.kind === 'stream'
                               ? Object.entries(tc.expectedOutputStream || {}).map(([k, v]) => `${k}: [${(v as number[]).join(',')}]`).join('; ')
                               : JSON.stringify(tc.expectedOutputs)
@@ -1371,7 +1371,7 @@ export default function CreatePuzzleForm() {
                           <td className="border p-2 text-center">
                             <button
                               onClick={() => handleRemoveTestCase(tc.id)}
-                              className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200"
+                              className="px-3 py-1 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
                             >
                               Delete
                             </button>
@@ -1397,11 +1397,11 @@ export default function CreatePuzzleForm() {
                 onChange={(e) =>
                   setData((prev) => ({ ...prev, instructions: e.target.value }))
                 }
-                className="w-full border p-4 rounded font-mono text-sm"
+                className="w-full rounded-lg border border-border bg-transparent p-4 font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={15}
                 placeholder="\\section*{Puzzle Instructions}\n\nExplain the puzzle to users in LaTeX format with math expressions like $C_{out}$ for subscripts..."
               />
-              <div className="text-sm text-gray-600">
+              <div className="text-[13px] text-muted-foreground">
                 Use LaTeX syntax: {'\\section*'}, {'\\subsection*'}, {'\\textbf{}'}, {'\\textit{}'}, $...$ for math, {'\\begin{itemize}'} for lists, {'\\begin{tabular}'} for tables
               </div>
             </div>
@@ -1414,9 +1414,9 @@ export default function CreatePuzzleForm() {
 
         {activeTab === "solution" && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded">
-              <h3 className="font-semibold text-blue-900 mb-2">⚡ Design Your Solution Circuit</h3>
-              <div className="text-sm text-blue-900 mb-3 space-y-2">
+            <div className="bg-secondary/50 border border-border p-4 rounded-lg">
+              <h3 className="font-semibold text-foreground mb-2">⚡ Design Your Solution Circuit</h3>
+              <div className="text-[13px] text-foreground mb-3 space-y-2">
                 <p>
                   <strong>IMPORTANT:</strong> Your circuit must correctly implement the logic for ALL test cases:
                 </p>
@@ -1442,19 +1442,19 @@ export default function CreatePuzzleForm() {
               </div>
               <button
                 onClick={exportSolution}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"
+                className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
               >
                 📥 Export Solution (generates eval_map from circuit)
               </button>
             </div>
 
             {/* Workstation Grid (with menu on left) */}
-            <div className="grid grid-cols-[240px_1fr] gap-4 border rounded bg-white h-[700px]">
+            <div className="grid grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card h-[700px]">
               {/* Gate Palette Sidebar */}
-              <div className="border-r p-3 overflow-y-auto bg-gray-50">
-                <div className="text-sm font-semibold text-gray-900 mb-3">Available Gates</div>
+              <div className="border-r p-3 overflow-y-auto bg-secondary/50">
+                <div className="text-[13px] font-semibold text-foreground mb-3">Available Gates</div>
                 {data.basic.gateSet.length === 0 ? (
-                  <p className="text-xs text-gray-500">Select gates in "Basic Info" tab</p>
+                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab</p>
                 ) : (
                   <div className="space-y-2">
                     {data.basic.gateSet.map((gateName) => (
@@ -1467,7 +1467,7 @@ export default function CreatePuzzleForm() {
                           setDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setDraggedPaletteComponentId(null)}
-                        className="p-2 border border-gray-300 bg-white rounded cursor-move hover:bg-blue-50 font-medium text-sm text-gray-900 transition"
+                        className="p-2 border border-border bg-card rounded-lg cursor-move hover:bg-secondary/50 font-medium text-[13px] text-foreground transition"
                       >
                         {gateName}
                       </div>
@@ -1494,16 +1494,16 @@ export default function CreatePuzzleForm() {
 
             {/* Export Status */}
             {data.solutionJSON.trim() && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-sm text-green-900 font-semibold">✓ Solution exported and ready</p>
+              <div className="p-3 bg-emerald-50/50 border border-border rounded-lg">
+                <p className="text-[13px] text-emerald-700 font-semibold">✓ Solution exported and ready</p>
               </div>
             )}
 
             {/* Fallback: Manual JSON Input */}
-            <details className="border rounded p-4 bg-gray-50">
-              <summary className="cursor-pointer font-semibold text-gray-900">OR: Paste Pre-Built Solution JSON</summary>
+            <details className="rounded-xl border border-border bg-secondary/50 p-4">
+              <summary className="cursor-pointer font-semibold text-foreground">OR: Paste Pre-Built Solution JSON</summary>
               <div className="mt-4 space-y-3">
-                <p className="text-sm text-gray-700">
+                <p className="text-[13px] text-foreground">
                   If you have a solution from another source, paste its JSON here:
                 </p>
                 <textarea
@@ -1511,7 +1511,7 @@ export default function CreatePuzzleForm() {
                   onChange={(e) =>
                     setData((prev) => ({ ...prev, solutionJSON: e.target.value }))
                   }
-                  className="w-full border p-3 rounded font-mono text-xs h-32 bg-white"
+                  className="w-full rounded-lg border border-border bg-transparent p-3 font-mono text-[11px] h-32 focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder={`{\n  "placed": [\n    {"id": "g1", "componentId": "XOR", "origin": {"row": 0, "col": 0}, "rotation": 0}\n  ],\n  "wires": [],\n  "inputs": ["A", "B"],\n  "outputs": ["S"],\n  "used_gates": ["XOR"]\n}`}
                 />
               </div>
@@ -1524,14 +1524,14 @@ export default function CreatePuzzleForm() {
       <div className="flex gap-4 justify-end border-t pt-6">
         <button
           onClick={() => setShowConfirm("cancel")}
-          className="px-6 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+          className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
           disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           onClick={() => setShowConfirm("submit")}
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+          className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Creating..." : "Create Puzzle"}
@@ -1541,8 +1541,8 @@ export default function CreatePuzzleForm() {
       {/* Confirmation Dialogs */}
       {showConfirm === "submit" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded max-w-sm">
-            <h2 className="text-xl font-bold mb-4">Confirm Creation</h2>
+          <div className="bg-card p-6 rounded-xl shadow-card max-w-sm">
+            <h2 className="text-xl font-semibold mb-4">Confirm Creation</h2>
             <p className="mb-6">
               Are you sure you want to create this puzzle? Make sure all
               information is correct.
@@ -1550,13 +1550,13 @@ export default function CreatePuzzleForm() {
             <div className="flex gap-4">
               <button
                 onClick={() => setShowConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="flex-1 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
               >
                 Create
               </button>
@@ -1567,21 +1567,21 @@ export default function CreatePuzzleForm() {
 
       {showConfirm === "cancel" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded max-w-sm">
-            <h2 className="text-xl font-bold mb-4">Discard Changes?</h2>
+          <div className="bg-card p-6 rounded-xl shadow-card max-w-sm">
+            <h2 className="text-xl font-semibold mb-4">Discard Changes?</h2>
             <p className="mb-6">
               You will lose all unsaved changes if you go back.
             </p>
             <div className="flex gap-4">
               <button
                 onClick={() => setShowConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Keep Editing
               </button>
               <button
                 onClick={handleCancel}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors"
               >
                 Discard
               </button>

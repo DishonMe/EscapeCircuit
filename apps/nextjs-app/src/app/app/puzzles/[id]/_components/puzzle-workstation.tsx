@@ -555,13 +555,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [selectedComponent.mode]);
 
   if (puzzleQuery.isLoading) {
-    return <div className="text-sm text-gray-600">Loading…</div>;
+    return <div className="text-[13px] text-muted-foreground">Loading…</div>;
   }
 
   if (!puzzle) {
     return (
       <div className="flex w-full flex-col gap-3">
-        <div className="text-sm text-gray-600">Puzzle not found.</div>
+        <div className="text-[13px] text-muted-foreground">Puzzle not found.</div>
         <Button
           variant="outline"
           onClick={() => router.push(paths.app.puzzles.getHref())}
@@ -771,76 +771,76 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const visibleBasics = basicComponents;
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold text-gray-900">
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                 {puzzle.title}
               </h1>
               {isSolved && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-700">
-                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                  <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   Solved
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-600">
+            <div className="text-[13px] text-muted-foreground">
               by {puzzle.creator?.username ?? ''}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <WorkstationTimer 
-              timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds} 
+            <WorkstationTimer
+              timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds}
             />
-            <Button variant="outline" onClick={() => setShowDebugger(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
               Debug
             </Button>
-            <Button variant="outline" onClick={() => setShowPuzzleInfo(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
-            <Button onClick={checkSolution} isLoading={isChecking}>
+            <Button size="sm" onClick={checkSolution} isLoading={isChecking}>
               Check Solution
             </Button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-700">
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
           <div>
-            <span className="font-medium">Budget:</span> {budgetLimit}
+            <span className="text-muted-foreground">Budget:</span> {budgetLimit}
           </div>
           <div>
-            <span className="font-medium">Tight Budget:</span> {tightBudget}
+            <span className="text-muted-foreground">Tight:</span> {tightBudget}
           </div>
           <div>
-            <span className="font-medium">Current Cost:</span> {currentCost}
+            <span className="text-muted-foreground">Cost:</span> {currentCost}
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Inputs:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Inputs:</span>
               {inputs.map((i) => (
                 <span
                   key={i}
                   className={
                     ioUsage.usedInputs.has(i)
-                      ? 'rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs text-green-700'
-                      : 'rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600'
+                      ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                      : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
                   }
                 >
                   {i}
                 </span>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Outputs:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Outputs:</span>
               {outputs.map((o) => (
                 <span
                   key={o}
                   className={
                     ioUsage.usedOutputs.has(o)
-                      ? 'rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs text-green-700'
-                      : 'rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600'
+                      ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                      : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
                   }
                 >
                   {o}
@@ -851,7 +851,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </div>
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_320px]">
+      <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
         <WorkstationMenu
           basic={visibleBasics}
           special={specialComponents}
@@ -884,34 +884,34 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         />
 
         <div className="flex flex-col gap-3">
-          <div className="rounded-md border border-gray-300 bg-white p-3">
-            <div className="mb-2 text-sm font-medium text-gray-900">
+          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
               Debugger
             </div>
-            <div className="text-xs text-gray-600">
+            <div className="text-[11px] text-muted-foreground">
               This debugger shows wiring and IO usage. Backend validation runs
               creator test-cases.
             </div>
             <div className="mt-3">
-              <div className="mb-2 text-xs font-medium text-gray-700">
+              <div className="mb-2 text-[11px] font-medium text-muted-foreground">
                 Wires
               </div>
               {wires.length === 0 ? (
-                <div className="text-xs text-gray-500">No wires yet.</div>
+                <div className="text-[11px] text-muted-foreground/60">No wires yet.</div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {wires.map((w) => (
                     <li
                       key={w.id}
-                      className="group flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1"
+                      className="group flex items-center justify-between gap-2 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5"
                     >
-                      <span className="truncate text-xs text-gray-700">
+                      <span className="truncate text-[11px] text-foreground">
                         {w.from.componentId} ({w.from.portId}) →{' '}
                         {w.to.componentId} ({w.to.portId})
                       </span>
                       <button
                         type="button"
-                        className="hidden text-gray-400 hover:text-red-600 group-hover:block"
+                        className="hidden text-muted-foreground hover:text-destructive group-hover:block"
                         onClick={() =>
                           setWires((prev) => prev.filter((x) => x.id !== w.id))
                         }
@@ -919,7 +919,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       >
                         <svg
                           viewBox="0 0 24 24"
-                          className="size-4"
+                          className="size-3.5"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
@@ -936,11 +936,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </div>
           </div>
 
-          <div className="rounded-md border border-gray-300 bg-white p-3">
-            <div className="mb-2 text-sm font-medium text-gray-900">
+          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
               Session
             </div>
-            <div className="text-xs text-gray-600">
+            <div className="text-[11px] text-muted-foreground">
               Signed in as {user.data?.email ?? 'Unknown'}
             </div>
             <Button
@@ -962,17 +962,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               Puzzle description and creator comment.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 text-sm text-gray-700">
+          <div className="space-y-3 text-[13px] text-foreground">
             <div>
-              <div className="font-medium text-gray-900">Description</div>
-              <div className="mt-1 whitespace-pre-wrap">
+              <div className="font-medium text-foreground">Description</div>
+              <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
                 {puzzle.description}
               </div>
             </div>
             {puzzle.creatorComment ? (
               <div>
-                <div className="font-medium text-gray-900">Creator comment</div>
-                <div className="mt-1 whitespace-pre-wrap">
+                <div className="font-medium text-foreground">Creator comment</div>
+                <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
                   {puzzle.creatorComment}
                 </div>
               </div>
@@ -980,9 +980,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
             {/* Special instructions for Binary Adder puzzle */}
             {puzzle?.title?.toLowerCase().includes('binary adder') && (
-              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <div className="font-medium text-blue-900 mb-2">Binary Adder Instructions</div>
-                <div className="text-blue-800 text-sm space-y-2">
+              <div className="mt-4 rounded-lg border border-border bg-secondary/50 p-4">
+                <div className="font-medium text-foreground mb-2">Binary Adder Instructions</div>
+                <div className="text-foreground text-[13px] space-y-2">
                   <p>
                     Design a <strong>full adder</strong> circuit that adds three binary digits:
                     two input bits (A and B) and a carry-in bit (C_in).
@@ -991,25 +991,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   <div>
                     <div className="font-medium mb-1">Truth Table:</div>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs border border-blue-300">
+                      <table className="min-w-full text-xs border border-border">
                         <thead>
-                          <tr className="bg-blue-100">
-                            <th className="border border-blue-300 px-2 py-1">A</th>
-                            <th className="border border-blue-300 px-2 py-1">B</th>
-                            <th className="border border-blue-300 px-2 py-1">C_in</th>
-                            <th className="border border-blue-300 px-2 py-1">S</th>
-                            <th className="border border-blue-300 px-2 py-1">C_out</th>
+                          <tr className="bg-secondary">
+                            <th className="border border-border px-2 py-1">A</th>
+                            <th className="border border-border px-2 py-1">B</th>
+                            <th className="border border-border px-2 py-1">C_in</th>
+                            <th className="border border-border px-2 py-1">S</th>
+                            <th className="border border-border px-2 py-1">C_out</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">0</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td><td className="border border-blue-300 px-2 py-1 text-center">1</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
+                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -1024,9 +1024,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     </ul>
                   </div>
 
-                  <div className="bg-yellow-100 border border-yellow-300 rounded p-2 mt-2">
-                    <div className="font-medium text-yellow-800 mb-1">💡 Hint:</div>
-                    <p className="text-yellow-700 text-xs">
+                  <div className="bg-amber-50/50 border border-amber-200/60 rounded-lg p-2.5 mt-2">
+                    <div className="font-medium text-amber-800 mb-1">Hint:</div>
+                    <p className="text-amber-700 text-xs">
                       NAND gates are universal - you can build any logic function with NAND gates.
                       Think about how to combine these gates to create XOR operations.
                     </p>
@@ -1073,7 +1073,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </DialogDescription>
           </DialogHeader>
           <div
-            className={cn('max-h-[50vh] overflow-auto text-sm text-gray-700')}
+            className={cn('max-h-[50vh] overflow-auto text-[13px] text-foreground')}
           >
             <ul className="list-disc space-y-1 pl-5">
               {(connectivityIssues ?? []).map((m, idx) => (
@@ -1105,7 +1105,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 ? 'Puzzle solved'
                 : 'Failed to solve'}
             </DialogTitle>
-            <div className="mt-2 max-h-[200px] w-full overflow-y-auto rounded bg-gray-50 p-2 text-sm text-gray-700">
+            <div className="mt-2 max-h-[200px] w-full overflow-y-auto rounded-lg bg-secondary/50 p-3 text-[13px] text-foreground">
                <p className="whitespace-pre-wrap break-words">
                 {postCheck.open ? postCheck.message : ''}
               </p>
@@ -1116,7 +1116,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </DialogDescription>
           </DialogHeader>
           {/* Visual Fix: Modal Text Overflow */}
-          <div className="max-h-[60vh] overflow-y-auto break-words text-sm text-gray-700">
+          <div className="max-h-[60vh] overflow-y-auto break-words text-[13px] text-foreground">
             {postCheck.open && postCheck.solved ? (
               <div className="space-y-2">
                 {postCheck.medal && postCheck.medal !== 'NONE' && (
@@ -1125,8 +1125,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       {postCheck.medal === 'GOLD' ? '🥇' : postCheck.medal === 'SILVER' ? '🥈' : '🥉'}
                     </span>
                     <span className={
-                      postCheck.medal === 'GOLD' ? 'text-yellow-500' :
-                      postCheck.medal === 'SILVER' ? 'text-gray-400' :
+                      postCheck.medal === 'GOLD' ? 'text-amber-500' :
+                      postCheck.medal === 'SILVER' ? 'text-muted-foreground' :
                       'text-amber-700'
                     }>
                       {postCheck.medal} Medal
@@ -1136,7 +1136,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 <p>Congrats! Your solution passed all test cases.</p>
               </div>
             ) : (
-              <div>
+              <div className="text-muted-foreground">
                 Your circuit did not pass the test cases. Try adjusting your
                 wiring/components.
               </div>

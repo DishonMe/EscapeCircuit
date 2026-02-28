@@ -51,8 +51,8 @@ export const AdminPuzzlesList = () => {
 
     if (puzzlesQuery.isError) {
       return (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">
+        <div className="rounded-lg border border-red-200/60 bg-red-50/50 p-4">
+          <p className="text-[13px] text-red-700">
             Failed to load puzzles.{' '}
             {puzzlesQuery.error?.message &&
               `Error: ${puzzlesQuery.error.message}`}
@@ -63,8 +63,8 @@ export const AdminPuzzlesList = () => {
 
     if (puzzles.length === 0) {
       return (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-gray-600">No puzzles found.</p>
+        <div className="rounded-xl border border-border bg-secondary p-4">
+          <p className="text-muted-foreground">No puzzles found.</p>
         </div>
       );
     }
@@ -90,13 +90,13 @@ export const AdminPuzzlesList = () => {
             Cell({ entry }: { entry: any }) {
               const color =
                 entry.status === 'published'
-                  ? 'text-green-600 bg-green-50'
+                  ? 'text-emerald-700 bg-emerald-50/50'
                   : entry.status === 'draft'
-                    ? 'text-yellow-600 bg-yellow-50'
-                    : 'text-gray-500 bg-gray-50';
+                    ? 'text-amber-700 bg-amber-50/50'
+                    : 'text-muted-foreground bg-secondary';
               return (
                 <span
-                  className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}
+                  className={`capitalize rounded-lg px-2 py-0.5 text-[11px] font-medium ${color}`}
                 >
                   {entry.status}
                 </span>
@@ -122,13 +122,13 @@ export const AdminPuzzlesList = () => {
             Cell({ entry }: { entry: any }) {
               const flags: string[] = entry.flags || [];
               if (flags.length === 0)
-                return <span className="text-gray-400">-</span>;
+                return <span className="text-muted-foreground">-</span>;
               return (
                 <div className="flex flex-wrap gap-1">
                   {flags.map((f: string) => (
                     <span
                       key={f}
-                      className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-700"
+                      className="inline-flex items-center gap-1 rounded-lg bg-red-50/50 px-2 py-0.5 text-[11px] text-red-700"
                     >
                       <AlertTriangle className="size-3" />{' '}
                       {f.replace(/_/g, ' ')}
@@ -193,7 +193,7 @@ export const AdminPuzzlesList = () => {
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-gray-600"
+            className="text-muted-foreground"
           >
             <X className="size-4" />
             Clear
@@ -203,17 +203,17 @@ export const AdminPuzzlesList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Name Search */}
             <div>
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-[13px] font-medium text-foreground">
                 Name
               </label>
               <input
                 type="text"
                 placeholder="Search puzzle name..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -226,13 +226,13 @@ export const AdminPuzzlesList = () => {
 
             {/* Creator Username */}
             <div>
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-[13px] font-medium text-foreground">
                 Creator
               </label>
               <input
                 type="text"
                 placeholder="Search by creator username..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.creatorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -245,11 +245,11 @@ export const AdminPuzzlesList = () => {
 
             {/* Status */}
             <div>
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-[13px] font-medium text-foreground">
                 Status
               </label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.status || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -267,11 +267,11 @@ export const AdminPuzzlesList = () => {
 
             {/* Order By */}
             <div>
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-[13px] font-medium text-foreground">
                 Order By
               </label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -290,11 +290,11 @@ export const AdminPuzzlesList = () => {
 
             {/* Direction */}
             <div>
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-[13px] font-medium text-foreground">
                 Direction
               </label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.orderDirection || 'DESC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({

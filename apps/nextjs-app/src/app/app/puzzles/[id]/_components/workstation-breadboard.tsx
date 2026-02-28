@@ -128,9 +128,9 @@ export const Breadboard = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded-md border border-gray-300 bg-white p-3">
-        <div className="mb-1 text-sm font-medium text-gray-900">Breadboard</div>
-        <div className="text-xs text-gray-600">
+      <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+        <div className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">Breadboard</div>
+        <div className="text-[11px] text-muted-foreground">
           Pins in the same row are inherently connected. Click two pins to add a
           wire.
         </div>
@@ -138,7 +138,7 @@ export const Breadboard = ({
 
       <div
         ref={boardRef}
-        className="relative overflow-auto rounded-md border border-gray-300 bg-white p-3"
+        className="relative overflow-auto rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm"
         style={{
           maxHeight: 'calc(100vh - 18rem)',
         }}
@@ -171,11 +171,11 @@ export const Breadboard = ({
                   className={cn(
                     'relative rounded-full border',
                     io
-                      ? 'border-blue-300 bg-blue-50'
+                      ? 'border-foreground/20 bg-foreground/5'
                       : isOccupied
-                        ? 'border-gray-400 bg-gray-200'
-                        : 'border-gray-300 bg-white hover:bg-gray-50',
-                    isSelected && 'ring-2 ring-blue-500 ring-offset-1',
+                        ? 'border-border bg-secondary'
+                        : 'border-border/60 bg-card hover:bg-secondary/50',
+                    isSelected && 'ring-2 ring-foreground/40 ring-offset-1',
                   )}
                   title={io ? io.label : id}
                   onClick={() =>
@@ -226,12 +226,12 @@ export const Breadboard = ({
                   }}
                 >
                   {io ? (
-                    <span className="absolute left-5 top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] font-medium text-blue-700">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] font-medium text-foreground/60">
                       {io.label}
                     </span>
                   ) : null}
                   {hoverDrop?.row === r && hoverDrop?.col === c ? (
-                    <span className="absolute inset-0 rounded-full ring-2 ring-blue-200" />
+                    <span className="absolute inset-0 rounded-full ring-2 ring-foreground/20" />
                   ) : null}
                 </button>
               );
@@ -242,7 +242,7 @@ export const Breadboard = ({
             <div
               key={p.id}
               className={cn(
-                'pointer-events-auto relative flex items-center justify-between rounded border border-gray-400 bg-gray-100 px-2',
+                'pointer-events-auto relative flex items-center justify-between rounded border border-border bg-secondary px-2',
               )}
               style={{
                 gridRowStart: p.row + 1,
@@ -251,7 +251,7 @@ export const Breadboard = ({
                 height: PIN_SIZE,
               }}
             >
-              <div className="truncate text-[10px] font-medium text-gray-900">
+              <div className="truncate text-[10px] font-medium text-foreground">
                 {p.componentId}
               </div>
               <Button
@@ -269,8 +269,8 @@ export const Breadboard = ({
           ))}
         </div>
 
-        <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-600">
-          <div className="font-medium text-gray-700">Wire instructions</div>
+        <div className="mt-3 rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground">
+          <div className="font-medium text-foreground">Wire instructions</div>
           <div className="mt-1">
             Click one pin (it becomes selected), then click another pin to
             connect them.
@@ -278,20 +278,20 @@ export const Breadboard = ({
         </div>
       </div>
 
-      <div className="rounded-md border border-gray-300 bg-white p-3">
-        <div className="mb-2 text-sm font-medium text-gray-900">
+      <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+        <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
           Connections
         </div>
         {wires.length === 0 ? (
-          <div className="text-xs text-gray-500">No wires yet.</div>
+          <div className="text-xs text-muted-foreground">No wires yet.</div>
         ) : (
           <div className="space-y-2">
             {wires.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/30 px-2.5 py-1.5"
               >
-                <div className="truncate text-xs text-gray-700">
+                <div className="truncate text-xs text-foreground">
                   {w.from.componentId} ({w.from.portId}) → {w.to.componentId} (
                   {w.to.portId})
                 </div>

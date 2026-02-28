@@ -44,13 +44,13 @@ export const DiscussionsList = () => {
     <div className="space-y-4">
       {/* Search bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
           placeholder="Search discussions..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 
@@ -67,10 +67,10 @@ export const DiscussionsList = () => {
               }))
             }
             className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              'rounded-full px-3 py-1 text-[11px] font-medium transition-colors',
               filters.category === opt.value || (!filters.category && !opt.value)
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                ? 'bg-foreground/5 border border-foreground/20 text-foreground'
+                : 'bg-secondary text-muted-foreground hover:bg-secondary',
             )}
           >
             {opt.label}
@@ -86,7 +86,7 @@ export const DiscussionsList = () => {
               offset: 0,
             }))
           }
-          className="ml-auto rounded-md border border-gray-300 px-2 py-1 text-xs"
+          className="ml-auto rounded-lg border border-border px-2 py-1 text-[11px]"
         >
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
@@ -101,7 +101,7 @@ export const DiscussionsList = () => {
           <Spinner size="lg" />
         </div>
       ) : !discussions || discussions.length === 0 ? (
-        <div className="py-12 text-center text-sm text-gray-400">
+        <div className="py-12 text-center text-[13px] text-muted-foreground">
           {searchInput
             ? 'No discussions match your search.'
             : 'No discussions found. Start the conversation!'}
@@ -121,11 +121,11 @@ export const DiscussionsList = () => {
             onClick={() =>
               setFilters((prev) => ({ ...prev, offset: (currentPage - 2) * limit }))
             }
-            className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+            className="rounded-lg px-3 py-1 text-[13px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
           >
             Previous
           </button>
-          <span className="text-sm text-gray-500">
+          <span className="text-[13px] text-muted-foreground">
             Page {currentPage} of {totalPages}
           </span>
           <button
@@ -133,7 +133,7 @@ export const DiscussionsList = () => {
             onClick={() =>
               setFilters((prev) => ({ ...prev, offset: currentPage * limit }))
             }
-            className="rounded px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+            className="rounded-lg px-3 py-1 text-[13px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
           >
             Next
           </button>

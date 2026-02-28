@@ -106,14 +106,14 @@ export const MyPuzzles = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <div className="mx-auto max-w-7xl px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
             My Created Puzzles
           </h1>
-          <p className="text-gray-600">
+          <p className="text-[13px] text-muted-foreground">
             Create, manage, and publish your circuit puzzles
           </p>
         </div>
@@ -122,28 +122,28 @@ export const MyPuzzles = () => {
         <div className="mb-6 flex gap-3">
           <Link
             href={paths.app.createPuzzle.getHref()}
-            className="rounded bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700"
+            className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
           >
-            ✏️ Create New Puzzle
+            Create New Puzzle
           </Link>
           {user.data?.role === 'admin' && (
             <Link
               href="/app/admin/upload-puzzle"
-              className="rounded bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700"
+              className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
             >
-              📤 Upload Puzzle Files
+              Upload Puzzle Files
             </Link>
           )}
           <Link
             href={paths.app.puzzles.getHref()}
-            className="rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
           >
             Browse All Puzzles
           </Link>
         </div>
 
         {/* Published/Unpublished Toggle */}
-        <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -153,7 +153,7 @@ export const MyPuzzles = () => {
                 onChange={() => setShowPublished(true)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium text-gray-700">Published Puzzles</span>
+              <span className="text-[13px] font-medium text-foreground">Published Puzzles</span>
             </label>
           </div>
           <div className="flex items-center gap-2">
@@ -165,7 +165,7 @@ export const MyPuzzles = () => {
                 onChange={() => setShowPublished(false)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium text-gray-700">Unpublished Puzzles</span>
+              <span className="text-[13px] font-medium text-foreground">Unpublished Puzzles</span>
             </label>
           </div>
         </div>
@@ -179,7 +179,7 @@ export const MyPuzzles = () => {
 
         {/* Empty state */}
         {!isLoading && isEmpty && (
-          <div className="rounded border border-gray-200 bg-white p-8 text-center text-gray-600">
+          <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
             <p className="mb-4">
               {showPublished
                 ? 'You have no published puzzles yet.'
@@ -187,7 +187,7 @@ export const MyPuzzles = () => {
             </p>
             <Link
               href={paths.app.createPuzzle.getHref()}
-              className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
             >
               Create Your First Puzzle
             </Link>
@@ -202,48 +202,48 @@ export const MyPuzzles = () => {
               return (
                 <div
                   key={puzzle.id}
-                  className={`relative rounded-lg border-2 bg-white p-5 transition-all hover:shadow-lg ${
+                  className={`relative rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
                     isPublished
-                      ? 'border-blue-400 hover:border-blue-500'
-                      : 'border-orange-400 hover:border-orange-500'
+                      ? 'border-border'
+                      : 'border-amber-300/60'
                   }`}
                 >
                   {/* Status Badge */}
-                  <div className={`absolute -right-2 -top-2 z-10 flex items-center justify-center rounded-full text-white shadow-md px-3 py-1 ${
-                    isPublished ? 'bg-blue-500' : 'bg-orange-500'
+                  <div className={`absolute -right-2 -top-2 z-10 flex items-center justify-center rounded-md px-2.5 py-0.5 ${
+                    isPublished ? 'bg-foreground text-background' : 'bg-amber-500 text-white'
                   }`}>
-                    <span className="text-xs font-semibold">
+                    <span className="text-[11px] font-semibold">
                       {isPublished ? 'Published' : 'Unpublished'}
                     </span>
                   </div>
 
                   {/* Title */}
                   <div className="mb-3">
-                    <h3 className="mb-1 font-medium text-gray-900">{puzzle.title || puzzle.name}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="mb-1 font-medium text-foreground">{puzzle.title || puzzle.name}</h3>
+                    <p className="text-[11px] text-muted-foreground">
                       Created on {new Date(puzzle.createdAt || '').toLocaleDateString()}
                     </p>
                   </div>
 
                   {/* Difficulty & Stats */}
                   <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600">
+                    <span className="rounded-md border border-border bg-secondary/50 px-2 py-1 text-[11px] text-muted-foreground">
                       {puzzle.difficulty?.charAt(0) + puzzle.difficulty?.slice(1).toLowerCase() || 'Unknown'}
                     </span>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-[11px] text-muted-foreground">
                       Solved by {puzzle.solvedCount || 0} users
                     </span>
                   </div>
 
                   {/* Description */}
                   {puzzle.description && (
-                    <p className="mb-4 text-sm text-gray-600 line-clamp-2">
+                    <p className="mb-4 text-[13px] text-muted-foreground line-clamp-2">
                       {puzzle.description}
                     </p>
                   )}
 
                   {/* Quick Stats */}
-                  <div className="mb-4 rounded-md bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
+                  <div className="mb-4 rounded-lg bg-secondary/50 p-3 text-[11px] text-muted-foreground space-y-1">
                     {puzzle.rating_metrics && puzzle.rating_metrics.count > 0 && (
                       <>
                         <div>
@@ -258,7 +258,7 @@ export const MyPuzzles = () => {
                       </>
                     )}
                     {!puzzle.rating_metrics || puzzle.rating_metrics.count === 0 && (
-                      <div className="text-gray-500">No ratings yet</div>
+                      <div className="text-muted-foreground">No ratings yet</div>
                     )}
                   </div>
 
@@ -267,13 +267,13 @@ export const MyPuzzles = () => {
                     <div className="flex gap-2">
                       <Link
                         href={paths.app.puzzle.getHref(String(puzzle.id))}
-                        className="flex-1 rounded bg-blue-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
+                        className="flex-1 rounded-lg bg-foreground px-3 py-2 text-center text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
                       >
                         View
                       </Link>
                       <button
                         onClick={() => openEditDialog(puzzle)}
-                        className="flex-1 rounded bg-gray-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-gray-700 flex items-center justify-center gap-1"
+                        className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-center text-[13px] font-medium text-foreground hover:bg-secondary transition-colors flex items-center justify-center gap-1"
                       >
                         <Edit2 className="size-4" />
                         Edit
@@ -285,7 +285,7 @@ export const MyPuzzles = () => {
                         <button
                           onClick={() => handleUnpublish(puzzle.id)}
                           disabled={unpublishMutation.isPending}
-                          className="flex-1 rounded bg-orange-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-amber-300/60 bg-amber-50/50 px-3 py-2 text-center text-[13px] font-medium text-amber-700 hover:bg-amber-100/50 transition-colors disabled:opacity-50"
                         >
                           {unpublishMutation.isPending ? 'Unpublishing...' : 'Unpublish'}
                         </button>
@@ -293,14 +293,14 @@ export const MyPuzzles = () => {
                         <button
                           onClick={() => handlePublish(puzzle.id)}
                           disabled={publishMutation.isPending}
-                          className="flex-1 rounded bg-green-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-emerald-300/60 bg-emerald-50/50 px-3 py-2 text-center text-[13px] font-medium text-emerald-700 hover:bg-emerald-100/50 transition-colors disabled:opacity-50"
                         >
                           {publishMutation.isPending ? 'Publishing...' : 'Publish'}
                         </button>
                       )}
                       <button
                         onClick={() => setDeleteConfirmId(String(puzzle.id))}
-                        className="rounded bg-red-600 px-3 py-2 text-white hover:bg-red-700"
+                        className="rounded-lg border border-red-200/60 bg-red-50/50 px-3 py-2 text-red-700 hover:bg-red-100/50 transition-colors"
                         title="Delete puzzle"
                       >
                         <Trash2 className="size-4" />
@@ -327,31 +327,31 @@ export const MyPuzzles = () => {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Puzzle Name</label>
+                  <label className="text-[13px] font-medium text-foreground">Puzzle Name</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm mt-1"
+                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
                     placeholder="Enter puzzle name"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Description</label>
+                  <label className="text-[13px] font-medium text-foreground">Description</label>
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm mt-1"
+                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
                     placeholder="Enter puzzle description"
                     rows={3}
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Instructions</label>
+                  <label className="text-[13px] font-medium text-foreground">Instructions</label>
                   <textarea
                     value={editInstructions}
                     onChange={(e) => setEditInstructions(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm mt-1"
+                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
                     placeholder="Enter puzzle instructions (supports Markdown and LaTeX)"
                     rows={4}
                   />
@@ -360,14 +360,14 @@ export const MyPuzzles = () => {
               <DialogFooter>
                 <button
                   onClick={() => setEditingPuzzle(null)}
-                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveEdit}
                   disabled={updateMutation.isPending}
-                  className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
                 >
                   {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -391,14 +391,14 @@ export const MyPuzzles = () => {
               <DialogFooter>
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(deleteConfirmId)}
                   disabled={deleteMutation.isPending}
-                  className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   {deleteMutation.isPending ? 'Deleting...' : 'Delete Puzzle'}
                 </button>

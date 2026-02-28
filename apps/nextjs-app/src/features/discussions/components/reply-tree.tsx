@@ -17,7 +17,7 @@ export const ReplyTree = ({
 }: ReplyTreeProps) => {
   if (!replies || replies.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-gray-400">
+      <p className="py-4 text-center text-[13px] text-muted-foreground">
         No replies yet. Be the first to respond!
       </p>
     );

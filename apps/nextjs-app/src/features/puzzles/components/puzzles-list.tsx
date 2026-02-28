@@ -93,13 +93,13 @@ export const PuzzlesList = () => {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
       case 'easy':
-        return 'text-green-600 bg-green-50 border-green-200';
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200/60';
       case 'medium':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-amber-600 bg-amber-50 border-amber-200/60';
       case 'hard':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-red-600 bg-red-50 border-red-200/60';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-muted-foreground bg-secondary border-border';
     }
   };
 
@@ -111,7 +111,7 @@ export const PuzzlesList = () => {
           key={i}
           className={`size-3.5 ${i <= Math.floor(rating)
               ? 'fill-yellow-500 text-yellow-500'
-              : 'text-gray-300'
+              : 'text-muted-foreground/40'
             }`}
         />,
       );
@@ -137,7 +137,7 @@ export const PuzzlesList = () => {
             variant="ghost"
             size="sm"
             onClick={() => setFilters({ page: 1 })}
-            className="text-gray-600"
+            className="text-muted-foreground text-[13px]"
           >
             <X className="size-4" />
             Clear
@@ -147,16 +147,16 @@ export const PuzzlesList = () => {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
           {/* Top Level: name, min difficulty, min fun, min clearness */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Search Name */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Search Name</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Name</label>
               <input
                 type="text"
                 placeholder="Puzzle name..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}
               />
@@ -164,9 +164,9 @@ export const PuzzlesList = () => {
 
             {/* Min Difficulty */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Min Difficulty</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Difficulty</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.minDifficulty || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, minDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               >
@@ -179,14 +179,14 @@ export const PuzzlesList = () => {
 
             {/* Min Fun */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Min Fun Rating</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Fun Rating</label>
               <input
                 type="number"
                 min="0"
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.minFun || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -194,14 +194,14 @@ export const PuzzlesList = () => {
 
             {/* Min Clearness */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Min Clearness Rating</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Clearness Rating</label>
               <input
                 type="number"
                 min="0"
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.minClearness || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -212,9 +212,9 @@ export const PuzzlesList = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Order By */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Order By</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
               >
@@ -227,9 +227,9 @@ export const PuzzlesList = () => {
 
             {/* Max Difficulty */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Max Difficulty</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Difficulty</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.maxDifficulty || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, maxDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               >
@@ -242,14 +242,14 @@ export const PuzzlesList = () => {
 
             {/* Max Fun */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Max Fun Rating</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Fun Rating</label>
               <input
                 type="number"
                 min="0"
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.maxFun || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -257,14 +257,14 @@ export const PuzzlesList = () => {
 
             {/* Max Clearness */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Max Clearness Rating</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Clearness Rating</label>
               <input
                 type="number"
                 min="0"
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.maxClearness || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -275,9 +275,9 @@ export const PuzzlesList = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {/* Direction */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Direction</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderDirection || 'ASC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any, page: 1 })}
               >
@@ -288,9 +288,9 @@ export const PuzzlesList = () => {
 
             {/* Experience Level */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Experience Level</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience Level</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.experienceLevel || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any, page: 1 })}
               >
@@ -302,9 +302,9 @@ export const PuzzlesList = () => {
 
             {/* Medal Filter */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Medal</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Medal</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.medalFilter || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, medalFilter: e.target.value as any, page: 1 })}
               >
@@ -328,7 +328,7 @@ export const PuzzlesList = () => {
 
       {/* Empty state */}
       {!puzzlesQuery.isLoading && isEmpty && (
-        <div className="rounded border border-gray-200 bg-white p-8 text-center text-gray-600">
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
           No puzzles available.
         </div>
       )}
@@ -339,15 +339,15 @@ export const PuzzlesList = () => {
         {filteredPuzzles!.map((puzzle) => (
           <div
             key={puzzle.id}
-            className={`relative cursor-pointer rounded-lg border-2 bg-white p-5 transition-all hover:shadow-lg ${
+            className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
               puzzle.is_solved
-                ? 'border-green-400 hover:border-green-500'
-                : 'border-gray-300 hover:border-blue-400'
+                ? 'border-emerald-200/60 hover:border-emerald-300/60'
+                : 'border-border hover:border-foreground/20'
             }`}
           >
             {/* Solved checkmark overlay */}
             {puzzle.is_solved && (
-              <div className="absolute -right-2 -top-2 z-10 flex size-8 items-center justify-center rounded-full bg-green-500 text-white shadow-md">
+              <div className="absolute -right-2 -top-2 z-10 flex size-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
                 <CheckCircle2 className="size-5" />
               </div>
             )}
@@ -355,14 +355,14 @@ export const PuzzlesList = () => {
           {/* Title & Creator with status badge */}
             <div className="mb-3 flex flex-wrap items-start gap-2">
               <div className="flex-1">
-                <h3 className="mb-1 font-medium text-gray-900">{puzzle.title}</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="mb-1 text-[15px] font-medium text-foreground">{puzzle.title}</h3>
+                <p className="text-[13px] text-muted-foreground">
                   by{' '}
                   {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
                 </p>
               </div>
               {puzzle.is_solved ? (
-                <div className="flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
+                <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-[11px] font-medium">
                   <CheckCircle2 className="size-3.5" />
                   <span>Solved</span>
                   {puzzle.best_medal && puzzle.best_medal >= 1 && (
@@ -372,7 +372,7 @@ export const PuzzlesList = () => {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                <div className="flex items-center gap-1 bg-secondary text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium">
                   <Medal className="size-3.5" />
                   <span>Unsolved</span>
                 </div>
@@ -381,14 +381,14 @@ export const PuzzlesList = () => {
 
             {/* Best Time (if solved) */}
             {puzzle.is_solved && puzzle.best_time != null && (
-              <div className="mb-3 flex items-center gap-1 text-sm text-green-700">
+              <div className="mb-3 flex items-center gap-1 text-[13px] text-emerald-600">
                 <Clock className="size-3.5" />
                 <span>Best Time: {Math.floor(puzzle.best_time / 60)}:{String(puzzle.best_time % 60).padStart(2, '0')}</span>
               </div>
             )}
 
             {/* XP Progress Bar */}
-            <div className="mb-3 rounded-md bg-gray-50 p-3">
+            <div className="mb-3 rounded-lg bg-secondary/50 p-3">
               <PuzzleXPBar
                 avgDifficulty={puzzle.avg_difficulty ?? 0}
                 currentXP={puzzle.total_xp ?? 0}
@@ -406,16 +406,16 @@ export const PuzzlesList = () => {
                 {puzzle.difficulty.charAt(0) +
                   puzzle.difficulty.slice(1).toLowerCase()}
               </span>
-              <div className="flex items-center gap-1 text-gray-600">
+              <div className="flex items-center gap-1 text-muted-foreground">
                 <Users className="size-3.5" />
-                <span className="text-xs">
+                <span className="text-[13px]">
                   {puzzle.solvedCount || 0} solved
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-auto w-full shadow-md ring-1 ring-blue-100 sm:w-40"
+                className="ml-auto w-full shadow-none ring-0 text-[13px] sm:w-40"
                 onClick={() => setDetailsPuzzleId(puzzle.id)}
               >
                 <Info className="mr-2 size-4" /> Puzzle details
@@ -423,13 +423,13 @@ export const PuzzlesList = () => {
             </div>
 
             {/* Rating and creator comment */}
-            <div className="flex flex-wrap items-start gap-3 border-t border-gray-200 pt-3">
+            <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3">
               {/* Weighted Difficulty — clickable to open rating dialog */}
               <button
                 type="button"
                 className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
                   puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-yellow-50'
+                    ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
                 title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
@@ -437,19 +437,19 @@ export const PuzzlesList = () => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Difficulty
                 </span>
                 <div className="flex items-center gap-1">
                   {puzzle.rating_metrics && puzzle.rating_metrics.count > 0 ? (
                     <>
                       {renderStars(puzzle.rating_metrics.weighted_difficulty)}
-                      <span className="ml-1 text-xs text-gray-600">
+                      <span className="ml-1 text-[13px] text-muted-foreground">
                         {puzzle.rating_metrics.weighted_difficulty.toFixed(1)}
                       </span>
                     </>
                   ) : (
-                    <span className="rounded bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                       No Ratings
                     </span>
                   )}
@@ -461,7 +461,7 @@ export const PuzzlesList = () => {
                 type="button"
                 className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
                   puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-yellow-50'
+                    ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
                 title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
@@ -469,7 +469,7 @@ export const PuzzlesList = () => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Fun
                 </span>
                 <div className="flex items-center gap-1">
@@ -482,12 +482,12 @@ export const PuzzlesList = () => {
                             ? '😊'
                             : '😄'}
                       </span>
-                      <span className="ml-1 text-xs text-gray-600">
+                      <span className="ml-1 text-[13px] text-muted-foreground">
                         {puzzle.rating_metrics.avg_fun.toFixed(1)}
                       </span>
                     </>
                   ) : (
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                       Needs Votes
                     </span>
                   )}
@@ -499,7 +499,7 @@ export const PuzzlesList = () => {
                 type="button"
                 className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
                   puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-yellow-50'
+                    ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
                 title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
@@ -507,7 +507,7 @@ export const PuzzlesList = () => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Clearness
                 </span>
                 <div className="flex items-center gap-1">
@@ -520,7 +520,7 @@ export const PuzzlesList = () => {
                             ? '💡'
                             : '✨'}
                       </span>
-                      <span className="ml-1 text-xs text-gray-600">
+                      <span className="ml-1 text-[13px] text-muted-foreground">
                         {puzzle.rating_metrics.avg_clearness < 2
                           ? 'Not clear'
                           : puzzle.rating_metrics.avg_clearness < 3.5
@@ -529,7 +529,7 @@ export const PuzzlesList = () => {
                       </span>
                     </>
                   ) : (
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                       Needs Votes
                     </span>
                   )}
@@ -540,7 +540,7 @@ export const PuzzlesList = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex items-center w-full sm:w-40"
+                  className="flex items-center w-full text-[13px] sm:w-40"
                   disabled={!puzzle.creatorComment}
                   onClick={() => {
                     if (puzzle.creatorComment) setCommentPuzzleId(puzzle.id);
@@ -556,7 +556,7 @@ export const PuzzlesList = () => {
             <div className="mt-4 flex justify-center">
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full max-w-xs rounded bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700"
+                className="w-full max-w-xs rounded-lg bg-foreground px-4 py-3 text-center text-sm font-semibold text-background shadow-md transition-colors hover:bg-foreground/90"
               >
                 Solve Puzzle
               </Link>
@@ -602,9 +602,9 @@ export const PuzzlesList = () => {
               <Link
                 key={pageNum}
                 href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
-                className={`rounded border px-3 py-2 text-sm ${pageNum === meta.page
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                className={`rounded-lg border px-3 py-2 text-sm ${pageNum === meta.page
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-border bg-card text-foreground hover:bg-secondary'
                   }`}
               >
                 {pageNum}

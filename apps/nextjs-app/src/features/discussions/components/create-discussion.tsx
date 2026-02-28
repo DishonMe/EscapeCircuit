@@ -54,14 +54,14 @@ export const CreateDiscussion = ({ onSuccess }: CreateDiscussionProps) => {
     <div className="space-y-4">
       <NextLink
         href={paths.app.discussions.getHref()}
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back to Discussions
       </NextLink>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h1 className="mb-6 text-xl font-bold text-gray-900">New Discussion</h1>
+      <div className="rounded-xl border border-border bg-card p-6">
+        <h1 className="mb-6 text-xl font-semibold text-foreground">New Discussion</h1>
 
         <Form
           id="create-discussion"

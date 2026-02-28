@@ -94,13 +94,13 @@ export const ReplyItem = ({
   return (
     <div
       className={cn(
-        'rounded-md border border-gray-100 bg-white p-3',
-        reply.is_accepted && 'border-green-300 bg-green-50',
+        'rounded-xl border border-border bg-card p-3',
+        reply.is_accepted && 'border-emerald-200/60 bg-emerald-50/50',
         depth > 0 && 'ml-6',
       )}
     >
       {reply.is_accepted && (
-        <div className="mb-2 flex items-center gap-1 text-xs font-medium text-green-700">
+        <div className="mb-2 flex items-center gap-1 text-[11px] font-medium text-emerald-700">
           <CheckCircle className="size-3.5" />
           Accepted Solution
         </div>
@@ -123,15 +123,15 @@ export const ReplyItem = ({
         )}
 
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-            <span className="font-medium text-gray-700">
+          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="font-medium text-foreground">
               {reply.author?.username || 'Unknown'}
             </span>
             <UserBadge user={reply.author} />
             <span>{timeAgo(reply.createdAt)}</span>
           </div>
 
-          <div className="prose prose-sm max-w-none text-sm text-gray-700">
+          <div className="prose prose-sm max-w-none text-[13px] text-foreground">
             <MDPreview value={reply.body} />
           </div>
 
@@ -157,7 +157,7 @@ export const ReplyItem = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-gray-500"
+                className="h-7 text-[11px] text-muted-foreground"
                 onClick={() => setShowReplyForm(!showReplyForm)}
               >
                 <MessageSquare className="mr-1 size-3" />
@@ -170,8 +170,8 @@ export const ReplyItem = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  'h-7 text-xs',
-                  reply.is_accepted ? 'text-green-600' : 'text-gray-500',
+                  'h-7 text-[11px]',
+                  reply.is_accepted ? 'text-emerald-600' : 'text-muted-foreground',
                 )}
                 onClick={() => acceptMutation.mutate({ replyId: reply.id })}
                 isLoading={acceptMutation.isPending}
@@ -190,7 +190,7 @@ export const ReplyItem = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs text-red-500"
+                    className="h-7 text-[11px] text-red-500"
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete

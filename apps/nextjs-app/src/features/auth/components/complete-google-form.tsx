@@ -36,9 +36,9 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
   if (!email || !token) {
     return (
       <div className="space-y-4 text-center">
-        <h2 className="text-xl font-semibold">Session Expired</h2>
-        <p>Your registration session has expired. Please start the login process again.</p>
-        <NextLink href={paths.auth.login.getHref()} className="text-blue-600 hover:text-blue-500">
+        <h2 className="text-xl font-semibold text-foreground">Session Expired</h2>
+        <p className="text-[13px] text-muted-foreground">Your registration session has expired. Please start the login process again.</p>
+        <NextLink href={paths.auth.login.getHref()} className="text-foreground underline underline-offset-4 hover:text-foreground/80">
           Back to Login
         </NextLink>
       </div>
@@ -75,7 +75,7 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
     <div className="space-y-4">
       <div className="text-center">
         <h2 className="text-xl font-semibold">Complete Your Account</h2>
-        <p className="text-sm text-gray-600 mt-2">
+        <p className="text-[13px] text-muted-foreground mt-2">
           {name && <span>Hi {name}! </span>}
           Set up a username and password for your account.
         </p>
@@ -93,7 +93,7 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
       >
         {({ register, formState }) => (
           <>
-            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+            <div className="bg-secondary/50 border border-border rounded-lg p-3 text-[13px] text-foreground">
               Email: <strong>{email}</strong>
             </div>
 
@@ -133,7 +133,7 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
       </Form>
 
       <div className="text-center text-sm">
-        <NextLink href={paths.auth.login.getHref()} className="text-blue-600 hover:text-blue-500">
+        <NextLink href={paths.auth.login.getHref()} className="text-foreground underline underline-offset-4 hover:text-foreground/80">
           Back to Login
         </NextLink>
       </div>
