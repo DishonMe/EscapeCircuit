@@ -41,17 +41,17 @@ const reasonLabels: Record<string, string> = {
 };
 
 const reasonColors: Record<string, string> = {
-  spam: 'bg-red-50 text-red-700',
-  harassment: 'bg-red-100 text-red-800',
-  off_topic: 'bg-yellow-50 text-yellow-700',
-  inappropriate: 'bg-orange-50 text-orange-700',
-  other: 'bg-gray-50 text-gray-700',
+  spam: 'bg-red-50/50 text-red-700',
+  harassment: 'bg-red-50/50 text-red-700',
+  off_topic: 'bg-amber-50/50 text-amber-700',
+  inappropriate: 'bg-orange-50/50 text-orange-700',
+  other: 'bg-secondary text-foreground',
 };
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-50 text-yellow-700',
-  reviewed: 'bg-green-50 text-green-700',
-  dismissed: 'bg-gray-100 text-gray-500',
+  pending: 'bg-amber-50/50 text-amber-700',
+  reviewed: 'bg-emerald-50/50 text-emerald-700',
+  dismissed: 'bg-secondary text-muted-foreground',
 };
 
 const STATUS_FILTERS = [
@@ -112,8 +112,8 @@ export const ReportsList = () => {
 
   if (query.isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-700">Failed to load reports.</p>
+      <div className="rounded-lg border border-red-200/60 bg-red-50/50 p-4">
+        <p className="text-[13px] text-red-700">Failed to load reports.</p>
       </div>
     );
   }
@@ -129,10 +129,10 @@ export const ReportsList = () => {
             key={f.value}
             onClick={() => setStatusFilter(f.value)}
             className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              'rounded-full px-3 py-1 text-[11px] font-medium transition-colors',
               statusFilter === f.value
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                ? 'bg-blue-50/50 text-blue-700'
+                : 'bg-secondary text-muted-foreground hover:bg-secondary',
             )}
           >
             {f.label}
@@ -141,8 +141,8 @@ export const ReportsList = () => {
       </div>
 
       {reports.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-gray-600">
+        <div className="rounded-xl border border-border bg-secondary p-4">
+          <p className="text-muted-foreground">
             {statusFilter
               ? `No ${statusFilter} reports.`
               : 'No reports yet.'}
@@ -153,47 +153,47 @@ export const ReportsList = () => {
           {reports.map((report) => (
             <div
               key={report.id}
-              className="rounded-lg border border-gray-200 bg-white p-3 text-sm"
+              className="rounded-xl border border-border bg-card p-3 text-[13px]"
             >
               {/* Top row: reason badge, status badge, date */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      reasonColors[report.reason] || 'bg-gray-50 text-gray-700'
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-medium ${
+                      reasonColors[report.reason] || 'bg-secondary text-foreground'
                     }`}
                   >
                     {reasonLabels[report.reason] || report.reason}
                   </span>
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-medium ${
                       statusColors[report.status] ||
-                      'bg-gray-50 text-gray-700'
+                      'bg-secondary text-foreground'
                     }`}
                   >
                     {report.status}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">
+                <span className="text-[11px] text-muted-foreground">
                   {formatDate(report.created_at)}
                 </span>
               </div>
 
               {/* Content info: target link, reporter, author */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-gray-600">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
                 <span className="font-medium capitalize">
                   {report.target_type}
                 </span>
                 <Link
                   href={`/app/discussions/${report.target_type === 'discussion' ? report.target_id : report.discussion_id || ''}`}
-                  className="text-blue-600 hover:underline"
+                  className="text-foreground underline underline-offset-4 hover:text-foreground/80"
                 >
                   #{report.target_id}
                 </Link>
                 {report.target_author_username && (
                   <>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-xs">
+                    <span className="text-border">|</span>
+                    <span className="text-[11px]">
                       Author:{' '}
                       <span className="font-medium">
                         {report.target_author_username}
@@ -201,8 +201,8 @@ export const ReportsList = () => {
                     </span>
                   </>
                 )}
-                <span className="text-gray-300">|</span>
-                <span className="text-xs">
+                <span className="text-border">|</span>
+                <span className="text-[11px]">
                   Reporter:{' '}
                   <span className="font-medium">
                     {report.reporter_username || `#${report.reporter_id}`}
@@ -211,7 +211,7 @@ export const ReportsList = () => {
               </div>
 
               {report.details && (
-                <div className="mt-1 text-xs text-gray-400">
+                <div className="mt-1 text-[11px] text-muted-foreground">
                   {report.details}
                 </div>
               )}
@@ -228,7 +228,7 @@ export const ReportsList = () => {
                       })
                     }
                     disabled={updateMutation.isPending}
-                    className="rounded bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+                    className="rounded-lg bg-emerald-50/50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-secondary disabled:opacity-50"
                   >
                     Mark Reviewed
                   </button>
@@ -240,12 +240,12 @@ export const ReportsList = () => {
                       })
                     }
                     disabled={updateMutation.isPending}
-                    className="rounded bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                    className="rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50"
                   >
                     Dismiss
                   </button>
 
-                  <span className="mx-1 border-l border-gray-200" />
+                  <span className="mx-1 border-l border-border" />
 
                   {/* Moderation actions */}
                   <button
@@ -253,7 +253,7 @@ export const ReportsList = () => {
                       warnMutation.mutate({ reportId: report.id })
                     }
                     disabled={warnMutation.isPending}
-                    className="flex items-center gap-1 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-lg bg-amber-50/50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-secondary disabled:opacity-50"
                   >
                     <AlertTriangle className="size-3" />
                     Warn Author
@@ -265,7 +265,7 @@ export const ReportsList = () => {
                         lockMutation.mutate({ reportId: report.id })
                       }
                       disabled={lockMutation.isPending}
-                      className="flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                      className="flex items-center gap-1 rounded-lg bg-blue-50/50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-secondary disabled:opacity-50"
                     >
                       <Lock className="size-3" />
                       Lock
@@ -277,7 +277,7 @@ export const ReportsList = () => {
                     title="Delete Reported Content"
                     body={`Permanently delete this ${report.target_type}? This action cannot be undone.`}
                     triggerButton={
-                      <button className="flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100">
+                      <button className="flex items-center gap-1 rounded-lg bg-red-50/50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-secondary">
                         <Trash2 className="size-3" />
                         Delete Content
                       </button>
@@ -301,7 +301,7 @@ export const ReportsList = () => {
                     title="Ban Author from Discussions"
                     body={`Ban ${report.target_author_username || 'this user'} from creating discussions and replies?`}
                     triggerButton={
-                      <button className="flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100">
+                      <button className="flex items-center gap-1 rounded-lg bg-red-50/50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-secondary">
                         <Ban className="size-3" />
                         Ban Author
                       </button>

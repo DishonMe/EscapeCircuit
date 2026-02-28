@@ -34,12 +34,12 @@ export const CreatorInviteBanner = () => {
   if (!isPendingCreator(user.data)) return null;
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
       <div>
-        <p className="font-medium text-blue-900">
+        <p className="font-medium text-foreground text-[13px]">
           You have been invited to become a Creator!
         </p>
-        <p className="text-sm text-blue-700">
+        <p className="text-[13px] text-muted-foreground">
           Accept to start creating puzzles, or decline to remain a Solver.
         </p>
       </div>

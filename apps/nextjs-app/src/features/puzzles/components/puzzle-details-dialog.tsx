@@ -181,11 +181,11 @@ export const PuzzleDetailsDialog = ({
             ) : null}
             {puzzle.instructions && renderedHtml ? (
               <div
-                className="prose prose-sm max-w-none dark:prose-invert text-black [&_*]:text-black"
+                className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
                 dangerouslySetInnerHTML={{ __html: renderedHtml }}
               />
             ) : (
-              <div className="text-gray-500">No instructions provided.</div>
+              <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
             )}
           </div>
         ) : null}
@@ -197,7 +197,7 @@ export const PuzzleDetailsDialog = ({
           {showLink && puzzle ? (
             <Link
               href={`/app/puzzles/${puzzle.id}`}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
             >
               Go to puzzle
             </Link>

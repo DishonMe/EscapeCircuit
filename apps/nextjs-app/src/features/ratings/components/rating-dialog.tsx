@@ -39,7 +39,7 @@ const StarInput = ({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className="text-[13px] font-medium text-foreground">{label}</span>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
@@ -53,13 +53,13 @@ const StarInput = ({
             <Star
               className={`size-7 transition-colors ${
                 star <= (hover || value)
-                  ? 'fill-yellow-400 text-yellow-400'
-                  : 'text-gray-300'
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-muted-foreground/40'
               }`}
             />
           </button>
         ))}
-        <span className="ml-2 text-sm text-gray-500">
+        <span className="ml-2 text-[13px] text-muted-foreground">
           {value > 0 ? `${value}/5` : '—'}
         </span>
       </div>

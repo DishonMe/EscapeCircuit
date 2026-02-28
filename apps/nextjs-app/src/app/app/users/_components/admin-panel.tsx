@@ -24,7 +24,7 @@ export const AdminPanel = () => {
   return (
     <div className="space-y-4">
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-border">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -32,10 +32,10 @@ export const AdminPanel = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                'flex items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
                 isActive
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
               )}
             >
               <tab.icon className="size-4" />

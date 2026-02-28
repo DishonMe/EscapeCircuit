@@ -293,7 +293,7 @@ export default function ArsenalCreatorPage() {
       {/* Header */}
       <div className="flex justify-between items-start px-6 pt-6">
         <div>
-          <h1 className="text-3xl font-bold">Create Arsenal Piece</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create Arsenal Piece</h1>
           <p className="text-muted-foreground">Design custom logic circuits to save for reuse</p>
         </div>
         <Button variant="outline" onClick={() => router.push(paths.app.arsenal.root.getHref())}>
@@ -304,15 +304,15 @@ export default function ArsenalCreatorPage() {
       {/* Configuration Panel */}
       <div className="px-6 flex gap-6">
         {/* I/O Configuration */}
-        <div className="bg-card rounded-lg border p-6 space-y-4 w-56">
-          <h2 className="font-semibold">I/O Configuration</h2>
+        <div className="bg-card rounded-xl border border-border p-6 space-y-4 w-56">
+          <h2 className="font-semibold text-[13px] text-foreground">I/O Configuration</h2>
 
           <div>
-            <label className="text-sm font-medium block mb-2">Inputs</label>
+            <label className="text-[13px] font-medium text-foreground block mb-2">Inputs</label>
             <select
               value={numInputs}
               onChange={(e: any) => setNumInputs(parseInt(e.target.value))}
-              className="w-full border rounded p-2"
+              className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {[1, 2, 3, 4, 5].map((n) => (
                 <option key={n} value={n}>
@@ -323,11 +323,11 @@ export default function ArsenalCreatorPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium block mb-2">Outputs</label>
+            <label className="text-[13px] font-medium text-foreground block mb-2">Outputs</label>
             <select
               value={numOutputs}
               onChange={(e: any) => setNumOutputs(parseInt(e.target.value))}
-              className="w-full border rounded p-2"
+              className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {[1, 2, 3].map((n) => (
                 <option key={n} value={n}>
@@ -339,9 +339,9 @@ export default function ArsenalCreatorPage() {
         </div>
 
         {/* Statistics */}
-        <div className="bg-card rounded-lg border p-6 space-y-3 w-48">
-          <h2 className="font-semibold">Piece Info</h2>
-          <div className="text-sm space-y-2">
+        <div className="bg-card rounded-xl border border-border p-6 space-y-3 w-48">
+          <h2 className="font-semibold text-[13px] text-foreground">Piece Info</h2>
+          <div className="text-[13px] space-y-2">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Components:</span>
               <span className="font-medium">{placed.length}</span>
@@ -414,20 +414,20 @@ export default function ArsenalCreatorPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium block mb-2">Piece Name</label>
+              <label className="text-[13px] font-medium text-foreground block mb-2">Piece Name</label>
               <input
                 type="text"
                 value={pieceName}
                 onChange={(e: any) => setPieceName(e.target.value)}
                 placeholder="Enter piece name (must be unique)"
-                className="w-full border rounded p-2"
+                className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e: any) => {
                   if (e.key === 'Enter') handleSave();
                 }}
               />
             </div>
 
-            <div className="bg-muted p-3 rounded text-sm space-y-1">
+            <div className="bg-secondary/50 p-3 rounded-lg text-[13px] space-y-1">
               <p>
                 <span className="text-muted-foreground">Inputs:</span> {numInputs}
               </p>

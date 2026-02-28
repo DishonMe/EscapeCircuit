@@ -95,14 +95,14 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
 
   if (discussionQuery.isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-700">
+      <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+        <p className="text-[13px] text-red-700">
           Failed to load discussion. It may have been deleted or you may not
           have permission to view it.
         </p>
         <NextLink
           href={paths.app.discussions.getHref()}
-          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-[13px] text-foreground underline underline-offset-4 hover:text-foreground/80"
         >
           <ArrowLeft className="size-4" />
           Back to Discussions
@@ -122,17 +122,17 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
     <div className="mx-auto max-w-3xl space-y-6">
       <NextLink
         href={paths.app.discussions.getHref()}
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back to Discussions
       </NextLink>
 
       {/* Thread header */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-border bg-card p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {discussion.is_pinned && <Pin className="size-4 text-blue-500" />}
-          {discussion.is_locked && <Lock className="size-4 text-gray-400" />}
+          {discussion.is_locked && <Lock className="size-4 text-muted-foreground" />}
           <CategoryBadge category={discussion.category} />
         </div>
 
@@ -154,12 +154,12 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
           )}
 
           <div className="flex-1">
-            <h1 className="mb-2 text-xl font-bold text-gray-900">
+            <h1 className="mb-2 text-xl font-semibold text-foreground">
               {discussion.title}
             </h1>
 
-            <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
-              <span className="font-medium text-gray-700">
+            <div className="mb-4 flex items-center gap-2 text-[13px] text-muted-foreground">
+              <span className="font-medium text-foreground">
                 {discussion.author?.username || 'Unknown'}
               </span>
               <UserBadge user={discussion.author} />
@@ -174,7 +174,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
               <span>{discussion.reply_count} replies</span>
             </div>
 
-            <div className="prose prose-sm max-w-none text-gray-700">
+            <div className="prose prose-sm max-w-none text-foreground">
               <MDPreview value={discussion.body} />
             </div>
 
@@ -198,11 +198,11 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
         </div>
 
         {/* Action bar: follow, bookmark, admin actions */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
           <Button
             variant="outline"
             size="sm"
-            className={cn(isFollowing && 'border-blue-300 bg-blue-50')}
+            className={cn(isFollowing && 'bg-foreground/5 border-foreground/20')}
             onClick={() => followMutation.mutate({ discussionId })}
             isLoading={followMutation.isPending}
           >
@@ -217,7 +217,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
           <Button
             variant="outline"
             size="sm"
-            className={cn(isBookmarked && 'border-yellow-300 bg-yellow-50')}
+            className={cn(isBookmarked && 'border-amber-200/60 bg-amber-50/50')}
             onClick={() => bookmarkMutation.mutate({ discussionId })}
             isLoading={bookmarkMutation.isPending}
           >
@@ -281,7 +281,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
 
       {/* Replies */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Replies ({discussion.reply_count})
         </h2>
         <ReplyTree
@@ -293,14 +293,14 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
 
       {/* Reply composer */}
       {!discussion.is_locked ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-medium text-gray-700">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-3 text-[13px] font-medium text-foreground">
             Post a Reply
           </h3>
           <ReplyComposer discussionId={discussionId} />
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+        <div className="rounded-xl border border-border bg-secondary p-4 text-center text-[13px] text-muted-foreground">
           <Lock className="mx-auto mb-2 size-5" />
           This discussion is locked. No new replies can be posted.
         </div>

@@ -36,19 +36,19 @@ export const PuzzleXPBar = ({ avgDifficulty = 0, currentXP = 0, isSolved = false
       case 'HARD':
         return 'bg-red-500';
       default:
-        return 'bg-gray-400';
+        return 'bg-foreground/30';
     }
   };
 
   return (
     <div className="w-full space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-semibold text-gray-700">Max XP</span>
-        <span className="font-medium text-gray-600">
+        <span className="font-semibold text-foreground">Max XP</span>
+        <span className="font-medium text-muted-foreground">
           {xpInfo.displayCurrent}/{xpInfo.maxXP}
         </span>
       </div>
-      <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${getTierColor(xpInfo.tier)}`}
           style={{ width: `${Math.min(100, xpInfo.percentage)}%` }}

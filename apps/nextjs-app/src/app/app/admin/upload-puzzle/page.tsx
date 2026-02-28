@@ -110,11 +110,11 @@ export default function UploadPuzzlePage() {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Upload New Puzzle</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Upload New Puzzle</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setShowInfo(!showInfo)}
-            className="px-4 py-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 font-semibold"
+            className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 font-medium text-[13px] transition-colors"
           >
             ℹ️ File Format Guide
           </button>
@@ -122,14 +122,14 @@ export default function UploadPuzzlePage() {
       </div>
 
       {showInfo && (
-        <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded space-y-6">
-          <h2 className="text-xl font-bold text-blue-900">File Format Guide</h2>
+        <div className="mb-8 p-6 bg-secondary/50 border border-border rounded-xl space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">File Format Guide</h2>
 
-          <details className="border p-4 rounded bg-white">
-            <summary className="font-semibold cursor-pointer text-blue-700">
+          <details className="border border-border p-4 rounded-lg bg-card">
+            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               📋 Configuration JSON (puzzle_config.json)
             </summary>
-            <pre className="mt-3 p-3 bg-gray-100 rounded text-xs overflow-x-auto">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`{
   "puzzle": {
     "name": "Binary Adder Quiz",
@@ -151,11 +151,11 @@ export default function UploadPuzzlePage() {
             </pre>
           </details>
 
-          <details className="border p-4 rounded bg-white">
-            <summary className="font-semibold cursor-pointer text-blue-700">
+          <details className="border border-border p-4 rounded-lg bg-card">
+            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               💡 Instructions LaTeX (puzzle_instructions.tex)
             </summary>
-            <pre className="mt-3 p-3 bg-gray-100 rounded text-xs overflow-x-auto">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`\section*{Binary Adder Quiz Instructions}
 
 \\subsection*{Objective}
@@ -189,11 +189,11 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
             </pre>
           </details>
 
-          <details className="border p-4 rounded bg-white">
-            <summary className="font-semibold cursor-pointer text-blue-700">
+          <details className="border border-border p-4 rounded-lg bg-card">
+            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               ✓ Sample Solution JSON (puzzle_solution.json)
             </summary>
-            <pre className="mt-3 p-3 bg-gray-100 rounded text-xs overflow-x-auto">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0, \\"C_in\\": 0}": {"S": 0, "C_out": 0},
@@ -206,15 +206,15 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
   "outputs": ["S", "C_out"]
 }`}
             </pre>
-            <p className="mt-3 text-sm">
+            <p className="mt-3 text-[13px] text-muted-foreground">
               The eval_map must contain entries for all possible input combinations.
               Keys are JSON strings of the input dict, values are the expected outputs.
             </p>
           </details>
 
-          <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
-            <p className="text-sm font-semibold text-yellow-900">⚠️ Important:</p>
-            <ul className="list-disc list-inside text-sm text-yellow-800 mt-2">
+          <div className="bg-amber-50/50 border border-amber-200/60 p-4 rounded-lg">
+            <p className="text-[13px] font-semibold text-amber-900">Important:</p>
+            <ul className="list-disc list-inside text-[13px] text-amber-800 mt-2">
               <li>Config and Solution files must be valid JSON</li>
               <li>Instructions file must be LaTeX format</li>
               <li>Sample solution must pass all test cases</li>
@@ -224,14 +224,14 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded border">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-xl border border-border">
         {/* Difficulty selector */}
         <div className="flex flex-col">
-          <label className="font-semibold mb-2">Difficulty</label>
+          <label className="text-[13px] font-medium text-foreground mb-2">Difficulty</label>
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as "EASY" | "MEDIUM" | "HARD")}
-            className="border p-2 rounded bg-white w-48"
+            className="border border-border p-2 rounded-lg bg-transparent w-48 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="EASY">Easy</option>
             <option value="MEDIUM">Medium</option>
@@ -242,22 +242,22 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
         {requiredFiles.map((req) => (
           <div key={req.key} className="flex flex-col">
             <div className="flex justify-between items-center mb-2">
-              <label className="font-semibold">{req.label}</label>
+              <label className="text-[13px] font-medium text-foreground">{req.label}</label>
               <button
                 type="button"
                 onClick={() => setExpandedFormat(expandedFormat === req.key ? null : req.key)}
-                className="text-xs px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                className="text-[11px] px-3 py-1 bg-secondary hover:bg-secondary/80 rounded-md transition-colors text-foreground"
               >
                 {expandedFormat === req.key ? "Hide Format" : "Show Format"}
               </button>
             </div>
             
             {expandedFormat === req.key && (
-              <div className="mb-3 p-3 bg-gray-50 rounded border border-gray-200 text-sm">
+              <div className="mb-3 p-3 bg-secondary/50 rounded-lg border border-border text-[13px]">
                 {req.key === "config" && (
                   <div>
-                    <p className="font-semibold mb-2">Configuration JSON Format:</p>
-                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                    <p className="font-medium text-[13px] text-foreground mb-2">Configuration JSON Format:</p>
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`{
   "puzzle": {
     "name": "...",
@@ -280,8 +280,8 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
                 )}
                 {req.key === "solution" && (
                   <div>
-                    <p className="font-semibold mb-2">Solution JSON Format:</p>
-                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                    <p className="font-medium text-[13px] text-foreground mb-2">Solution JSON Format:</p>
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},
@@ -296,8 +296,8 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
                 )}
                 {req.key === "instructions" && (
                   <div>
-                    <p className="font-semibold mb-2">Instructions LaTeX Format:</p>
-                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                    <p className="font-medium text-[13px] text-foreground mb-2">Instructions LaTeX Format:</p>
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
 {`\\section*{Puzzle Name}
 \\subsection*{Objective}
 Design a circuit that...
@@ -328,10 +328,10 @@ Use $...$ for math: $C_{out}$`}
               type="file"
               accept={req.ext}
               onChange={(e) => handleFileChange(req.key, e)}
-              className="border p-2 rounded"
+              className="border border-border p-2 rounded-lg text-[13px]"
             />
             {files[req.key] && !files[req.key]!.name.endsWith(req.ext) && (
-              <span className="text-red-500 text-sm">Invalid extension. Must be {req.ext}</span>
+              <span className="text-destructive text-[13px]">Invalid extension. Must be {req.ext}</span>
             )}
           </div>
         ))}
@@ -340,10 +340,10 @@ Use $...$ for math: $C_{out}$`}
           <button
             type="submit"
             disabled={!isFormValid || status === "uploading"}
-            className={`w-full p-3 text-white font-bold rounded transition-colors ${
-              isFormValid 
-                ? "bg-blue-600 hover:bg-blue-700" 
-                : "bg-gray-400 cursor-not-allowed"
+            className={`w-full p-3 font-medium text-[13px] rounded-lg transition-colors ${
+              isFormValid
+                ? "bg-foreground text-background hover:bg-foreground/90"
+                : "bg-secondary text-muted-foreground cursor-not-allowed"
             }`}
           >
             {status === "uploading" ? "Uploading..." : "Upload to Database"}
@@ -351,7 +351,7 @@ Use $...$ for math: $C_{out}$`}
         </div>
 
         {message && (
-          <div className={`p-4 rounded ${status === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+          <div className={`p-4 rounded-lg text-[13px] ${status === "success" ? "bg-emerald-50/50 border border-emerald-200/60 text-emerald-700" : "bg-red-50/50 border border-red-200/60 text-red-700"}`}>
             {message}
           </div>
         )}

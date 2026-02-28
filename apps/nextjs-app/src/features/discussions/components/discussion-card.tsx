@@ -27,7 +27,7 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
     <NextLink
       href={paths.app.discussion.getHref(discussion.id)}
       className={cn(
-        'block rounded-lg border border-gray-200 bg-white p-4 transition-all hover:border-blue-300 hover:shadow-sm',
+        'block rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/20 hover:shadow-card',
         discussion.is_pinned && 'border-l-4 border-l-blue-500',
       )}
     >
@@ -38,9 +38,9 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
               <Pin className="size-3.5 text-blue-500" />
             )}
             {discussion.is_locked && (
-              <Lock className="size-3.5 text-gray-400" />
+              <Lock className="size-3.5 text-muted-foreground" />
             )}
-            <h3 className="truncate text-sm font-semibold text-gray-900">
+            <h3 className="truncate text-[13px] font-semibold text-foreground">
               {discussion.title}
             </h3>
           </div>
@@ -48,21 +48,21 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <CategoryBadge category={discussion.category} />
             {hasAcceptedSolution && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                 <CheckCircle className="size-3" />
                 Solved
               </span>
             )}
           </div>
 
-          <p className="line-clamp-1 text-xs text-gray-500">
+          <p className="line-clamp-1 text-[11px] text-muted-foreground">
             {discussion.body.slice(0, 120)}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-4 text-xs text-gray-400">
-        <span className="font-medium text-gray-600">
+      <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="font-medium text-muted-foreground">
           {discussion.author?.username || 'Unknown'}
         </span>
         <UserBadge user={discussion.author} />

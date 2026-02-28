@@ -20,10 +20,10 @@ const actionTypeLabels: Record<string, string> = {
 };
 
 const actionTypeColors: Record<string, string> = {
-  assign_creator: 'bg-blue-50 text-blue-700',
-  remove_creator: 'bg-orange-50 text-orange-700',
-  delete_puzzle: 'bg-red-50 text-red-700',
-  unpublish_puzzle: 'bg-yellow-50 text-yellow-700',
+  assign_creator: 'bg-blue-50/50 text-blue-700',
+  remove_creator: 'bg-orange-50/50 text-orange-700',
+  delete_puzzle: 'bg-red-50/50 text-red-700',
+  unpublish_puzzle: 'bg-amber-50/50 text-amber-700',
 };
 
 export const AuditLogList = () => {
@@ -39,8 +39,8 @@ export const AuditLogList = () => {
 
   if (query.isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-700">Failed to load audit log.</p>
+      <div className="rounded-lg border border-red-200/60 bg-red-50/50 p-4">
+        <p className="text-[13px] text-red-700">Failed to load audit log.</p>
       </div>
     );
   }
@@ -49,8 +49,8 @@ export const AuditLogList = () => {
 
   if (entries.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="text-gray-600">No audit log entries yet.</p>
+      <div className="rounded-xl border border-border bg-secondary p-4">
+        <p className="text-muted-foreground">No audit log entries yet.</p>
       </div>
     );
   }
@@ -60,23 +60,23 @@ export const AuditLogList = () => {
       {entries.map((entry) => (
         <div
           key={entry.id}
-          className="rounded-lg border border-gray-200 bg-white p-3 text-sm"
+          className="rounded-xl border border-border bg-card p-3 text-[13px]"
         >
           <div className="flex items-center justify-between gap-2">
             <span
-              className={`rounded px-2 py-0.5 text-xs font-medium ${
+              className={`rounded-lg px-2 py-0.5 text-[11px] font-medium ${
                 actionTypeColors[entry.action_type] ||
-                'bg-gray-50 text-gray-700'
+                'bg-secondary text-foreground'
               }`}
             >
               {actionTypeLabels[entry.action_type] ||
                 entry.action_type.replace(/_/g, ' ')}
             </span>
-            <span className="text-xs text-gray-500">
+            <span className="text-[11px] text-muted-foreground">
               {formatAuditDate(entry.created_at)}
             </span>
           </div>
-          <div className="mt-1.5 text-gray-600">
+          <div className="mt-1.5 text-muted-foreground">
             <span>Admin #{entry.admin_user_id}</span>
             {entry.target_user_id && (
               <span> &rarr; User #{entry.target_user_id}</span>
@@ -86,7 +86,7 @@ export const AuditLogList = () => {
             )}
           </div>
           {entry.details && Object.keys(entry.details).length > 0 && (
-            <div className="mt-1 text-xs text-gray-400">
+            <div className="mt-1 text-[11px] text-muted-foreground">
               {Object.entries(entry.details).map(([key, value]) => (
                 <span key={key} className="mr-3">
                   {key.replace(/_/g, ' ')}: {String(value)}

@@ -56,8 +56,8 @@ export const UsersList = () => {
 
     if (usersQuery.isError) {
       return (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">
+        <div className="rounded-xl border border-red-200/60 bg-red-50/50 p-4">
+          <p className="text-[13px] text-red-700">
             Failed to load users. {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
           </p>
         </div>
@@ -66,8 +66,8 @@ export const UsersList = () => {
 
     if (!users || users.length === 0) {
       return (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-gray-600">No users found.</p>
+        <div className="rounded-xl border border-border bg-secondary/50 p-4">
+          <p className="text-[13px] text-muted-foreground">No users found.</p>
         </div>
       );
     }
@@ -89,15 +89,15 @@ export const UsersList = () => {
             field: 'role',
             Cell({ entry: { role } }: { entry: any }) {
               const roleColors: Record<string, string> = {
-                admin: 'bg-purple-50 text-purple-700',
-                creator: 'bg-green-50 text-green-700',
-                solver: 'bg-gray-50 text-gray-700',
-                pending_creator: 'bg-yellow-50 text-yellow-700',
+                admin: 'bg-violet-50/50 text-violet-700',
+                creator: 'bg-emerald-50/50 text-emerald-700',
+                solver: 'bg-secondary text-muted-foreground',
+                pending_creator: 'bg-amber-50/50 text-amber-700',
               };
-              const color = roleColors[role] || 'bg-gray-50 text-gray-700';
+              const color = roleColors[role] || 'bg-secondary text-muted-foreground';
               const label = role === 'pending_creator' ? 'Pending Creator' : role;
               return (
-                <span className={`capitalize rounded px-2 py-0.5 text-xs font-medium ${color}`}>
+                <span className={`capitalize rounded-md px-2 py-0.5 text-[11px] font-medium ${color}`}>
                   {label}
                 </span>
               );
@@ -157,7 +157,7 @@ export const UsersList = () => {
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-gray-600"
+            className="text-muted-foreground"
           >
             <X className="size-4" />
             Clear
@@ -167,15 +167,15 @@ export const UsersList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Username Search */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Username</label>
+              <label className="text-[13px] font-medium text-foreground">Username</label>
               <input
                 type="text"
                 placeholder="Search username..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.usernameSearch || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, usernameSearch: e.target.value || undefined })}
               />
@@ -183,9 +183,9 @@ export const UsersList = () => {
 
             {/* Role */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Role</label>
+              <label className="text-[13px] font-medium text-foreground">Role</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.role || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, role: (e.target.value || undefined) as any })}
               >
@@ -199,9 +199,9 @@ export const UsersList = () => {
 
             {/* Experience Level */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Experience</label>
+              <label className="text-[13px] font-medium text-foreground">Experience</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.experienceLevel || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any })}
               >
@@ -213,9 +213,9 @@ export const UsersList = () => {
 
             {/* Order By */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Order By</label>
+              <label className="text-[13px] font-medium text-foreground">Order By</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
               >
@@ -227,9 +227,9 @@ export const UsersList = () => {
 
             {/* Direction */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Direction</label>
+              <label className="text-[13px] font-medium text-foreground">Direction</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderDirection || 'ASC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
               >

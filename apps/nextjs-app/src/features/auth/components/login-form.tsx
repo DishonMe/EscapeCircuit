@@ -112,12 +112,12 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
 
       {isGoogleLoginEnabled && (
         <>
-          <div className="relative my-4">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
+              <div className="w-full border-t border-border" />
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">OR</span>
+            <div className="relative flex justify-center text-[13px]">
+              <span className="bg-card px-3 text-muted-foreground">OR</span>
             </div>
           </div>
 
@@ -145,7 +145,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         <div className="text-sm">
           <NextLink
             href={paths.auth.register.getHref(redirectTo)}
-            className="font-medium text-blue-600 hover:text-blue-500"
+            className="font-medium text-foreground underline underline-offset-4 hover:text-foreground/80"
           >
             Register
           </NextLink>

@@ -124,7 +124,7 @@ export default function ArsenalPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">My Arsenal</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
           <p className="text-muted-foreground">
             Custom logic pieces you've created ({pieces.length}/10)
           </p>
@@ -148,10 +148,10 @@ export default function ArsenalPage() {
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium">Name</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium">Cost</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium">Basic Gates</th>
-                  <th className="px-6 py-3 text-right text-sm font-medium">Actions</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Name</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Cost</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Basic Gates</th>
+                  <th className="px-6 py-3 text-right text-[13px] font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -159,11 +159,11 @@ export default function ArsenalPage() {
                   <tr key={piece.id} className="hover:bg-muted/50">
                     <td className="px-6 py-4 font-medium">{piece.name}</td>
                     <td className="px-6 py-4">
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm font-medium">
+                      <span className="bg-secondary text-foreground px-2 py-1 rounded-md text-[13px] font-medium">
                         {piece.cost}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                    <td className="px-6 py-4 text-[13px] text-muted-foreground">
                       {parseBasicGates(piece.basic_gates).join(', ') || 'None'}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
@@ -212,13 +212,13 @@ export default function ArsenalPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">New Name</label>
+              <label className="text-[13px] font-medium text-foreground">New Name</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e: any) => setNewName(e.target.value)}
                 placeholder="Enter new name"
-                className="w-full mt-1 border rounded p-2"
+                className="w-full mt-1 border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e: any) => {
                   if (e.key === 'Enter') confirmRename();
                 }}
@@ -246,19 +246,19 @@ export default function ArsenalPage() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold mb-2">Basic Gates Used</h3>
-                <div className="bg-muted p-3 rounded text-sm">
+                <div className="bg-secondary/50 p-3 rounded-lg text-[13px]">
                   {parseBasicGates(selectedPiece.basic_gates).join(', ') || 'None'} (Cost: {selectedPiece.cost})
                 </div>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-2">Truth Table</h3>
-                <div className="max-h-96 overflow-auto border rounded">
+                <div className="max-h-96 overflow-auto border border-border rounded-lg">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted sticky top-0">
+                    <thead className="bg-secondary sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium">Inputs</th>
-                        <th className="px-3 py-2 text-left font-medium">Outputs</th>
+                        <th className="px-3 py-2 text-left text-[13px] font-medium text-muted-foreground">Inputs</th>
+                        <th className="px-3 py-2 text-left text-[13px] font-medium text-muted-foreground">Outputs</th>
                       </tr>
                     </thead>
                     <tbody>
