@@ -574,27 +574,34 @@ export default function CreatePuzzleForm() {
             const cycleKey = `cycle_${cycleIdx}`;
             const cycleActualOutputs = cycleOutputs[cycleKey] || {};
             
-            console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(cycleActualOutputs)}`);
+            // Reorder cycle actual outputs to match expected outputs key order
+            const reorderedCycleOutputs: Record<string, number> = {};
+            const expectedOutputKeys = Object.keys(cycleExpectedOutputs);
+            for (const key of expectedOutputKeys) {
+              reorderedCycleOutputs[key] = cycleActualOutputs[key];
+            }
             
-            // Create eval_map key for this input
+            console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(reorderedCycleOutputs)}`);
+            
+            // Create eval_map key for this input - MUST be sorted for backend lookup
             const sortedInputKeys = Object.keys(cycleInput).sort();
             const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, cycleInput[k]])), undefined, '');
             
             // For sequential circuits, the same input can appear in different cycles
             // with different outputs due to state. We'll use the first occurrence.
             if (!(evalKey in evalMap)) {
-              evalMap[evalKey] = cycleActualOutputs;
-              console.log('[EXPORT-STREAM] Added eval_map entry:', evalKey, '->', cycleActualOutputs);
+              evalMap[evalKey] = reorderedCycleOutputs;
+              console.log('[EXPORT-STREAM] Added eval_map entry:', evalKey, '->', reorderedCycleOutputs);
             } else {
               console.log('[EXPORT-STREAM] Skipped duplicate eval_map entry for:', evalKey);
             }
             
             // Check if this cycle matches expected output
-            const cycleMatches = JSON.stringify(cycleActualOutputs) === JSON.stringify(cycleExpectedOutputs);
+            const cycleMatches = JSON.stringify(reorderedCycleOutputs) === JSON.stringify(cycleExpectedOutputs);
             if (!cycleMatches) {
               simulationErrors.push(
                 `Stream test cycle ${cycleIdx} ${JSON.stringify(cycleInput)}: ` +
-                `Expected ${JSON.stringify(cycleExpectedOutputs)} but got ${JSON.stringify(cycleActualOutputs)}`
+                `Expected ${JSON.stringify(cycleExpectedOutputs)} but got ${JSON.stringify(reorderedCycleOutputs)}`
               );
               hasSimulationErrors = true;
             }
@@ -636,19 +643,27 @@ export default function CreatePuzzleForm() {
           const result = await response.json();
           const simulatedOutputs = result.outputs || {};
           
+          // Reorder simulated outputs to match expected outputs key order
+          const reorderedOutputs: Record<string, number> = {};
+          const expectedKeys = Object.keys(tc.expectedOutputs);
+          for (const key of expectedKeys) {
+            reorderedOutputs[key] = simulatedOutputs[key];
+          }
+          
           console.log('[EXPORT-BLACKBOX] Simulated outputs:', simulatedOutputs);
+          console.log('[EXPORT-BLACKBOX] Reordered outputs:', reorderedOutputs);
           
           // Store the ACTUAL circuit output, not the expected output
-          evalMap[key] = simulatedOutputs;
+          evalMap[key] = reorderedOutputs;
           
           // Check if it matches expected
-          const matches = JSON.stringify(simulatedOutputs) === JSON.stringify(tc.expectedOutputs);
-          console.log('[EXPORT-BLACKBOX] Expected:', tc.expectedOutputs, 'Actual:', simulatedOutputs, 'Match:', matches);
+          const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(tc.expectedOutputs);
+          console.log('[EXPORT-BLACKBOX] Expected:', tc.expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
           
           if (!matches) {
             simulationErrors.push(
               `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
-              `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(simulatedOutputs)}`
+              `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
             );
             hasSimulationErrors = true;
           }
