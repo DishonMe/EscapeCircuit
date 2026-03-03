@@ -540,3 +540,334 @@ class TestPuzzleServiceBranches:
             result = self.service.add_test_case("valid_token", 1, payload)
 
         assert result["puzzle_id"] == 1
+
+
+class TestPuzzleServicePublish:
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_publish_success_creator(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        test_case = Mock()
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle]
+        self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
+        self.mock_puzzle_repo.conn.execute.return_value.rowcount = 1
+        
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle, published_puzzle]
+
+        result = self.service.publish("valid_token", 1)
+
+        assert result["name"] == "Test"
+        self.mock_puzzle_repo.get_by_id.assert_called()
+
+    def test_publish_no_test_cases(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self.mock_puzzle_repo.list_test_cases.return_value = []
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+        assert "Cannot publish puzzle without test cases" in str(exc_info.value)
+
+    def test_publish_puzzle_not_found(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+        assert "puzzle not found" in str(exc_info.value)
+
+    def test_publish_not_creator_not_admin(self):
+        other_user = User(id=1, username="user", role=UserRole.SOLVER)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = other_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+        assert "not allowed" in str(exc_info.value)
+
+    def test_publish_user_not_found(self):
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+        assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServiceUnpublish:
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_unpublish_success_creator(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle]
+        
+        unpublished_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.UNPUBLISHED)
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle, unpublished_puzzle]
+
+        result = self.service.unpublish("valid_token", 1)
+
+        assert result["name"] == "Test"
+        self.mock_puzzle_repo.conn.execute.assert_called()
+
+    def test_unpublish_puzzle_not_found(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.unpublish("valid_token", 1)
+        assert "puzzle not found" in str(exc_info.value)
+
+    def test_unpublish_not_creator(self):
+        other_user = User(id=1, username="user", role=UserRole.SOLVER)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = other_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.unpublish("valid_token", 1)
+        assert "not allowed" in str(exc_info.value)
+
+    def test_unpublish_user_not_found(self):
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.unpublish("valid_token", 1)
+        assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServiceDeletePuzzle:
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_delete_puzzle_success_creator(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self.mock_puzzle_repo.delete.return_value = True
+
+        result = self.service.delete_puzzle("valid_token", 1)
+
+        assert result["success"] is True
+        self.mock_puzzle_repo.delete.assert_called_once_with(1)
+
+    def test_delete_puzzle_success_admin(self):
+        admin_user = User(id=1, username="admin", role=UserRole.ADMIN)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self.mock_puzzle_repo.delete.return_value = True
+
+        result = self.service.delete_puzzle("valid_token", 1)
+
+        assert result["success"] is True
+
+    def test_delete_puzzle_puzzle_not_found(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.delete_puzzle("valid_token", 1)
+        assert "puzzle not found" in str(exc_info.value)
+
+    def test_delete_puzzle_not_creator(self):
+        other_user = User(id=1, username="user", role=UserRole.SOLVER)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = other_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.delete_puzzle("valid_token", 1)
+        assert "not allowed" in str(exc_info.value)
+
+    def test_delete_puzzle_delete_failed(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self.mock_puzzle_repo.delete.return_value = False
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.delete_puzzle("valid_token", 1)
+        assert "Failed to delete puzzle" in str(exc_info.value)
+
+    def test_delete_puzzle_user_not_found(self):
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.delete_puzzle("valid_token", 1)
+        assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServiceUpdatePuzzle:
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_update_puzzle_name_only(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Old", creator_user_id=1)
+        updated_puzzle = Puzzle(id=1, name="New", creator_user_id=1)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, updated_puzzle]
+        
+        payload = {"name": "New"}
+        result = self.service.update_puzzle("valid_token", 1, payload)
+        
+        assert result["name"] == "New"
+        self.mock_puzzle_repo.conn.execute.assert_called()
+
+    def test_update_puzzle_description_only(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, description="Old")
+        updated_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, description="New")
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, updated_puzzle]
+        
+        payload = {"description": "New"}
+        result = self.service.update_puzzle("valid_token", 1, payload)
+        
+        assert result["description"] == "New"
+
+    def test_update_puzzle_empty_name_validation(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        payload = {"name": ""}
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.update_puzzle("valid_token", 1, payload)
+        assert "empty" in str(exc_info.value).lower()
+
+    def test_update_puzzle_no_changes(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle]
+        
+        payload = {}
+        result = self.service.update_puzzle("valid_token", 1, payload)
+        
+        assert result["name"] == "Test"
+
+    def test_update_puzzle_multiple_fields(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, description="Old")
+        updated = Puzzle(id=1, name="New", creator_user_id=1, description="New desc")
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, updated]
+        
+        payload = {"name": "New", "description": "New desc"}
+        result = self.service.update_puzzle("valid_token", 1, payload)
+        
+        self.mock_puzzle_repo.conn.execute.assert_called()
+
+    def test_update_puzzle_not_creator_admin_allowed(self):
+        admin_user = User(id=1, username="admin", role=UserRole.ADMIN)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+        updated = Puzzle(id=1, name="Updated", creator_user_id=2)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin_user
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, updated]
+        
+        payload = {"name": "Updated"}
+        result = self.service.update_puzzle("valid_token", 1, payload)
+        
+        assert result["name"] == "Updated"
+
+    def test_update_puzzle_puzzle_not_found(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.get_by_id.return_value = None
+        
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.update_puzzle("valid_token", 1, {"name": "New"})
+        assert "puzzle not found" in str(exc_info.value)
+
+    def test_update_puzzle_not_creator(self):
+        other_user = User(id=1, username="user", role=UserRole.SOLVER)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+        
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = other_user
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.update_puzzle("valid_token", 1, {"name": "New"})
+        assert "not allowed" in str(exc_info.value)
+
+    def test_update_puzzle_user_not_found(self):
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = None
+        
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.update_puzzle("valid_token", 1, {"name": "New"})
+        assert "user not found" in str(exc_info.value)

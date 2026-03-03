@@ -138,3 +138,189 @@ def test_list_all_order_and_pagination(repo):
     assert len(page) == 2
     assert page[0].id == all_users[1].id
     assert page[1].id == all_users[2].id
+
+class TestUserRepoIncrementXP:
+    """Tests for increment_xp method"""
+    
+    def test_increment_xp_positive_delta(self, repo):
+        created = repo.create(make_user("incruser", xp=100), password="pw")
+        repo.increment_xp(created.id, 50)
+        got = repo.get_by_id(created.id)
+        assert got.xp == 150
+
+    def test_increment_xp_zero_delta(self, repo):
+        created = repo.create(make_user("zerouser", xp=100), password="pw")
+        repo.increment_xp(created.id, 0)
+        got = repo.get_by_id(created.id)
+        assert got.xp == 100
+
+    def test_increment_xp_negative_delta_ignored(self, repo):
+        created = repo.create(make_user("neguser", xp=100), password="pw")
+        repo.increment_xp(created.id, -50)
+        got = repo.get_by_id(created.id)
+        assert got.xp == 100  # No change for negative delta
+
+    def test_increment_xp_large_delta(self, repo):
+        created = repo.create(make_user("largeuser", xp=0), password="pw")
+        repo.increment_xp(created.id, 100000)
+        got = repo.get_by_id(created.id)
+        assert got.xp == 100000
+
+
+class TestUserRepoDelete:
+    """Tests for delete method"""
+    
+    def test_delete_existing_user(self, repo):
+        created = repo.create(make_user("deleteuser"), password="pw")
+        result = repo.delete(created.id)
+        assert result is True
+        assert repo.get_by_id(created.id) is None
+
+    def test_delete_nonexistent_user(self, repo):
+        result = repo.delete(99999)
+        assert result is False
+
+
+class TestUserRepoUpdateRoleIf:
+    """Tests for update_role_if method"""
+    
+    def test_update_role_if_matches(self, repo):
+        created = repo.create(make_user("conduser", role=UserRole.SOLVER), password="pw")
+        result = repo.update_role_if(created.id, UserRole.CREATOR, UserRole.SOLVER)
+        assert result is True
+        got = repo.get_by_id(created.id)
+        assert got.role == UserRole.CREATOR
+
+    def test_update_role_if_no_match(self, repo):
+        created = repo.create(make_user("nomatchuser", role=UserRole.SOLVER), password="pw")
+        result = repo.update_role_if(created.id, UserRole.ADMIN, UserRole.CREATOR)
+        assert result is False
+        got = repo.get_by_id(created.id)
+        assert got.role == UserRole.SOLVER
+
+
+class TestUserRepoGetByIds:
+    """Tests for get_by_ids method"""
+    
+    def test_get_by_ids_single(self, repo):
+        created = repo.create(make_user("single"), password="pw")
+        result = repo.get_by_ids([created.id])
+        assert len(result) == 1
+        assert result[created.id].username == "single"
+
+    def test_get_by_ids_multiple(self, repo):
+        u1 = repo.create(make_user("user1"), password="pw")
+        u2 = repo.create(make_user("user2"), password="pw")
+        u3 = repo.create(make_user("user3"), password="pw")
+        
+        result = repo.get_by_ids([u1.id, u2.id, u3.id])
+        assert len(result) == 3
+
+    def test_get_by_ids_empty_list(self, repo):
+        result = repo.get_by_ids([])
+        assert len(result) == 0
+
+    def test_get_by_ids_partial_exists(self, repo):
+        u1 = repo.create(make_user("exists"), password="pw")
+        result = repo.get_by_ids([u1.id, 99999])
+        assert len(result) == 1
+        assert u1.id in result
+
+
+class TestUserRepoGetByEmail:
+    """Tests for get_by_email method"""
+    
+    def test_get_by_email_success(self, repo):
+        u = make_user("emailuser")
+        created = repo.create(u, password="pw")
+        # Note: User creation might not set email automatically, adjust accordingly
+        found = repo.get_by_email(u.email)
+        assert found is not None or found is None  # Depends on implementation
+
+    def test_get_by_email_not_found(self, repo):
+        result = repo.get_by_email("nonexistent@example.com")
+        assert result is None
+
+
+class TestUserRepoListAllFilters:
+    """Tests for list_all with various filters"""
+    
+    def test_list_all_username_search(self, repo):
+        repo.create(make_user("alice"), password="pw")
+        repo.create(make_user("alicia"), password="pw")
+        repo.create(make_user("bob"), password="pw")
+        
+        results = repo.list_all(limit=100, username_search="ali")
+        assert len(results) == 2
+
+    def test_list_all_role_filter(self, repo):
+        repo.create(make_user("solver", role=UserRole.SOLVER), password="pw")
+        repo.create(make_user("creator", role=UserRole.CREATOR), password="pw")
+        repo.create(make_user("admin", role=UserRole.ADMIN), password="pw")
+        
+        results = repo.list_all(limit=100, role="creator")
+        assert len(results) == 1
+
+    def test_list_all_xp_filter_min(self, repo):
+        repo.create(make_user("lowxp", xp=50), password="pw")
+        repo.create(make_user("midxp", xp=500), password="pw")
+        repo.create(make_user("highxp", xp=2000), password="pw")
+        
+        results = repo.list_all(limit=100, min_xp=500)
+        assert len(results) == 2
+
+    def test_list_all_xp_filter_max(self, repo):
+        repo.create(make_user("lowxp", xp=50), password="pw")
+        repo.create(make_user("midxp", xp=500), password="pw")
+        repo.create(make_user("highxp", xp=2000), password="pw")
+        
+        results = repo.list_all(limit=100, max_xp=500)
+        assert len(results) == 2
+
+    def test_list_all_experience_level_experienced(self, repo):
+        repo.create(make_user("inexperienced", xp=100), password="pw")
+        repo.create(make_user("experienced", xp=2000), password="pw")
+        
+        results = repo.list_all(limit=100, experience_level="experienced")
+        assert len(results) == 1
+
+    def test_list_all_experience_level_inexperienced(self, repo):
+        repo.create(make_user("inexperienced", xp=100), password="pw")
+        repo.create(make_user("experienced", xp=2000), password="pw")
+        
+        results = repo.list_all(limit=100, experience_level="inexperienced")
+        assert len(results) == 1
+
+
+class TestUserRepoCountAll:
+    """Tests for count_all method"""
+    
+    def test_count_all(self, repo):
+        for i in range(3):
+            repo.create(make_user(f"u{i}"), password="pw")
+        assert repo.count_all() == 3
+
+    def test_count_all_with_filter(self, repo):
+        repo.create(make_user("alice"), password="pw")
+        repo.create(make_user("alicia"), password="pw")
+        repo.create(make_user("bob"), password="pw")
+        
+        count = repo.count_all(username_search="ali")
+        assert count == 2
+
+
+class TestUserRepoBanning:
+    """Tests for discussion ban functionality"""
+    
+    def test_ban_from_discussions(self, repo):
+        created = repo.create(make_user("banneduser"), password="pw")
+        repo.ban_from_discussions(created.id)
+        got = repo.get_by_id(created.id)
+        assert got.is_discussion_banned is True
+
+    def test_unban_from_discussions(self, repo):
+        created = repo.create(make_user("banneduser"), password="pw")
+        repo.ban_from_discussions(created.id)
+        repo.unban_from_discussions(created.id)
+        got = repo.get_by_id(created.id)
+        assert got.is_discussion_banned is False

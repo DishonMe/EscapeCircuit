@@ -274,3 +274,150 @@ class TestXPServiceMedalCalculation:
         # No time limit, under budget -> 1 condition
         medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
         assert medal == Medal.SILVER
+
+class TestXPServiceArsenalCapacity:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def test_arsenal_limit_level_1(self):
+        # New player, level 1
+        limit = self.service.get_arsenal_limit(0)
+        assert limit > 0
+
+    def test_arsenal_limit_increases_with_level(self):
+        # Arsenal should grow with level
+        limit_low = self.service.get_arsenal_limit(0)
+        limit_high = self.service.get_arsenal_limit(10000)
+        assert limit_high >= limit_low
+
+
+class TestXPServiceRewardCalculation:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def test_calculate_solve_xp_easy_no_medal(self):
+        xp = self.service.calculate_solve_xp(
+            difficulty=PuzzleDifficulty.EASY,
+            medal=Medal.NONE,
+            previous_best_xp=0
+        )
+        assert xp == 50  # BASE_XP[EASY] + MEDAL_BONUS[NONE]
+
+    def test_calculate_solve_xp_hard_with_gold(self):
+        xp = self.service.calculate_solve_xp(
+            difficulty=PuzzleDifficulty.HARD,
+            medal=Medal.GOLD,
+            previous_best_xp=0
+        )
+        assert xp == 250  # 200 + 50
+
+    def test_calculate_solve_xp_delta_no_improvement(self):
+        xp = self.service.calculate_solve_xp(
+            difficulty=PuzzleDifficulty.EASY,
+            medal=Medal.NONE,
+            previous_best_xp=100
+        )
+        assert xp == 0  # 50 - 100 = -50, max(0, -50) = 0
+
+    def test_calculate_solve_xp_delta_partial_improvement(self):
+        xp = self.service.calculate_solve_xp(
+            difficulty=PuzzleDifficulty.EASY,
+            medal=Medal.SILVER,
+            previous_best_xp=30
+        )
+        # EASY(50) + SILVER(25) - 30 = 45
+        assert xp == 45
+
+    def test_award_creator_solve_same_creator_and_solver(self):
+        xp = self.service.award_creator_solve_xp(
+            creator_user_id=1,
+            solver_user_id=1
+        )
+        assert xp == 0
+        self.mock_user_repo.increment_xp.assert_not_called()
+
+    def test_award_creator_solve_different_creator(self):
+        xp = self.service.award_creator_solve_xp(
+            creator_user_id=1,
+            solver_user_id=2
+        )
+        assert xp > 0
+        self.mock_user_repo.increment_xp.assert_called_once()
+
+    def test_award_rating_xp_not_first_time(self):
+        xp = self.service.award_rating_xp(
+            rater_user_id=1,
+            creator_user_id=2,
+            first_time_rating=False
+        )
+        assert xp == 0
+        self.mock_user_repo.increment_xp.assert_not_called()
+
+    def test_award_rating_xp_first_time_different_creator(self):
+        xp = self.service.award_rating_xp(
+            rater_user_id=1,
+            creator_user_id=2,
+            first_time_rating=True
+        )
+        assert xp > 0  # Both rater and creator get XP
+        assert self.mock_user_repo.increment_xp.call_count == 2
+
+    def test_award_rating_xp_first_time_same_creator(self):
+        xp = self.service.award_rating_xp(
+            rater_user_id=1,
+            creator_user_id=1,
+            first_time_rating=True
+        )
+        assert xp > 0  # Only rater gets XP
+        self.mock_user_repo.increment_xp.assert_called_once()
+
+    def test_award_solve_xp_legacy(self):
+        self.service.award_solve_xp(
+            user_id=1,
+            difficulty_tier="medium",
+            is_first_solve=True
+        )
+        self.mock_user_repo.increment_xp.assert_called()
+
+
+class TestXPServiceTierFromDifficulty:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def test_tier_from_difficulty_easy(self):
+        tier = self.service.tier_from_avg_difficulty(1.0)
+        assert tier == PuzzleDifficulty.EASY
+
+    def test_tier_from_difficulty_medium(self):
+        tier = self.service.tier_from_avg_difficulty(4.0)
+        assert tier == PuzzleDifficulty.MEDIUM
+
+    def test_tier_from_difficulty_hard(self):
+        tier = self.service.tier_from_avg_difficulty(7.0)
+        assert tier == PuzzleDifficulty.HARD
+
+    def test_tier_from_difficulty_invalid_string(self):
+        tier = self.service.tier_from_avg_difficulty("invalid")
+        # Should handle gracefully and return EASY
+        assert tier == PuzzleDifficulty.EASY
+
+
+class TestXPServiceIsExperienced:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def test_is_experienced_low_xp(self):
+        experienced = self.service.is_experienced(0)
+        # Low XP should not be experienced
+        assert not experienced
+
+    def test_is_experienced_high_xp(self):
+        # Calculate enough XP to reach experienced level
+        from Backend import settings
+        high_xp = settings.EXPERIENCED_LEVEL_MIN * settings.EXPERIENCED_LEVEL_MIN * settings.LEVEL_XP_DIVISOR
+        experienced = self.service.is_experienced(high_xp)
+        assert experienced
