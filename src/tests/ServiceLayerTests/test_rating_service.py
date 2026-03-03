@@ -630,3 +630,163 @@ class TestRatingServiceMultipleRatings:
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_rating("valid_token", 1, payload)
         assert "5 minutes" in str(exc_info.value)
+
+
+# ============ Additional branch coverage tests ============
+
+class TestRatingServiceRemoveRating:
+    """Test remove_rating functionality"""
+    
+    def setup_method(self):
+        self.mock_rating_repo = Mock(spec=RatingRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_xp = Mock(spec=XPService)
+        self.mock_rating_repo.conn = Mock()
+        self.mock_rating_repo.list_by_puzzle = Mock(return_value=[])
+        self.mock_puzzle_repo.get_by_id = Mock(return_value=Puzzle(id=1, name="Test", creator_user_id=2))
+        
+        self.service = RatingService(
+            self.mock_rating_repo, self.mock_puzzle_repo,
+            self.mock_solve_repo, self.mock_auth, self.mock_xp
+        )
+    
+    def test_remove_rating_success(self):
+        """Test successfully removing a rating"""
+        self.mock_auth.require_user_id.return_value = 1
+        
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.execute.return_value = mock_cursor
+        mock_cursor.rowcount = 1
+        mock_conn.__enter__ = Mock(return_value=mock_conn)
+        mock_conn.__exit__ = Mock(return_value=False)
+        
+        self.mock_rating_repo.conn = mock_conn
+        self.mock_rating_repo.list_by_puzzle.return_value = []
+        
+        result = self.service.remove_rating("token", 1)
+        assert result is True
+    
+    def test_remove_rating_not_found(self):
+        """Test removing non-existent rating"""
+        self.mock_auth.require_user_id.return_value = 1
+        
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.execute.return_value = mock_cursor
+        mock_cursor.rowcount = 0
+        mock_conn.__enter__ = Mock(return_value=mock_conn)
+        mock_conn.__exit__ = Mock(return_value=False)
+        
+        self.mock_rating_repo.conn = mock_conn
+        self.mock_rating_repo.list_by_puzzle.return_value = []
+        
+        result = self.service.remove_rating("token", 1)
+        assert result is False
+
+
+class TestRatingServiceGetMethods:
+    """Test rating retrieval methods"""
+    
+    def setup_method(self):
+        self.mock_rating_repo = Mock(spec=RatingRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_xp = Mock(spec=XPService)
+        
+        self.service = RatingService(
+            self.mock_rating_repo, self.mock_puzzle_repo,
+            self.mock_solve_repo, self.mock_auth, self.mock_xp
+        )
+    
+    def test_get_my_rating_exists(self):
+        """Test getting user's own rating"""
+        self.mock_auth.require_user_id.return_value = 1
+        rating_obj = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+        self.mock_rating_repo.get_by_puzzle_user.return_value = rating_obj
+        
+        result = self.service.get_my_rating("token", 1)
+        assert result is not None
+        assert "difficulty" in result
+    
+    def test_get_my_rating_not_found(self):
+        """Test getting rating when user hasn't rated"""
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_rating_repo.get_by_puzzle_user.return_value = None
+        
+        result = self.service.get_my_rating("token", 1)
+        assert result is None
+    
+    def test_list_ratings_for_puzzle(self):
+        """Test listing all ratings for a puzzle"""
+        self.mock_auth.require_user_id.return_value = 1
+        rating1 = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+        rating2 = Rating(id=2, puzzle_id=1, user_id=2, difficulty=4, fun=3, clearness=4)
+        self.mock_rating_repo.list_by_puzzle.return_value = [rating1, rating2]
+        
+        result = self.service.list_ratings_for_puzzle("token", 1)
+        assert len(result) >= 2
+
+
+class TestRatingServicePuzzleMetrics:
+    """Test puzzle metrics calculation"""
+    
+    def setup_method(self):
+        self.mock_rating_repo = Mock(spec=RatingRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_xp = Mock(spec=XPService)
+        
+        self.service = RatingService(
+            self.mock_rating_repo, self.mock_puzzle_repo,
+            self.mock_solve_repo, self.mock_auth, self.mock_xp
+        )
+    
+    def test_get_puzzle_metrics_with_ratings(self):
+        """Test getting metrics for puzzle with ratings"""
+        rating1 = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+        rating2 = Rating(id=2, puzzle_id=1, user_id=2, difficulty=4, fun=3, clearness=4)
+        self.mock_rating_repo.list_by_puzzle.return_value = [rating1, rating2]
+        
+        result = self.service.get_puzzle_metrics(1)
+        assert "avg_difficulty" in result
+        assert "avg_fun" in result
+        assert "avg_clearness" in result
+        assert result["count"] == 2
+    
+    def test_get_puzzle_metrics_no_ratings(self):
+        """Test getting metrics for puzzle with no ratings"""
+        self.mock_rating_repo.list_by_puzzle.return_value = []
+        
+        result = self.service.get_puzzle_metrics(1)
+        assert "avg_difficulty" in result
+        assert result["count"] == 0
+
+
+class TestRatingServiceListRatings:
+    """Test list_ratings functionality"""
+    
+    def setup_method(self):
+        self.mock_rating_repo = Mock(spec=RatingRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_xp = Mock(spec=XPService)
+        
+        self.service = RatingService(
+            self.mock_rating_repo, self.mock_puzzle_repo,
+            self.mock_solve_repo, self.mock_auth, self.mock_xp
+        )
+    
+    def test_list_ratings_returns_list(self):
+        """Test list_ratings returns list format"""
+        self.mock_auth.require_user_id.return_value = 1
+        rating = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3)
+        self.mock_rating_repo.list_by_puzzle.return_value = [rating]
+        
+        result = self.service.list_ratings("token", 1)
+        assert isinstance(result, list)

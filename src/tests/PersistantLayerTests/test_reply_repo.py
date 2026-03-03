@@ -166,3 +166,135 @@ def test_nested_replies(repo):
     children_of_child = repo.list_children(child.id)
     assert len(children_of_child) == 1
     assert children_of_child[0].id == grandchild.id
+
+class TestReplyRepoGetByIds:
+    """Tests for get_by_ids method"""
+    
+    def test_get_by_ids_single(self, repo):
+        r = repo.create(make_reply())
+        result = repo.get_by_ids([r.id])
+        assert len(result) == 1
+        assert result[r.id].body == "This is a reply"
+
+    def test_get_by_ids_multiple(self, repo):
+        r1 = repo.create(make_reply(body="Reply 1"))
+        r2 = repo.create(make_reply(body="Reply 2"))
+        r3 = repo.create(make_reply(body="Reply 3"))
+        
+        result = repo.get_by_ids([r1.id, r2.id, r3.id])
+        assert len(result) == 3
+
+    def test_get_by_ids_empty_list(self, repo):
+        result = repo.get_by_ids([])
+        assert len(result) == 0
+
+    def test_get_by_ids_partial_exists(self, repo):
+        r = repo.create(make_reply())
+        result = repo.get_by_ids([r.id, 99999])
+        assert len(result) == 1
+
+
+class TestReplyRepoPagination:
+    """Tests for pagination in list operations"""
+    
+    def test_list_by_discussion_pagination(self, repo):
+        for i in range(5):
+            repo.create(make_reply(body=f"Reply {i}"))
+        
+        page1 = repo.list_by_discussion(1, limit=2, offset=0)
+        page2 = repo.list_by_discussion(1, limit=2, offset=2)
+        
+        assert len(page1) == 2
+        assert len(page2) == 2
+        assert page1[0].id != page2[0].id
+
+    def test_list_top_level_pagination(self, repo):
+        for i in range(3):
+            repo.create(make_reply(body=f"Top {i}"))
+        
+        page = repo.list_top_level(1, limit=1, offset=0)
+        assert len(page) == 1
+
+
+class TestReplyRepoVoting:
+    """Tests for upvote/downvote functionality"""
+    
+    def test_update_votes_increment(self, repo):
+        r = repo.create(make_reply())
+        repo.update_votes(r.id, 10, 2)
+        
+        fetched = repo.get_by_id(r.id)
+        assert fetched.upvotes == 10
+        assert fetched.downvotes == 2
+
+    def test_update_votes_zero(self, repo):
+        r = repo.create(make_reply())
+        repo.update_votes(r.id, 0, 0)
+        
+        fetched = repo.get_by_id(r.id)
+        assert fetched.upvotes == 0
+        assert fetched.downvotes == 0
+
+    def test_update_votes_large_numbers(self, repo):
+        r = repo.create(make_reply())
+        repo.update_votes(r.id, 1000, 500)
+        
+        fetched = repo.get_by_id(r.id)
+        assert fetched.upvotes == 1000
+        assert fetched.downvotes == 500
+
+
+class TestReplyRepoAcceptance:
+    """Tests for accepted answer functionality"""
+    
+    def test_set_accepted(self, repo):
+        r = repo.create(make_reply())
+        repo.update(r.id, {"is_accepted": True})
+        
+        fetched = repo.get_by_id(r.id)
+        assert fetched.is_accepted is True
+
+    def test_clear_accepted_for_discussion_comprehensive(self, repo):
+        r1 = repo.create(make_reply(body="R1"))
+        r2 = repo.create(make_reply(body="R2"))
+        r3 = repo.create(make_reply(body="R3"))
+        
+        repo.update(r1.id, {"is_accepted": True})
+        repo.update(r2.id, {"is_accepted": True})
+        
+        repo.clear_accepted_for_discussion(1)
+        
+        assert repo.get_by_id(r1.id).is_accepted is False
+        assert repo.get_by_id(r2.id).is_accepted is False
+        assert repo.get_by_id(r3.id).is_accepted is False
+
+
+class TestReplyRepoUpdateOperations:
+    """Tests for update operations"""
+    
+    def test_update_body(self, repo):
+        r = repo.create(make_reply(body="Original"))
+        repo.update(r.id, {"body": "Updated"})
+        fetched = repo.get_by_id(r.id)
+        assert fetched.body == "Updated"
+
+    def test_update_multiple_fields(self, repo):
+        r = repo.create(make_reply(body="Original"))
+        repo.update(r.id, {"body": "Updated", "is_accepted": True})
+        fetched = repo.get_by_id(r.id)
+        assert fetched.body == "Updated"
+        assert fetched.is_accepted is True
+
+
+class TestReplyRepoCountByDiscussion:
+    """Tests for count_by_discussion method"""
+    
+    def test_count_by_discussion_empty(self, repo):
+        count = repo.count_by_discussion(999)
+        assert count == 0
+
+    def test_count_by_discussion_multiple(self, repo):
+        for i in range(3):
+            repo.create(make_reply())
+        count = repo.count_by_discussion(1)
+        assert count == 3
