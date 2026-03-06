@@ -111,6 +111,7 @@ class DiscussionService:
             raise ValidationError("discussion not found")
 
         result = discussion.to_dict()
+        result["is_bookmarked"] = self.discussion_repo.is_bookmarked(user_id, discussion_id)
 
         # Fetch ALL replies in one query (created_at ASC ordering preserved)
         all_replies = self.reply_repo.list_by_discussion(discussion_id, limit=10000)
@@ -129,6 +130,7 @@ class DiscussionService:
         # Attach discussion engagement (single discussion — still 6 sub-queries)
         if self.engagement:
             result["engagement"] = self.engagement.get_discussion_engagement(discussion_id, user_id)
+            result["engagement"]["is_bookmarked"] = result["is_bookmarked"]
 
         # Bulk-fetch reply engagement (4 queries instead of 4*N)
         reply_ids = [r.id for r in all_replies]
@@ -189,8 +191,10 @@ class DiscussionService:
         author_id: Optional[int] = None,
         sort_by: str = "newest",
         search: Optional[str] = None,
+        bookmarked_only: bool = False,
     ) -> dict:
-        self.auth.require_user_id(token)
+        user_id = self.auth.require_user_id(token)
+        bookmarked_user_id = user_id if bookmarked_only else None
 
         discussions = self.discussion_repo.list_all(
             limit=limit,
@@ -200,17 +204,26 @@ class DiscussionService:
             author_id=author_id,
             sort_by=sort_by,
             search=search,
+            bookmarked_user_id=bookmarked_user_id,
+            prioritize_bookmarked_user_id=user_id,
         )
         total = self.discussion_repo.count(
             category=category,
             puzzle_id=puzzle_id,
             author_id=author_id,
             search=search,
+            bookmarked_user_id=bookmarked_user_id,
         )
 
         # Batch-fetch all authors in one query instead of N individual queries
         author_ids = list(set(d.author_id for d in discussions))
         authors_map = self.user_repo.get_by_ids(author_ids)
+
+        bookmarks_raw = self.discussion_repo.get_user_bookmarks(user_id)
+        if isinstance(bookmarks_raw, (list, tuple, set)):
+            user_bookmarks = {int(did) for did in bookmarks_raw}
+        else:
+            user_bookmarks = set()
 
         items = []
         for d in discussions:
@@ -218,6 +231,7 @@ class DiscussionService:
             author = authors_map.get(d.author_id)
             if author:
                 item["author"] = author.to_dict()
+            item["is_bookmarked"] = d.id in user_bookmarks
             items.append(item)
 
         return {
@@ -414,14 +428,20 @@ class DiscussionService:
 
     def bookmark_discussion(self, token: str, discussion_id: int) -> dict:
         user_id = self.auth.require_user_id(token)
-        if not self.engagement:
-            raise ValidationError("engagement not available")
 
         discussion = self.discussion_repo.get_by_id(discussion_id)
         if not discussion:
             raise ValidationError("discussion not found")
 
-        is_bookmarked = self.engagement.toggle_bookmark(discussion_id, user_id)
+        current_state = self.discussion_repo.is_bookmarked(user_id, discussion_id)
+        is_currently_bookmarked = current_state if isinstance(current_state, bool) else False
+
+        if is_currently_bookmarked:
+            self.discussion_repo.remove_bookmark(user_id, discussion_id)
+            is_bookmarked = False
+        else:
+            self.discussion_repo.add_bookmark(user_id, discussion_id)
+            is_bookmarked = True
         return {
             "discussion_id": discussion_id,
             "is_bookmarked": is_bookmarked,
