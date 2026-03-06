@@ -398,6 +398,28 @@ class TestUtilsFunctionBranches:
         """Test ensure_non_empty with valid string"""
         result = ensure_non_empty("test", "valid")
         assert result == "valid"
+
+
+class TestEnsureBitDictListBranches:
+    """Test list branches in ensure_bit_dict"""
+    
+    def test_ensure_bit_dict_with_list_values_valid(self):
+        """Test ensure_bit_dict with valid list values"""
+        d = {"a": [0, 1, 0], "b": [1, 1]}
+        result = ensure_bit_dict("test", d)
+        assert result == d
+    
+    def test_ensure_bit_dict_with_list_values_invalid(self):
+        """Test ensure_bit_dict with invalid list values"""
+        with pytest.raises(ValidationError) as exc_info:
+            ensure_bit_dict("test", {"a": [0, 1, 2]})
+        assert "test 'a' list must contain only 0/1" in str(exc_info.value)
+    
+    def test_ensure_bit_dict_mixed_list_and_scalar(self):
+        """Test ensure_bit_dict with mix of list and scalar values"""
+        d = {"a": [0, 1], "b": 0}
+        result = ensure_bit_dict("test", d)
+        assert result == d
     
     def test_clamp_int_not_int_type(self):
         """Test clamp_int with non-int type"""

@@ -1540,10 +1540,44 @@ class TestListAllForAdmin:
         result = repo.list_all_for_admin()
         assert len(result) == 2
     
-    def test_list_all_for_admin_with_status_filter(self, repo):
-        """Test list_all_for_admin with status filter"""
+    def test_list_all_for_admin_with_status(self, repo):
+        """Test list_all_for_admin with status parameter"""
         repo.create(make_puzzle("draft", status=PuzzleStatus.DRAFT))
         repo.create(make_puzzle("published", status=PuzzleStatus.PUBLISHED))
+        
+        result = repo.list_all_for_admin(status=PuzzleStatus.PUBLISHED.value)
+        assert len(result) == 1
+        assert result[0].status == PuzzleStatus.PUBLISHED
+
+    def test_list_all_for_admin_offset(self, repo):
+        """Test list_all_for_admin with offset parameter"""
+        puzzle1 = repo.create(make_puzzle("puzzle_1"))
+        puzzle2 = repo.create(make_puzzle("puzzle_2"))
+        puzzle3 = repo.create(make_puzzle("puzzle_3"))
+        
+        result = repo.list_all_for_admin(limit=2, offset=1)
+        assert len(result) == 2
+
+    def test_list_all_for_admin_creator_id(self, repo):
+        """Test list_all_for_admin with creator_id filter"""
+        creator_id = 123
+        puzzle1 = make_puzzle("puzzle_1", creator_user_id=creator_id)
+        puzzle2 = make_puzzle("puzzle_2", creator_user_id=456)
+        repo.create(puzzle1)
+        repo.create(puzzle2)
+        
+        result = repo.list_all_for_admin(creator_id=creator_id)
+        assert len(result) == 1
+        assert result[0].creator_user_id == creator_id
+
+    def test_list_all_for_admin_date_range(self, repo):
+        """Test list_all_for_admin with date range filter"""
+        puzzle = repo.create(make_puzzle("puzzle_1"))
+        
+        result = repo.list_all_for_admin(date_from="2020-01-01", date_to="2030-01-01")
+        assert len(result) >= 1
+
+
         
         result = repo.list_all_for_admin(status=PuzzleStatus.DRAFT.value)
         assert len(result) == 1

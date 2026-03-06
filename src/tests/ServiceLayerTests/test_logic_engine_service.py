@@ -419,6 +419,318 @@ class TestLogicEngineServiceValidation:
             self.service.evaluate(circuit, {"a": 0})
 
 
+class TestExtractUsedGates:
+    """Test extract_used_gates method with different formats"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_extract_used_gates_from_used_gates_field(self):
+        """Test extracting gates from 'used_gates' field"""
+        structure_json = json.dumps({
+            "used_gates": ["AND", "OR", "NOT"]
+        })
+        
+        gates = self.service.extract_used_gates(structure_json)
+        assert gates == {"AND", "OR", "NOT"}
+    
+    def test_extract_used_gates_from_gates_counts(self):
+        """Test extracting gates from 'gates_counts' field"""
+        structure_json = json.dumps({
+            "gates_counts": {"AND": 3, "OR": 2, "NOT": 1}
+        })
+        
+        gates = self.service.extract_used_gates(structure_json)
+        assert gates == {"AND", "OR", "NOT"}
+    
+    def test_extract_used_gates_from_components_array(self):
+        """Test extracting gates from 'components' array"""
+        structure_json = json.dumps({
+            "components": [
+                {"type": "AND", "id": 1},
+                {"type": "OR", "id": 2},
+                {"type": "AND", "id": 3}
+            ]
+        })
+        
+        gates = self.service.extract_used_gates(structure_json)
+        assert gates == {"AND", "OR"}
+    
+    def test_extract_used_gates_empty(self):
+        """Test extracting gates from empty structure"""
+        structure_json = json.dumps({})
+        
+        gates = self.service.extract_used_gates(structure_json)
+        assert gates == set()
+
+
+class TestExtractGateCounts:
+    """Test extract_gate_counts method with different formats"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_extract_gate_counts_from_gates_counts_field(self):
+        """Test extracting counts from 'gates_counts' field"""
+        structure_json = json.dumps({
+            "gates_counts": {"AND": 3, "OR": 2, "NOT": 1}
+        })
+        
+        counts = self.service.extract_gate_counts(structure_json)
+        assert counts == {"AND": 3, "OR": 2, "NOT": 1}
+    
+    def test_extract_gate_counts_from_components_array(self):
+        """Test extracting counts from 'components' array"""
+        structure_json = json.dumps({
+            "components": [
+                {"type": "AND", "id": 1},
+                {"type": "OR", "id": 2},
+                {"type": "AND", "id": 3},
+                {"type": "AND", "id": 4}
+            ]
+        })
+        
+        counts = self.service.extract_gate_counts(structure_json)
+        assert counts == {"AND": 3, "OR": 1}
+    
+    def test_extract_gate_counts_from_placed_components(self):
+        """Test extracting counts from 'placedComponents' array"""
+        structure_json = json.dumps({
+            "placedComponents": [
+                {"id": "c1", "componentId": "AND"},
+                {"id": "c2", "componentId": "OR"},
+                {"id": "c3", "type": "NOT"}
+            ]
+        })
+        
+        counts = self.service.extract_gate_counts(structure_json)
+        assert counts == {"AND": 1, "OR": 1, "NOT": 1}
+    
+    def test_extract_gate_counts_empty(self):
+        """Test extracting counts from empty structure"""
+        structure_json = json.dumps({})
+        
+        counts = self.service.extract_gate_counts(structure_json)
+        assert counts == {}
+
+
+class TestComputeCostMethod:
+    """Test compute_cost method"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_compute_cost_with_explicit_cost_field(self):
+        """Test when 'cost' field is explicitly provided"""
+        structure_json = json.dumps({
+            "cost": 42
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 42
+    
+    def test_compute_cost_with_value_field(self):
+        """Test when 'value' field is provided"""
+        structure_json = json.dumps({
+            "value": 15
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 15
+    
+    def test_compute_cost_computed_cost_field(self):
+        """Test when 'computed_cost' field is provided"""
+        structure_json = json.dumps({
+            "computed_cost": 25
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 25
+    
+    def test_compute_cost_from_gates_counts(self):
+        """Test cost computation from gates_counts"""
+        structure_json = json.dumps({
+            "gates_counts": {"AND": 3, "OR": 2, "NOT": 1}
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 6  # 3 + 2 + 1
+    
+    def test_compute_cost_from_components(self):
+        """Test cost computation from components array"""
+        structure_json = json.dumps({
+            "components": [
+                {"type": "AND"},
+                {"type": "OR"},
+                {"type": "NOT"}
+            ]
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 3
+    
+    def test_compute_cost_with_nested_costs(self):
+        """Test cost computation with nested_costs"""
+        structure_json = json.dumps({
+            "gates_counts": {"AND": 2, "OR": 1},
+            "nested_costs": [5, 3]
+        })
+        
+        cost = self.service.compute_cost(structure_json)
+        assert cost == 11  # 2 + 1 + 5 + 3
+
+
+class TestValidateGateUsage:
+    """Test validate_gate_usage method"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_validate_gate_usage_allowed_gates(self):
+        """Test validation with allowed gates"""
+        structure_json = json.dumps({
+            "used_gates": ["AND", "OR"]
+        })
+        
+        # Should not raise
+        self.service.validate_gate_usage(structure_json, {"AND", "OR", "NOT", "XOR"})
+    
+    def test_validate_gate_usage_illegal_gates(self):
+        """Test validation with illegal gates"""
+        structure_json = json.dumps({
+            "used_gates": ["AND", "OR", "EXOTIC"]
+        })
+        
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.validate_gate_usage(structure_json, {"AND", "OR", "NOT"})
+        
+        assert "illegal gates" in str(exc_info.value)
+    
+    def test_validate_gate_usage_empty_gates(self):
+        """Test validation with no used gates"""
+        structure_json = json.dumps({
+            "used_gates": []
+        })
+        
+        # Should not raise even with empty allowed set
+        self.service.validate_gate_usage(structure_json, set())
+
+
+class TestComputeGateLogic:
+    """Test _compute_gate helper method"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_and_gate_logic(self):
+        """Test AND gate computation"""
+        assert self.service._compute_gate("AND", [0, 0]) == 0
+        assert self.service._compute_gate("AND", [0, 1]) == 0
+        assert self.service._compute_gate("AND", [1, 0]) == 0
+        assert self.service._compute_gate("AND", [1, 1]) == 1
+    
+    def test_or_gate_logic(self):
+        """Test OR gate computation"""
+        assert self.service._compute_gate("OR", [0, 0]) == 0
+        assert self.service._compute_gate("OR", [0, 1]) == 1
+        assert self.service._compute_gate("OR", [1, 0]) == 1
+        assert self.service._compute_gate("OR", [1, 1]) == 1
+    
+    def test_xor_gate_logic(self):
+        """Test XOR gate computation"""
+        assert self.service._compute_gate("XOR", [0, 0]) == 0
+        assert self.service._compute_gate("XOR", [0, 1]) == 1
+        assert self.service._compute_gate("XOR", [1, 0]) == 1
+        assert self.service._compute_gate("XOR", [1, 1]) == 0
+    
+    def test_nand_gate_logic(self):
+        """Test NAND gate computation"""
+        assert self.service._compute_gate("NAND", [0, 0]) == 1
+        assert self.service._compute_gate("NAND", [0, 1]) == 1
+        assert self.service._compute_gate("NAND", [1, 0]) == 1
+        assert self.service._compute_gate("NAND", [1, 1]) == 0
+    
+    def test_nor_gate_logic(self):
+        """Test NOR gate computation"""
+        assert self.service._compute_gate("NOR", [0, 0]) == 1
+        assert self.service._compute_gate("NOR", [0, 1]) == 0
+        assert self.service._compute_gate("NOR", [1, 0]) == 0
+        assert self.service._compute_gate("NOR", [1, 1]) == 0
+    
+    def test_xnor_gate_logic(self):
+        """Test XNOR gate computation"""
+        assert self.service._compute_gate("XNOR", [0, 0]) == 1
+        assert self.service._compute_gate("XNOR", [0, 1]) == 0
+        assert self.service._compute_gate("XNOR", [1, 0]) == 0
+        assert self.service._compute_gate("XNOR", [1, 1]) == 1
+    
+    def test_not_gate_logic(self):
+        """Test NOT gate computation"""
+        assert self.service._compute_gate("NOT", [0]) == 1
+        assert self.service._compute_gate("NOT", [1]) == 0
+    
+    def test_delay_gate_logic(self):
+        """Test DELAY gate computation"""
+        assert self.service._compute_gate("DELAY", [0]) == 0
+        assert self.service._compute_gate("DELAY", [1]) == 1
+    
+    def test_buf_gate_logic(self):
+        """Test BUF gate computation"""
+        assert self.service._compute_gate("BUF", [0]) == 0
+        assert self.service._compute_gate("BUF", [1]) == 1
+    
+    def test_unknown_gate_logic(self):
+        """Test with unknown gate type"""
+        assert self.service._compute_gate("UNKNOWN", [0, 1]) is None
+    
+    def test_gate_logic_with_none_input(self):
+        """Test gate with None input (unknown/floating)"""
+        assert self.service._compute_gate("AND", [None, 1]) is None
+        assert self.service._compute_gate("AND", [0, None]) is None
+
+
+class TestSimulateCircuit:
+    """Test simulate method for combinatorial circuits"""
+    
+    def setup_method(self):
+        self.service = logicEngineService()
+    
+    def test_simulate_basic_circuit(self):
+        """Test simulate with basic circuit structure"""
+        data = {
+            "placedComponents": [
+                {"id": "c1", "componentId": "AND"},
+                {"id": "c2", "componentId": "OR"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service.simulate(data, {})
+        assert isinstance(result, dict)
+    
+    def test_simulate_with_none_arsenal_pieces(self):
+        """Test simulate with None arsenal_pieces"""
+        data = {
+            "placedComponents": [],
+            "wires": []
+        }
+        
+        result = self.service.simulate(data, {}, arsenal_pieces=None)
+        assert result == {}
+    
+    def test_simulate_fallback_to_components(self):
+        """Test simulate fallback to 'components' when 'placedComponents' missing"""
+        data = {
+            "components": [
+                {"id": "c1", "componentId": "AND"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service.simulate(data, {})
+        assert isinstance(result, dict)
+
+
 class TestEvalMapEvaluate:
     """Test evaluate method with eval_map (lines 27-31)"""
     

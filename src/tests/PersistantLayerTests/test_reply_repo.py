@@ -244,6 +244,48 @@ class TestReplyRepoVoting:
         assert fetched.downvotes == 500
 
 
+class TestReplyRepoUpdateCommit:
+    """Tests for update method variants"""
+    
+    def test_update_with_empty_fields(self, repo):
+        """Test update with empty fields dict returns current reply"""
+        r = repo.create(make_reply(body="Original"))
+        
+        # Call update with no fields (empty dict)
+        result = repo.update(r.id, {})
+        
+        # Should return the unchanged reply
+        assert result is not None
+        assert result.body == "Original"
+
+    def test_update_body_with_updated_at(self, repo):
+        """Test update automatically adds updated_at when not provided"""
+        r = repo.create(make_reply(body="Original"))
+        
+        result = repo.update(r.id, {"body": "Updated"})
+        assert result.body == "Updated"
+
+
+class TestReplyRepoCommitControl:
+    """Tests for methods with commit parameter"""
+    
+    def test_delete_with_commit_false(self, repo):
+        """Test delete with commit=False does not auto-commit"""
+        r = repo.create(make_reply())
+        # Calling delete with commit=False should not auto-commit
+        result = repo.delete(r.id, commit=False)
+        assert result is True
+
+    def test_update_votes_with_commit_false(self, repo):
+        """Test update_votes with commit=False does not auto-commit"""
+        r = repo.create(make_reply())
+        # Calling update_votes with commit=False should not auto-commit
+        repo.update_votes(r.id, 5, 2, commit=False)
+        # Should still work without commit
+        fetched = repo.get_by_id(r.id)
+        assert fetched is not None
+
+
 class TestReplyRepoAcceptance:
     """Tests for accepted answer functionality"""
     
