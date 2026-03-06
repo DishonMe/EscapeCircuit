@@ -2,8 +2,9 @@ import sqlite3
 from typing import Any, Dict, List
 
 from Backend.DomainLayer.Circuit import Circuit
-from Backend.DomainLayer.Enums import GateType
+from Backend.DomainLayer.Enums import GateType, UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.settings import ARSENAL_XP_LEVEL_TIERS, ARSENAL_XP_MAX_SLOTS
 from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
@@ -51,7 +52,9 @@ class CircuitService:
         user = self.user_repo.get_by_id(user_id)
         if not user:
             raise ValidationError("Your user account could not be found. Please log in again.")
-        limit = self.xp.get_arsenal_limit(user.xp)
+        is_admin = self._is_admin(user.role)
+        user_level = self.xp.calculate_level(user.xp)
+        limit = self._resolve_max_slots_for_level(user_level)
 
         # Validate gate usage & compute cost server-side.
         allowed_basic = {g.value for g in GateType}
@@ -69,12 +72,15 @@ class CircuitService:
         # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU
         try:
             with transaction(self.repo.conn):
-                count_row = self.repo.conn.execute(
-                    "SELECT COUNT(*) FROM circuits WHERE user_id = ?", (int(user_id),)
-                ).fetchone()
-                current_count = count_row[0] if count_row else 0
-                if current_count >= limit:
-                    raise ValidationError(f"You have reached the maximum number of arsenal pieces ({limit}). You can create more by earning XP or manage existing pieces.")
+                if not is_admin:
+                    count_row = self.repo.conn.execute(
+                        "SELECT COUNT(*) FROM circuits WHERE user_id = ?", (int(user_id),)
+                    ).fetchone()
+                    current_count = count_row[0] if count_row else 0
+                    if current_count >= limit:
+                        raise ValidationError(
+                            f"Arsenal capacity reached ({current_count}/{limit}). Level up to unlock more slots!"
+                        )
                 saved = self.repo.create(c, commit=False)
         except sqlite3.IntegrityError:
             # UNIQUE(user_id, name)
@@ -102,3 +108,16 @@ class CircuitService:
         if not ok:
             raise ValidationError("Circuit not found or you do not own this circuit. Please verify the circuit ID and try again.")
         return {"ok": True}
+
+    @staticmethod
+    def _is_admin(role: Any) -> bool:
+        if isinstance(role, UserRole):
+            return role == UserRole.ADMIN
+        return str(role).strip().lower() == UserRole.ADMIN.value
+
+    @staticmethod
+    def _resolve_max_slots_for_level(user_level: int) -> int:
+        for max_level_inclusive, slot_count in ARSENAL_XP_LEVEL_TIERS:
+            if int(user_level) <= int(max_level_inclusive):
+                return int(slot_count)
+        return int(ARSENAL_XP_MAX_SLOTS)

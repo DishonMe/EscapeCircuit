@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
+import { useUser } from '@/lib/auth';
 import {
   useMyArsenal,
   useDeleteArsenalPiece,
@@ -21,8 +22,31 @@ import {
   ArsenalPiece,
 } from '@/features/arsenal/api';
 
+const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [
+  [2, 5],
+  [4, 10],
+  [6, 20],
+  [8, 35],
+];
+const ARSENAL_MAX_SLOTS = 50;
+
+const calculateArsenalSlots = (level: number): number => {
+  for (const [maxLevelInclusive, slots] of ARSENAL_LEVEL_TIERS) {
+    if (level <= maxLevelInclusive) {
+      return slots;
+    }
+  }
+  return ARSENAL_MAX_SLOTS;
+};
+
+const calculateLevelFromXp = (xp: number): number => {
+  const safeXp = Number.isFinite(xp) ? Math.max(0, xp) : 0;
+  return Math.floor(Math.sqrt(safeXp / 100)) + 1;
+};
+
 export default function ArsenalPage() {
   const router = useRouter();
+  const user = useUser();
   const { addNotification } = useNotifications();
   const { data: arsenal, isLoading } = useMyArsenal();
   const deleteArsenalMutation = useDeleteArsenalPiece();
@@ -118,6 +142,10 @@ export default function ArsenalPage() {
   }
 
   const pieces = arsenal || [];
+  const role = String(user.data?.role || '').toLowerCase();
+  const isAdmin = role === 'admin';
+  const level = calculateLevelFromXp(Number(user.data?.xp || 0));
+  const maxSlots = calculateArsenalSlots(level);
 
   return (
     <div className="space-y-6">
@@ -126,8 +154,15 @@ export default function ArsenalPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
           <p className="text-muted-foreground">
-            Custom logic pieces you've created ({pieces.length}/10)
+            {isAdmin
+              ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
+              : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
           </p>
+          {!isAdmin && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Capacity by level: 1-2 => 5, 3-4 => 10, 5-6 => 20, 7-8 => 35, 9+ => 50.
+            </p>
+          )}
         </div>
         <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
           + Create New Piece

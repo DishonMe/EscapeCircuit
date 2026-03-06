@@ -11,6 +11,7 @@ from Backend.DomainLayer.User import User
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
+from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 import json
 
 
@@ -18,6 +19,7 @@ class TestPuzzleServiceCreation:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.count_published.return_value = 0
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -245,6 +247,7 @@ class TestPuzzleServicePublish:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.count_published.return_value = 0
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -306,6 +309,42 @@ class TestPuzzleServicePublish:
         with pytest.raises(ValidationError) as exc_info:
             self.service.publish("valid_token", 999)
         assert "puzzle not found" in str(exc_info.value)
+
+    def test_publish_rejects_non_admin_at_published_limit(self):
+        self.mock_auth.require_user_id.return_value = 1
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_user_repo.get_by_id.return_value = creator_user
+
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.get_by_id.return_value = draft_puzzle
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+        self.mock_puzzle_repo.count_published.return_value = PUZZLE_MAX_PUBLISHED_PER_USER
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+
+        assert str(exc_info.value) == (
+            f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
+        )
+
+    def test_publish_admin_bypasses_published_limit(self):
+        self.mock_auth.require_user_id.return_value = 1
+        admin_user = User(id=1, username="admin", role=UserRole.ADMIN)
+        self.mock_user_repo.get_by_id.return_value = admin_user
+
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        self.mock_puzzle_repo.get_by_id.side_effect = [draft_puzzle, published_puzzle]
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        self.mock_puzzle_repo.conn.execute.return_value = mock_cursor
+
+        result = self.service.publish("valid_token", 1)
+
+        assert result["status"] == PuzzleStatus.PUBLISHED.value
+        self.mock_puzzle_repo.count_published.assert_not_called()
 
 
 class TestPuzzleServiceUnpublish:
@@ -546,6 +585,7 @@ class TestPuzzleServicePublish:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.count_published.return_value = 0
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)

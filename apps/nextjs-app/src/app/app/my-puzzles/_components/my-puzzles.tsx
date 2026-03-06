@@ -22,6 +22,8 @@ import {
 import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 
+const PUZZLE_MAX_PUBLISHED_PER_USER = 10;
+
 export const MyPuzzles = () => {
   const user = useUser();
   const [page, setPage] = useState(1);
@@ -49,6 +51,10 @@ export const MyPuzzles = () => {
   const allPuzzles = puzzlesQuery.data?.data || [];
   const meta = puzzlesQuery.data?.meta;
   const isLoading = puzzlesQuery.isLoading;
+  const isAdmin = String(user.data?.role || '').toLowerCase() === 'admin';
+  const publishedCount = allPuzzles.filter(
+    (p) => (p as any).status === 'published' || (p as any).isPublished === true
+  ).length;
 
   // Filter by published status
   const filteredPuzzles = allPuzzles.filter((p) => {
@@ -115,6 +121,11 @@ export const MyPuzzles = () => {
           </h1>
           <p className="text-[13px] text-muted-foreground">
             Create, manage, and publish your circuit puzzles
+          </p>
+          <p className="text-[12px] text-muted-foreground mt-1">
+            {isAdmin
+              ? `Publishing capacity: ${publishedCount}/Unlimited (Admin)`
+              : `Publishing capacity: ${publishedCount}/${PUZZLE_MAX_PUBLISHED_PER_USER}`}
           </p>
         </div>
 

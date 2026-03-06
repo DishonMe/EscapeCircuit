@@ -23,6 +23,7 @@ class TestCircuitServiceCreation:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()  # Fix: add missing mock_engine
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -50,6 +51,7 @@ class TestCircuitServiceSaveCircuit:
         self.mock_engine = Mock()
         self.mock_engine.compute_cost.return_value = 0  # Ensure compute_cost returns int
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -204,6 +206,7 @@ class TestCircuitServiceListMyCircuits:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -257,6 +260,7 @@ class TestCircuitServiceGetCircuit:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -319,6 +323,7 @@ class TestCircuitServiceDeleteCircuit:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,

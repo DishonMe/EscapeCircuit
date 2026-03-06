@@ -128,3 +128,10 @@ class CircuitRepo:
               circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.id, circuit.user_id))
         self.conn.commit()
         return cur.rowcount > 0
+
+    def count_user_components(self, user_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) FROM circuits WHERE user_id = ? AND is_arsenal = 1",
+            (int(user_id),),
+        ).fetchone()
+        return int(row[0]) if row else 0
