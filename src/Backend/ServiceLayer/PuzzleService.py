@@ -39,6 +39,7 @@ class PuzzleService:
         offset: int = 0,
         search: str = None,
         creator_id: int = None,
+        creator_username: str = None,
         min_difficulty: float = None,
         max_difficulty: float = None,
         only_experienced_difficulty: bool = False,
@@ -60,6 +61,7 @@ class PuzzleService:
             offset=offset,
             search=search,
             creator_id=creator_id,
+            creator_username=creator_username,
             min_difficulty=min_difficulty,
             max_difficulty=max_difficulty,
             only_experienced_difficulty=only_experienced_difficulty,
@@ -80,6 +82,7 @@ class PuzzleService:
         total = self.repo.count_published(
             search=search,
             creator_id=creator_id,
+            creator_username=creator_username,
             min_difficulty=min_difficulty,
             max_difficulty=max_difficulty,
             only_experienced_difficulty=only_experienced_difficulty,

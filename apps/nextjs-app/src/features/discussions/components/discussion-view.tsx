@@ -17,7 +17,7 @@ import {
 } from '@/lib/authorization';
 import { cn } from '@/utils/cn';
 
-import { useBookmarkDiscussion } from '../api/bookmark-discussion';
+import { useToggleBookmark } from '../api/bookmark-discussion';
 import { useDeleteDiscussion } from '../api/delete-discussion';
 import { useFollowDiscussion } from '../api/follow-discussion';
 import { useDiscussion } from '../api/get-discussion';
@@ -61,7 +61,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
     discussionId,
   });
 
-  const bookmarkMutation = useBookmarkDiscussion({
+  const bookmarkMutation = useToggleBookmark({
     discussionId,
   });
 

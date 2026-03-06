@@ -7,6 +7,7 @@ import { Puzzle, Meta } from '@/types/api';
 export interface PuzzleFilters {
   page?: number;
   search?: string;
+  creator?: string;
   minDifficulty?: number;
   maxDifficulty?: number;
   onlyExperiencedDifficulty?: boolean;
@@ -38,6 +39,7 @@ export const getPuzzles = (
   };
 
   if (filters.search !== undefined) params.search = filters.search;
+  if (filters.creator !== undefined) params.creator = filters.creator;
   if (filters.minDifficulty !== undefined) params.min_difficulty = filters.minDifficulty;
   if (filters.maxDifficulty !== undefined) params.max_difficulty = filters.maxDifficulty;
   if (filters.creator_id !== undefined) params.creator_id = filters.creator_id;

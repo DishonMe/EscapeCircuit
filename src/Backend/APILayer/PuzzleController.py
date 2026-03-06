@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, Union, List
 import re
@@ -120,6 +120,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         offset: int = 0, 
         page: Optional[int] = None,
         search: Optional[str] = None,
+        creator: Optional[str] = Query(None),
         creator_id: Optional[int] = None,
         min_difficulty: Optional[float] = None,
         max_difficulty: Optional[float] = None,
@@ -148,6 +149,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 offset=offset,
                 search=search,
                 creator_id=creator_id,
+                creator_username=creator,
                 min_difficulty=min_difficulty,
                 max_difficulty=max_difficulty,
                 only_experienced_difficulty=only_experienced_difficulty,

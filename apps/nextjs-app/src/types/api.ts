@@ -56,6 +56,7 @@ export type Discussion = Entity<{
   reply_count: number;
   upvotes: number;
   accepted_reply_id: number | null;
+  is_bookmarked?: boolean;
   updated_at: string;
   engagement?: DiscussionEngagement;
 }>;

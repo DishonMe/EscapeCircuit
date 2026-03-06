@@ -472,6 +472,47 @@ def test_list_published_with_creator_filter(repo):
     assert p2.id not in [p.id for p in result]
 
 
+def test_list_published_with_creator_username_filter_case_insensitive(conn, repo):
+    """Test list_published filters by creator username substring (case-insensitive)."""
+    conn.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE
+        )
+    """)
+    conn.execute("INSERT INTO users(id, username) VALUES (?, ?)", (1, "AliceMaker"))
+    conn.execute("INSERT INTO users(id, username) VALUES (?, ?)", (2, "bob_builder"))
+
+    alice_pub = repo.create(make_puzzle("AlicePublished", creator_user_id=1, status=PuzzleStatus.PUBLISHED))
+    repo.create(make_puzzle("AliceDraft", creator_user_id=1, status=PuzzleStatus.DRAFT))
+    bob_pub = repo.create(make_puzzle("BobPublished", creator_user_id=2, status=PuzzleStatus.PUBLISHED))
+
+    result = repo.list_published(limit=20, offset=0, creator_username="alice")
+    result_ids = {p.id for p in result}
+
+    assert alice_pub.id in result_ids
+    assert bob_pub.id not in result_ids
+
+
+def test_count_published_with_creator_username_filter(conn, repo):
+    """Test count_published applies creator username filtering."""
+    conn.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE
+        )
+    """)
+    conn.execute("INSERT INTO users(id, username) VALUES (?, ?)", (10, "CreatorOne"))
+    conn.execute("INSERT INTO users(id, username) VALUES (?, ?)", (20, "OtherCreator"))
+
+    repo.create(make_puzzle("C1-Published", creator_user_id=10, status=PuzzleStatus.PUBLISHED))
+    repo.create(make_puzzle("C1-Draft", creator_user_id=10, status=PuzzleStatus.DRAFT))
+    repo.create(make_puzzle("C2-Published", creator_user_id=20, status=PuzzleStatus.PUBLISHED))
+
+    count = repo.count_published(creator_username="creatorone")
+    assert count == 1
+
+
 def test_list_published_pagination_offset(repo):
     """Test list_published pagination with offset"""
     for i in range(5):

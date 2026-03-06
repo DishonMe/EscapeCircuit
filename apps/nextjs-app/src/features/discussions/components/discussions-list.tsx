@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search } from 'lucide-react';
 
 import { Spinner } from '@/components/ui/spinner';
@@ -33,7 +33,12 @@ export const DiscussionsList = () => {
 
   const discussionsQuery = useDiscussions({ filters });
 
-  const discussions = discussionsQuery.data?.discussions;
+  const discussions = useMemo(() => {
+    const rows = discussionsQuery.data?.discussions || [];
+    return [...rows].sort(
+      (a, b) => Number(Boolean(b.is_bookmarked)) - Number(Boolean(a.is_bookmarked)),
+    );
+  }, [discussionsQuery.data?.discussions]);
   const total = discussionsQuery.data?.total ?? 0;
   const limit = filters.limit ?? 20;
   const offset = filters.offset ?? 0;
@@ -94,6 +99,22 @@ export const DiscussionsList = () => {
           <option value="most_upvotes">Most Upvotes</option>
           <option value="trending">Trending</option>
         </select>
+
+        <label className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-foreground">
+          <input
+            type="checkbox"
+            checked={filters.bookmarkedOnly ?? false}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                bookmarkedOnly: e.target.checked,
+                offset: 0,
+              }))
+            }
+            className="size-3"
+          />
+          Show Bookmarked Only
+        </label>
       </div>
 
       {discussionsQuery.isLoading ? (
@@ -102,7 +123,9 @@ export const DiscussionsList = () => {
         </div>
       ) : !discussions || discussions.length === 0 ? (
         <div className="py-12 text-center text-[13px] text-muted-foreground">
-          {searchInput
+          {filters.bookmarkedOnly
+            ? 'No bookmarked discussions yet.'
+            : searchInput
             ? 'No discussions match your search.'
             : 'No discussions found. Start the conversation!'}
         </div>

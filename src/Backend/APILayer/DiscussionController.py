@@ -65,6 +65,7 @@ def build_discussion_router(
         author_id: Optional[int] = None,
         sort: str = "newest",
         search: Optional[str] = None,
+        bookmarked_only: bool = False,
         token: str = Depends(verify_token),
     ):
         try:
@@ -77,6 +78,7 @@ def build_discussion_router(
                 author_id=author_id,
                 sort_by=sort,
                 search=search,
+                bookmarked_only=bookmarked_only,
             )
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))

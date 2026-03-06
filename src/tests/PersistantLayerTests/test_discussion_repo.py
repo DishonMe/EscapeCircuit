@@ -55,6 +55,11 @@ def test_schema_created(conn, repo):
     ).fetchone()
     assert row is not None
 
+    bookmark_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='bookmarked_discussions'"
+    ).fetchone()
+    assert bookmark_row is not None
+
 
 def test_create_and_get(repo):
     d = make_discussion()
@@ -578,3 +583,35 @@ def test_create_with_all_optional_fields(repo):
     assert fetched.is_pinned is True
     assert fetched.is_locked is True
     assert fetched.accepted_reply_id == 42
+def test_add_and_remove_bookmark(repo):
+    d = repo.create(make_discussion())
+
+    added = repo.add_bookmark(user_id=1, discussion_id=d.id)
+    assert added is True
+    assert repo.is_bookmarked(user_id=1, discussion_id=d.id) is True
+
+    removed = repo.remove_bookmark(user_id=1, discussion_id=d.id)
+    assert removed is True
+    assert repo.is_bookmarked(user_id=1, discussion_id=d.id) is False
+
+
+def test_get_user_bookmarks(repo):
+    d1 = repo.create(make_discussion(title="One"))
+    d2 = repo.create(make_discussion(title="Two"))
+
+    repo.add_bookmark(user_id=1, discussion_id=d1.id)
+    repo.add_bookmark(user_id=1, discussion_id=d2.id)
+
+    bookmarks = repo.get_user_bookmarks(user_id=1)
+    assert set(bookmarks) == {d1.id, d2.id}
+
+
+def test_list_and_count_bookmarked_only(repo):
+    d1 = repo.create(make_discussion(title="Bookmarked"))
+    repo.create(make_discussion(title="Not Bookmarked"))
+    repo.add_bookmark(user_id=1, discussion_id=d1.id)
+
+    rows = repo.list_all(bookmarked_user_id=1)
+    assert len(rows) == 1
+    assert rows[0].id == d1.id
+    assert repo.count(bookmarked_user_id=1) == 1
