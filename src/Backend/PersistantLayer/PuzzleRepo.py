@@ -181,6 +181,7 @@ class PuzzleRepo:
         offset: int = 0,
         search: Optional[str] = None,
         creator_id: Optional[int] = None,
+        creator_username: Optional[str] = None,
         min_difficulty: Optional[float] = None,
         max_difficulty: Optional[float] = None,
         only_experienced_difficulty: bool = False,
@@ -205,16 +206,22 @@ class PuzzleRepo:
             order_direction: 'DESC' (default) or 'ASC'
             order_only_experienced: If True, uses avg ratings for ordering (experienced users only)
         """
-        where_clauses = ["status=?"]
+        where_clauses = ["p.status=?"]
         params = [PuzzleStatus.PUBLISHED.value]
+        join_sql = ""
         
         if search is not None:
-            where_clauses.append("name LIKE ?")
+            where_clauses.append("p.name LIKE ?")
             params.append(f"%{search}%")
         
         if creator_id is not None:
-            where_clauses.append("creator_user_id=?")
+            where_clauses.append("p.creator_user_id=?")
             params.append(creator_id)
+
+        if creator_username is not None:
+            join_sql = "JOIN users u ON p.creator_user_id = u.id"
+            where_clauses.append("LOWER(u.username) LIKE LOWER(?)")
+            params.append(f"%{creator_username}%")
         
         if min_difficulty is not None or max_difficulty is not None:
             if only_experienced_difficulty:
@@ -263,48 +270,48 @@ class PuzzleRepo:
         
         if min_clearness is not None or max_clearness is not None:
             # Exclude unrated puzzles when filtering by clearness
-            where_clauses.append("avg_clearness > 0")
+            where_clauses.append("p.avg_clearness > 0")
             if only_experienced_clearness:
                 if min_clearness is not None:
-                    where_clauses.append("avg_clearness>=?")
+                    where_clauses.append("p.avg_clearness>=?")
                     params.append(min_clearness)
                 if max_clearness is not None:
-                    where_clauses.append("avg_clearness<=?")
+                    where_clauses.append("p.avg_clearness<=?")
                     params.append(max_clearness)
             else:
                 # Filter by min/max clearness regardless of experience
                 if min_clearness is not None:
-                    where_clauses.append("avg_clearness>=?")
+                    where_clauses.append("p.avg_clearness>=?")
                     params.append(min_clearness)
                 if max_clearness is not None:
-                    where_clauses.append("avg_clearness<=?")
+                    where_clauses.append("p.avg_clearness<=?")
                     params.append(max_clearness)
         
         if min_fun is not None or max_fun is not None:
             # Exclude unrated puzzles when filtering by fun
-            where_clauses.append("avg_fun > 0")
+            where_clauses.append("p.avg_fun > 0")
             if only_experienced_fun:
                 if min_fun is not None:
-                    where_clauses.append("avg_fun>=?")
+                    where_clauses.append("p.avg_fun>=?")
                     params.append(min_fun)
                 if max_fun is not None:
-                    where_clauses.append("avg_fun<=?")
+                    where_clauses.append("p.avg_fun<=?")
                     params.append(max_fun)
             else:
                 # Filter by min/max fun regardless of experience
                 if min_fun is not None:
-                    where_clauses.append("avg_fun>=?")
+                    where_clauses.append("p.avg_fun>=?")
                     params.append(min_fun)
                 if max_fun is not None:
-                    where_clauses.append("avg_fun<=?")
+                    where_clauses.append("p.avg_fun<=?")
                     params.append(max_fun)
         
         if date_from is not None:
-            where_clauses.append("created_at>=?")
+            where_clauses.append("p.created_at>=?")
             params.append(date_from)
         
         if date_to is not None:
-            where_clauses.append("created_at<=?")
+            where_clauses.append("p.created_at<=?")
             params.append(date_to)
         
         # Build order by clause
@@ -313,21 +320,22 @@ class PuzzleRepo:
             order_by = "created_at"
         
         if order_by == "id":
-            order_clause = f"id {order_direction}"
+            order_clause = f"p.id {order_direction}"
         elif order_by == "created_at":
-            order_clause = f"created_at {order_direction}"
+            order_clause = f"p.created_at {order_direction}"
         elif order_by == "difficulty":
-            order_clause = f"avg_difficulty {order_direction}"
+            order_clause = f"p.avg_difficulty {order_direction}"
         elif order_by == "fun":
-            order_clause = f"avg_fun {order_direction}"
+            order_clause = f"p.avg_fun {order_direction}"
         elif order_by == "clearness":
-            order_clause = f"avg_clearness {order_direction}"
+            order_clause = f"p.avg_clearness {order_direction}"
         else:
-            order_clause = "created_at DESC"
+            order_clause = "p.created_at DESC"
         
         where_sql = " AND ".join(where_clauses)
         query = f"""
-            SELECT * FROM puzzles
+            SELECT p.* FROM puzzles p
+            {join_sql}
             WHERE {where_sql}
             ORDER BY {order_clause}
             LIMIT ? OFFSET ?
@@ -341,6 +349,7 @@ class PuzzleRepo:
         self,
         search: Optional[str] = None,
         creator_id: Optional[int] = None,
+        creator_username: Optional[str] = None,
         min_difficulty: Optional[float] = None,
         max_difficulty: Optional[float] = None,
         only_experienced_difficulty: bool = False,
@@ -354,16 +363,22 @@ class PuzzleRepo:
         date_to: Optional[str] = None,
     ) -> int:
         """Count published puzzles with optional filters."""
-        where_clauses = ["status=?"]
+        where_clauses = ["p.status=?"]
         params = [PuzzleStatus.PUBLISHED.value]
+        join_sql = ""
         
         if search is not None:
-            where_clauses.append("name LIKE ?")
+            where_clauses.append("p.name LIKE ?")
             params.append(f"%{search}%")
         
         if creator_id is not None:
-            where_clauses.append("creator_user_id=?")
+            where_clauses.append("p.creator_user_id=?")
             params.append(creator_id)
+
+        if creator_username is not None:
+            join_sql = "JOIN users u ON p.creator_user_id = u.id"
+            where_clauses.append("LOWER(u.username) LIKE LOWER(?)")
+            params.append(f"%{creator_username}%")
         
         if min_difficulty is not None or max_difficulty is not None:
             if only_experienced_difficulty:
@@ -409,31 +424,31 @@ class PuzzleRepo:
         if min_clearness is not None or max_clearness is not None:
             if only_experienced_clearness:
                 if min_clearness is not None:
-                    where_clauses.append("avg_clearness>=?")
+                    where_clauses.append("p.avg_clearness>=?")
                     params.append(min_clearness)
                 if max_clearness is not None:
-                    where_clauses.append("avg_clearness<=?")
+                    where_clauses.append("p.avg_clearness<=?")
                     params.append(max_clearness)
         
         if min_fun is not None or max_fun is not None:
             if only_experienced_fun:
                 if min_fun is not None:
-                    where_clauses.append("avg_fun>=?")
+                    where_clauses.append("p.avg_fun>=?")
                     params.append(min_fun)
                 if max_fun is not None:
-                    where_clauses.append("avg_fun<=?")
+                    where_clauses.append("p.avg_fun<=?")
                     params.append(max_fun)
         
         if date_from is not None:
-            where_clauses.append("created_at>=?")
+            where_clauses.append("p.created_at>=?")
             params.append(date_from)
         
         if date_to is not None:
-            where_clauses.append("created_at<=?")
+            where_clauses.append("p.created_at<=?")
             params.append(date_to)
         
         where_sql = " AND ".join(where_clauses)
-        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles WHERE {where_sql}", params)
+        cur = self.conn.execute(f"SELECT COUNT(*) FROM puzzles p {join_sql} WHERE {where_sql}", params)
         row = cur.fetchone()
         return row[0] if row else 0
 
