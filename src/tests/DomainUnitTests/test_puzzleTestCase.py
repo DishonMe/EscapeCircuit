@@ -920,3 +920,189 @@ class TestPuzzleTestCaseNegativeIDHandling:
         )
         with pytest.raises(ValidationError):
             test_case.set_puzzle_id(-5)
+
+
+class TestPuzzleTestCaseListInputsOutputs:
+    """Test list branches in inputs/outputs validation"""
+    
+    def test_input_with_list_values_valid(self):
+        """Test inputs with list values containing only 0/1"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": [0, 1, 0], "b": [1, 1]},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": [0, 1, 0], "b": [1, 1]}
+    
+    def test_output_with_list_values_valid(self):
+        """Test outputs with list values containing only 0/1"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": [0, 1], "s": [1, 0, 1]}
+        )
+        assert test_case.get_expected_outputs() == {"r": [0, 1], "s": [1, 0, 1]}
+    
+    def test_input_with_list_values_invalid(self):
+        """Test inputs with list containing invalid values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": [0, 1, 2]},
+                expected_outputs={"r": 1}
+            )
+        assert "Input 'a' list must contain only 0/1" in str(exc_info.value)
+    
+    def test_output_with_list_values_invalid(self):
+        """Test outputs with list containing invalid values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": 0},
+                expected_outputs={"r": [0, 2, 1]}
+            )
+        assert "Output 'r' list must contain only 0/1" in str(exc_info.value)
+    
+    def test_mixed_scalar_and_list_inputs(self):
+        """Test mix of scalar and list values in inputs"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0, "b": [1, 0], "c": 1},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": 0, "b": [1, 0], "c": 1}
+    
+    def test_mixed_scalar_and_list_outputs(self):
+        """Test mix of scalar and list values in outputs"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": 1, "s": [0, 1], "t": 0}
+        )
+        assert test_case.get_expected_outputs() == {"r": 1, "s": [0, 1], "t": 0}
+    
+    def test_empty_list_in_input_allowed(self):
+        """Test empty list in input values - should be allowed"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": []},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": []}
+
+
+class TestPuzzleTestCaseSequentialFormat:
+    """Test sequential test cases with input_stream and output_stream"""
+    
+    def test_sequential_with_input_output_streams(self):
+        """Test sequential format with input and output streams"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[{"a": 0, "b": 1}, {"a": 1, "b": 0}],
+            expected_output_stream={"r": [0, 1]}
+        )
+        assert len(test_case.input_stream) == 2
+        assert "r" in test_case.expected_output_stream
+    
+    def test_sequential_input_stream_scalar_values(self):
+        """Test input_stream with scalar values"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1, 0, 1],
+            expected_output_stream={"out": [1, 0, 1, 0]}
+        )
+        assert test_case.input_stream == [0, 1, 0, 1]
+    
+    def test_sequential_invalid_input_stream_value(self):
+        """Test sequential with invalid input_stream values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"a": 2}],
+                expected_output_stream={"r": [0]}
+            )
+        assert "Input stream value 'a' must be 0/1" in str(exc_info.value)
+    
+    def test_sequential_invalid_output_stream_value(self):
+        """Test sequential with invalid output_stream values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"a": 0}],
+                expected_output_stream={"r": [0, 2, 1]}
+            )
+        assert "Output stream 'r' must contain only 0/1" in str(exc_info.value)
+    
+    def test_sequential_output_stream_scalar_values(self):
+        """Test output_stream with scalar values (not list)"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1, 0],
+            expected_output_stream={"out": 1}  # Single scalar value, not a list
+        )
+        assert test_case.expected_output_stream == {"out": 1}
+    
+    def test_sequential_mixed_scalar_and_list_output_stream(self):
+        """Test output_stream with both scalar and list values"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1],
+            expected_output_stream={"out1": 1, "out2": [0, 1]}
+        )
+        assert test_case.expected_output_stream == {"out1": 1, "out2": [0, 1]}
+
+
+class TestPuzzleTestCaseNoFormat:
+    """Test error when neither format is provided"""
+    
+    def test_no_combinatorial_no_sequential(self):
+        """Test validation error when neither format is provided"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[],
+                expected_output_stream={}
+            )
+        assert "must have either inputs/expected_outputs or input_stream/expected_output_stream" in str(exc_info.value)
