@@ -107,42 +107,127 @@ class AdminService:
         if target.role not in (UserRole.CREATOR, UserRole.PENDING_CREATOR):
             raise ValidationError("user is not a creator or pending creator")
 
+        # If pending creator, just cancel without asking about puzzles
+        if target.role == UserRole.PENDING_CREATOR:
+            changed = self.user_repo.update_role_if(target_user_id, UserRole.SOLVER, target.role)
+            if not changed:
+                raise ValidationError("user role was changed by another admin")
+            
+            self.notification_repo.create(
+                user_id=target_user_id,
+                notif_type="role_change",
+                message="Your pending Creator role has been cancelled by an admin.",
+            )
+            
+            self.audit_log.create(
+                admin_user_id=admin_id,
+                action_type=AuditActionType.REMOVE_CREATOR.value,
+                target_user_id=target_user_id,
+                details={
+                    "previous_role": target.role.value,
+                    "was_pending": True,
+                },
+            )
+            
+            return {"ok": True, "new_role": UserRole.SOLVER.value, "was_pending": True}
+
+        # For actual creators, return info about their puzzles
+        published_puzzles = self.puzzle_repo.get_by_creator_and_status(
+            target_user_id, PuzzleStatus.PUBLISHED
+        )
+        draft_puzzles = self.puzzle_repo.get_by_creator_and_status(
+            target_user_id, PuzzleStatus.DRAFT
+        )
+        
+        return {
+            "ok": True,
+            "user_id": target_user_id,
+            "username": target.username,
+            "published_count": len(published_puzzles),
+            "draft_count": len(draft_puzzles),
+            "published_puzzles": [{"id": p.id, "name": p.name} for p in published_puzzles],
+            "admin_action_required": len(published_puzzles) > 0,
+        }
+
+    def confirm_remove_creator(
+        self, 
+        session_token: str, 
+        target_user_id: int, 
+        action: str
+    ) -> dict:
+        """
+        Confirm creator removal with specified action for published puzzles.
+        action: "unpublish", "delete", or "leave"
+        """
+        admin_id = self._require_admin(session_token)
+
+        target = self.user_repo.get_by_id(target_user_id)
+        if not target:
+            raise ValidationError("target user not found")
+        if target.role != UserRole.CREATOR:
+            raise ValidationError("user is not a creator")
+
+        if action not in ("unpublish", "delete", "leave"):
+            raise ValidationError("invalid action")
+
         previous_role = target.role.value
         draft_count = 0
+        published_count = 0
+        action_taken = action
 
-        # Wrap the entire read-draft-IDs + delete + role-demote in one
-        # IMMEDIATE transaction to prevent TOCTOU (C6).
         with transaction(self.user_repo.conn) as txn:
-            if target.role == UserRole.CREATOR:
-                draft_puzzles = self.puzzle_repo.get_by_creator_and_status(
-                    target_user_id, PuzzleStatus.DRAFT
-                )
-                draft_ids = [p.id for p in draft_puzzles]
-                draft_count = len(draft_ids)
-                if draft_ids:
-                    self.solve_repo.delete_by_puzzle_ids(draft_ids)
-                    for pid in draft_ids:
-                        self.rating_repo.delete_by_puzzle(pid)
-                    txn.execute(
-                        "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
-                    )
-                    for p in draft_puzzles:
-                        txn.execute(
-                            "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
-                            (p.name,),
-                        )
-                    self.puzzle_repo.delete_by_ids(draft_ids)
+            # Handle draft puzzles — always delete
+            draft_puzzles = self.puzzle_repo.get_by_creator_and_status(
+                target_user_id, PuzzleStatus.DRAFT
+            )
+            draft_ids = [p.id for p in draft_puzzles]
+            draft_count = len(draft_ids)
+            if draft_ids:
+                self.solve_repo.delete_by_puzzle_ids(draft_ids)
+                for pid in draft_ids:
+                    self.rating_repo.delete_by_puzzle(pid)
+                for p in draft_puzzles:
+                    self.puzzle_repo.track_user_deletion(p.name)
+                self.puzzle_repo.delete_by_ids(draft_ids)
 
+            # Handle published puzzles based on admin's choice
+            published_puzzles = self.puzzle_repo.get_by_creator_and_status(
+                target_user_id, PuzzleStatus.PUBLISHED
+            )
+            published_ids = [p.id for p in published_puzzles]
+            published_count = len(published_ids)
+
+            if action == "delete" and published_ids:
+                self.solve_repo.delete_by_puzzle_ids(published_ids)
+                for pid in published_ids:
+                    self.rating_repo.delete_by_puzzle(pid)
+                for p in published_puzzles:
+                    self.puzzle_repo.track_admin_deletion(p.name)
+                self.puzzle_repo.delete_by_ids(published_ids)
+            elif action == "unpublish" and published_ids:
+                # Unpublish published puzzles
+                for p in published_puzzles:
+                    p.status = PuzzleStatus.UNPUBLISHED
+                    self.puzzle_repo.update(p)
+
+            # Demote user to solver
             changed = self.user_repo.update_role_if(target_user_id, UserRole.SOLVER, target.role)
             if not changed:
                 raise ValidationError("user role was changed by another admin")
             # COMMIT at context-manager exit
 
         # Notify user
+        if action == "delete":
+            message = f"Your Creator role has been removed by an admin. {published_count} published puzzle(s) and {draft_count} draft puzzle(s) have been deleted. You have been set back to Solver."
+        elif action == "unpublish":
+            message = f"Your Creator role has been removed by an admin. {published_count} published puzzle(s) have been unpublished and {draft_count} draft puzzle(s) have been deleted. You have been set back to Solver."
+        else:  # leave
+            message = f"Your Creator role has been removed by an admin. Your {published_count} published puzzle(s) remain published. {draft_count} draft puzzle(s) have been deleted. You have been set back to Solver."
+
         self.notification_repo.create(
             user_id=target_user_id,
             notif_type="role_change",
-            message="Your Creator role has been removed by an admin. You have been set back to Solver.",
+            message=message,
         )
 
         # Audit log (req 7.5)
@@ -153,10 +238,18 @@ class AdminService:
             details={
                 "previous_role": previous_role,
                 "draft_puzzles_deleted": draft_count,
+                "published_puzzles_action": action_taken,
+                "published_count": published_count,
             },
         )
 
-        return {"ok": True, "new_role": UserRole.SOLVER.value}
+        return {
+            "ok": True,
+            "new_role": UserRole.SOLVER.value,
+            "action": action,
+            "draft_deleted": draft_count,
+            "published_affected": published_count,
+        }
 
     # ------------------------------------------------------------------ #
     #  REQ 7.4  —  Delete Any Puzzle
@@ -178,13 +271,8 @@ class AdminService:
             self.solve_repo.delete_by_puzzle(puzzle_id)
             self.rating_repo.delete_by_puzzle(puzzle_id)
             self.puzzle_repo.delete(puzzle_id)
-            txn.execute(
-                "CREATE TABLE IF NOT EXISTS deleted_puzzle_names (name TEXT PRIMARY KEY)"
-            )
-            txn.execute(
-                "INSERT OR IGNORE INTO deleted_puzzle_names(name) VALUES(?)",
-                (puzzle_name,),
-            )
+            # Track admin deletion to prevent re-import by insert_riddles
+            self.puzzle_repo.track_admin_deletion(puzzle_name)
             # COMMIT at context-manager exit
 
         # Audit log (req 7.5)

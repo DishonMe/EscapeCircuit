@@ -83,6 +83,18 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzle_test_cases DROP COLUMN max_cycles;")
         except Exception:
             pass
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_deleted_puzzles (
+            name TEXT PRIMARY KEY,
+            deleted_at TEXT NOT NULL
+        );
+        """)
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_deleted_puzzles (
+            name TEXT PRIMARY KEY,
+            deleted_at TEXT NOT NULL
+        );
+        """)
 
     def create(self, puzzle: Puzzle) -> Puzzle:
         cur = self.conn.execute("""
@@ -623,6 +635,46 @@ class PuzzleRepo:
             f"DELETE FROM puzzles WHERE id IN ({placeholders})", puzzle_ids
         )
         return cur.rowcount
+
+    def track_user_deletion(self, puzzle_name: str) -> None:
+        """Track that a puzzle was deleted by a user."""
+        from datetime import datetime, timezone
+        deleted_at = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            "INSERT OR REPLACE INTO user_deleted_puzzles(name, deleted_at) VALUES(?, ?)",
+            (puzzle_name, deleted_at)
+        )
+
+    def track_admin_deletion(self, puzzle_name: str) -> None:
+        """Track that a puzzle was deleted by an admin."""
+        from datetime import datetime, timezone
+        deleted_at = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            "INSERT OR REPLACE INTO admin_deleted_puzzles(name, deleted_at) VALUES(?, ?)",
+            (puzzle_name, deleted_at)
+        )
+
+    def get_deleted_puzzle_names(self) -> set:
+        """Get all deleted puzzle names (both user and admin deletions)."""
+        user_deleted = set(
+            r[0] for r in self.conn.execute("SELECT name FROM user_deleted_puzzles").fetchall()
+        )
+        admin_deleted = set(
+            r[0] for r in self.conn.execute("SELECT name FROM admin_deleted_puzzles").fetchall()
+        )
+        return user_deleted | admin_deleted
+
+    def get_user_deleted_puzzle_names(self) -> set:
+        """Get puzzle names deleted by users."""
+        return set(
+            r[0] for r in self.conn.execute("SELECT name FROM user_deleted_puzzles").fetchall()
+        )
+
+    def get_admin_deleted_puzzle_names(self) -> set:
+        """Get puzzle names deleted by admins."""
+        return set(
+            r[0] for r in self.conn.execute("SELECT name FROM admin_deleted_puzzles").fetchall()
+        )
 
     @staticmethod
     def _difficulty_to_level(difficulty_value: float) -> str:

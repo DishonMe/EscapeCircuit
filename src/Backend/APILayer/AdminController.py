@@ -24,6 +24,11 @@ class RemoveCreatorReq(BaseModel):
     target_user_id: int
 
 
+class ConfirmRemoveCreatorReq(BaseModel):
+    target_user_id: int
+    action: str  # "unpublish", "delete", or "leave"
+
+
 def get_db_conn():
     """Helper to get a fresh connection for the upload-puzzle script."""
     current_file = pathlib.Path(__file__).resolve()
@@ -78,6 +83,19 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
     def remove_creator(req: RemoveCreatorReq, token: str = Depends(verify_token)):
         try:
             return admin_service.remove_creator(token, req.target_user_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    # ------------------------------------------------------------------ #
+    #  REQ 7.3 + 1.2.1  —  Confirm remove creator with action
+    # ------------------------------------------------------------------ #
+    @router.post("/confirm-remove-creator")
+    def confirm_remove_creator(req: ConfirmRemoveCreatorReq, token: str = Depends(verify_token)):
+        try:
+            return admin_service.confirm_remove_creator(token, req.target_user_id, req.action)
         except ValidationError as e:
             msg = str(e)
             if "admin required" in msg:

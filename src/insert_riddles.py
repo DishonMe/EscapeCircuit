@@ -101,29 +101,61 @@ def latex_to_html(latex_text: str) -> str:
     
     return html
 
+def get_seed_puzzle_names(riddles_dir):
+    """
+    Get the set of puzzle names that are defined in the riddles/ directory.
+    These are the 'seed' puzzles that should be imported/updated.
+    """
+    seed_names = set()
+    if not os.path.exists(riddles_dir):
+        return seed_names
+    
+    for filename in os.listdir(riddles_dir):
+        if not filename.endswith('_config.json'):
+            continue
+        config_path = os.path.join(riddles_dir, filename)
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            puzzle_name = cfg.get('puzzle', {}).get('name', '')
+            if puzzle_name:
+                seed_names.add(puzzle_name)
+        except Exception:
+            pass
+    return seed_names
+
 def clean_database(conn):
     """
-    Clears ratings, test cases, and puzzles (for fresh re-import).
-    Also resets AUTOINCREMENT sequence counters so IDs start at 1.
+    Clears ratings and test cases for seed puzzles (for fresh re-import).
+    DOES NOT delete puzzles - preserves user-created puzzles.
+    Seed puzzles will be updated in-place if they exist.
     """
     print("Cleaning re-importable data...")
     c = conn.cursor()
     
-    # Clear old data
-    for table in ["rating", "puzzle_test_cases", "puzzles"]:
+    # Get seed puzzle IDs to clear their test cases
+    seed_names = get_seed_puzzle_names(RIDDLES_DIR)
+    if seed_names:
+        placeholders = ','.join('?' * len(seed_names))
         try:
-            c.execute(f"DELETE FROM {table}")
-            print(f"  - Cleared table: {table}")
-        except sqlite3.OperationalError as e:
-            print(f"  - Warning: Could not clear {table} (maybe doesn't exist): {e}")
-    
-    # Reset AUTOINCREMENT sequence so IDs start at 1
-    try:
-        c.execute("DELETE FROM sqlite_sequence WHERE name IN ('puzzles', 'puzzle_test_cases')")
-        print(f"  - Reset ID sequences for puzzles and puzzle_test_cases")
-    except sqlite3.OperationalError:
-        pass  # sqlite_sequence table may not exist yet
+            # Clear test cases for seed puzzles only
+            c.execute(
+                f"DELETE FROM puzzle_test_cases WHERE puzzle_id IN "
+                f"(SELECT id FROM puzzles WHERE name IN ({placeholders}))",
+                list(seed_names)
+            )
+            print(f"  - Cleared test cases for seed puzzles")
             
+            # Clear ratings for seed puzzles only
+            c.execute(
+                f"DELETE FROM rating WHERE puzzle_id IN "
+                f"(SELECT id FROM puzzles WHERE name IN ({placeholders}))",
+                list(seed_names)
+            )
+            print(f"  - Cleared ratings for seed puzzles")
+        except sqlite3.OperationalError as e:
+            print(f"  - Warning: Could not clear seed puzzle data: {e}")
+    
     conn.commit()
     print("Done.")
 
@@ -332,24 +364,37 @@ def main():
         # 2. Get Admin
         admin_id = get_or_create_admin(conn)
         
-        # 3. Build set of puzzle names that were admin-deleted (should not be re-imported)
+        # 3. Build set of puzzle names that were deleted (should not be re-imported)
+        # Query both user_deleted_puzzles and admin_deleted_puzzles tables
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS deleted_puzzle_names (
-                name TEXT PRIMARY KEY
+            CREATE TABLE IF NOT EXISTS user_deleted_puzzles (
+                name TEXT PRIMARY KEY,
+                deleted_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS admin_deleted_puzzles (
+                name TEXT PRIMARY KEY,
+                deleted_at TEXT NOT NULL
             )
         """)
         conn.commit()
+        
         deleted_names = set()
         try:
-            rows = conn.execute("SELECT name FROM deleted_puzzle_names").fetchall()
-            deleted_names = {r[0] for r in rows}
+            # Get user deletions
+            user_deleted = conn.execute("SELECT name FROM user_deleted_puzzles").fetchall()
+            deleted_names.update(r[0] for r in user_deleted)
+            # Get admin deletions
+            admin_deleted = conn.execute("SELECT name FROM admin_deleted_puzzles").fetchall()
+            deleted_names.update(r[0] for r in admin_deleted)
         except sqlite3.OperationalError:
             pass
         if deleted_names:
-            print(f"  Skipping {len(deleted_names)} admin-deleted puzzle(s).")
+            print(f"  Skipping {len(deleted_names)} deleted puzzle(s).")
 
         # 4. Iterate and insert/update ALL riddles from files,
-        #    but skip any whose name was admin-deleted.
+        #    but skip any whose name was deleted (user or admin).
         print("Importing riddles...")
         count = 0
         for filename in os.listdir(RIDDLES_DIR):

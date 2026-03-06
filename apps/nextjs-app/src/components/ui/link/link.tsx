@@ -1,3 +1,5 @@
+'use client';
+
 import NextLink, { LinkProps as NextLinkProps } from 'next/link';
 import { MouseEvent } from 'react';
 

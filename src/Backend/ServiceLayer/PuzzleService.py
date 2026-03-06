@@ -271,11 +271,14 @@ class PuzzleService:
         if not self.repo.list_test_cases(puzzle_id):
             raise ValidationError("Cannot publish puzzle without test cases. Add at least one test case that demonstrates the solution.")
 
-        # 2) creator must have solved (self-solve). If SolveRepo isn't wired yet,
-        #    we skip this check to avoid breaking dependency injection.
+        # 2) creator must have solved (self-solve) — but only on first publish from DRAFT.
+        #    If re-publishing from UNPUBLISHED status, skip this check since it was solved before.
+        #    If SolveRepo isn't wired yet, we skip this check to avoid breaking dependency injection.
         if self.solve_repo is not None and not is_admin:
-            if not self.solve_repo.has_passed(user_id, puzzle_id):
-                raise ValidationError("You must solve this puzzle yourself before publishing it. This ensures the puzzle is actually solvable.")
+            # Only enforce solve requirement if transitioning from DRAFT
+            if p.status == PuzzleStatus.DRAFT:
+                if not self.solve_repo.has_passed(user_id, puzzle_id):
+                    raise ValidationError("You must solve this puzzle yourself before publishing it. This ensures the puzzle is actually solvable.")
 
         # Atomic publish with per-user limit check inside IMMEDIATE transaction
         now_iso = utcnow().isoformat()
@@ -340,8 +343,13 @@ class PuzzleService:
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
+        puzzle_name = p.name
         deleted = self.repo.delete(puzzle_id)
+        
+        # Track user deletion to prevent re-import by insert_riddles
+        self.repo.track_user_deletion(puzzle_name)
         self.repo.conn.commit()
+        
         if not deleted:
             raise ValidationError("Failed to delete puzzle")
         return {"success": True, "message": "Puzzle deleted successfully"}
