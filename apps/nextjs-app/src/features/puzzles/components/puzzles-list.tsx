@@ -12,8 +12,7 @@ import {
   Filter,
   X,
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
-import { useMemo, useState, ChangeEvent } from 'react';
+import { useMemo, useState, ChangeEvent, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +24,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Link } from '@/components/ui/link';
-import { Spinner } from '@/components/ui/spinner';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
@@ -35,25 +33,56 @@ import { usePuzzles, PuzzleFilters } from '../api/get-puzzles';
 import { CreatorCommentDialog } from './creator-comment-dialog';
 import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 
-export const PuzzlesList = () => {
-  const searchParams = useSearchParams();
-  const page = searchParams?.get('page') ? Number(searchParams.get('page')) : 1;
+function useDebouncedValue<T>(value: T, delay: number = 400): T {
+  const [debounced, setDebounced] = useState(value);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+
+export const PuzzlesList = () => {
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1 });
+  const [creatorSearchInput, setCreatorSearchInput] = useState('');
+  const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
+
+  useEffect(() => {
+    setFilters((prev) => {
+      const nextCreator = debouncedCreatorSearch.trim() || undefined;
+      if (prev.creator === nextCreator) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        creator: nextCreator,
+        page: 1,
+      };
+    });
+  }, [debouncedCreatorSearch]);
 
   const puzzlesQuery = usePuzzles({
     filters: {
-      page: filters.page || page,
+      page: filters.page || 1,
       ...filters,
+    },
+    config: {
+      // Keep prior page/filter results visible while the next request is in-flight.
+      placeholderData: (previousData) => previousData,
     },
   });
 
   const puzzles = puzzlesQuery.data?.data;
   const meta = puzzlesQuery.data?.meta;
+  const isRefetching = puzzlesQuery.isFetching && !puzzlesQuery.isLoading;
+  const isBusyLoading = puzzlesQuery.isLoading || isRefetching;
 
   // Filter puzzles based on medal filter (client-side, based on best_medal)
   const filteredPuzzles = useMemo(() => {
@@ -136,7 +165,10 @@ export const PuzzlesList = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setFilters({ page: 1 })}
+            onClick={() => {
+              setFilters({ page: 1 });
+              setCreatorSearchInput('');
+            }}
             className="text-muted-foreground text-[13px]"
           >
             <X className="size-4" />
@@ -148,8 +180,8 @@ export const PuzzlesList = () => {
       {/* Filter Panel */}
       {showFilters && (
         <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-          {/* Top Level: name, min difficulty, min fun, min clearness */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* Top Level: name, creator, min difficulty, min fun, min clearness */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Search Name */}
             <div>
               <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Name</label>
@@ -159,6 +191,18 @@ export const PuzzlesList = () => {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Search Creator */}
+            <div>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Creator</label>
+              <input
+                type="text"
+                placeholder="Search by Creator..."
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                value={creatorSearchInput}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setCreatorSearchInput(e.target.value)}
               />
             </div>
 
@@ -319,10 +363,17 @@ export const PuzzlesList = () => {
         </div>
       )}
 
-      {/* Loading */}
-      {puzzlesQuery.isLoading && (
-        <div className="flex h-48 w-full items-center justify-center">
-          <Spinner size="lg" />
+      {/* Loading popup */}
+      {isBusyLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
+          <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-xl">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:0ms]" />
+              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:120ms]" />
+              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:240ms]" />
+            </div>
+            <p className="mt-3 text-center text-sm text-muted-foreground">Loading page...</p>
+          </div>
         </div>
       )}
 
@@ -335,16 +386,17 @@ export const PuzzlesList = () => {
 
       {/* Puzzle Grid */}
       {!puzzlesQuery.isLoading && !isEmpty && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredPuzzles!.map((puzzle) => (
-          <div
-            key={puzzle.id}
-            className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
-              puzzle.is_solved
-                ? 'border-emerald-200/60 hover:border-emerald-300/60'
-                : 'border-border hover:border-foreground/20'
-            }`}
-          >
+        <div className="relative">
+          <div className={`grid grid-cols-1 gap-6 transition-opacity md:grid-cols-2 lg:grid-cols-3 ${isRefetching ? 'opacity-50' : 'opacity-100'}`}>
+          {filteredPuzzles!.map((puzzle) => (
+            <div
+              key={puzzle.id}
+              className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
+                puzzle.is_solved
+                  ? 'border-emerald-200/60 hover:border-emerald-300/60'
+                  : 'border-border hover:border-foreground/20'
+              }`}
+            >
             {/* Solved checkmark overlay */}
             {puzzle.is_solved && (
               <div className="absolute -right-2 -top-2 z-10 flex size-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
@@ -561,9 +613,10 @@ export const PuzzlesList = () => {
                 Solve Puzzle
               </Link>
             </div>
+            </div>
+          ))}
           </div>
-        ))}
-      </div>
+        </div>
       )}
 
       <PuzzleDetailsDialog
@@ -599,16 +652,17 @@ export const PuzzlesList = () => {
         <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map(
             (pageNum) => (
-              <Link
+              <button
+                type="button"
                 key={pageNum}
-                href={`${paths.app.puzzles.getHref()}?page=${pageNum}`}
+                onClick={() => setFilters((prev) => ({ ...prev, page: pageNum }))}
                 className={`rounded-lg border px-3 py-2 text-sm ${pageNum === meta.page
                     ? 'border-foreground bg-foreground text-background'
                     : 'border-border bg-card text-foreground hover:bg-secondary'
                   }`}
               >
                 {pageNum}
-              </Link>
+              </button>
             ),
           )}
         </div>
