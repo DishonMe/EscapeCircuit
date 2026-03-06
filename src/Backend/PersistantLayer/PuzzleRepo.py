@@ -308,11 +308,13 @@ class PuzzleRepo:
             params.append(date_to)
         
         # Build order by clause
-        valid_order_fields = ["created_at", "difficulty", "fun", "clearness"]
+        valid_order_fields = ["id", "created_at", "difficulty", "fun", "clearness"]
         if order_by not in valid_order_fields:
             order_by = "created_at"
         
-        if order_by == "created_at":
+        if order_by == "id":
+            order_clause = f"id {order_direction}"
+        elif order_by == "created_at":
             order_clause = f"created_at {order_direction}"
         elif order_by == "difficulty":
             order_clause = f"avg_difficulty {order_direction}"

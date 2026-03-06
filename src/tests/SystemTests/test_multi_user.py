@@ -182,22 +182,3 @@ class TestUserIsolation:
         resp = client.get("/circuits", headers=auth_header(user_b))
         assert resp.status_code == 200
         assert len(resp.json()) == 0
-
-    def test_drafts_isolated(self, client, conn):
-        """User A's draft is not visible to User B."""
-        creator_token = make_creator(client, conn, "iso_creator")
-        from .conftest import create_puzzle
-        puzzle = create_puzzle(client, creator_token)
-        pid = int(puzzle["id"])
-
-        # Creator saves a draft
-        client.put(f"/puzzles/{pid}/draft", json={
-            "state_json": '{"wip": true}',
-        }, headers=auth_header(creator_token))
-
-        # Another user sees no draft for same puzzle
-        other_token = register_and_login(client, "iso_other")
-        resp = client.get(f"/puzzles/{pid}/draft",
-                          headers=auth_header(other_token))
-        assert resp.status_code == 200
-        assert resp.json()["state_json"] is None

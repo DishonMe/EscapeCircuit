@@ -19,7 +19,6 @@ from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReportRepo import ReportRepo
-from Backend.PersistantLayer.DraftRepo import DraftRepo
 
 # Services
 from Backend.ServiceLayer.AuthService import AuthService
@@ -45,7 +44,6 @@ from Backend.APILayer.RatingController import build_rating_router
 from Backend.APILayer.AdminController import build_admin_router
 from Backend.APILayer.DebuggerController import build_debugger_router
 from Backend.APILayer.DiscussionController import build_discussion_router
-from Backend.APILayer.DraftController import build_draft_router
 
 
 def create_app() -> FastAPI:
@@ -73,7 +71,6 @@ def create_app() -> FastAPI:
     reply_repo = ReplyRepo(conn)
     engagement_repo = EngagementRepo(conn)
     report_repo = ReportRepo(conn)
-    draft_repo = DraftRepo(conn)
 
     # 3. Services
     # logic engine (stateless)
@@ -208,7 +205,6 @@ def create_app() -> FastAPI:
     app.include_router(reply_router)
     app.include_router(puzzle_disc_router)
     app.include_router(report_router)
-    app.include_router(build_draft_router(draft_repo, auth_service))
 
     @app.get("/")
     def root():
