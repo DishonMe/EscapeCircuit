@@ -52,6 +52,14 @@ class TestArsenalServiceSaveArsenalPiece:
         self.mock_auth = Mock()
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
 
     def _valid_payload(self) -> dict:
         return {
@@ -125,7 +133,9 @@ class TestArsenalServiceSaveArsenalPiece:
         self.mock_auth.require_user_id.return_value = user_id
         user = Mock()
         user.id = user_id
+        user.xp = 0
         self.mock_user_repo.get_by_id.return_value = user
+        self.mock_xp.calculate_level.return_value = 1
         
         with pytest.raises(ValidationError):
             self.service.save_arsenal_piece(token, payload)
@@ -143,7 +153,9 @@ class TestArsenalServiceSaveArsenalPiece:
         self.mock_auth.require_user_id.return_value = user_id
         user = Mock()
         user.id = user_id
+        user.xp = 0
         self.mock_user_repo.get_by_id.return_value = user
+        self.mock_xp.calculate_level.return_value = 1
         
         # Mock full arsenal (MAX_ARSENAL_SIZE pieces)
         full_arsenal = [Mock() for _ in range(self.service.MAX_ARSENAL_SIZE)]
