@@ -106,12 +106,14 @@ class TestGetDiscussion:
         svc = make_service()
         svc.auth.require_user_id.return_value = 1
         svc.discussion_repo.get_by_id.return_value = make_discussion()
+        svc.discussion_repo.is_bookmarked.return_value = True
         svc.user_repo.get_by_ids.return_value = {1: make_user()}
         svc.reply_repo.list_by_discussion.return_value = []
 
         result = svc.get_discussion("token", 1)
         assert result["title"] == "Test"
         assert result["author"]["username"] == "user1"
+        assert result["is_bookmarked"] is True
         # get_discussion should NOT increment view count
         svc.discussion_repo.increment_view_count.assert_not_called()
 
@@ -129,6 +131,7 @@ class TestListDiscussions:
         svc.auth.require_user_id.return_value = 1
         svc.discussion_repo.list_all.return_value = [make_discussion(), make_discussion(discussion_id=2, title="T2")]
         svc.discussion_repo.count.return_value = 2
+        svc.discussion_repo.get_user_bookmarks.return_value = [2]
         svc.user_repo.get_by_ids.return_value = {1: make_user()}
 
         result = svc.list_discussions("token")
@@ -136,6 +139,23 @@ class TestListDiscussions:
         assert result["total"] == 2
         # Verify authors are enriched via batch fetch
         assert result["discussions"][0]["author"]["username"] == "user1"
+        assert result["discussions"][0]["is_bookmarked"] is False
+        assert result["discussions"][1]["is_bookmarked"] is True
+
+    def test_bookmarked_only_filter_passes_user_id(self):
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 7
+        svc.discussion_repo.list_all.return_value = []
+        svc.discussion_repo.count.return_value = 0
+        svc.discussion_repo.get_user_bookmarks.return_value = []
+        svc.user_repo.get_by_ids.return_value = {}
+
+        svc.list_discussions("token", bookmarked_only=True)
+
+        svc.discussion_repo.list_all.assert_called_once()
+        assert svc.discussion_repo.list_all.call_args.kwargs["bookmarked_user_id"] == 7
+        svc.discussion_repo.count.assert_called_once()
+        assert svc.discussion_repo.count.call_args.kwargs["bookmarked_user_id"] == 7
 
 
 class TestUpdateDiscussion:
@@ -374,24 +394,26 @@ class TestFollowDiscussion:
 
 class TestBookmarkDiscussion:
     def test_bookmark_success(self):
-        svc = make_full_service()
+        svc = make_service()
         svc.auth.require_user_id.return_value = 2
         svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
-        svc.engagement.toggle_bookmark.return_value = True
+        svc.discussion_repo.is_bookmarked.return_value = False
 
         result = svc.bookmark_discussion("token", 1)
 
         assert result["is_bookmarked"] is True
+        svc.discussion_repo.add_bookmark.assert_called_once_with(2, 1)
 
     def test_unbookmark_success(self):
-        svc = make_full_service()
+        svc = make_service()
         svc.auth.require_user_id.return_value = 2
         svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1, author_id=1)
-        svc.engagement.toggle_bookmark.return_value = False
+        svc.discussion_repo.is_bookmarked.return_value = True
 
         result = svc.bookmark_discussion("token", 1)
 
         assert result["is_bookmarked"] is False
+        svc.discussion_repo.remove_bookmark.assert_called_once_with(2, 1)
 
 
 # ---------------------------------------------------------------------------

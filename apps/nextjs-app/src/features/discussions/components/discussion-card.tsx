@@ -1,12 +1,13 @@
 'use client';
 
-import { MessageSquare, Eye, Pin, Lock, CheckCircle } from 'lucide-react';
+import { MessageSquare, Eye, Pin, Lock, CheckCircle, Bookmark } from 'lucide-react';
 import NextLink from 'next/link';
 
 import { paths } from '@/config/paths';
 import { Discussion } from '@/types/api';
 import { cn } from '@/utils/cn';
 
+import { useToggleBookmark } from '../api/bookmark-discussion';
 import { CategoryBadge } from './category-badge';
 import { UserBadge } from './user-badge';
 
@@ -22,17 +23,23 @@ function timeAgo(ts: number): string {
 
 export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
   const hasAcceptedSolution = discussion.accepted_reply_id != null;
+  const isBookmarked = discussion.is_bookmarked ?? false;
+  const bookmarkMutation = useToggleBookmark({
+    discussionId: String(discussion.id),
+  });
 
   return (
-    <NextLink
-      href={paths.app.discussion.getHref(discussion.id)}
+    <div
       className={cn(
         'block rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/20 hover:shadow-card',
         discussion.is_pinned && 'border-l-4 border-l-blue-500',
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <NextLink
+          href={paths.app.discussion.getHref(discussion.id)}
+          className="min-w-0 flex-1"
+        >
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {discussion.is_pinned && (
               <Pin className="size-3.5 text-blue-500" />
@@ -58,10 +65,32 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
           <p className="line-clamp-1 text-[11px] text-muted-foreground">
             {discussion.body.slice(0, 120)}
           </p>
-        </div>
+        </NextLink>
+
+        <button
+          type="button"
+          aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+          className={cn(
+            'rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+            isBookmarked && 'text-yellow-600',
+          )}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            bookmarkMutation.mutate({ discussionId: String(discussion.id) });
+          }}
+          disabled={bookmarkMutation.isPending}
+        >
+          <Bookmark
+            className={cn('size-4', isBookmarked && 'fill-yellow-500 text-yellow-500')}
+          />
+        </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+      <NextLink
+        href={paths.app.discussion.getHref(discussion.id)}
+        className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground"
+      >
         <span className="font-medium text-muted-foreground">
           {discussion.author?.username || 'Unknown'}
         </span>
@@ -75,7 +104,7 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
           {discussion.view_count}
         </span>
         <span className="ml-auto">{timeAgo(discussion.createdAt)}</span>
-      </div>
-    </NextLink>
+      </NextLink>
+    </div>
   );
 };

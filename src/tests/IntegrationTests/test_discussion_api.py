@@ -212,6 +212,26 @@ class TestDiscussionEngagement:
 
         resp = client.post(f"/discussions/{did}/bookmark", headers=auth_header(token))
         assert resp.status_code == 200
+        assert resp.json()["is_bookmarked"] is True
+
+        # Toggle off
+        resp = client.post(f"/discussions/{did}/bookmark", headers=auth_header(token))
+        assert resp.status_code == 200
+        assert resp.json()["is_bookmarked"] is False
+
+    def test_list_bookmarked_only(self, client):
+        token = register_and_login(client)
+        d1 = _create_discussion(client, token, "Bookmarked")
+        _create_discussion(client, token, "Unbookmarked")
+
+        client.post(f"/discussions/{d1['id']}/bookmark", headers=auth_header(token))
+
+        resp = client.get("/discussions?bookmarked_only=true", headers=auth_header(token))
+        assert resp.status_code == 200
+        data = resp.json()["discussions"]
+        assert len(data) == 1
+        assert data[0]["id"] == d1["id"]
+        assert data[0]["is_bookmarked"] is True
 
     def test_follow_discussion(self, client):
         token = register_and_login(client)

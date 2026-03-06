@@ -31,6 +31,20 @@ class DiscussionRepo:
             updated_at TEXT NOT NULL
         );
         """)
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS bookmarked_discussions (
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, discussion_id)
+        );
+        """)
+
+    def _has_legacy_bookmark_table(self) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='discussion_bookmarks'"
+        ).fetchone()
+        return row is not None
 
     def create(self, discussion: Discussion) -> Discussion:
         cur = self.conn.execute("""
@@ -80,12 +94,13 @@ class DiscussionRepo:
                 result[disc.id] = disc
         return result
 
-    @staticmethod
     def _build_where(
+        self,
         category: Optional[str] = None,
         puzzle_id: Optional[int] = None,
         author_id: Optional[int] = None,
         search: Optional[str] = None,
+        bookmarked_user_id: Optional[int] = None,
     ) -> tuple:
         """Build WHERE clause and params shared by list_all() and count()."""
         where_clauses: list = []
@@ -104,6 +119,32 @@ class DiscussionRepo:
             where_clauses.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
             pattern = f"%{escaped}%"
             params.extend([pattern, pattern])
+        if bookmarked_user_id is not None:
+            if self._has_legacy_bookmark_table():
+                where_clauses.append("""
+                    (
+                        EXISTS (
+                            SELECT 1
+                            FROM bookmarked_discussions bd
+                            WHERE bd.discussion_id = discussions.id AND bd.user_id = ?
+                        )
+                        OR EXISTS (
+                            SELECT 1
+                            FROM discussion_bookmarks db
+                            WHERE db.discussion_id = discussions.id AND db.user_id = ?
+                        )
+                    )
+                """)
+                params.extend([int(bookmarked_user_id), int(bookmarked_user_id)])
+            else:
+                where_clauses.append("""
+                    EXISTS (
+                        SELECT 1
+                        FROM bookmarked_discussions bd
+                        WHERE bd.discussion_id = discussions.id AND bd.user_id = ?
+                    )
+                """)
+                params.append(int(bookmarked_user_id))
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
         return where_sql, params
 
@@ -116,8 +157,16 @@ class DiscussionRepo:
         author_id: Optional[int] = None,
         sort_by: str = "newest",
         search: Optional[str] = None,
+        bookmarked_user_id: Optional[int] = None,
+        prioritize_bookmarked_user_id: Optional[int] = None,
     ) -> List[Discussion]:
-        where_sql, params = self._build_where(category=category, puzzle_id=puzzle_id, author_id=author_id, search=search)
+        where_sql, params = self._build_where(
+            category=category,
+            puzzle_id=puzzle_id,
+            author_id=author_id,
+            search=search,
+            bookmarked_user_id=bookmarked_user_id,
+        )
 
         order_map = {
             "newest": "created_at DESC",
@@ -128,11 +177,42 @@ class DiscussionRepo:
         }
         order_clause = order_map.get(sort_by, "created_at DESC")
 
+        bookmark_order_clause = ""
+        bookmark_params: list = []
+        if prioritize_bookmarked_user_id is not None:
+            if self._has_legacy_bookmark_table():
+                bookmark_order_clause = """
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM bookmarked_discussions bd
+                            WHERE bd.discussion_id = discussions.id AND bd.user_id = ?
+                        ) OR EXISTS (
+                            SELECT 1 FROM discussion_bookmarks db
+                            WHERE db.discussion_id = discussions.id AND db.user_id = ?
+                        ) THEN 0 ELSE 1
+                    END,
+                """
+                bookmark_params.extend([
+                    int(prioritize_bookmarked_user_id),
+                    int(prioritize_bookmarked_user_id),
+                ])
+            else:
+                bookmark_order_clause = """
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM bookmarked_discussions bd
+                            WHERE bd.discussion_id = discussions.id AND bd.user_id = ?
+                        ) THEN 0 ELSE 1
+                    END,
+                """
+                bookmark_params.append(int(prioritize_bookmarked_user_id))
+
         query = f"""
             SELECT * FROM discussions {where_sql}
-            ORDER BY is_pinned DESC, {order_clause}
+            ORDER BY {bookmark_order_clause} is_pinned DESC, {order_clause}
             LIMIT ? OFFSET ?
         """
+        params.extend(bookmark_params)
         params.extend([limit, offset])
         rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_discussion(r) for r in rows]
@@ -143,12 +223,95 @@ class DiscussionRepo:
         puzzle_id: Optional[int] = None,
         author_id: Optional[int] = None,
         search: Optional[str] = None,
+        bookmarked_user_id: Optional[int] = None,
     ) -> int:
-        where_sql, params = self._build_where(category=category, puzzle_id=puzzle_id, author_id=author_id, search=search)
+        where_sql, params = self._build_where(
+            category=category,
+            puzzle_id=puzzle_id,
+            author_id=author_id,
+            search=search,
+            bookmarked_user_id=bookmarked_user_id,
+        )
         row = self.conn.execute(
             f"SELECT COUNT(*) FROM discussions {where_sql}", params
         ).fetchone()
         return row[0] if row else 0
+
+    def add_bookmark(self, user_id: int, discussion_id: int) -> bool:
+        cur = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO bookmarked_discussions(user_id, discussion_id, created_at)
+            VALUES(?,?,?)
+            """,
+            (int(user_id), int(discussion_id), utcnow().isoformat()),
+        )
+        if self._has_legacy_bookmark_table():
+            self.conn.execute(
+                """
+                INSERT OR IGNORE INTO discussion_bookmarks(discussion_id, user_id, created_at)
+                VALUES(?,?,?)
+                """,
+                (int(discussion_id), int(user_id), utcnow().isoformat()),
+            )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def remove_bookmark(self, user_id: int, discussion_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM bookmarked_discussions WHERE user_id=? AND discussion_id=?",
+            (int(user_id), int(discussion_id)),
+        )
+        if self._has_legacy_bookmark_table():
+            self.conn.execute(
+                "DELETE FROM discussion_bookmarks WHERE user_id=? AND discussion_id=?",
+                (int(user_id), int(discussion_id)),
+            )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_user_bookmarks(self, user_id: int) -> List[int]:
+        rows = self.conn.execute(
+            """
+            SELECT discussion_id
+            FROM bookmarked_discussions
+            WHERE user_id=?
+            ORDER BY created_at DESC
+            """,
+            (int(user_id),),
+        ).fetchall()
+        bookmark_ids = [int(row["discussion_id"]) for row in rows]
+
+        if self._has_legacy_bookmark_table():
+            legacy_rows = self.conn.execute(
+                """
+                SELECT discussion_id
+                FROM discussion_bookmarks
+                WHERE user_id=?
+                ORDER BY created_at DESC
+                """,
+                (int(user_id),),
+            ).fetchall()
+            legacy_ids = [int(row["discussion_id"]) for row in legacy_rows]
+            return list(dict.fromkeys(bookmark_ids + legacy_ids))
+
+        return bookmark_ids
+
+    def is_bookmarked(self, user_id: int, discussion_id: int) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM bookmarked_discussions WHERE user_id=? AND discussion_id=?",
+            (int(user_id), int(discussion_id)),
+        ).fetchone()
+        if row is not None:
+            return True
+
+        if self._has_legacy_bookmark_table():
+            legacy_row = self.conn.execute(
+                "SELECT 1 FROM discussion_bookmarks WHERE user_id=? AND discussion_id=?",
+                (int(user_id), int(discussion_id)),
+            ).fetchone()
+            return legacy_row is not None
+
+        return False
 
     def update(self, discussion_id: int, fields: dict) -> Optional[Discussion]:
         allowed = {"title", "body", "category", "is_pinned", "is_locked", "upvotes", "updated_at"}

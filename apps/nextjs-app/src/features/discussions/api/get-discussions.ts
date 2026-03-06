@@ -10,6 +10,7 @@ export type DiscussionFilters = {
   category?: ThreadCategory;
   puzzle_id?: number;
   author_id?: number;
+  bookmarkedOnly?: boolean;
   sort?: 'newest' | 'oldest' | 'most_replies' | 'most_upvotes' | 'trending';
   search?: string;
 };
@@ -29,6 +30,7 @@ export const getDiscussions = (
       category: filters.category,
       puzzle_id: filters.puzzle_id,
       author_id: filters.author_id,
+      bookmarked_only: filters.bookmarkedOnly ?? false,
       sort: filters.sort ?? 'newest',
       search: filters.search || undefined,
     },
