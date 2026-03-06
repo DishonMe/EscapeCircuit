@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 
 from Backend import settings
+from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 
@@ -260,7 +261,9 @@ class PuzzleService:
         if not p:
             raise ValidationError("puzzle not found")
 
-        if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
+        is_admin = self._is_admin(user.role)
+
+        if not is_admin and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
 
         # Publish preconditions (ADD/ARD):
@@ -270,41 +273,36 @@ class PuzzleService:
 
         # 2) creator must have solved (self-solve). If SolveRepo isn't wired yet,
         #    we skip this check to avoid breaking dependency injection.
-        if self.solve_repo is not None and user.role != UserRole.ADMIN:
+        if self.solve_repo is not None and not is_admin:
             if not self.solve_repo.has_passed(user_id, puzzle_id):
                 raise ValidationError("You must solve this puzzle yourself before publishing it. This ensures the puzzle is actually solvable.")
 
         # Atomic publish with per-user limit check inside IMMEDIATE transaction
         now_iso = utcnow().isoformat()
-        _max_pub = settings.PUZZLE_MAX_PUBLISHED_PER_USER
         with transaction(self.repo.conn):
-            if user.role != UserRole.ADMIN:
-                cur = self.repo.conn.execute(
-                    f"""
-                    UPDATE puzzles
-                    SET status = 'published', created_at = ?
-                    WHERE id = ? AND status != 'published'
-                      AND (SELECT COUNT(*) FROM puzzles
-                           WHERE creator_user_id = ? AND status = 'published') < {_max_pub}
-                    """,
-                    (now_iso, int(puzzle_id), int(user_id)),
-                )
-                if cur.rowcount == 0:
-                    # Either already published or hit the limit — check which
-                    published_count = self.repo.count_published(creator_id=user_id)
-                    if published_count >= _max_pub:
-                        raise ValidationError(f"You have reached the maximum of {_max_pub} published puzzles. Unpublish a puzzle before publishing a new one.")
-                    raise ValidationError("Puzzle is already published or could not be updated.")
-            else:
-                # Admins bypass the 10-puzzle limit
-                self.repo.conn.execute(
-                    "UPDATE puzzles SET status = 'published', created_at = ? WHERE id = ?",
-                    (now_iso, int(puzzle_id)),
-                )
+            if not is_admin:
+                current_count = self.repo.count_published(creator_id=user_id)
+                if p.status != PuzzleStatus.PUBLISHED and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER:
+                    raise ValidationError(
+                        f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
+                    )
+
+            cur = self.repo.conn.execute(
+                "UPDATE puzzles SET status = 'published', created_at = ? WHERE id = ? AND status != 'published'",
+                (now_iso, int(puzzle_id)),
+            )
+            if cur.rowcount == 0:
+                raise ValidationError("Puzzle is already published or could not be updated.")
 
         # Re-read for return value
         p = self.repo.get_by_id(puzzle_id)
         return self._enrich_puzzle(p.to_dict())
+
+    @staticmethod
+    def _is_admin(role: Any) -> bool:
+        if isinstance(role, UserRole):
+            return role == UserRole.ADMIN
+        return str(role).strip().lower() == UserRole.ADMIN.value
 
     def unpublish(self, session_token: str, puzzle_id: int) -> dict:
         user_id = self.auth.require_user_id(session_token)
