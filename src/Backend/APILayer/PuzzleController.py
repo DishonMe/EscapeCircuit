@@ -201,6 +201,14 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                                 p["can_rate"] = p.get("is_solved", False)
                         else:
                             p["can_rate"] = p.get("is_solved", False)
+                        # Inject user's rating (if exists)
+                        if pid and rating_service:
+                            try:
+                                user_rating = rating_service.rating_repo.get_by_puzzle_user(pid, user_id)
+                                if user_rating:
+                                    p["user_rating"] = user_rating.to_dict()
+                            except Exception:
+                                pass
                         # Inject rating metrics
                         _inject_rating_metrics(p)
             except Exception:

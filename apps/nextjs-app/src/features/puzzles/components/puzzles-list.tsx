@@ -476,6 +476,14 @@ export const PuzzlesList = () => {
 
             {/* Rating and creator comment */}
             <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3">
+              {/* Already Rated Badge */}
+              {puzzle.user_rating && (
+                <div className="flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 w-full">
+                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                  <span>You already rated this puzzle</span>
+                </div>
+              )}
+
               {/* Weighted Difficulty — clickable to open rating dialog */}
               <button
                 type="button"
