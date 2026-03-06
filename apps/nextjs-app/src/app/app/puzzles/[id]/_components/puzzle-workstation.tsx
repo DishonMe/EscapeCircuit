@@ -32,6 +32,7 @@ import {
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 import { CircuitDebugger } from '@/components/circuit-debugger';
+import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -49,7 +50,15 @@ const EMPTY_COMPONENTS: CircuitComponent[] = [];
 
 type PostCheckState =
   | { open: false }
-  | { open: true; solved: boolean; message: string; medal?: string };
+  | {
+      open: true;
+      solved: boolean;
+      message: string;
+      medal?: string;
+      xpEarned?: number;
+      puzzleTotalXP?: number;
+      xpLeftForMax?: number;
+    };
 
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
@@ -436,6 +445,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   }, [uiCatalog]);
 
+  // Keep a ref to applyParsedState so the load-state effect doesn't re-run
+  // every time uiCatalog changes (which would reset the board from localStorage).
+  const applyParsedStateRef = useRef(applyParsedState);
+  useEffect(() => {
+    applyParsedStateRef.current = applyParsedState;
+  }, [applyParsedState]);
+
   // Load state from localStorage
   useEffect(() => {
     let cancelled = false;
@@ -447,7 +463,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         const raw = window.localStorage.getItem(STATE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw);
-        applyParsedState(parsed);
+        applyParsedStateRef.current(parsed);
       } catch {
         // ignore
       }
@@ -455,8 +471,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     loadState();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STATE_KEY, puzzleId, applyParsedState]);
+  }, [STATE_KEY, puzzleId]);
 
   // Save to localStorage (immediate)
   useEffect(() => {
@@ -473,7 +488,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     } catch {
       // ignore
     }
-  }, [STATE_KEY, placed, wires, buildHoleState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [STATE_KEY, placed, wires]);
 
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
@@ -634,13 +650,30 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         solution: buildSolution(),
         timeTaken,
       });
-      setPostCheck({ open: true, solved: res.solved, message: res.message, medal: res.medal });
+      setPostCheck({
+        open: true,
+        solved: res.solved,
+        message: res.message,
+        medal: res.medal,
+        xpEarned: res.xp_earned,
+        puzzleTotalXP: res.puzzle_total_xp,
+        xpLeftForMax: res.xp_left_for_max,
+      });
 
       if (res.solved) {
         setIsSolved(true);
-        // Invalidate caches so the puzzles list shows "Solved" and XP bar updates
+        // Update user XP immediately
+        const currentUser = queryClient.getQueryData(['user']) as
+          | { xp?: number; [key: string]: unknown }
+          | undefined;
+        if (currentUser && res.xp_earned) {
+          queryClient.setQueryData(['user'], {
+            ...currentUser,
+            xp: (currentUser.xp || 0) + res.xp_earned,
+          });
+        }
+        // Invalidate caches so the puzzles list shows "Solved"
         await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
-        await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
       }
     } catch (e: any) {
       let errorTitle = 'Validation Failed';
@@ -669,20 +702,30 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   };
 
   const onSolveAgain = () => {
-    // Reset all state for a fresh start
-    setPlaced([]);
-    setWires([]);
+    const shouldResetBoard = postCheck.open && postCheck.solved;
+
+    // For "Try again" after a failed check, keep the user's board.
+    // For "Solve again" after success, start from a clean board.
+    if (shouldResetBoard) {
+      try {
+        window.localStorage.removeItem(STATE_KEY);
+      } catch {
+        // ignore
+      }
+      setPlaced([]);
+      setWires([]);
+      setIsSolved(false);
+      startTime.current = Date.now();
+    }
+
+    // Always reset interaction/UI state
     setSelectedComponent({ mode: 'none' });
     setDraggedPaletteComponentId(null);
     setShowPuzzleInfo(false);
     setShowDebugger(false);
     setPostCheck({ open: false });
     setIsChecking(false);
-    setIsSolved(false);
     setConnectivityIssues(null);
-    startTime.current = Date.now();
-    // Refresh the page to ensure clean state
-    router.refresh();
   };
 
   const onBrowsePuzzles = () => {
@@ -1053,6 +1096,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       {postCheck.medal} Medal
                     </span>
                   </div>
+                )}
+                {typeof postCheck.puzzleTotalXP === 'number' && (
+                  <div className="rounded-lg border border-border/60 bg-secondary/40 p-2.5">
+                    <PuzzleXPBar
+                      difficulty={puzzle.difficulty}
+                      avgDifficulty={puzzle.avg_difficulty ?? 0}
+                      currentXP={postCheck.puzzleTotalXP}
+                    />
+                  </div>
+                )}
+                {typeof postCheck.xpLeftForMax === 'number' && postCheck.xpLeftForMax > 0 && (
+                  <p className="font-medium text-amber-700">
+                    You have {postCheck.xpLeftForMax} XP left for max.
+                  </p>
+                )}
+                {typeof postCheck.xpLeftForMax === 'number' && postCheck.xpLeftForMax === 0 && postCheck.xpEarned === 0 && (
+                  <p className="font-medium text-emerald-700">
+                    You have reached the maximum XP for this puzzle.
+                  </p>
                 )}
                 <p>Congrats! Your solution passed all test cases.</p>
               </div>

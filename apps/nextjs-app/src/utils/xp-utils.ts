@@ -44,6 +44,17 @@ export function calculateMaxXP(avgDifficulty: number): number {
 }
 
 /**
+ * Calculate the maximum XP directly from a difficulty tier string (EASY/MEDIUM/HARD).
+ * Use this instead of calculateMaxXP when the creator-set difficulty is available,
+ * so that community ratings never affect the max XP value.
+ */
+export function calculateMaxXPFromTier(tier: string): number {
+  const normalised = (tier ?? '').toUpperCase() as keyof typeof BASE_XP;
+  const baseXP = BASE_XP[normalised] ?? BASE_XP.EASY;
+  return baseXP + MEDAL_BONUS.GOLD;
+}
+
+/**
  * Get the XP range (min and max) for a puzzle
  */
 export function getXPRange(avgDifficulty: number) {

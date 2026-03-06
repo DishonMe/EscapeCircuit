@@ -99,13 +99,13 @@ class SolveRepo:
 
     def try_award_creator_solve_xp(self, puzzle_id: int, solver_user_id: int) -> bool:
         """Atomically mark creator-solve-XP as awarded for this (puzzle, solver) pair.
-        Returns True if first time (XP should be awarded), False if already awarded."""
+        Returns True if first time (XP should be awarded), False if already awarded.
+        NOTE: must be called inside an active transaction — caller handles the commit."""
         try:
             self.conn.execute(
                 "INSERT INTO creator_solve_xp_awarded(puzzle_id, solver_user_id) VALUES(?,?)",
                 (int(puzzle_id), int(solver_user_id)),
             )
-            self.conn.commit()
             return True
         except sqlite3.IntegrityError:
             return False

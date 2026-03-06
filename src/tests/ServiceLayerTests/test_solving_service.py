@@ -3538,7 +3538,13 @@ class TestValidateSolutionMedalPaths:
     def test_validate_solution_xp_improvement(self):
         """Better solve earns additional XP"""
         self._setup_passing_solution()
-        old_progress = Mock(best_xp=50)
+        old_progress = Mock(
+            best_xp=50,
+            best_medal=Medal.BRONZE.value,
+            timer_upgraded=False,
+            tight_upgraded=False,
+            first_solved_at="2026-01-01T00:00:00Z",
+        )
         self.mock_solve_repo.get_progress.return_value = old_progress
         self.mock_solve_repo.claim_xp_delta.return_value = 25  # Delta from previous best
         
@@ -3547,6 +3553,54 @@ class TestValidateSolutionMedalPaths:
         
         assert result["solved"] is True
         assert result["xp_earned"] == 25
+
+    def test_validate_solution_message_max_xp_with_gain(self):
+        """If this solve reaches max XP and awards XP, message should be celebratory."""
+        self._setup_passing_solution()
+        # Simulate legacy/inconsistent progress state where first-solve heuristic can be false.
+        self.mock_solve_repo.get_progress.return_value = Mock(
+            best_xp=0,
+            best_medal=0,
+            timer_upgraded=False,
+            tight_upgraded=False,
+            first_solved_at="2026-01-01T00:00:00Z",
+        )
+        self.mock_xp.calculate_medal.return_value = Medal.GOLD
+        self.mock_xp.calculate_solve_xp.return_value = 100
+        self.mock_xp.BASE_XP = {PuzzleDifficulty.EASY: 50}
+        self.mock_xp.MEDAL_BONUS = {Medal.GOLD: 50}
+        self.mock_solve_repo.claim_xp_delta.return_value = 100
+
+        payload = {"totalCost": 40, "components": [], "wires": []}
+        result = self.service.validate_solution("token", 1, payload, time_taken=10)
+
+        assert result["solved"] is True
+        assert result["xp_left_for_max"] == 0
+        assert "reached this puzzle's maximum XP" in result["message"]
+        assert "No XP improvement this time." not in result["message"]
+
+    def test_validate_solution_message_shows_xp_left_for_max(self):
+        """When max XP is not reached yet, include remaining XP message."""
+        self._setup_passing_solution()
+        self.mock_solve_repo.get_progress.return_value = Mock(
+            best_xp=50,
+            best_medal=Medal.BRONZE.value,
+            timer_upgraded=False,
+            tight_upgraded=False,
+            first_solved_at="2026-01-01T00:00:00Z",
+        )
+        self.mock_xp.calculate_medal.return_value = Medal.SILVER
+        self.mock_xp.calculate_solve_xp.return_value = 75
+        self.mock_xp.BASE_XP = {PuzzleDifficulty.EASY: 50}
+        self.mock_xp.MEDAL_BONUS = {Medal.GOLD: 50}
+        self.mock_solve_repo.claim_xp_delta.return_value = 25
+
+        payload = {"totalCost": 60, "components": [], "wires": []}
+        result = self.service.validate_solution("token", 1, payload, time_taken=35)
+
+        assert result["solved"] is True
+        assert result["xp_left_for_max"] == 25
+        assert "You have 25 XP left for max." in result["message"]
 
 
 class TestValidateSolutionDifficultyTiers:
@@ -3633,6 +3687,21 @@ class TestValidateSolutionDifficultyTiers:
         result = self.service.validate_solution("token", 1, payload)
         
         assert result["solved"] is True
+
+    def test_validate_solution_prefers_creator_difficulty_for_xp(self):
+        """Creator-set difficulty should be used before avg_difficulty for XP tier."""
+        self._setup_puzzle(avg_difficulty=8.5)  # Would be HARD if avg_difficulty was used
+        puzzle = self.mock_puzzle_repo.get_by_id.return_value
+        puzzle.difficulty = PuzzleDifficulty.MEDIUM
+
+        payload = {"totalCost": 50, "components": [], "wires": []}
+        result = self.service.validate_solution("token", 1, payload)
+
+        assert result["solved"] is True
+        self.mock_xp.calculate_solve_xp.assert_called_once()
+        call_kwargs = self.mock_xp.calculate_solve_xp.call_args.kwargs
+        assert call_kwargs["difficulty"] == PuzzleDifficulty.MEDIUM
+        self.mock_xp.tier_from_avg_difficulty.assert_not_called()
 
 
 class TestSimulateSolutionMethods:
@@ -3943,7 +4012,7 @@ class TestSolvingServiceExtended:
         result = self.service.validate_solution("token", 1, payload)
 
         assert result["solved"] is True
-        assert result["message"] == "All test cases passed!"
+        assert result["message"].startswith("All test cases passed!")
         assert self.mock_logic.evaluate.call_count == 1
 
     def test_validate_solution_fail(self):
@@ -5957,7 +6026,7 @@ class TestSolvingServiceExtended:
         result = self.service.validate_solution("token", 1, payload)
 
         assert result["solved"] is True
-        assert result["message"] == "All test cases passed!"
+        assert result["message"].startswith("All test cases passed!")
         assert self.mock_logic.evaluate.call_count == 1
 
     def test_validate_solution_fail(self):
