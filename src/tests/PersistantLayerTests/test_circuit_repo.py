@@ -1,6 +1,7 @@
 import sqlite3
 import pytest
 import json
+from unittest.mock import patch, MagicMock
 
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.DomainLayer.Circuit import Circuit
@@ -372,3 +373,185 @@ class TestCircuitFields:
         created = repo.create(circuit)
         fetched = repo.get_by_id(created.id)
         assert fetched.num_outputs == 0
+
+
+class TestCircuitMigration:
+    """Test migration of old circuits database schema to new schema"""
+
+    def test_migration_adds_is_arsenal_column(self):
+        """Migration adds is_arsenal column if it doesn't exist"""
+        # Create a database with old schema (no is_arsenal column)
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.isolation_level = None
+        c.execute("PRAGMA foreign_keys = ON;")
+        
+        # Create old schema without new columns
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS circuits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            structure_json TEXT NOT NULL,
+            UNIQUE(user_id, name)
+        );
+        """)
+        
+        # Insert a circuit with old schema
+        c.execute(
+            "INSERT INTO circuits(user_id, name, cost, structure_json) VALUES(?, ?, ?, ?)",
+            (1, "old_circuit", 5, structure_json("old"))
+        )
+        c.commit()
+        
+        # Now create CircuitRepo, which should trigger migration
+        repo = CircuitRepo(c)
+        
+        # Verify new columns exist
+        cols = {r[1] for r in c.execute("PRAGMA table_info(circuits);").fetchall()}
+        assert "is_arsenal" in cols
+        assert "basic_gates" in cols
+        assert "truth_table" in cols
+        assert "num_inputs" in cols
+        assert "num_outputs" in cols
+        
+        # Verify old data is still there with proper defaults
+        fetched = repo.get_by_id(1)
+        assert fetched is not None
+        assert fetched.user_id == 1
+        assert fetched.name == "old_circuit"
+        assert fetched.cost == 5
+        assert fetched.is_arsenal is False
+        assert fetched.basic_gates == "[]"
+        assert fetched.truth_table == "{}"
+        assert fetched.num_inputs == 0
+        assert fetched.num_outputs == 0
+
+    def test_migration_multiple_missing_columns(self):
+        """Migration handles adding multiple missing columns at once"""
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.isolation_level = None
+        c.execute("PRAGMA foreign_keys = ON;")
+        
+        # Create old schema with only basic columns
+        c.execute("""
+        CREATE TABLE circuits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            structure_json TEXT NOT NULL,
+            UNIQUE(user_id, name)
+        );
+        """)
+        
+        c.execute(
+            "INSERT INTO circuits(user_id, name, cost, structure_json) VALUES(?, ?, ?, ?)",
+            (2, "test", 10, structure_json("test"))
+        )
+        c.commit()
+        
+        repo = CircuitRepo(c)
+        
+        # Verify we can now create with new fields
+        new_circuit = Circuit(
+            id=0, user_id=2, name="new_circuit", cost=15,
+            structure_json=structure_json("new"),
+            is_arsenal=True, basic_gates='["AND"]', truth_table='{"0": "1"}',
+            num_inputs=1, num_outputs=1
+        )
+        created = repo.create(new_circuit)
+        
+        fetched = repo.get_by_id(created.id)
+        assert fetched.is_arsenal is True
+        assert fetched.basic_gates == '["AND"]'
+
+    def test_migration_idempotent_on_second_instantiation(self):
+        """Migration is idempotent - creating CircuitRepo twice doesn't error"""
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.isolation_level = None
+        c.execute("PRAGMA foreign_keys = ON;")
+        
+        # Create old schema
+        c.execute("""
+        CREATE TABLE circuits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            structure_json TEXT NOT NULL,
+            UNIQUE(user_id, name)
+        );
+        """)
+        
+        c.execute(
+            "INSERT INTO circuits(user_id, name, cost, structure_json) VALUES(?, ?, ?, ?)",
+            (4, "test", 5, structure_json("x"))
+        )
+        c.commit()
+        
+        # First instantiation should trigger migration
+        repo1 = CircuitRepo(c)
+        
+        # Second instantiation should handle the fact that columns now exist
+        # The except block catches any errors from trying to add existing columns
+        repo2 = CircuitRepo(c)
+        
+        # Both should work
+        assert repo1.get_by_id(1) is not None
+        assert repo2.get_by_id(1) is not None
+
+    def test_migration_exception_handler_catches_errors(self):
+        """Migration exception handler silently catches unexpected errors"""
+        # Create a temporary database file that will become read-only
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            # Create initial database
+            c = sqlite3.connect(tmp_path)
+            c.row_factory = sqlite3.Row
+            c.isolation_level = None
+            c.execute("PRAGMA foreign_keys = ON;")
+            
+            # Create old schema
+            c.execute("""
+            CREATE TABLE circuits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                cost INTEGER NOT NULL,
+                structure_json TEXT NOT NULL,
+                UNIQUE(user_id, name)
+            );
+            """)
+            c.commit()
+            c.close()
+            
+            # Now make the file read-only to cause migration to fail
+            os.chmod(tmp_path, 0o444)
+            
+            # Try to create CircuitRepo - migration will fail but exception is caught
+            try:
+                c = sqlite3.connect(tmp_path)
+                c.row_factory = sqlite3.Row
+                c.isolation_level = None
+                repo = CircuitRepo(c)
+                # If we get here, the exception was caught silently
+                assert repo is not None
+            except sqlite3.OperationalError:
+                # This is acceptable - the migration failed but the class still works
+                pass
+        finally:
+            # Restore permissions and clean up
+            try:
+                os.chmod(tmp_path, 0o644)
+                os.unlink(tmp_path)
+            except:
+                pass

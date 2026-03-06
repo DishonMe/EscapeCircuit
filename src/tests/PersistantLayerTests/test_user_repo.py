@@ -291,6 +291,90 @@ class TestUserRepoListAllFilters:
         results = repo.list_all(limit=100, experience_level="inexperienced")
         assert len(results) == 1
 
+    def test_list_all_date_from_filter(self, repo):
+        """Test list_all with date_from filter"""
+        past_time = "2020-01-01T00:00:00+00:00"
+        recent_time = "2024-01-01T00:00:00+00:00"
+        
+        # Create user with past date
+        past_user = make_user("past", created_at=datetime.fromisoformat(past_time))
+        repo.create(past_user, password="pw")
+        
+        # Create user with recent date
+        recent_user = make_user("recent", created_at=datetime.fromisoformat(recent_time))
+        repo.create(recent_user, password="pw")
+        
+        # Filter from recent date should only return recent_user
+        results = repo.list_all(limit=100, date_from=recent_time)
+        assert len(results) == 1
+        assert results[0].username == "recent"
+
+    def test_list_all_date_to_filter(self, repo):
+        """Test list_all with date_to filter"""
+        past_time = "2020-01-01T00:00:00+00:00"
+        recent_time = "2024-01-01T00:00:00+00:00"
+        
+        # Create users with different dates
+        past_user = make_user("past", created_at=datetime.fromisoformat(past_time))
+        repo.create(past_user, password="pw")
+        
+        recent_user = make_user("recent", created_at=datetime.fromisoformat(recent_time))
+        repo.create(recent_user, password="pw")
+        
+        # Filter to past date should only return past_user
+        results = repo.list_all(limit=100, date_to=past_time)
+        assert len(results) == 1
+        assert results[0].username == "past"
+
+    def test_list_all_order_by_xp_desc(self, repo):
+        """Test list_all with order_by=xp"""
+        repo.create(make_user("low", xp=100), password="pw")
+        repo.create(make_user("high", xp=1000), password="pw")
+        repo.create(make_user("mid", xp=500), password="pw")
+        
+        results = repo.list_all(limit=100, order_by="xp", order_direction="DESC")
+        assert len(results) == 3
+        assert results[0].xp >= results[1].xp >= results[2].xp
+
+    def test_list_all_order_by_xp_asc(self, repo):
+        """Test list_all with order_by=xp ascending"""
+        repo.create(make_user("low", xp=100), password="pw")
+        repo.create(make_user("high", xp=1000), password="pw")
+        repo.create(make_user("mid", xp=500), password="pw")
+        
+        results = repo.list_all(limit=100, order_by="xp", order_direction="ASC")
+        assert len(results) == 3
+        assert results[0].xp <= results[1].xp <= results[2].xp
+
+    def test_list_all_order_by_invalid(self, repo):
+        """Test list_all with invalid order_by defaults to created_at"""
+        repo.create(make_user("user1"), password="pw")
+        repo.create(make_user("user2"), password="pw")
+        
+        # Invalid order_by should not raise error, should default to created_at
+        results = repo.list_all(limit=100, order_by="invalid_field")
+        assert len(results) == 2
+
+    def test_list_all_order_by_role(self, repo):
+        """Test list_all with order_by=role"""
+        repo.create(make_user("solver", role=UserRole.SOLVER), password="pw")
+        repo.create(make_user("creator", role=UserRole.CREATOR), password="pw")
+        repo.create(make_user("admin", role=UserRole.ADMIN), password="pw")
+        
+        results = repo.list_all(limit=100, order_by="role", order_direction="ASC")
+        assert len(results) == 3
+        # Roles should be ordered (order depends on alphabetical)
+        assert results[0].role is not None
+
+    def test_list_all_order_by_level(self, repo):
+        """Test list_all with order_by=level (maps to xp)"""
+        repo.create(make_user("lowxp", xp=100), password="pw")
+        repo.create(make_user("highxp", xp=1000), password="pw")
+        
+        results = repo.list_all(limit=100, order_by="level", order_direction="DESC")
+        assert len(results) == 2
+        assert results[0].xp >= results[1].xp
+
 
 class TestUserRepoCountAll:
     """Tests for count_all method"""
