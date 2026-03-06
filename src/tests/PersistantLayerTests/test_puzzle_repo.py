@@ -186,7 +186,7 @@ def test_list_published_filters_and_pagination(repo):
     assert set(names) >= {"Pub1", "Pub2", "Pub3"}
 
     # ORDER BY id DESC, then pagination
-    published_page = repo.list_published(limit=1, offset=1)
+    published_page = repo.list_published(limit=1, offset=1, order_by="id", order_direction="DESC")
     assert len(published_page) == 1
     # second item in DESC order:
     ordered = sorted([p1, p2, p3], key=lambda x: x.id, reverse=True)

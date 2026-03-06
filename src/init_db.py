@@ -17,7 +17,6 @@ from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
 from Backend.PersistantLayer.ReplyRepo import ReplyRepo
 from Backend.PersistantLayer.EngagementRepo import EngagementRepo
 from Backend.PersistantLayer.ReportRepo import ReportRepo
-from Backend.PersistantLayer.DraftRepo import DraftRepo
 
 def init_db():
     # DB in project root (src/..)
@@ -36,7 +35,6 @@ def init_db():
     ReplyRepo(conn)
     EngagementRepo(conn)
     ReportRepo(conn)
-    DraftRepo(conn)
 
     conn.commit()
     conn.close()

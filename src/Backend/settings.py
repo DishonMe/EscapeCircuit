@@ -106,10 +106,6 @@ MODERATION_VALID_REPORT_REASONS: frozenset = frozenset(
     {"spam", "harassment", "off_topic", "inappropriate", "other"}
 )
 
-# ── Draft optimistic-concurrency tolerance ────────────────────────────────────
-# abs(stored_updated_at - expected_updated_at) must be < this (seconds)
-DRAFT_TIMESTAMP_TOLERANCE_S: float = 0.001
-
 # ── Pagination defaults ────────────────────────────────────────────────────────
 BROWSE_PUZZLES_DEFAULT_LIMIT: int = 50
 LIST_MY_PUZZLES_DEFAULT_LIMIT: int = 50

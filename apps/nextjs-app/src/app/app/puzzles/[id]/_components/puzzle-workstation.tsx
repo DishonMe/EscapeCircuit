@@ -76,9 +76,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     null,
   );
 
-  // Draft version tracking for optimistic concurrency control
-  const draftUpdatedAtRef = useRef<number | null>(null);
-
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
     if (puzzle?.is_solved) {
@@ -439,27 +436,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   }, [uiCatalog]);
 
-  // Load state: try backend first, fall back to localStorage
+  // Load state from localStorage
   useEffect(() => {
     let cancelled = false;
 
     const loadState = async () => {
-      // Try backend draft first
-      try {
-        const draft = await api.get<{ state_json: string | null; updated_at: number | null }>(`/puzzles/${puzzleId}/draft`, {
-          suppressErrorNotification: true,
-        });
-        if (!cancelled && draft.state_json) {
-          const parsed = JSON.parse(draft.state_json);
-          applyParsedState(parsed);
-          draftUpdatedAtRef.current = draft.updated_at;
-          return;
-        }
-      } catch {
-        // Backend unavailable, fall through to localStorage
-      }
-
-      // Fall back to localStorage
+      // Load from localStorage
       if (cancelled) return;
       try {
         const raw = window.localStorage.getItem(STATE_KEY);
@@ -492,67 +474,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       // ignore
     }
   }, [STATE_KEY, placed, wires, buildHoleState]);
-
-  // Auto-save to backend (debounced, 2s after last change)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initialLoadDone = useRef(false);
-
-  useEffect(() => {
-    // Skip the first render (initial load sets placed/wires)
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true;
-      return;
-    }
-
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-
-    saveTimerRef.current = setTimeout(async () => {
-      const stateJson = JSON.stringify({
-        grid: { rows: 10, cols: 14 },
-        placed,
-        wires,
-        holes: buildHoleState(),
-      });
-      try {
-        const res = await api.put<{ ok: boolean; updated_at: number }>(
-          `/puzzles/${puzzleId}/draft`,
-          {
-            state_json: stateJson,
-            expected_updated_at: draftUpdatedAtRef.current,
-          },
-          { suppressErrorNotification: true },
-        );
-        // Track the new version for the next save
-        draftUpdatedAtRef.current = res.updated_at;
-      } catch (err: any) {
-        if (err?.response?.status === 409) {
-          notifications.addNotification({
-            type: 'warning',
-            title: 'Draft Conflict',
-            message: 'Your draft was modified in another session. Reload to get the latest version.',
-          });
-        }
-        // Other errors silently ignored — localStorage is the fallback
-      }
-    }, 2000);
-
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [placed, wires, puzzleId, buildHoleState]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (selectedComponent.mode !== 'placing') return;
-      if (e.key.toLowerCase() !== 'r') return;
-      setSelectedComponent((prev) => {
-        if (prev.mode !== 'placing') return prev;
-        return { ...prev, rotation: prev.rotation === 0 ? 90 : 0 };
-      });
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedComponent.mode]);
 
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
