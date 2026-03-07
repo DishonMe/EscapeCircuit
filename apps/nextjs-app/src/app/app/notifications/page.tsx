@@ -1,17 +1,23 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Loader } from 'lucide-react';
+import { Loader, ChevronDown } from 'lucide-react';
+import { useState, ChangeEvent } from 'react';
 
 import { useUser } from '@/lib/auth';
-import { useCreatorNotificationsHistory } from '@/features/notifications/api';
+import { useCreatorNotificationsHistory, NotificationFilters } from '@/features/notifications/api';
 
 const NotificationsPage = () => {
   const user = useUser();
   const router = useRouter();
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<NotificationFilters>({
+    orderBy: 'created_at',
+    orderDirection: 'ASC',
+  });
 
   const { data: notifications, isLoading, isError, error, refetch } = useCreatorNotificationsHistory({
-    filters: { limit: 10, orderBy: 'created_at', orderDirection: 'DESC' },
+    filters,
   });
 
   // Only allow creators and admins to view this page
@@ -22,12 +28,96 @@ const NotificationsPage = () => {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-6xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notifications</h1>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Your 10 most recent notifications
+          View and filter your creator notifications
         </p>
+      </div>
+
+      {/* Filters Toggle */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 rounded-lg bg-secondary/50 px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+        >
+          Filters
+          <ChevronDown
+            className={`size-4 transition-transform ${showFilters ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {/* Filter Controls */}
+        {showFilters && (
+          <div className="mt-4 flex flex-wrap gap-4 rounded-lg border border-border bg-secondary/50 p-4">
+            {/* Type Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">Type</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.notifType || ''}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, notifType: (e.target.value || undefined) as any })}
+              >
+                <option value="">All Types</option>
+                <option value="solve">Puzzle Solved</option>
+                <option value="rating">Rating</option>
+                <option value="warning">Warning</option>
+                <option value="ban">Account Restriction</option>
+              </select>
+            </div>
+
+            {/* Puzzle Name Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">Puzzle Name</label>
+              <input
+                type="text"
+                placeholder="Search puzzle..."
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.puzzleName || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, puzzleName: e.target.value || undefined })}
+              />
+            </div>
+
+            {/* Actor Username Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">Actor</label>
+              <input
+                type="text"
+                placeholder="Search user..."
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.actorUsername || ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, actorUsername: e.target.value || undefined })}
+              />
+            </div>
+
+            {/* Order By */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">Order By</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.orderBy || 'created_at'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
+              >
+                <option value="created_at">Creation Date</option>
+                <option value="xp_amount">XP Amount</option>
+              </select>
+            </div>
+
+            {/* Direction */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">Direction</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={filters.orderDirection || 'ASC'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
+              >
+                <option value="ASC">Ascending</option>
+                <option value="DESC">Descending</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
