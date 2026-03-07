@@ -248,3 +248,7 @@ local/
 
 # Yarn stuff
 yarn.lock
+
+# Database files
+*.db-shm
+*.db-wal
