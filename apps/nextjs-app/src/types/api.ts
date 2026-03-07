@@ -145,7 +145,8 @@ export type Puzzle = Entity<{
 
   // Difficulty ratings (injected by backend)
   avg_difficulty?: number;
-
+  // User's rating (injected by browse endpoint if user already rated)
+  user_rating?: RatingEntry | null;
   // Rating metrics (injected by browse/get endpoints)
   rating_metrics?: RatingMetrics;
 }>;
