@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 type NavigationLoadingContextValue = {
   isNavigating: boolean;
-  startNavigation: () => void;
+  startNavigation: (href?: string) => void;
 };
 
 const NavigationLoadingContext = createContext<NavigationLoadingContextValue | null>(null);
@@ -13,15 +13,31 @@ const NavigationLoadingContext = createContext<NavigationLoadingContextValue | n
 export const NavigationLoadingProvider = ({ children }: { children: React.ReactNode }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationStartKey, setNavigationStartKey] = useState<string | null>(null);
+  const [navigationTargetKey, setNavigationTargetKey] = useState<string | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const routeKey = `${pathname}?${searchParams?.toString() ?? ''}`;
 
-  const startNavigation = useCallback(() => {
+  const keyFromHref = useCallback((href: string): string | null => {
+    try {
+      const destination = new URL(href, window.location.origin);
+      if (destination.origin !== window.location.origin) return null;
+      return `${destination.pathname}?${destination.searchParams.toString()}`;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const startNavigation = useCallback((href?: string) => {
+    const targetKey = href ? keyFromHref(href) : null;
+    // Do not show loader for no-op navigations to current route.
+    if (targetKey && targetKey === routeKey) return;
+
     setNavigationStartKey(routeKey);
+    setNavigationTargetKey(targetKey);
     setIsNavigating(true);
-  }, [routeKey]);
+  }, [keyFromHref, routeKey]);
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
@@ -46,7 +62,7 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
         if (destination.origin !== window.location.origin) return;
       }
 
-      startNavigation();
+      startNavigation(href);
     };
 
     document.addEventListener('click', handleDocumentClick, true);
@@ -56,16 +72,29 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
   useEffect(() => {
     if (!isNavigating || !navigationStartKey) return;
 
-    // Hide only after we are actually in a different route/search state.
-    if (routeKey === navigationStartKey) return;
+    // Hide only after we are actually in the destination route/search state.
+    // If target is unknown (programmatic push), any routeKey change is accepted.
+    const reachedDestination = navigationTargetKey
+      ? routeKey === navigationTargetKey
+      : routeKey !== navigationStartKey;
+    if (!reachedDestination) return;
 
-    const settleTimer = window.setTimeout(() => {
-      setIsNavigating(false);
-      setNavigationStartKey(null);
-    }, 180);
+    // Wait for first paint of the new route before hiding the loader.
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        setIsNavigating(false);
+        setNavigationStartKey(null);
+        setNavigationTargetKey(null);
+      });
+    });
 
-    return () => window.clearTimeout(settleTimer);
-  }, [routeKey, isNavigating, navigationStartKey]);
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [routeKey, isNavigating, navigationStartKey, navigationTargetKey]);
 
   useEffect(() => {
     if (!isNavigating) return;
@@ -74,6 +103,7 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
     const failSafeTimer = window.setTimeout(() => {
       setIsNavigating(false);
       setNavigationStartKey(null);
+      setNavigationTargetKey(null);
     }, 10000);
     return () => window.clearTimeout(failSafeTimer);
   }, [isNavigating]);
