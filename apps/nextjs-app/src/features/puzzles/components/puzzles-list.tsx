@@ -442,9 +442,9 @@ export const PuzzlesList = () => {
             {/* XP Progress Bar */}
             <div className="mb-3 rounded-lg bg-secondary/50 p-3">
               <PuzzleXPBar
+                difficulty={puzzle.difficulty}
                 avgDifficulty={puzzle.avg_difficulty ?? 0}
                 currentXP={puzzle.total_xp ?? 0}
-                isSolved={puzzle.is_solved ?? false}
               />
             </div>
 

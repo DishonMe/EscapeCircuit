@@ -10,6 +10,8 @@ export type ValidateSolutionResponse = {
   solved: boolean;
   message: string;
   xp_earned?: number;
+  puzzle_total_xp?: number;
+  xp_left_for_max?: number;
   time_taken?: number;
   medal?: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD';
   medal_value?: number;

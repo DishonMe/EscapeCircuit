@@ -179,11 +179,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             pid = int(pid)
                         except (TypeError, ValueError):
                             pid = None
-                        # Per-user solved status (but not for puzzle creator)
-                        creator_user_id = p.get("creator_user_id")
-                        is_creator = creator_user_id is not None and int(creator_user_id) == int(user_id)
-                        
-                        if pid and pid in status_map and not is_creator:
+                        # Per-user solved status
+                        if pid and pid in status_map:
                             p["is_solved"] = True
                             p["best_time"] = status_map[pid].get("best_time")
                             p["total_xp"] = status_map[pid].get("total_xp", 0)

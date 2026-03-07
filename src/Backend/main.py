@@ -1,6 +1,7 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from Backend import settings
 from Backend.APILayer.middleware import ContentionMonitorMiddleware
@@ -187,6 +188,13 @@ def create_app() -> FastAPI:
 
     # DB contention monitoring (logs warnings when requests stall on write-lock)
     app.add_middleware(ContentionMonitorMiddleware)
+
+    # Catch-all handler so unhandled exceptions return a JSON 500 with CORS headers
+    # (without this, exceptions that escape route handlers bypass CORSMiddleware and
+    # the browser sees a network-level failure instead of a readable HTTP error)
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
     # 5. Routers
     app.include_router(build_user_router(user_service, notification_service))

@@ -268,13 +268,27 @@ class SolvingService:
             cost_used = int(solution_payload.get("totalCost", 0))
             time_taken_s = max(0, int(time_taken))
 
-            # --- Determine difficulty tier from avg_difficulty ---
+            # --- Determine difficulty tier for XP ---
+            # Use creator-set puzzle difficulty first so XP/medal rewards stay
+            # stable and do not drift with community rating changes.
             difficulty = PuzzleDifficulty.EASY
-            if hasattr(self.xp_service, 'tier_from_avg_difficulty'):
+            difficulty_from_puzzle = False
+            puzzle_difficulty = getattr(p, 'difficulty', None)
+            if puzzle_difficulty is not None:
+                try:
+                    if isinstance(puzzle_difficulty, PuzzleDifficulty):
+                        difficulty = puzzle_difficulty
+                        difficulty_from_puzzle = True
+                    else:
+                        difficulty = PuzzleDifficulty(str(puzzle_difficulty).upper())
+                        difficulty_from_puzzle = True
+                except Exception:
+                    difficulty_from_puzzle = False
+            if not difficulty_from_puzzle and hasattr(self.xp_service, 'tier_from_avg_difficulty'):
                 difficulty = self.xp_service.tier_from_avg_difficulty(
                     getattr(p, 'avg_difficulty', 0.0)
                 )
-            elif hasattr(p, 'avg_difficulty') and p.avg_difficulty is not None:
+            elif not difficulty_from_puzzle and hasattr(p, 'avg_difficulty') and p.avg_difficulty is not None:
                 if p.avg_difficulty >= 7.0:
                     difficulty = PuzzleDifficulty.HARD
                 elif p.avg_difficulty >= 4.0:
@@ -306,6 +320,14 @@ class SolvingService:
             from Backend.PersistantLayer.SolveRepo import PuzzleProgress
             from Backend.DomainLayer.Utils import utcnow
             old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+            is_first_time_solve = (
+                old_progress is None
+                or (
+                    int(getattr(old_progress, 'best_medal', 0) or 0) == 0
+                    and int(getattr(old_progress, 'best_xp', 0) or 0) == 0
+                    and not getattr(old_progress, 'first_solved_at', None)
+                )
+            )
 
             # --- Compute max possible XP for this puzzle's difficulty (Gold medal) ---
             base_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
@@ -315,13 +337,15 @@ class SolvingService:
             # Determine whether max has been reached (SQL will handle best_xp via MAX)
             old_best_xp = old_progress.best_xp if old_progress else 0
             new_max_xp_reached = (max(old_best_xp, raw_xp) >= max_possible_xp)
+            achieved_max_xp_this_solve = raw_xp >= max_possible_xp
 
             # --- Wrap the entire persist + XP pipeline in one IMMEDIATE
             #     transaction (C2).  This prevents two concurrent solves of the
             #     same puzzle from both reading stale progress and double-awarding XP.
             with transaction(self.conn):
+                attempt_id = None
                 if hasattr(self.solve_repo, 'add_solve'):
-                    self.solve_repo.add_solve(
+                    attempt_id = self.solve_repo.add_solve(
                         user_id=user_id,
                         puzzle_id=puzzle_id,
                         time_taken_seconds=time_taken_s,
@@ -357,6 +381,13 @@ class SolvingService:
                     xp_earned = new_progress.total_xp_awarded if new_progress else 0
                 xp_earned = max(0, xp_earned)
 
+                # Prefer attempt-history truth for first-time solve detection.
+                if hasattr(self.solve_repo, 'has_passed_before_attempt') and attempt_id is not None:
+                    try:
+                        is_first_time_solve = not self.solve_repo.has_passed_before_attempt(user_id, puzzle_id, attempt_id)
+                    except Exception:
+                        pass
+
                 if self.user_repo is not None and xp_earned > 0:
                     self.user_repo.increment_xp(user_id, int(xp_earned))
 
@@ -386,14 +417,25 @@ class SolvingService:
                 # COMMIT at context-manager exit
 
             medal_name = medal.name if isinstance(medal, Medal) else ["NONE", "BRONZE", "SILVER", "GOLD"][int(medal)]
+            best_xp_after_solve = max(old_best_xp, raw_xp)
+            xp_left_for_max = max(0, int(max_possible_xp) - int(best_xp_after_solve))
             msg = "All test cases passed!"
-            if xp_earned == 0:
+            if achieved_max_xp_this_solve and xp_left_for_max == 0 and xp_earned > 0:
+                if is_first_time_solve:
+                    msg += " First solve complete: you reached this puzzle's maximum XP."
+                else:
+                    msg += " Great solve: you reached this puzzle's maximum XP."
+            elif xp_left_for_max > 0:
+                msg += f" You have {xp_left_for_max} XP left for max."
+            elif xp_earned == 0:
                 msg += " No XP improvement this time."
 
             return {
                 "solved": True,
                 "message": msg,
                 "xp_earned": xp_earned,
+                "puzzle_total_xp": int(best_xp_after_solve),
+                "xp_left_for_max": xp_left_for_max,
                 "time_taken": time_taken_s,
                 "medal": medal_name,
                 "medal_value": medal.value if isinstance(medal, Medal) else int(medal),

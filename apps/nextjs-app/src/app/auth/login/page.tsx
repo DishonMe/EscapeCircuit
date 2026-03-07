@@ -22,10 +22,9 @@ const LoginPage = () => {
           title: 'Login Successful',
           message: 'Welcome back!',
         });
-        startNavigation();
-        router.push(
-          redirectTo ? decodeURIComponent(redirectTo) : paths.app.puzzles.getHref(),
-        );
+        const destination = redirectTo ? decodeURIComponent(redirectTo) : paths.app.puzzles.getHref();
+        startNavigation(destination);
+        router.push(destination);
       }}
     />
   );

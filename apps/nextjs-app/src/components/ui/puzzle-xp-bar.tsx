@@ -1,23 +1,28 @@
 'use client';
 
 import { useMemo } from 'react';
-import { calculateMaxXP, getDifficultyTier } from '@/utils/xp-utils';
+import { calculateMaxXP, calculateMaxXPFromTier, getDifficultyTier } from '@/utils/xp-utils';
 
 interface PuzzleXPBarProps {
   avgDifficulty?: number;
+  /** Creator-set difficulty tier (EASY/MEDIUM/HARD). When provided, max XP is
+   *  derived from this fixed value so community ratings cannot change it. */
+  difficulty?: string;
   currentXP?: number;
-  isSolved?: boolean;
 }
 
 /**
  * Display bar showing max XP achievable on a puzzle and current earned XP
  */
-export const PuzzleXPBar = ({ avgDifficulty = 0, currentXP = 0, isSolved = false }: PuzzleXPBarProps) => {
+export const PuzzleXPBar = ({ avgDifficulty = 0, difficulty, currentXP = 0 }: PuzzleXPBarProps) => {
   const xpInfo = useMemo(() => {
-    const maxXP = calculateMaxXP(avgDifficulty);
-    const displayCurrent = isSolved ? currentXP : 0;
+    // Use creator-set difficulty tier for max XP so ratings don't change it.
+    // Fall back to avg_difficulty-based calculation if tier is not provided.
+    const maxXP = difficulty ? calculateMaxXPFromTier(difficulty) : calculateMaxXP(avgDifficulty);
+    const displayCurrent = Math.max(0, currentXP);
     const percentage = maxXP > 0 ? (displayCurrent / maxXP) * 100 : 0;
-    const tier = getDifficultyTier(avgDifficulty);
+    // Tier colour still reflects community rating for visual feedback.
+    const tier = difficulty ? (difficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD') : getDifficultyTier(avgDifficulty);
 
     return {
       maxXP,
@@ -25,7 +30,7 @@ export const PuzzleXPBar = ({ avgDifficulty = 0, currentXP = 0, isSolved = false
       percentage,
       tier,
     };
-  }, [avgDifficulty, currentXP, isSolved]);
+  }, [avgDifficulty, difficulty, currentXP]);
 
   const getTierColor = (tier: string) => {
     switch (tier) {
