@@ -2,6 +2,7 @@ import sqlite3
 import pytest
 from datetime import datetime, timezone
 
+from Backend import settings
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
@@ -291,6 +292,26 @@ class TestUserRepoListAllFilters:
         results = repo.list_all(limit=100, experience_level="inexperienced")
         assert len(results) == 1
 
+    def test_list_all_experience_level_boundary_level_5(self, repo):
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        repo.create(make_user("below_boundary", xp=exp_xp_min - 1), password="pw")
+        repo.create(make_user("at_boundary", xp=exp_xp_min), password="pw")
+
+        results = repo.list_all(limit=100, experience_level="experienced")
+        usernames = {u.username for u in results}
+        assert "at_boundary" in usernames
+        assert "below_boundary" not in usernames
+
+    def test_list_all_inexperienced_excludes_level_5(self, repo):
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        repo.create(make_user("below_boundary", xp=exp_xp_min - 1), password="pw")
+        repo.create(make_user("at_boundary", xp=exp_xp_min), password="pw")
+
+        results = repo.list_all(limit=100, experience_level="inexperienced")
+        usernames = {u.username for u in results}
+        assert "below_boundary" in usernames
+        assert "at_boundary" not in usernames
+
     def test_list_all_date_from_filter(self, repo):
         """Test list_all with date_from filter"""
         past_time = "2020-01-01T00:00:00+00:00"
@@ -374,6 +395,26 @@ class TestUserRepoListAllFilters:
         results = repo.list_all(limit=100, order_by="level", order_direction="DESC")
         assert len(results) == 2
         assert results[0].xp >= results[1].xp
+
+    def test_list_all_order_by_experienced_desc(self, repo):
+        """DESC should place experienced users (lvl 5+) first."""
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        repo.create(make_user("inexperienced", xp=exp_xp_min - 1), password="pw")
+        repo.create(make_user("experienced", xp=exp_xp_min), password="pw")
+
+        results = repo.list_all(limit=100, order_by="experienced", order_direction="DESC")
+        assert len(results) == 2
+        assert results[0].username == "experienced"
+
+    def test_list_all_order_by_experienced_asc(self, repo):
+        """ASC should place inexperienced users first."""
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        repo.create(make_user("inexperienced", xp=exp_xp_min - 1), password="pw")
+        repo.create(make_user("experienced", xp=exp_xp_min), password="pw")
+
+        results = repo.list_all(limit=100, order_by="experienced", order_direction="ASC")
+        assert len(results) == 2
+        assert results[0].username == "inexperienced"
 
 
 class TestUserRepoCountAll:

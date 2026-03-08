@@ -140,6 +140,17 @@ class RatingService:
 
     _DIFFICULTY_MAP = settings.RATING_DIFFICULTY_MAP
 
+    @staticmethod
+    def _exp_weight(rating: Rating) -> int:
+        return 2 if rating.is_experienced_at_rating else 1
+
+    @staticmethod
+    def _weighted_avg(values: list[float], weights: list[int]) -> float | None:
+        total_weight = sum(weights)
+        if total_weight <= 0:
+            return None
+        return sum(v * w for v, w in zip(values, weights)) / total_weight
+
     def get_puzzle_metrics(self, puzzle_id: int) -> dict:
         """Compute aggregated rating metrics for a puzzle."""
         puzzle = self.puzzle_repo.get_by_id(int(puzzle_id))
@@ -153,22 +164,25 @@ class RatingService:
         creator_diff_str = puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty)
         creator_diff = self._DIFFICULTY_MAP.get(creator_diff_str, 1)
 
-        # Pure user average difficulty
-        avg_difficulty = sum(r.difficulty for r in ratings) / count if count > 0 else None
+        # General averages use experienced double-weighting.
+        weights = [self._exp_weight(r) for r in ratings]
+        avg_difficulty = self._weighted_avg([float(r.difficulty) for r in ratings], weights)
+        weighted_avg_fun = self._weighted_avg([float(r.fun) for r in ratings], weights)
+        weighted_avg_clearness = self._weighted_avg([float(r.clearness) for r in ratings], weights)
 
         # Weighted difficulty (blends creator label with user ratings)
-        users_avg = avg_difficulty if avg_difficulty is not None else 0.0
+        weighted_user_avg_difficulty = avg_difficulty if avg_difficulty is not None else 0.0
         _w_few  = settings.RATING_DIFF_WEIGHT_FEW_RATINGS
         _w_many = settings.RATING_DIFF_WEIGHT_MANY_RATINGS
         if count < settings.RATING_USER_COUNT_THRESHOLD:
-            weighted_difficulty = (_w_few[0] * creator_diff) + (_w_few[1] * users_avg)
+            weighted_difficulty = (_w_few[0] * creator_diff) + (_w_few[1] * weighted_user_avg_difficulty)
         else:
-            weighted_difficulty = (_w_many[0] * creator_diff) + (_w_many[1] * users_avg)
+            weighted_difficulty = (_w_many[0] * creator_diff) + (_w_many[1] * weighted_user_avg_difficulty)
 
-        # Fun & clearness: always compute when ratings exist
+        # Keep UI behavior: expose fun/clearness as soon as ratings exist.
         if count > 0:
-            avg_fun = sum(r.fun for r in ratings) / count
-            avg_clearness = sum(r.clearness for r in ratings) / count
+            avg_fun = weighted_avg_fun
+            avg_clearness = weighted_avg_clearness
         else:
             avg_fun = None
             avg_clearness = None
@@ -185,6 +199,13 @@ class RatingService:
             exp_avg_fun = None
             exp_avg_clearness = None
 
+        experienced_metrics = {
+            "count": exp_count,
+            "experienced_avg_difficulty": round(exp_avg_difficulty, 2) if exp_avg_difficulty is not None else None,
+            "experienced_avg_fun": round(exp_avg_fun, 2) if exp_avg_fun is not None else None,
+            "experienced_avg_clearness": round(exp_avg_clearness, 2) if exp_avg_clearness is not None else None,
+        }
+
         return {
             "puzzle_id": int(puzzle_id),
             "count": count,
@@ -192,11 +213,13 @@ class RatingService:
             "weighted_difficulty": round(weighted_difficulty, 1),
             "avg_fun": round(avg_fun, 2) if avg_fun is not None else None,
             "avg_clearness": round(avg_clearness, 2) if avg_clearness is not None else None,
+            "experienced_metrics": experienced_metrics,
+            # Backward-compatible alias retained for existing clients.
             "experienced": {
-                "count": exp_count,
-                "avg_difficulty": round(exp_avg_difficulty, 2) if exp_avg_difficulty is not None else None,
-                "avg_fun": round(exp_avg_fun, 2) if exp_avg_fun is not None else None,
-                "avg_clearness": round(exp_avg_clearness, 2) if exp_avg_clearness is not None else None,
+                "count": experienced_metrics["count"],
+                "avg_difficulty": experienced_metrics["experienced_avg_difficulty"],
+                "avg_fun": experienced_metrics["experienced_avg_fun"],
+                "avg_clearness": experienced_metrics["experienced_avg_clearness"],
             },
         }
 
@@ -208,33 +231,34 @@ class RatingService:
         ratings = self.rating_repo.list_by_puzzle(int(puzzle_id))
         rating_count = len(ratings)
 
-        # Creator vs non-creator split
-        creator_id = int(puzzle.creator_user_id)
-        creator_r = next((x for x in ratings if int(x.user_id) == creator_id), None)
-        user_rs = [x for x in ratings if int(x.user_id) != creator_id]
-        user_count = len(user_rs)
-
-        # Difficulty weighting: until 10 user ratings collected -> 80% creator, 20% users; after -> 40% creator, 60% users
-        if user_count > 0:
-            users_difficulty_avg = sum(x.difficulty for x in user_rs) / user_count
-        else:
-            users_difficulty_avg = 0.0
-
-        if creator_r is not None:
-            _w = (settings.RATING_DIFF_WEIGHT_FEW_RATINGS
-                  if user_count < settings.RATING_USER_COUNT_THRESHOLD
-                  else settings.RATING_DIFF_WEIGHT_MANY_RATINGS)
-            avg_difficulty = _w[0] * float(creator_r.difficulty) + _w[1] * float(users_difficulty_avg)
-        else:
-            avg_difficulty = float(users_difficulty_avg)
-
-        # Fun & clearness undecided until enough USER ratings (excluding creator)
-        if user_count < settings.RATING_USER_COUNT_THRESHOLD:
+        # Keep zero aggregates when no ratings exist.
+        if rating_count == 0:
+            avg_difficulty = 0.0
             avg_fun = 0.0
             avg_clearness = 0.0
         else:
-            avg_fun = float(sum(x.fun for x in user_rs) / user_count)
-            avg_clearness = float(sum(x.clearness for x in user_rs) / user_count)
+            creator_diff_str = puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty)
+            creator_diff = float(self._DIFFICULTY_MAP.get(creator_diff_str, 1))
+
+            weights = [self._exp_weight(r) for r in ratings]
+            weighted_user_avg_difficulty = self._weighted_avg([float(r.difficulty) for r in ratings], weights) or 0.0
+            weighted_avg_fun = self._weighted_avg([float(r.fun) for r in ratings], weights) or 0.0
+            weighted_avg_clearness = self._weighted_avg([float(r.clearness) for r in ratings], weights) or 0.0
+
+            _w = (
+                settings.RATING_DIFF_WEIGHT_FEW_RATINGS
+                if rating_count < settings.RATING_USER_COUNT_THRESHOLD
+                else settings.RATING_DIFF_WEIGHT_MANY_RATINGS
+            )
+            avg_difficulty = (_w[0] * creator_diff) + (_w[1] * weighted_user_avg_difficulty)
+
+            # Undecided status for persisted aggregates remains 0.0 until enough raw ratings exist.
+            if rating_count < settings.RATING_USER_COUNT_THRESHOLD:
+                avg_fun = 0.0
+                avg_clearness = 0.0
+            else:
+                avg_fun = weighted_avg_fun
+                avg_clearness = weighted_avg_clearness
 
         # Use targeted update — only writes rating columns, won't clobber
         # concurrent changes to name, status, description, budget, etc.

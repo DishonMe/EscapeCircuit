@@ -47,6 +47,11 @@ class XPService:
         xp_total = max(0, int(xp_total))
         return floor(sqrt(xp_total / settings.LEVEL_XP_DIVISOR)) + 1
 
+    def calculate_xp_for_level(self, level: int) -> int:
+        """Return the minimum XP required to reach the given level."""
+        lvl = max(1, int(level))
+        return ((lvl - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+
     def is_experienced(self, xp_total: int) -> bool:
         return self.calculate_level(xp_total) >= settings.EXPERIENCED_LEVEL_MIN
 
