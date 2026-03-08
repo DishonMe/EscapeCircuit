@@ -84,6 +84,76 @@ class UserService:
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
         d["is_experienced"] = self.xp.is_experienced(user.xp)
+        conn = self.user_repo.conn
+
+        medal_rows = conn.execute(
+            """
+            SELECT best_medal, COUNT(*) AS count
+            FROM puzzle_progress
+            WHERE user_id = ?
+            GROUP BY best_medal
+            """,
+            (int(user_id),),
+        ).fetchall()
+        medal_counts = {"bronze": 0, "silver": 0, "gold": 0}
+        for row in medal_rows:
+            best_medal = int(row["best_medal"])
+            count = int(row["count"])
+            if best_medal == 1:
+                medal_counts["bronze"] += count
+            elif best_medal == 2:
+                medal_counts["silver"] += count
+            elif best_medal == 3:
+                medal_counts["gold"] += count
+        d["medals"] = {
+            **medal_counts,
+            "total": medal_counts["bronze"] + medal_counts["silver"] + medal_counts["gold"],
+        }
+
+        arsenal_count_row = conn.execute(
+            "SELECT COUNT(*) AS count FROM circuits WHERE user_id=? AND is_arsenal=1",
+            (int(user_id),),
+        ).fetchone()
+        d["arsenal_count"] = int(arsenal_count_row["count"]) if arsenal_count_row else 0
+
+        saved_rows = conn.execute(
+            """
+            SELECT p.id, p.name, p.status, sp.created_at
+            FROM saved_puzzles sp
+            JOIN puzzles p ON p.id = sp.puzzle_id
+            WHERE sp.user_id = ?
+            ORDER BY sp.created_at DESC
+            """,
+            (int(user_id),),
+        ).fetchall()
+        d["saved_puzzles"] = [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "status": row["status"],
+                "saved_at": row["created_at"],
+            }
+            for row in saved_rows
+        ]
+
+        created_rows = conn.execute(
+            """
+            SELECT id, name, status, created_at
+            FROM puzzles
+            WHERE creator_user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (int(user_id),),
+        ).fetchall()
+        d["created_puzzles"] = [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+            }
+            for row in created_rows
+        ]
         return d
 
     def list_users(

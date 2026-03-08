@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, Union, List
 import re
+from Backend import settings
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.PuzzleService import PuzzleService
@@ -96,6 +97,51 @@ def sanitize_puzzle_name(name: str) -> str:
     sanitized = re.sub(r'[^\w\s-]', '', name)
     sanitized = re.sub(r'[\s-]+', '_', sanitized)
     return sanitized.lower()
+
+
+def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
+    puzzle_config = config_data.get('puzzle', {})
+    if not puzzle_config:
+        raise ValidationError("Config missing 'puzzle' section")
+
+    puzzle_name = (puzzle_config.get('name') or '').strip()
+    if not puzzle_name:
+        raise ValidationError("Puzzle name is required")
+    if len(puzzle_name) > settings.PUZZLE_NAME_MAX_LENGTH:
+        raise ValidationError(
+            f"Puzzle name must be at most {settings.PUZZLE_NAME_MAX_LENGTH} characters."
+        )
+
+    description = puzzle_config.get('description', '') or ''
+    if len(description) > settings.PUZZLE_DESCRIPTION_MAX_LENGTH:
+        raise ValidationError(
+            f"Puzzle description must be at most {settings.PUZZLE_DESCRIPTION_MAX_LENGTH} characters."
+        )
+
+    if len(instructions_text.encode('utf-8')) > settings.PUZZLE_INSTRUCTIONS_MAX_BYTES:
+        raise ValidationError(
+            f"Puzzle instructions must be at most {settings.PUZZLE_INSTRUCTIONS_MAX_BYTES} bytes."
+        )
+
+    existing = conn.execute(
+        "SELECT 1 FROM puzzles WHERE LOWER(name) = LOWER(?) LIMIT 1",
+        (puzzle_name,),
+    ).fetchone()
+    if existing:
+        raise ValidationError("Puzzle name already exists. Please choose a unique name.")
+
+    if not puzzle_config.get('inputs') or not isinstance(puzzle_config['inputs'], list):
+        raise ValidationError("Puzzle must have 'inputs' list")
+    if not puzzle_config.get('outputs') or not isinstance(puzzle_config['outputs'], list):
+        raise ValidationError("Puzzle must have 'outputs' list")
+    if not puzzle_config.get('default_gate_set'):
+        raise ValidationError("Puzzle must have 'default_gate_set'")
+
+    test_cases = config_data.get('test_cases', [])
+    if not test_cases:
+        raise ValidationError("Puzzle must have at least one test case")
+
+    return puzzle_config
 
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
@@ -364,6 +410,15 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    @router.get("/{puzzle_id}/leaderboard")
+    def leaderboard(puzzle_id: int, limit: int = 50, token: str = Depends(verify_token)):
+        try:
+            puzzle_service.auth.require_user_id(token)
+            entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
+            return {"data": entries}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
     @router.post("/{puzzle_id}/simulate")
     def simulate(puzzle_id: int, req: SimulateReq, token: str = Depends(verify_token)):
         try:
@@ -407,9 +462,12 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 if not riddles_dir.exists():
                     riddles_dir.mkdir(parents=True)
 
-                # Read config first to get puzzle name
                 config_content = await config_file.read()
                 config_data = json.loads(config_content)
+                instructions_content = await instructions_file.read()
+                instructions_text = instructions_content.decode('utf-8')
+                _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+
                 puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
                 puzzle_num = get_next_puzzle_number(riddles_dir)
                 sanitized_name = sanitize_puzzle_name(puzzle_name)
@@ -434,34 +492,21 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                         shutil.copyfileobj(upload_file.file, buffer)
                     return str(dest_path)
 
-                # Reset file pointers after reading config
-                await config_file.seek(0)
+                solution_content = await sample_solution_file.read()
 
-                # Save to TEMP directory first
-                config_path = save_file_to_temp(config_file, 'config')
-                instructions_path = save_file_to_temp(instructions_file, 'instructions')
-                solution_path = save_file_to_temp(sample_solution_file, 'sample_solution')
+                config_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_config.json'
+                instructions_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
+                solution_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_sample_solution.json'
+
+                config_path.write_bytes(config_content)
+                instructions_path.write_bytes(instructions_content)
+                solution_path.write_bytes(solution_content)
 
                 # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
                     config_data = json.load(cf)
-                
-                # Validate config structure
-                puzzle_config = config_data.get('puzzle', {})
-                if not puzzle_config:
-                    raise ValidationError("Config missing 'puzzle' section")
-                if not puzzle_config.get('name'):
-                    raise ValidationError("Puzzle name is required")
-                if not puzzle_config.get('inputs') or not isinstance(puzzle_config['inputs'], list):
-                    raise ValidationError("Puzzle must have 'inputs' list")
-                if not puzzle_config.get('outputs') or not isinstance(puzzle_config['outputs'], list):
-                    raise ValidationError("Puzzle must have 'outputs' list")
-                if not puzzle_config.get('default_gate_set'):
-                    raise ValidationError("Puzzle must have 'default_gate_set'")
-                
+                puzzle_config = _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
                 test_cases = config_data.get('test_cases', [])
-                if not test_cases:
-                    raise ValidationError("Puzzle must have at least one test case")
                 
                 # Load and validate sample solution using logic engine
                 with open(solution_path, 'r', encoding='utf-8') as sf:
@@ -809,6 +854,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id)
 
                 return {"message": "Puzzle created successfully"}
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             print(f"Error during puzzle creation: {e}")
             import traceback

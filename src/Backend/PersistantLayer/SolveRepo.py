@@ -321,6 +321,37 @@ class SolveRepo:
         )
         return int(cur.lastrowid)
 
+    def get_leaderboard(self, puzzle_id: int, limit: int = 50) -> list[dict]:
+        """Return the leaderboard for a puzzle: best (fastest) passed solve per user, ranked by time."""
+        rows = self.conn.execute(
+            """
+            SELECT sa.user_id,
+                   u.username,
+                   MIN(sa.time_taken_seconds) AS best_time,
+                   MAX(sa.highest_medal)       AS best_medal,
+                   MIN(sa.submitted_at)        AS first_solved_at
+            FROM solve_attempts sa
+            JOIN users u ON u.id = sa.user_id
+            WHERE sa.puzzle_id = ? AND sa.passed = 1
+              AND sa.time_taken_seconds IS NOT NULL
+            GROUP BY sa.user_id
+            ORDER BY best_time ASC
+            LIMIT ?
+            """,
+            (int(puzzle_id), int(limit)),
+        ).fetchall()
+        result = []
+        for rank, r in enumerate(rows, start=1):
+            result.append({
+                "rank": rank,
+                "user_id": int(r["user_id"]),
+                "username": r["username"],
+                "best_time": int(r["best_time"]),
+                "best_medal": int(r["best_medal"]) if r["best_medal"] is not None else 0,
+                "first_solved_at": r["first_solved_at"],
+            })
+        return result
+
     def delete_by_puzzle(self, puzzle_id: int) -> None:
         """Delete all solve attempts, progress, and creator XP dedup records for a puzzle."""
         self.conn.execute("DELETE FROM solve_attempts WHERE puzzle_id=?", (int(puzzle_id),))

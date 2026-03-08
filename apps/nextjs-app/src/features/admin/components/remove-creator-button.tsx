@@ -6,7 +6,12 @@ import { ConfirmationDialog } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
 
-import { useRemoveCreator, useConfirmRemoveCreator, RemoveCreatorResponse } from '../api/remove-creator';
+import {
+  useRemoveCreator,
+  useConfirmRemoveCreator,
+  RemoveCreatorResponse,
+  ConfirmRemoveCreatorResponse,
+} from '../api/remove-creator';
 
 type RemoveCreatorButtonProps = {
   userId: number;
@@ -50,7 +55,7 @@ export const RemoveCreatorButton = ({
         addNotification({
           type: 'error',
           title: 'Failed to remove Creator role',
-          description: error?.message,
+          message: error?.message,
         });
         setStep('closed');
       },
@@ -59,12 +64,12 @@ export const RemoveCreatorButton = ({
 
   const confirmMutation = useConfirmRemoveCreator({
     mutationConfig: {
-      onSuccess: (data) => {
+      onSuccess: (data: ConfirmRemoveCreatorResponse) => {
         const actionText = data.action === 'delete' ? 'deleted' : data.action === 'unpublish' ? 'unpublished' : 'left published';
         addNotification({
           type: 'success',
           title: `Creator role removed from ${username}`,
-          description: `${data.published_affected} puzzle(s) ${actionText}`,
+          message: `${data.published_affected} puzzle(s) ${actionText}`,
         });
         setStep('closed');
         setPuzzlesData(null);
@@ -73,7 +78,7 @@ export const RemoveCreatorButton = ({
         addNotification({
           type: 'error',
           title: 'Failed to confirm Creator removal',
-          description: error?.message,
+          message: error?.message,
         });
       },
     },

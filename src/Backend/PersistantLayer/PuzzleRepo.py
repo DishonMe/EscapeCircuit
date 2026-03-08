@@ -96,6 +96,16 @@ class PuzzleRepo:
             deleted_at TEXT NOT NULL
         );
         """)
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS saved_puzzles (
+            user_id INTEGER NOT NULL,
+            puzzle_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, puzzle_id),
+            FOREIGN KEY(puzzle_id) REFERENCES puzzles(id) ON DELETE CASCADE
+        );
+        """)
+
         # Needed by experienced-only puzzle filters/order when PuzzleRepo is used in isolation.
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS ratings (
@@ -711,6 +721,36 @@ class PuzzleRepo:
         rows = self.conn.execute(
             "SELECT * FROM puzzles WHERE creator_user_id=? AND status=?",
             (int(creator_user_id), status.value),
+        ).fetchall()
+        return [self._row_to_puzzle(r) for r in rows]
+
+    def save_for_later(self, user_id: int, puzzle_id: int, created_at: str) -> bool:
+        cur = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO saved_puzzles(user_id, puzzle_id, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (int(user_id), int(puzzle_id), created_at),
+        )
+        return cur.rowcount > 0
+
+    def remove_saved_puzzle(self, user_id: int, puzzle_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM saved_puzzles WHERE user_id=? AND puzzle_id=?",
+            (int(user_id), int(puzzle_id)),
+        )
+        return cur.rowcount > 0
+
+    def list_saved_puzzles(self, user_id: int) -> List[Puzzle]:
+        rows = self.conn.execute(
+            """
+            SELECT p.*
+            FROM saved_puzzles sp
+            JOIN puzzles p ON p.id = sp.puzzle_id
+            WHERE sp.user_id = ?
+            ORDER BY sp.created_at DESC
+            """,
+            (int(user_id),),
         ).fetchall()
         return [self._row_to_puzzle(r) for r in rows]
 

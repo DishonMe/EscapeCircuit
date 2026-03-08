@@ -143,6 +143,7 @@ class TestPuzzleServiceCreatePuzzle:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -202,6 +203,52 @@ class TestPuzzleServiceCreatePuzzle:
         with pytest.raises(ValidationError) as exc_info:
             self.service.create_puzzle("valid_token", payload)
         assert "name is required" in str(exc_info.value).lower()
+
+    def test_create_puzzle_rejects_name_too_long(self):
+        self.mock_auth.require_user_id.return_value = 1
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+
+        payload = {"name": "x" * 101}
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", payload)
+        assert "at most 100 characters" in str(exc_info.value)
+
+    def test_create_puzzle_rejects_duplicate_name(self):
+        self.mock_auth.require_user_id.return_value = 1
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = (1,)
+
+        payload = {"name": "Existing Puzzle"}
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", payload)
+        assert "already exists" in str(exc_info.value)
+
+    def test_create_puzzle_rejects_description_too_long(self):
+        self.mock_auth.require_user_id.return_value = 1
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_user_repo.get_by_id.return_value = creator_user
+
+        payload = {"name": "Valid Name", "description": "d" * 2001}
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", payload)
+        assert "description must be at most 2000 characters" in str(exc_info.value).lower()
+
+    def test_create_puzzle_rejects_instructions_too_large(self):
+        self.mock_auth.require_user_id.return_value = 1
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_user_repo.get_by_id.return_value = creator_user
+
+        payload = {"name": "Valid Name", "instructions": "a" * 5121}
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", payload)
+        assert "instructions must be at most 5120 bytes" in str(exc_info.value).lower()
 
     def test_create_puzzle_user_not_found(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -794,6 +841,7 @@ class TestPuzzleServiceUpdatePuzzle:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)

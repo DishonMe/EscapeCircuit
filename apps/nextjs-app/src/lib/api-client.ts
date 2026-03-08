@@ -135,6 +135,8 @@ async function fetchApi<T>(
       throw error;
     }
   }
+
+  throw new Error('Request failed after retries');
 }
 
 export const api = {
