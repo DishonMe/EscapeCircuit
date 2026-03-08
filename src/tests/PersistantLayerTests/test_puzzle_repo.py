@@ -513,6 +513,53 @@ def test_count_published_with_creator_username_filter(conn, repo):
     assert count == 1
 
 
+def test_list_published_filters_by_creator_experience_level(conn, repo):
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            xp INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute("INSERT INTO users(id, username, xp) VALUES (?, ?, ?)", (1, "ExperiencedCreator", 2000))
+    conn.execute("INSERT INTO users(id, username, xp) VALUES (?, ?, ?)", (2, "NewCreator", 100))
+
+    exp_puzzle = repo.create(make_puzzle("ByExp", creator_user_id=1, status=PuzzleStatus.PUBLISHED))
+    inxp_puzzle = repo.create(make_puzzle("ByInxp", creator_user_id=2, status=PuzzleStatus.PUBLISHED))
+
+    experienced = repo.list_published(limit=50, creator_experience_level="experienced")
+    experienced_ids = {p.id for p in experienced}
+    assert exp_puzzle.id in experienced_ids
+    assert inxp_puzzle.id not in experienced_ids
+
+    inexperienced = repo.list_published(limit=50, creator_experience_level="inexperienced")
+    inexperienced_ids = {p.id for p in inexperienced}
+    assert inxp_puzzle.id in inexperienced_ids
+    assert exp_puzzle.id not in inexperienced_ids
+
+
+def test_count_published_filters_by_creator_experience_level(conn, repo):
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            xp INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute("INSERT INTO users(id, username, xp) VALUES (?, ?, ?)", (11, "ExperiencedCreator", 2000))
+    conn.execute("INSERT INTO users(id, username, xp) VALUES (?, ?, ?)", (22, "NewCreator", 100))
+
+    repo.create(make_puzzle("ByExp", creator_user_id=11, status=PuzzleStatus.PUBLISHED))
+    repo.create(make_puzzle("ByInxp", creator_user_id=22, status=PuzzleStatus.PUBLISHED))
+
+    assert repo.count_published(creator_experience_level="experienced") == 1
+    assert repo.count_published(creator_experience_level="inexperienced") == 1
+
+
 def test_list_published_pagination_offset(repo):
     """Test list_published pagination with offset"""
     for i in range(5):
@@ -649,6 +696,70 @@ def test_list_published_experienced_clearness_filter(repo):
     
     result = repo.list_published(min_clearness=3.0, only_experienced_clearness=True)
     assert isinstance(result, list)
+
+
+def test_list_published_experienced_fun_uses_experienced_ratings(conn, repo):
+    """Experienced fun filter should use ratings where is_experienced_at_rating=1 only."""
+    p_exp = repo.create(make_puzzle("ExpRated", status=PuzzleStatus.PUBLISHED, avg_fun=1.0))
+    p_non = repo.create(make_puzzle("NonExpOnly", status=PuzzleStatus.PUBLISHED, avg_fun=5.0))
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p_exp.id, 101, 3, 5, 3, now_iso, 1, 0),
+    )
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p_non.id, 102, 3, 5, 3, now_iso, 0, 0),
+    )
+
+    result = repo.list_published(min_fun=4.0, only_experienced_fun=True, limit=50)
+    names = {p.name for p in result}
+    assert "ExpRated" in names
+    assert "NonExpOnly" not in names
+
+
+def test_list_published_experienced_fun_without_bounds_filters_to_experienced_rated(repo, conn):
+    p_non = repo.create(make_puzzle("NonExpOnly", status=PuzzleStatus.PUBLISHED, avg_fun=2.0))
+    p_exp = repo.create(make_puzzle("ExpRated", status=PuzzleStatus.PUBLISHED, avg_fun=5.0))
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p_non.id, 101, 2, 2, 2, now_iso, 0, 0),
+    )
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p_exp.id, 202, 5, 5, 5, now_iso, 1, 0),
+    )
+
+    listed = repo.list_published(only_experienced_fun=True, limit=50)
+    names = {p.name for p in listed}
+    assert "ExpRated" in names
+    assert "NonExpOnly" not in names
+
+    count = repo.count_published(only_experienced_fun=True)
+    assert count == 1
+
+
+def test_list_published_order_only_experienced_fun(repo, conn):
+    """Ordering with order_only_experienced should use experienced-only fun averages."""
+    p1 = repo.create(make_puzzle("HighExpFun", status=PuzzleStatus.PUBLISHED, avg_fun=1.0))
+    p2 = repo.create(make_puzzle("LowExpFun", status=PuzzleStatus.PUBLISHED, avg_fun=5.0))
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p1.id, 201, 3, 5, 3, now_iso, 1, 0),
+    )
+    conn.execute(
+        "INSERT INTO ratings(puzzle_id,user_id,difficulty,fun,clearness,created_at,is_experienced_at_rating,rating_xp_awarded) VALUES(?,?,?,?,?,?,?,?)",
+        (p2.id, 202, 3, 1, 3, now_iso, 1, 0),
+    )
+
+    result = repo.list_published(order_by="fun", order_direction="DESC", order_only_experienced=True, limit=50)
+    names = [p.name for p in result]
+    assert names.index("HighExpFun") < names.index("LowExpFun")
 
 
 def test_search_by_name_with_limit_zero(repo):

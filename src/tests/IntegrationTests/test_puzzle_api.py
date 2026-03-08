@@ -148,3 +148,72 @@ class TestPuzzleBrowse:
         token = register_and_login(client)
         resp = client.get("/puzzles/search?q=nonexistent", headers=auth_header(token))
         assert resp.status_code == 200
+
+    def test_browse_only_experienced_fun_filters_without_bounds(self, client, conn):
+        creator_token = _register_creator(client, conn, "exp_filter_creator")
+
+        p_non = _create_puzzle(client, creator_token, "NonExpOnly")
+        p_exp = _create_puzzle(client, creator_token, "ExpRated")
+
+        conn.execute(
+            "UPDATE puzzles SET status='published' WHERE id IN (?, ?)",
+            (int(p_non["id"]), int(p_exp["id"])),
+        )
+
+        conn.execute(
+            "INSERT INTO ratings (puzzle_id, user_id, difficulty, fun, clearness, created_at, is_experienced_at_rating, rating_xp_awarded) VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?)",
+            (int(p_non["id"]), 2001, 2, 2, 2, 0, 0),
+        )
+        conn.execute(
+            "INSERT INTO ratings (puzzle_id, user_id, difficulty, fun, clearness, created_at, is_experienced_at_rating, rating_xp_awarded) VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?)",
+            (int(p_exp["id"]), 2002, 5, 5, 5, 1, 0),
+        )
+        conn.commit()
+
+        viewer_token = register_and_login(client, "exp_filter_viewer")
+        resp = client.get("/puzzles?only_experienced_fun=true&limit=50", headers=auth_header(viewer_token))
+        assert resp.status_code == 200
+
+        data = resp.json().get("data", [])
+        names = {p.get("name") for p in data}
+        assert "ExpRated" in names
+        assert "NonExpOnly" not in names
+
+    def test_browse_filters_by_creator_experience_level(self, client, conn):
+        exp_creator_token = _register_creator(client, conn, "exp_creator")
+        exp_creator_me = client.get("/users/me", headers=auth_header(exp_creator_token)).json()
+
+        inxp_creator_token = _register_creator(client, conn, "inxp_creator")
+        inxp_creator_me = client.get("/users/me", headers=auth_header(inxp_creator_token)).json()
+
+        conn.execute("UPDATE users SET xp=? WHERE id=?", (2000, int(exp_creator_me["id"])))
+        conn.execute("UPDATE users SET xp=? WHERE id=?", (100, int(inxp_creator_me["id"])))
+
+        p_exp = _create_puzzle(client, exp_creator_token, "PuzzleByExperiencedCreator")
+        p_inxp = _create_puzzle(client, inxp_creator_token, "PuzzleByInexperiencedCreator")
+
+        conn.execute(
+            "UPDATE puzzles SET status='published' WHERE id IN (?, ?)",
+            (int(p_exp["id"]), int(p_inxp["id"])),
+        )
+        conn.commit()
+
+        viewer_token = register_and_login(client, "creator_exp_filter_viewer")
+
+        experienced_resp = client.get(
+            "/puzzles?creator_experience_level=experienced&limit=50",
+            headers=auth_header(viewer_token),
+        )
+        assert experienced_resp.status_code == 200
+        experienced_names = {p.get("name") for p in experienced_resp.json().get("data", [])}
+        assert "PuzzleByExperiencedCreator" in experienced_names
+        assert "PuzzleByInexperiencedCreator" not in experienced_names
+
+        inexperienced_resp = client.get(
+            "/puzzles?creator_experience_level=inexperienced&limit=50",
+            headers=auth_header(viewer_token),
+        )
+        assert inexperienced_resp.status_code == 200
+        inexperienced_names = {p.get("name") for p in inexperienced_resp.json().get("data", [])}
+        assert "PuzzleByInexperiencedCreator" in inexperienced_names
+        assert "PuzzleByExperiencedCreator" not in inexperienced_names

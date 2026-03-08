@@ -197,6 +197,12 @@ export type RatingMetrics = {
   weighted_difficulty: number;
   avg_fun: number | null;
   avg_clearness: number | null;
+  experienced_metrics?: {
+    count: number;
+    experienced_avg_difficulty: number | null;
+    experienced_avg_fun: number | null;
+    experienced_avg_clearness: number | null;
+  };
   experienced: {
     count: number;
     avg_difficulty: number | null;

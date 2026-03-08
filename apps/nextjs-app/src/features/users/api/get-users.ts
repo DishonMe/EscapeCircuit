@@ -12,7 +12,7 @@ export interface UserFilters {
   minLevel?: number;
   maxLevel?: number;
   experienceLevel?: 'all' | 'experienced' | 'inexperienced';
-  orderBy?: 'created_at' | 'level' | 'role';
+  orderBy?: 'created_at' | 'level' | 'role' | 'experienced';
   orderDirection?: 'ASC' | 'DESC';
   limit?: number;
   offset?: number;

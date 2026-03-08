@@ -116,14 +116,15 @@ def test_aggregate_calculation_multiple_ratings():
     service.rating_repo.upsert.return_value = normal_rating
     payload = {"difficulty": 3, "fun": 4, "clearness": 3}
     service.submit_rating("valid_token", 1, payload)
-    # Weighted average: alpha * creator + (1-alpha) * user_avg
-    # For <10 user ratings, alpha=0.8
-    # creator=5, user_avg=3, expected=0.8*5 + 0.2*3 = 4.6
+    # Weighted average: alpha * creator_label + (1-alpha) * weighted_user_avg
+    # For <10 raw ratings, alpha=0.8 and creator label defaults to EASY=1.
+    # weighted_user_avg=(5*2 + 3*1)/(2+1)=13/3=4.333...
+    # expected=0.8*1 + 0.2*4.333... = 1.666...
     # _recalculate_and_store now uses update_rating_aggregates (targeted SQL)
     service.puzzle_repo.update_rating_aggregates.assert_called_once()
     call_kwargs = service.puzzle_repo.update_rating_aggregates.call_args
     assert call_kwargs[0][0] == 1  # puzzle_id
-    assert abs(call_kwargs[1]["avg_difficulty"] - 4.6) < 1e-6
+    assert abs(call_kwargs[1]["avg_difficulty"] - 1.6666666667) < 1e-6
     assert call_kwargs[1]["rating_count"] == 2
 
 def test_exception_propagation_from_dependencies():
@@ -740,6 +741,7 @@ class TestRatingServicePuzzleMetrics:
         self.mock_solve_repo = Mock(spec=SolveRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_xp = Mock(spec=XPService)
+        self.mock_puzzle_repo.get_by_id.return_value = Puzzle(id=1, name="Test", creator_user_id=2)
         
         self.service = RatingService(
             self.mock_rating_repo, self.mock_puzzle_repo,
@@ -765,6 +767,79 @@ class TestRatingServicePuzzleMetrics:
         result = self.service.get_puzzle_metrics(1)
         assert "avg_difficulty" in result
         assert result["count"] == 0
+
+    def test_get_puzzle_metrics_double_weighting_and_dual_metrics(self):
+        """Experienced ratings should be double-weighted in general averages and separately tracked."""
+        experienced = Rating(
+            id=1, puzzle_id=1, user_id=10,
+            difficulty=5, fun=5, clearness=4,
+            is_experienced_at_rating=True,
+        )
+        regular = Rating(
+            id=2, puzzle_id=1, user_id=11,
+            difficulty=1, fun=1, clearness=2,
+            is_experienced_at_rating=False,
+        )
+        self.mock_rating_repo.list_by_puzzle.return_value = [experienced, regular]
+
+        result = self.service.get_puzzle_metrics(1)
+
+        # Double-weighted general difficulty: (5*2 + 1*1) / (2+1) = 11/3 = 3.67
+        assert result["avg_difficulty"] == pytest.approx(3.67, abs=0.01)
+
+        # Restored UI behavior: fun/clearness are shown as soon as ratings exist.
+        # Weighted: (5*2 + 1*1) / (2+1) = 11/3 = 3.67
+        # Weighted clearness: (4*2 + 2*1) / (2+1) = 10/3 = 3.33
+        assert result["avg_fun"] == pytest.approx(3.67, abs=0.01)
+        assert result["avg_clearness"] == pytest.approx(3.33, abs=0.01)
+
+        # Dual metrics payload (experienced-only, unweighted among experienced ratings)
+        assert result["experienced_metrics"]["count"] == 1
+        assert result["experienced_metrics"]["experienced_avg_difficulty"] == 5.0
+        assert result["experienced_metrics"]["experienced_avg_fun"] == 5.0
+        assert result["experienced_metrics"]["experienced_avg_clearness"] == 4.0
+
+    def test_get_puzzle_metrics_fun_clearness_computed_at_raw_count_10(self):
+        """Fun and clearness should be decided once raw rating count reaches 10."""
+        ratings = [
+            Rating(id=i + 1, puzzle_id=1, user_id=100 + i, difficulty=2, fun=1, clearness=1, is_experienced_at_rating=False)
+            for i in range(9)
+        ]
+        ratings.append(
+            Rating(id=99, puzzle_id=1, user_id=999, difficulty=5, fun=5, clearness=5, is_experienced_at_rating=True)
+        )
+        self.mock_rating_repo.list_by_puzzle.return_value = ratings
+
+        result = self.service.get_puzzle_metrics(1)
+
+        # Weighted fun/clearness at raw count 10: (9*1 + 5*2) / (9 + 2) = 19/11 = 1.73
+        assert result["count"] == 10
+        assert result["avg_fun"] == pytest.approx(1.73, abs=0.01)
+        assert result["avg_clearness"] == pytest.approx(1.73, abs=0.01)
+
+    def test_recalculate_and_store_uses_experienced_weighting(self):
+        experienced = Rating(
+            id=1, puzzle_id=1, user_id=10,
+            difficulty=5, fun=5, clearness=4,
+            is_experienced_at_rating=True,
+        )
+        regular = Rating(
+            id=2, puzzle_id=1, user_id=11,
+            difficulty=1, fun=1, clearness=2,
+            is_experienced_at_rating=False,
+        )
+        self.mock_rating_repo.list_by_puzzle.return_value = [experienced, regular]
+
+        self.service._recalculate_and_store(1)
+
+        self.mock_puzzle_repo.update_rating_aggregates.assert_called_once()
+        kwargs = self.mock_puzzle_repo.update_rating_aggregates.call_args.kwargs
+        assert kwargs["rating_count"] == 2
+        # Blended difficulty with EASY creator label (1): 0.8*1 + 0.2*(11/3) = 1.53...
+        assert kwargs["avg_difficulty"] == pytest.approx(1.5333, abs=0.01)
+        # Undecided persisted as 0.0 while raw count < 10
+        assert kwargs["avg_fun"] == 0.0
+        assert kwargs["avg_clearness"] == 0.0
 
 
 class TestRatingServiceListRatings:

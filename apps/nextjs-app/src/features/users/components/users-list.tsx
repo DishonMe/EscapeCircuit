@@ -221,6 +221,7 @@ export const UsersList = () => {
               >
                 <option value="created_at">Creation Date</option>
                 <option value="level">Level</option>
+                <option value="experienced">Experienced Status</option>
                 <option value="role">Role</option>
               </select>
             </div>

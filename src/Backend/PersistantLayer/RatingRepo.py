@@ -73,7 +73,10 @@ class RatingRepo:
 
     def list_by_puzzle(self, puzzle_id: int) -> List[Rating]:
         rows = self.conn.execute("""
-            SELECT * FROM ratings WHERE puzzle_id=? ORDER BY id ASC
+            SELECT id, puzzle_id, user_id, difficulty, fun, clearness, created_at, is_experienced_at_rating
+            FROM ratings
+            WHERE puzzle_id=?
+            ORDER BY id ASC
         """, (puzzle_id,)).fetchall()
         return [
             Rating.from_dict({
