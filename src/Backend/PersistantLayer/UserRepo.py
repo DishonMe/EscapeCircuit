@@ -3,6 +3,7 @@ import sqlite3
 import hashlib
 from typing import Optional, List, Dict
 
+from Backend import settings
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -136,6 +137,11 @@ class UserRepo:
         return cur.rowcount > 0
 
     @staticmethod
+    def _min_xp_for_level(level: int) -> int:
+        lvl = max(1, int(level))
+        return ((lvl - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+
+    @staticmethod
     def _build_where(
         username_search: Optional[str] = None,
         role: Optional[str] = None,
@@ -148,6 +154,7 @@ class UserRepo:
         """Build WHERE clause and params shared by list_all() and count_all()."""
         where_clauses: list = []
         params: list = []
+        experienced_xp_min = UserRepo._min_xp_for_level(settings.EXPERIENCED_LEVEL_MIN)
         if username_search is not None:
             where_clauses.append("username LIKE ?")
             params.append(f"%{username_search}%")
@@ -168,10 +175,10 @@ class UserRepo:
             params.append(max_xp)
         if experience_level == "experienced":
             where_clauses.append("xp>=?")
-            params.append(1600)
+            params.append(experienced_xp_min)
         elif experience_level == "inexperienced":
             where_clauses.append("xp<?")
-            params.append(1600)
+            params.append(experienced_xp_min)
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
         return where_sql, params
 
@@ -195,7 +202,7 @@ class UserRepo:
             experience_level=experience_level,
         )
 
-        valid_order_fields = ["created_at", "level", "role", "xp", "id"]
+        valid_order_fields = ["created_at", "level", "role", "xp", "id", "experienced"]
         if order_by not in valid_order_fields:
             order_by = "created_at"
 
@@ -207,6 +214,11 @@ class UserRepo:
             order_clause = f"xp {order_direction}"
         elif order_by == "id":
             order_clause = f"id {order_direction}"
+        elif order_by == "experienced":
+            # DESC => experienced users first, ASC => inexperienced users first.
+            # Secondary sort by XP keeps ordering stable within each group.
+            experienced_xp_min = self._min_xp_for_level(settings.EXPERIENCED_LEVEL_MIN)
+            order_clause = f"CASE WHEN xp >= {experienced_xp_min} THEN 1 ELSE 0 END {order_direction}, xp {order_direction}"
         else:
             order_clause = f"created_at {order_direction}"
 

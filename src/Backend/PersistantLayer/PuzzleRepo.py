@@ -2,6 +2,7 @@ import json
 import sqlite3
 from typing import Optional, List
 
+from Backend import settings
 from Backend.DomainLayer.Puzzle import Puzzle
 from Backend.DomainLayer.PuzzleTestCase import PuzzleTestCase
 from Backend.DomainLayer.Enums import PuzzleStatus, GateType, PuzzleDifficulty
@@ -105,6 +106,22 @@ class PuzzleRepo:
         );
         """)
 
+        # Needed by experienced-only puzzle filters/order when PuzzleRepo is used in isolation.
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS ratings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            puzzle_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            difficulty INTEGER NOT NULL,
+            fun INTEGER NOT NULL,
+            clearness INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            is_experienced_at_rating INTEGER NOT NULL,
+            rating_xp_awarded INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(puzzle_id, user_id)
+        );
+        """)
+
     def create(self, puzzle: Puzzle) -> Puzzle:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
@@ -203,6 +220,7 @@ class PuzzleRepo:
         search: Optional[str] = None,
         creator_id: Optional[int] = None,
         creator_username: Optional[str] = None,
+        creator_experience_level: Optional[str] = None,
         min_difficulty: Optional[float] = None,
         max_difficulty: Optional[float] = None,
         only_experienced_difficulty: bool = False,
@@ -230,6 +248,9 @@ class PuzzleRepo:
         where_clauses = ["p.status=?"]
         params = [PuzzleStatus.PUBLISHED.value]
         join_sql = ""
+        exp_avg_difficulty_sql = "(SELECT AVG(r.difficulty) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
+        exp_avg_fun_sql = "(SELECT AVG(r.fun) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
+        exp_avg_clearness_sql = "(SELECT AVG(r.clearness) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
         
         if search is not None:
             where_clauses.append("p.name LIKE ?")
@@ -239,21 +260,36 @@ class PuzzleRepo:
             where_clauses.append("p.creator_user_id=?")
             params.append(creator_id)
 
-        if creator_username is not None:
+        needs_creator_join = creator_username is not None or creator_experience_level in ("experienced", "inexperienced")
+        if needs_creator_join:
             join_sql = "JOIN users u ON p.creator_user_id = u.id"
+
+        if creator_username is not None:
             where_clauses.append("LOWER(u.username) LIKE LOWER(?)")
             params.append(f"%{creator_username}%")
+
+        if creator_experience_level in ("experienced", "inexperienced"):
+            experienced_xp_min = self._min_xp_for_level(settings.EXPERIENCED_LEVEL_MIN)
+            if creator_experience_level == "experienced":
+                where_clauses.append("u.xp >= ?")
+            else:
+                where_clauses.append("u.xp < ?")
+            params.append(experienced_xp_min)
         
+        if only_experienced_difficulty:
+            # Experienced mode should always restrict to puzzles that have experienced ratings.
+            where_clauses.append(f"{exp_avg_difficulty_sql} IS NOT NULL")
+
         if min_difficulty is not None or max_difficulty is not None:
             if only_experienced_difficulty:
                 # For experienced users: filter by avg_difficulty rating (with fallback to base difficulty)
                 # COALESCE to handle NULL avg_difficulty by using base difficulty
-                difficulty_case = """
+                difficulty_case = f"""
                     CASE 
-                        WHEN avg_difficulty IS NOT NULL THEN avg_difficulty
-                        WHEN difficulty = 'EASY' THEN 1
-                        WHEN difficulty = 'MEDIUM' THEN 2
-                        WHEN difficulty = 'HARD' THEN 3
+                        WHEN {exp_avg_difficulty_sql} IS NOT NULL THEN {exp_avg_difficulty_sql}
+                        WHEN p.difficulty = 'EASY' THEN 1
+                        WHEN p.difficulty = 'MEDIUM' THEN 2
+                        WHEN p.difficulty = 'HARD' THEN 3
                         ELSE 1.5
                     END
                 """
@@ -270,9 +306,9 @@ class PuzzleRepo:
                     min_level = self._difficulty_to_level(min_difficulty)
                     where_clauses.append("""
                         CASE 
-                            WHEN difficulty = 'EASY' THEN 1
-                            WHEN difficulty = 'MEDIUM' THEN 2
-                            WHEN difficulty = 'HARD' THEN 3
+                            WHEN p.difficulty = 'EASY' THEN 1
+                            WHEN p.difficulty = 'MEDIUM' THEN 2
+                            WHEN p.difficulty = 'HARD' THEN 3
                             ELSE 1.5
                         END >= ?
                     """)
@@ -281,25 +317,28 @@ class PuzzleRepo:
                     max_level = self._difficulty_to_level(max_difficulty)
                     where_clauses.append("""
                         CASE 
-                            WHEN difficulty = 'EASY' THEN 1
-                            WHEN difficulty = 'MEDIUM' THEN 2
-                            WHEN difficulty = 'HARD' THEN 3
+                            WHEN p.difficulty = 'EASY' THEN 1
+                            WHEN p.difficulty = 'MEDIUM' THEN 2
+                            WHEN p.difficulty = 'HARD' THEN 3
                             ELSE 1.5
                         END <= ?
                     """)
                     params.append(max_difficulty)
         
+        if only_experienced_clearness:
+            where_clauses.append(f"{exp_avg_clearness_sql} IS NOT NULL")
+
         if min_clearness is not None or max_clearness is not None:
             # Exclude unrated puzzles when filtering by clearness
-            where_clauses.append("p.avg_clearness > 0")
             if only_experienced_clearness:
                 if min_clearness is not None:
-                    where_clauses.append("p.avg_clearness>=?")
+                    where_clauses.append(f"{exp_avg_clearness_sql}>=?")
                     params.append(min_clearness)
                 if max_clearness is not None:
-                    where_clauses.append("p.avg_clearness<=?")
+                    where_clauses.append(f"{exp_avg_clearness_sql}<=?")
                     params.append(max_clearness)
             else:
+                where_clauses.append("p.avg_clearness > 0")
                 # Filter by min/max clearness regardless of experience
                 if min_clearness is not None:
                     where_clauses.append("p.avg_clearness>=?")
@@ -308,17 +347,20 @@ class PuzzleRepo:
                     where_clauses.append("p.avg_clearness<=?")
                     params.append(max_clearness)
         
+        if only_experienced_fun:
+            where_clauses.append(f"{exp_avg_fun_sql} IS NOT NULL")
+
         if min_fun is not None or max_fun is not None:
             # Exclude unrated puzzles when filtering by fun
-            where_clauses.append("p.avg_fun > 0")
             if only_experienced_fun:
                 if min_fun is not None:
-                    where_clauses.append("p.avg_fun>=?")
+                    where_clauses.append(f"{exp_avg_fun_sql}>=?")
                     params.append(min_fun)
                 if max_fun is not None:
-                    where_clauses.append("p.avg_fun<=?")
+                    where_clauses.append(f"{exp_avg_fun_sql}<=?")
                     params.append(max_fun)
             else:
+                where_clauses.append("p.avg_fun > 0")
                 # Filter by min/max fun regardless of experience
                 if min_fun is not None:
                     where_clauses.append("p.avg_fun>=?")
@@ -345,11 +387,20 @@ class PuzzleRepo:
         elif order_by == "created_at":
             order_clause = f"p.created_at {order_direction}"
         elif order_by == "difficulty":
-            order_clause = f"p.avg_difficulty {order_direction}"
+            if order_only_experienced:
+                order_clause = f"COALESCE({exp_avg_difficulty_sql}, CASE WHEN p.difficulty='EASY' THEN 1 WHEN p.difficulty='MEDIUM' THEN 2 WHEN p.difficulty='HARD' THEN 3 ELSE 1.5 END) {order_direction}"
+            else:
+                order_clause = f"p.avg_difficulty {order_direction}"
         elif order_by == "fun":
-            order_clause = f"p.avg_fun {order_direction}"
+            if order_only_experienced:
+                order_clause = f"COALESCE({exp_avg_fun_sql}, -1) {order_direction}"
+            else:
+                order_clause = f"p.avg_fun {order_direction}"
         elif order_by == "clearness":
-            order_clause = f"p.avg_clearness {order_direction}"
+            if order_only_experienced:
+                order_clause = f"COALESCE({exp_avg_clearness_sql}, -1) {order_direction}"
+            else:
+                order_clause = f"p.avg_clearness {order_direction}"
         else:
             order_clause = "p.created_at DESC"
         
@@ -371,6 +422,7 @@ class PuzzleRepo:
         search: Optional[str] = None,
         creator_id: Optional[int] = None,
         creator_username: Optional[str] = None,
+        creator_experience_level: Optional[str] = None,
         min_difficulty: Optional[float] = None,
         max_difficulty: Optional[float] = None,
         only_experienced_difficulty: bool = False,
@@ -387,6 +439,9 @@ class PuzzleRepo:
         where_clauses = ["p.status=?"]
         params = [PuzzleStatus.PUBLISHED.value]
         join_sql = ""
+        exp_avg_difficulty_sql = "(SELECT AVG(r.difficulty) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
+        exp_avg_fun_sql = "(SELECT AVG(r.fun) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
+        exp_avg_clearness_sql = "(SELECT AVG(r.clearness) FROM ratings r WHERE r.puzzle_id = p.id AND r.is_experienced_at_rating = 1)"
         
         if search is not None:
             where_clauses.append("p.name LIKE ?")
@@ -396,20 +451,34 @@ class PuzzleRepo:
             where_clauses.append("p.creator_user_id=?")
             params.append(creator_id)
 
-        if creator_username is not None:
+        needs_creator_join = creator_username is not None or creator_experience_level in ("experienced", "inexperienced")
+        if needs_creator_join:
             join_sql = "JOIN users u ON p.creator_user_id = u.id"
+
+        if creator_username is not None:
             where_clauses.append("LOWER(u.username) LIKE LOWER(?)")
             params.append(f"%{creator_username}%")
+
+        if creator_experience_level in ("experienced", "inexperienced"):
+            experienced_xp_min = self._min_xp_for_level(settings.EXPERIENCED_LEVEL_MIN)
+            if creator_experience_level == "experienced":
+                where_clauses.append("u.xp >= ?")
+            else:
+                where_clauses.append("u.xp < ?")
+            params.append(experienced_xp_min)
         
+        if only_experienced_difficulty:
+            where_clauses.append(f"{exp_avg_difficulty_sql} IS NOT NULL")
+
         if min_difficulty is not None or max_difficulty is not None:
             if only_experienced_difficulty:
                 # For experienced users: filter by avg_difficulty rating (with fallback to base difficulty)
-                difficulty_case = """
+                difficulty_case = f"""
                     CASE 
-                        WHEN avg_difficulty IS NOT NULL THEN avg_difficulty
-                        WHEN difficulty = 'EASY' THEN 1
-                        WHEN difficulty = 'MEDIUM' THEN 2
-                        WHEN difficulty = 'HARD' THEN 3
+                        WHEN {exp_avg_difficulty_sql} IS NOT NULL THEN {exp_avg_difficulty_sql}
+                        WHEN p.difficulty = 'EASY' THEN 1
+                        WHEN p.difficulty = 'MEDIUM' THEN 2
+                        WHEN p.difficulty = 'HARD' THEN 3
                         ELSE 1.5
                     END
                 """
@@ -424,9 +493,9 @@ class PuzzleRepo:
                 if min_difficulty is not None:
                     where_clauses.append("""
                         CASE 
-                            WHEN difficulty = 'EASY' THEN 1
-                            WHEN difficulty = 'MEDIUM' THEN 2
-                            WHEN difficulty = 'HARD' THEN 3
+                            WHEN p.difficulty = 'EASY' THEN 1
+                            WHEN p.difficulty = 'MEDIUM' THEN 2
+                            WHEN p.difficulty = 'HARD' THEN 3
                             ELSE 1.5
                         END >= ?
                     """)
@@ -434,16 +503,26 @@ class PuzzleRepo:
                 if max_difficulty is not None:
                     where_clauses.append("""
                         CASE 
-                            WHEN difficulty = 'EASY' THEN 1
-                            WHEN difficulty = 'MEDIUM' THEN 2
-                            WHEN difficulty = 'HARD' THEN 3
+                            WHEN p.difficulty = 'EASY' THEN 1
+                            WHEN p.difficulty = 'MEDIUM' THEN 2
+                            WHEN p.difficulty = 'HARD' THEN 3
                             ELSE 1.5
                         END <= ?
                     """)
                     params.append(max_difficulty)
         
+        if only_experienced_clearness:
+            where_clauses.append(f"{exp_avg_clearness_sql} IS NOT NULL")
+
         if min_clearness is not None or max_clearness is not None:
             if only_experienced_clearness:
+                if min_clearness is not None:
+                    where_clauses.append(f"{exp_avg_clearness_sql}>=?")
+                    params.append(min_clearness)
+                if max_clearness is not None:
+                    where_clauses.append(f"{exp_avg_clearness_sql}<=?")
+                    params.append(max_clearness)
+            else:
                 if min_clearness is not None:
                     where_clauses.append("p.avg_clearness>=?")
                     params.append(min_clearness)
@@ -451,8 +530,18 @@ class PuzzleRepo:
                     where_clauses.append("p.avg_clearness<=?")
                     params.append(max_clearness)
         
+        if only_experienced_fun:
+            where_clauses.append(f"{exp_avg_fun_sql} IS NOT NULL")
+
         if min_fun is not None or max_fun is not None:
             if only_experienced_fun:
+                if min_fun is not None:
+                    where_clauses.append(f"{exp_avg_fun_sql}>=?")
+                    params.append(min_fun)
+                if max_fun is not None:
+                    where_clauses.append(f"{exp_avg_fun_sql}<=?")
+                    params.append(max_fun)
+            else:
                 if min_fun is not None:
                     where_clauses.append("p.avg_fun>=?")
                     params.append(min_fun)
@@ -724,6 +813,11 @@ class PuzzleRepo:
             return "MEDIUM"
         else:
             return "HARD"
+
+    @staticmethod
+    def _min_xp_for_level(level: int) -> int:
+        lvl = max(1, int(level))
+        return ((lvl - 1) ** 2) * settings.LEVEL_XP_DIVISOR
 
     @staticmethod
     def _row_to_puzzle(row: sqlite3.Row) -> Puzzle:

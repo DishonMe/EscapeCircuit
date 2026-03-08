@@ -48,6 +48,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => router.push(paths.auth.login.getHref(pathname)),
   });
   const userRole = user.data?.role?.toLowerCase() || '';
+  const isExperienced = (user.data?.level ?? 0) >= 5;
   const navigation = [
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
     (userRole === 'creator' || userRole === 'admin') && {
@@ -110,6 +111,14 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <span className="font-medium text-foreground">{user.data?.username}</span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground capitalize">{user.data?.role}</span>
+            {isExperienced && (
+              <>
+                <span className="text-border">|</span>
+                <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  Experienced
+                </span>
+              </>
+            )}
           </div>
           <Drawer>
             <DrawerTrigger asChild>

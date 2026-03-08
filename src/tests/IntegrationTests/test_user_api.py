@@ -1,4 +1,6 @@
 """Integration tests for the User API (/users endpoints)."""
+from Backend import settings
+
 from .conftest import register_user, auth_header, register_and_login
 
 
@@ -101,6 +103,60 @@ class TestListUsers:
     def test_list_users_no_token(self, client):
         resp = client.get("/users")
         assert resp.status_code == 401
+
+    def test_list_users_experience_level_experienced(self, client, conn):
+        token = register_and_login(client, "alice")
+        register_user(client, "bob")
+
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min, "alice"))
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min - 1, "bob"))
+
+        resp = client.get(
+            "/users",
+            headers=auth_header(token),
+            params={"experience_level": "experienced"},
+        )
+        assert resp.status_code == 200
+        usernames = {u["username"] for u in resp.json()["data"]}
+        assert "alice" in usernames
+        assert "bob" not in usernames
+
+    def test_list_users_experience_level_inexperienced(self, client, conn):
+        token = register_and_login(client, "alice")
+        register_user(client, "bob")
+
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min, "alice"))
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min - 1, "bob"))
+
+        resp = client.get(
+            "/users",
+            headers=auth_header(token),
+            params={"experience_level": "inexperienced"},
+        )
+        assert resp.status_code == 200
+        usernames = {u["username"] for u in resp.json()["data"]}
+        assert "bob" in usernames
+        assert "alice" not in usernames
+
+    def test_list_users_order_by_experienced_desc(self, client, conn):
+        token = register_and_login(client, "alice")
+        register_user(client, "bob")
+
+        exp_xp_min = ((settings.EXPERIENCED_LEVEL_MIN - 1) ** 2) * settings.LEVEL_XP_DIVISOR
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min, "alice"))
+        conn.execute("UPDATE users SET xp=? WHERE username=?", (exp_xp_min - 1, "bob"))
+
+        resp = client.get(
+            "/users",
+            headers=auth_header(token),
+            params={"order_by": "experienced", "order_direction": "DESC"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        usernames = [u["username"] for u in data]
+        assert usernames.index("alice") < usernames.index("bob")
 
 
 class TestNotifications:

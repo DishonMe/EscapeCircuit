@@ -43,13 +43,8 @@ export const getPuzzles = (
   if (filters.minDifficulty !== undefined) params.min_difficulty = filters.minDifficulty;
   if (filters.maxDifficulty !== undefined) params.max_difficulty = filters.maxDifficulty;
   if (filters.creator_id !== undefined) params.creator_id = filters.creator_id;
-  if (filters.experienceLevel === 'experienced') {
-    params.only_experienced_difficulty = true;
-    params.only_experienced_clearness = true;
-    params.only_experienced_fun = true;
-    params.order_only_experienced = true;
-  } else if (filters.experienceLevel === 'inexperienced') {
-    params.only_experienced_difficulty = false;
+  if (filters.experienceLevel && filters.experienceLevel !== 'all') {
+    params.creator_experience_level = filters.experienceLevel;
   }
   if (filters.minClearness !== undefined) params.min_clearness = filters.minClearness;
   if (filters.maxClearness !== undefined) params.max_clearness = filters.maxClearness;

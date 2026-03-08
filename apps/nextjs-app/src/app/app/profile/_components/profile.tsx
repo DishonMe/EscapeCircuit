@@ -18,6 +18,7 @@ const Entry = ({ label, value }: EntryProps) => (
 
 export const Profile = () => {
   const user = useUser();
+  const isExperienced = (user.data?.level ?? 0) >= 5;
 
   if (!user) return null;
 
@@ -39,6 +40,7 @@ export const Profile = () => {
           <Entry label="Username" value={user.data?.username ?? ''} />
           <Entry label="Email Address" value={user.data?.email ?? ''} />
           <Entry label="Role" value={user.data?.role ?? ''} />
+          {isExperienced && <Entry label="Experience" value="Experienced" />}
           <Entry label="Bio" value={user.data?.bio ?? ''} />
         </dl>
       </div>
