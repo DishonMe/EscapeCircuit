@@ -750,328 +750,8 @@ class TestUseCase8PuzzleSolutionValidation:
 # ADD acceptance tests
 
 
-class TestAddedAcceptanceTests:
-    ROOT = Path("/Users/dorsteinlauf/Desktop/EscapeCircuit")
-
-    # UC2-AT5 - Successful leaderboard ranking
-    # Description: User 123's solve time appears on the puzzle leaderboard, ranked by fastest time. Top 3 solvers shown on podium.
-    def test_uc2_at5_successful_leaderboard_ranking(self, client, conn):
-        creator_token = make_creator(client, conn, "uc2_add_creator_leaderboard")
-        pid, _ = create_and_publish_puzzle(
-            client, conn, creator_token, name="UC2 Leaderboard Ranking", budget=5, time_limit=60
-        )
-
-        slow_token = register_and_login(client, "uc2_slow_solver")
-        fast_token = register_and_login(client, "uc2_fast_solver")
-        mid_token = register_and_login(client, "uc2_mid_solver")
-
-        validate_solution(client, slow_token, pid, _and_solution(), time_taken=30)
-        validate_solution(client, fast_token, pid, _and_solution(), time_taken=15)
-        validate_solution(client, mid_token, pid, _and_solution(), time_taken=20)
-
-        leaderboard = client.get(f"/puzzles/{pid}/leaderboard", headers=auth_header(fast_token))
-        assert leaderboard.status_code == 200, leaderboard.text
-
-        entries = leaderboard.json()["data"]
-        assert [entry["rank"] for entry in entries[:4]] == [1, 2, 3, 4]
-        assert [entry["username"] for entry in entries[:4]] == [
-            "uc2_add_creator_leaderboard",
-            "uc2_fast_solver",
-            "uc2_mid_solver",
-            "uc2_slow_solver",
-        ]
-        assert [entry["best_time"] for entry in entries[:4]] == [10, 15, 20, 30]
-
-    # UC4-AT6 - Unsuccessful name too long
-    # Description: User 123 creates a puzzle with a name exceeding 100 characters. Upload blocked, validation error displayed.
-    def test_uc4_at6_unsuccessful_name_too_long(self, client, conn, monkeypatch):
-        token = register_and_login(client, "uc4_add_name_limit_creator")
-        me = client.get("/users/me", headers=auth_header(token)).json()
-        conn.execute("UPDATE users SET role = 'creator' WHERE id = ?", (me["id"],))
-
-        upload_conn = sqlite3.connect(":memory:", check_same_thread=False)
-        upload_conn.row_factory = sqlite3.Row
-        PuzzleRepo(upload_conn)
-        monkeypatch.setattr(puzzle_controller_module, "get_db_conn", lambda: upload_conn)
-
-        copy_guard = _CopyGuard()
-        monkeypatch.setattr(puzzle_controller_module.shutil, "copy2", copy_guard)
-
-        resp = client.post(
-            "/puzzles/create-puzzle-form",
-            files=_multipart_payload(_upload_base_config(name="x" * 101), "short instructions", _upload_solution()),
-            headers=auth_header(token),
-        )
-
-        assert resp.status_code == 400
-        assert "100 characters" in resp.json()["detail"]
-        assert copy_guard.calls == 0
-
-    # UC4-AT7 - Unsuccessful description too long
-    # Description: User 123 creates a puzzle with description exceeding the allowed limit. Upload blocked, validation error displayed.
-    def test_uc4_at7_unsuccessful_description_too_long(self, client, conn, monkeypatch):
-        token = register_and_login(client, "uc4_add_description_limit_creator")
-        me = client.get("/users/me", headers=auth_header(token)).json()
-        conn.execute("UPDATE users SET role = 'creator' WHERE id = ?", (me["id"],))
-
-        upload_conn = sqlite3.connect(":memory:", check_same_thread=False)
-        upload_conn.row_factory = sqlite3.Row
-        PuzzleRepo(upload_conn)
-        monkeypatch.setattr(puzzle_controller_module, "get_db_conn", lambda: upload_conn)
-
-        copy_guard = _CopyGuard()
-        monkeypatch.setattr(puzzle_controller_module.shutil, "copy2", copy_guard)
-
-        resp = client.post(
-            "/puzzles/create-puzzle-form",
-            files=_multipart_payload(
-                _upload_base_config(description="d" * 2001),
-                "short instructions",
-                _upload_solution(),
-            ),
-            headers=auth_header(token),
-        )
-
-        assert resp.status_code == 400
-        assert "2000 characters" in resp.json()["detail"]
-        assert copy_guard.calls == 0
-
-    # UC4-AT8 - Successful custom board size
-    # Description: User 123 creates a puzzle and sets board rows to 15. Puzzle creation flow keeps custom board size wiring and default grid constants.
-    def test_uc4_at8_successful_custom_board_size(self):
-        create_puzzle_source = (
-            self.ROOT / "apps/nextjs-app/src/app/app/create-puzzle/page.tsx"
-        ).read_text()
-        workstation_grid_source = (
-            self.ROOT / "apps/nextjs-app/src/app/app/puzzles/[id]/_components/workstation-grid.tsx"
-        ).read_text()
-
-        assert "const DEFAULT_BOARD_ROWS = 15;" in create_puzzle_source
-        assert "boardRows: DEFAULT_BOARD_ROWS," in create_puzzle_source
-        assert "rows: data.basic.boardRows," in create_puzzle_source
-        assert "boardRows={data.basic.boardRows}" in create_puzzle_source
-        assert "const DEFAULT_GRID_ROWS = 15;" in workstation_grid_source
-        assert "boardRows = DEFAULT_GRID_ROWS," in workstation_grid_source
-
-    # UC5-AT6 - Unsuccessful duplicate rating
-    # Description: User 123 has already rated this puzzle. User 123 submits a new rating (not via edit).
-    @pytest.mark.skip(reason="Current API treats repeated rating submission as edit-in-place; duplicate-create rejection flow is not exposed.")
-    def test_uc5_at6_unsuccessful_duplicate_rating(self):
-        pass
-
-    # UC6-AT6 - Successful medal tie at boundary
-    # Description: User 123 solves a puzzle with cost exactly equal to the greater value limit. Boundary value is treated as within limits.
-    def test_uc6_at6_successful_medal_tie_at_boundary(self, client, conn):
-        creator_token = make_creator(client, conn, "uc6_add_creator_boundary")
-        pid, _ = create_and_publish_puzzle(
-            client,
-            conn,
-            creator_token,
-            name="UC6 Boundary Medal",
-            budget=1,
-            time_limit=None,
-            difficulty="EASY",
-        )
-
-        solver_token = register_and_login(client, "uc6_boundary_solver")
-        result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=10)
-
-        assert result["solved"] is True
-        assert result["medal"] == "SILVER"
-
-    # UC6-AT7 - Successful leaderboard after reward
-    # Description: User 123 solves a puzzle and earns gold medal. XP and medal awarded; user appears on puzzle leaderboard ranked by solve time.
-    def test_uc6_at7_successful_leaderboard_after_reward(self, client, conn):
-        creator_token = make_creator(client, conn, "uc6_add_creator_leaderboard")
-        pid, _ = create_and_publish_puzzle(
-            client,
-            conn,
-            creator_token,
-            name="UC6 Reward Leaderboard",
-            budget=1,
-            time_limit=60,
-            difficulty="EASY",
-        )
-
-        solver_token = register_and_login(client, "uc6_reward_solver")
-        result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=5)
-        assert result["solved"] is True
-        assert result["medal"] == "GOLD"
-        assert result["xp_earned"] > 0
-
-        leaderboard = client.get(f"/puzzles/{pid}/leaderboard", headers=auth_header(solver_token))
-        assert leaderboard.status_code == 200, leaderboard.text
-
-        entries = leaderboard.json()["data"]
-        assert entries[0]["username"] == "uc6_reward_solver"
-        assert entries[0]["rank"] == 1
-        assert entries[0]["best_time"] == 5
-
-    # UC9-AT1 - Successful Appointment
-    # Description: User 123 (admin) appoints User 456. System records appointment or sends invite to User 456.
-    def test_uc9_at1_successful_appointment(self, client, conn):
-        admin_token = make_admin(client, conn, "uc9_admin_success")
-        target_token = register_and_login(client, "uc9_target_solver")
-        target_info = get_user_info(client, target_token)
-
-        resp = client.post(
-            "/admin/assign-creator",
-            json={"target_user_id": target_info["id"]},
-            headers=auth_header(admin_token),
-        )
-        assert resp.status_code == 200, resp.text
-
-        updated = get_user_info(client, target_token)
-        assert updated["role"] == "pending_creator"
-
-    # UC9-AT2 - Successful already appointed
-    # Description: System notify that this user is already a creator.
-    def test_uc9_at2_successful_already_appointed(self, client, conn):
-        admin_token = make_admin(client, conn, "uc9_admin_existing")
-        creator_token = make_creator(client, conn, "uc9_existing_creator")
-        creator_info = get_user_info(client, creator_token)
-
-        resp = client.post(
-            "/admin/assign-creator",
-            json={"target_user_id": creator_info["id"]},
-            headers=auth_header(admin_token),
-        )
-        assert resp.status_code == 400
-        assert "already" in resp.json()["detail"].lower()
-
-    # UC9-AT3 - Unsuccessful - Unauthorized
-    # Description: User 789 tries to access the appointment interface. System denies access or hides the option.
-    def test_uc9_at3_unsuccessful_unauthorized(self, client):
-        solver_token = register_and_login(client, "uc9_unauthorized_solver")
-        target_token = register_and_login(client, "uc9_target_other")
-        target_info = get_user_info(client, target_token)
-
-        resp = client.post(
-            "/admin/assign-creator",
-            json={"target_user_id": target_info["id"]},
-            headers=auth_header(solver_token),
-        )
-        assert resp.status_code == 403
-
-    # UC10-AT1 - Successful Profile Load
-    # Description: System displays profile progress metrics.
-    @pytest.mark.skip(reason="Current /users/me API does not expose medal aggregates or saved-puzzle profile sections.")
-    def test_uc10_at1_successful_profile_load(self):
-        pass
-
-    # UC10-AT2 - Successful Puzzle Access
-    # Description: System displays a clickable list of saved puzzles from the profile page.
-    @pytest.mark.skip(reason="Saved-for-later puzzles are not exposed by the current backend profile contract.")
-    def test_uc10_at2_successful_puzzle_access(self):
-        pass
-
-    # UC11-AT1 - Successful Sandbox Save
-    # Description: User 123 builds a valid circuit and saves it as \"MyAdder\".
-    def test_uc11_at1_successful_sandbox_save(self, client):
-        solver_token = register_and_login(client, "uc11_sandbox_save_solver")
-
-        resp = client.post(
-            "/arsenal",
-            json=_arsenal_payload("MyAdder"),
-            headers=auth_header(solver_token),
-        )
-        assert resp.status_code == 200, resp.text
-
-        listed = client.get("/arsenal", headers=auth_header(solver_token))
-        assert listed.status_code == 200
-        names = [piece["name"] for piece in listed.json()]
-        assert "MyAdder" in names
-
-    # UC11-AT2 - Unsuccessful - Arsenal Full
-    # Description: The system rejects save and displays a capacity error.
-    def test_uc11_at2_unsuccessful_arsenal_full(self, client):
-        solver_token = register_and_login(client, "uc11_sandbox_capacity_solver")
-
-        for idx in range(5):
-            resp = client.post(
-                "/arsenal",
-                json=_arsenal_payload(f"uc11-piece-{idx}"),
-                headers=auth_header(solver_token),
-            )
-            assert resp.status_code == 200, resp.text
-
-        overflow = client.post(
-            "/arsenal",
-            json=_arsenal_payload("uc11-overflow"),
-            headers=auth_header(solver_token),
-        )
-        assert overflow.status_code == 400
-        assert "capacity reached" in overflow.json()["detail"].lower()
-
-    # UC11-AT3 - Unsuccessful - Name collision
-    # Description: The system rejects save and displays a naming error.
-    def test_uc11_at3_unsuccessful_name_collision(self, client):
-        solver_token = register_and_login(client, "uc11_sandbox_collision_solver")
-
-        first = client.post(
-            "/arsenal",
-            json=_arsenal_payload("A"),
-            headers=auth_header(solver_token),
-        )
-        assert first.status_code == 200, first.text
-
-        second = client.post(
-            "/arsenal",
-            json=_arsenal_payload("A"),
-            headers=auth_header(solver_token),
-        )
-        assert second.status_code == 400
-        assert "already exists" in second.json()["detail"]
-
-    # UC12-AT1 - Successful Deletion
-    # Description: The system deletes the file and updates the count.
-    def test_uc12_at1_successful_deletion(self, client):
-        solver_token = register_and_login(client, "uc12_delete_solver")
-
-        created = client.post(
-            "/arsenal",
-            json=_arsenal_payload("Old_Circuit"),
-            headers=auth_header(solver_token),
-        )
-        assert created.status_code == 200, created.text
-        piece_id = created.json()["id"]
-
-        deleted = client.delete(f"/arsenal/{piece_id}", headers=auth_header(solver_token))
-        assert deleted.status_code == 200, deleted.text
-
-        listed = client.get("/arsenal", headers=auth_header(solver_token))
-        assert listed.status_code == 200
-        names = [piece["name"] for piece in listed.json()]
-        assert "Old_Circuit" not in names
-
-    # UC12-AT2 - Successful Rename
-    # Description: System updates the name in the list.
-    def test_uc12_at2_successful_rename(self, client):
-        solver_token = register_and_login(client, "uc12_rename_solver")
-
-        created = client.post(
-            "/arsenal",
-            json=_arsenal_payload("Circuit_A"),
-            headers=auth_header(solver_token),
-        )
-        assert created.status_code == 200, created.text
-        piece_id = created.json()["id"]
-
-        renamed = client.put(
-            f"/arsenal/{piece_id}",
-            json={"new_name": "Circuit_B"},
-            headers=auth_header(solver_token),
-        )
-        assert renamed.status_code == 200, renamed.text
-
-        listed = client.get("/arsenal", headers=auth_header(solver_token))
-        assert listed.status_code == 200
-        names = [piece["name"] for piece in listed.json()]
-        assert "Circuit_B" in names
-        assert "Circuit_A" not in names
-
-
 class TestAddedAcceptanceTestsDuplicates:
+    ROOT = Path("/Users/dorsteinlauf/Desktop/EscapeCircuit")
     # UC1-AT1 - Successful Search
     # Description: User 123 searches with filters and the system returns puzzles meeting filters.
     def test_add_uc1_at1_successful_search(self, client, conn):
@@ -1185,6 +865,35 @@ class TestAddedAcceptanceTestsDuplicates:
 
         assert result["solved"] is True
         assert result["medal"] == "SILVER"
+
+    # UC2-AT5 - Successful leaderboard ranking
+    # Description: User 123's solve time appears on the puzzle leaderboard, ranked by fastest time. Top 3 solvers shown on podium.
+    def test_add_uc2_at5_successful_leaderboard_ranking(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc2_creator_leaderboard")
+        pid, _ = create_and_publish_puzzle(
+            client, conn, creator_token, name="ADD UC2 Leaderboard Ranking", budget=5, time_limit=60
+        )
+
+        slow_token = register_and_login(client, "add_uc2_slow_solver")
+        fast_token = register_and_login(client, "add_uc2_fast_solver")
+        mid_token = register_and_login(client, "add_uc2_mid_solver")
+
+        validate_solution(client, slow_token, pid, _and_solution(), time_taken=30)
+        validate_solution(client, fast_token, pid, _and_solution(), time_taken=15)
+        validate_solution(client, mid_token, pid, _and_solution(), time_taken=20)
+
+        leaderboard = client.get(f"/puzzles/{pid}/leaderboard", headers=auth_header(fast_token))
+        assert leaderboard.status_code == 200, leaderboard.text
+
+        entries = leaderboard.json()["data"]
+        assert [entry["rank"] for entry in entries[:4]] == [1, 2, 3, 4]
+        assert [entry["username"] for entry in entries[:4]] == [
+            "add_uc2_creator_leaderboard",
+            "add_uc2_fast_solver",
+            "add_uc2_mid_solver",
+            "add_uc2_slow_solver",
+        ]
+        assert [entry["best_time"] for entry in entries[:4]] == [10, 15, 20, 30]
 
     # UC3-AT1 - Successful save to arsenal
     # Description: Legal circuit is saved and appears in arsenal.
@@ -1342,6 +1051,77 @@ class TestAddedAcceptanceTestsDuplicates:
         )
         assert resp.status_code == 400
 
+    # UC4-AT6 - Unsuccessful name too long
+    # Description: User 123 creates a puzzle with a name exceeding 100 characters. Upload blocked, validation error displayed.
+    def test_add_uc4_at6_unsuccessful_name_too_long(self, client, conn, monkeypatch):
+        token = register_and_login(client, "add_uc4_name_limit_creator")
+        me = client.get("/users/me", headers=auth_header(token)).json()
+        conn.execute("UPDATE users SET role = 'creator' WHERE id = ?", (me["id"],))
+
+        upload_conn = sqlite3.connect(":memory:", check_same_thread=False)
+        upload_conn.row_factory = sqlite3.Row
+        PuzzleRepo(upload_conn)
+        monkeypatch.setattr(puzzle_controller_module, "get_db_conn", lambda: upload_conn)
+
+        copy_guard = _CopyGuard()
+        monkeypatch.setattr(puzzle_controller_module.shutil, "copy2", copy_guard)
+
+        resp = client.post(
+            "/puzzles/create-puzzle-form",
+            files=_multipart_payload(_upload_base_config(name="x" * 101), "short instructions", _upload_solution()),
+            headers=auth_header(token),
+        )
+
+        assert resp.status_code == 400
+        assert "100 characters" in resp.json()["detail"]
+        assert copy_guard.calls == 0
+
+    # UC4-AT7 - Unsuccessful description too long
+    # Description: User 123 creates a puzzle with description exceeding the allowed limit. Upload blocked, validation error displayed.
+    def test_add_uc4_at7_unsuccessful_description_too_long(self, client, conn, monkeypatch):
+        token = register_and_login(client, "add_uc4_description_limit_creator")
+        me = client.get("/users/me", headers=auth_header(token)).json()
+        conn.execute("UPDATE users SET role = 'creator' WHERE id = ?", (me["id"],))
+
+        upload_conn = sqlite3.connect(":memory:", check_same_thread=False)
+        upload_conn.row_factory = sqlite3.Row
+        PuzzleRepo(upload_conn)
+        monkeypatch.setattr(puzzle_controller_module, "get_db_conn", lambda: upload_conn)
+
+        copy_guard = _CopyGuard()
+        monkeypatch.setattr(puzzle_controller_module.shutil, "copy2", copy_guard)
+
+        resp = client.post(
+            "/puzzles/create-puzzle-form",
+            files=_multipart_payload(
+                _upload_base_config(description="d" * 2001),
+                "short instructions",
+                _upload_solution(),
+            ),
+            headers=auth_header(token),
+        )
+
+        assert resp.status_code == 400
+        assert "2000 characters" in resp.json()["detail"]
+        assert copy_guard.calls == 0
+
+    # UC4-AT8 - Successful custom board size
+    # Description: User 123 creates a puzzle and sets board rows to 15. Puzzle creation flow keeps custom board size wiring and default grid constants.
+    def test_add_uc4_at8_successful_custom_board_size(self):
+        create_puzzle_source = (
+            self.ROOT / "apps/nextjs-app/src/app/app/create-puzzle/page.tsx"
+        ).read_text()
+        workstation_grid_source = (
+            self.ROOT / "apps/nextjs-app/src/app/app/puzzles/[id]/_components/workstation-grid.tsx"
+        ).read_text()
+
+        assert "const DEFAULT_BOARD_ROWS = 15;" in create_puzzle_source
+        assert "boardRows: DEFAULT_BOARD_ROWS," in create_puzzle_source
+        assert "rows: data.basic.boardRows," in create_puzzle_source
+        assert "boardRows={data.basic.boardRows}" in create_puzzle_source
+        assert "const DEFAULT_GRID_ROWS = 15;" in workstation_grid_source
+        assert "boardRows = DEFAULT_GRID_ROWS," in workstation_grid_source
+
     # UC5-AT1 - Successful valid rating (Pre-10)
     # Description: Weighted difficulty reflects creator/user weighting before 10 ratings.
     def test_add_uc5_at1_successful_valid_rating_pre_10(self, client, conn):
@@ -1443,6 +1223,12 @@ class TestAddedAcceptanceTestsDuplicates:
         )
         assert resp.status_code == 400
 
+    # UC5-AT6 - Unsuccessful duplicate rating
+    # Description: User 123 has already rated this puzzle. User 123 submits a new rating (not via edit).
+    @pytest.mark.skip(reason="Current API treats repeated rating submission as edit-in-place; duplicate-create rejection flow is not exposed.")
+    def test_add_uc5_at6_unsuccessful_duplicate_rating(self):
+        pass
+
     # UC6-AT1 - Successful standard XP
     # Description: XP awarded per difficulty tier.
     def test_add_uc6_at1_successful_standard_xp(self, client, conn):
@@ -1526,6 +1312,54 @@ class TestAddedAcceptanceTestsDuplicates:
         second = validate_solution(client, solver_token, pid, _and_solution(), time_taken=10)
 
         assert second["xp_earned"] == 0
+
+    # UC6-AT6 - Successful medal tie at boundary
+    # Description: User 123 solves a puzzle with cost exactly equal to the greater value limit. Boundary value is treated as within limits.
+    def test_add_uc6_at6_successful_medal_tie_at_boundary(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc6_creator_boundary")
+        pid, _ = create_and_publish_puzzle(
+            client,
+            conn,
+            creator_token,
+            name="ADD UC6 Boundary Medal",
+            budget=1,
+            time_limit=None,
+            difficulty="EASY",
+        )
+
+        solver_token = register_and_login(client, "add_uc6_boundary_solver")
+        result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=10)
+
+        assert result["solved"] is True
+        assert result["medal"] == "SILVER"
+
+    # UC6-AT7 - Successful leaderboard after reward
+    # Description: User 123 solves a puzzle and earns gold medal. XP and medal awarded; user appears on puzzle leaderboard ranked by solve time.
+    def test_add_uc6_at7_successful_leaderboard_after_reward(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc6_creator_leaderboard")
+        pid, _ = create_and_publish_puzzle(
+            client,
+            conn,
+            creator_token,
+            name="ADD UC6 Reward Leaderboard",
+            budget=1,
+            time_limit=60,
+            difficulty="EASY",
+        )
+
+        solver_token = register_and_login(client, "add_uc6_reward_solver")
+        result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=5)
+        assert result["solved"] is True
+        assert result["medal"] == "GOLD"
+        assert result["xp_earned"] > 0
+
+        leaderboard = client.get(f"/puzzles/{pid}/leaderboard", headers=auth_header(solver_token))
+        assert leaderboard.status_code == 200, leaderboard.text
+
+        entries = leaderboard.json()["data"]
+        assert entries[0]["username"] == "add_uc6_reward_solver"
+        assert entries[0]["rank"] == 1
+        assert entries[0]["best_time"] == 5
 
     # UC7-AT1 - Successful comment addition
     # Description: Creator comment is stored and visible.
@@ -1637,3 +1471,168 @@ class TestAddedAcceptanceTestsDuplicates:
         result = validate_solution(client, solver_token, pid, _and_solution_with_extra_gate(), time_taken=10)
 
         assert result["solved"] is False
+
+
+class TestAddedAcceptanceTestsUC9ToUC12:
+    # UC9-AT1 - Successful Appointment
+    # Description: User 123 (admin) appoints User 456. System records appointment or sends invite to User 456.
+    def test_add_uc9_at1_successful_appointment(self, client, conn):
+        admin_token = make_admin(client, conn, "add_uc9_admin_success")
+        target_token = register_and_login(client, "add_uc9_target_solver")
+        target_info = get_user_info(client, target_token)
+
+        resp = client.post(
+            "/admin/assign-creator",
+            json={"target_user_id": target_info["id"]},
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 200, resp.text
+
+        updated = get_user_info(client, target_token)
+        assert updated["role"] == "pending_creator"
+
+    # UC9-AT2 - Successful already appointed
+    # Description: System notify that this user is already a creator.
+    def test_add_uc9_at2_successful_already_appointed(self, client, conn):
+        admin_token = make_admin(client, conn, "add_uc9_admin_existing")
+        creator_token = make_creator(client, conn, "add_uc9_existing_creator")
+        creator_info = get_user_info(client, creator_token)
+
+        resp = client.post(
+            "/admin/assign-creator",
+            json={"target_user_id": creator_info["id"]},
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 400
+        assert "already" in resp.json()["detail"].lower()
+
+    # UC9-AT3 - Unsuccessful - Unauthorized
+    # Description: User 789 tries to access the appointment interface. System denies access or hides the option.
+    def test_add_uc9_at3_unsuccessful_unauthorized(self, client):
+        solver_token = register_and_login(client, "add_uc9_unauthorized_solver")
+        target_token = register_and_login(client, "add_uc9_target_other")
+        target_info = get_user_info(client, target_token)
+
+        resp = client.post(
+            "/admin/assign-creator",
+            json={"target_user_id": target_info["id"]},
+            headers=auth_header(solver_token),
+        )
+        assert resp.status_code == 403
+
+    # UC10-AT1 - Successful Profile Load
+    # Description: System displays profile progress metrics.
+    @pytest.mark.skip(reason="Current /users/me API does not expose medal aggregates or saved-puzzle profile sections.")
+    def test_add_uc10_at1_successful_profile_load(self):
+        pass
+
+    # UC10-AT2 - Successful Puzzle Access
+    # Description: System displays a clickable list of saved puzzles from the profile page.
+    @pytest.mark.skip(reason="Saved-for-later puzzles are not exposed by the current backend profile contract.")
+    def test_add_uc10_at2_successful_puzzle_access(self):
+        pass
+
+    # UC11-AT1 - Successful Sandbox Save
+    # Description: User 123 builds a valid circuit and saves it as "MyAdder".
+    def test_add_uc11_at1_successful_sandbox_save(self, client):
+        solver_token = register_and_login(client, "add_uc11_sandbox_save_solver")
+
+        resp = client.post(
+            "/arsenal",
+            json=_arsenal_payload("MyAdder"),
+            headers=auth_header(solver_token),
+        )
+        assert resp.status_code == 200, resp.text
+
+        listed = client.get("/arsenal", headers=auth_header(solver_token))
+        assert listed.status_code == 200
+        names = [piece["name"] for piece in listed.json()]
+        assert "MyAdder" in names
+
+    # UC11-AT2 - Unsuccessful - Arsenal Full
+    # Description: The system rejects save and displays a capacity error.
+    def test_add_uc11_at2_unsuccessful_arsenal_full(self, client):
+        solver_token = register_and_login(client, "add_uc11_sandbox_capacity_solver")
+
+        for idx in range(5):
+            resp = client.post(
+                "/arsenal",
+                json=_arsenal_payload(f"add-uc11-piece-{idx}"),
+                headers=auth_header(solver_token),
+            )
+            assert resp.status_code == 200, resp.text
+
+        overflow = client.post(
+            "/arsenal",
+            json=_arsenal_payload("add-uc11-overflow"),
+            headers=auth_header(solver_token),
+        )
+        assert overflow.status_code == 400
+        assert "capacity reached" in overflow.json()["detail"].lower()
+
+    # UC11-AT3 - Unsuccessful - Name collision
+    # Description: The system rejects save and displays a naming error.
+    def test_add_uc11_at3_unsuccessful_name_collision(self, client):
+        solver_token = register_and_login(client, "add_uc11_sandbox_collision_solver")
+
+        first = client.post(
+            "/arsenal",
+            json=_arsenal_payload("A"),
+            headers=auth_header(solver_token),
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.post(
+            "/arsenal",
+            json=_arsenal_payload("A"),
+            headers=auth_header(solver_token),
+        )
+        assert second.status_code == 400
+        assert "already exists" in second.json()["detail"]
+
+    # UC12-AT1 - Successful Deletion
+    # Description: The system deletes the file and updates the count.
+    def test_add_uc12_at1_successful_deletion(self, client):
+        solver_token = register_and_login(client, "add_uc12_delete_solver")
+
+        created = client.post(
+            "/arsenal",
+            json=_arsenal_payload("Old_Circuit"),
+            headers=auth_header(solver_token),
+        )
+        assert created.status_code == 200, created.text
+        piece_id = created.json()["id"]
+
+        deleted = client.delete(f"/arsenal/{piece_id}", headers=auth_header(solver_token))
+        assert deleted.status_code == 200, deleted.text
+
+        listed = client.get("/arsenal", headers=auth_header(solver_token))
+        assert listed.status_code == 200
+        names = [piece["name"] for piece in listed.json()]
+        assert "Old_Circuit" not in names
+
+    # UC12-AT2 - Successful Rename
+    # Description: System updates the name in the list.
+    def test_add_uc12_at2_successful_rename(self, client):
+        solver_token = register_and_login(client, "add_uc12_rename_solver")
+
+        created = client.post(
+            "/arsenal",
+            json=_arsenal_payload("Circuit_A"),
+            headers=auth_header(solver_token),
+        )
+        assert created.status_code == 200, created.text
+        piece_id = created.json()["id"]
+
+        renamed = client.put(
+            f"/arsenal/{piece_id}",
+            json={"new_name": "Circuit_B"},
+            headers=auth_header(solver_token),
+        )
+        assert renamed.status_code == 200, renamed.text
+
+        listed = client.get("/arsenal", headers=auth_header(solver_token))
+        assert listed.status_code == 200
+        names = [piece["name"] for piece in listed.json()]
+        assert "Circuit_B" in names
+        assert "Circuit_A" not in names
