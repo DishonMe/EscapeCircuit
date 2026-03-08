@@ -26,11 +26,17 @@ export type RemoveCreatorResponse = {
   new_role?: string;
 };
 
+export type ConfirmRemoveCreatorResponse = {
+  ok: boolean;
+  action: 'unpublish' | 'delete' | 'leave';
+  published_affected: number;
+};
+
 export const removeCreator = ({ targetUserId }: RemoveCreatorDTO): Promise<RemoveCreatorResponse> => {
   return api.post('/admin/remove-creator', { target_user_id: targetUserId });
 };
 
-export const confirmRemoveCreator = ({ targetUserId, action }: ConfirmRemoveCreatorDTO) => {
+export const confirmRemoveCreator = ({ targetUserId, action }: ConfirmRemoveCreatorDTO): Promise<ConfirmRemoveCreatorResponse> => {
   return api.post('/admin/confirm-remove-creator', { target_user_id: targetUserId, action });
 };
 

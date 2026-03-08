@@ -70,6 +70,9 @@ ARSENAL_MIN_OUTPUTS: int = 1
 
 # ── Puzzle publishing ─────────────────────────────────────────────────────────
 PUZZLE_MAX_PUBLISHED_PER_USER: int = 10
+PUZZLE_NAME_MAX_LENGTH: int = 100
+PUZZLE_DESCRIPTION_MAX_LENGTH: int = 2000
+PUZZLE_INSTRUCTIONS_MAX_BYTES: int = 5 * 1024
 
 # ── Rating system ─────────────────────────────────────────────────────────────
 # Minimum puzzle-attempt time (seconds) to unlock rating without having solved

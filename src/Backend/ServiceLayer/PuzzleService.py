@@ -1,3 +1,4 @@
+import sqlite3
 from typing import Dict, Any, List
 
 from Backend import settings
@@ -226,6 +227,29 @@ class PuzzleService:
         name = (payload.get("name") or "").strip()
         if not name:
             raise ValidationError("Puzzle name is required. Please provide a meaningful name for your puzzle.")
+        if len(name) > settings.PUZZLE_NAME_MAX_LENGTH:
+            raise ValidationError(
+                f"Puzzle name must be at most {settings.PUZZLE_NAME_MAX_LENGTH} characters."
+            )
+
+        description = (payload.get("description", "") or "")
+        if len(description) > settings.PUZZLE_DESCRIPTION_MAX_LENGTH:
+            raise ValidationError(
+                f"Puzzle description must be at most {settings.PUZZLE_DESCRIPTION_MAX_LENGTH} characters."
+            )
+
+        instructions = (payload.get("instructions", "") or "")
+        if len(instructions.encode("utf-8")) > settings.PUZZLE_INSTRUCTIONS_MAX_BYTES:
+            raise ValidationError(
+                f"Puzzle instructions must be at most {settings.PUZZLE_INSTRUCTIONS_MAX_BYTES} bytes."
+            )
+
+        existing = self.repo.conn.execute(
+            "SELECT 1 FROM puzzles WHERE LOWER(name) = LOWER(?) LIMIT 1",
+            (name,),
+        ).fetchone()
+        if existing:
+            raise ValidationError("Puzzle name already exists. Please choose a unique name.")
 
         default_gate_set_raw = payload.get("default_gate_set", [])
         gate_set = {GateType(x) for x in default_gate_set_raw}
@@ -240,14 +264,18 @@ class PuzzleService:
             id=0,
             name=name,
             creator_user_id=user_id,
-            description=payload.get("description", "") or "",
+            description=description,
             status=PuzzleStatus.DRAFT,
             budget=int(payload.get("budget", 0)),
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
             difficulty=difficulty,
         )
-        created = self.repo.create(p)
+        p.instructions = instructions or None
+        try:
+            created = self.repo.create(p)
+        except sqlite3.IntegrityError:
+            raise ValidationError("Puzzle name already exists. Please choose a unique name.")
         self.repo.conn.commit()
         return self._enrich_puzzle(created.to_dict())
 
@@ -376,16 +404,36 @@ class PuzzleService:
             name = (payload.get("name") or "").strip()
             if not name:
                 raise ValidationError("Puzzle name cannot be empty")
+            if len(name) > settings.PUZZLE_NAME_MAX_LENGTH:
+                raise ValidationError(
+                    f"Puzzle name must be at most {settings.PUZZLE_NAME_MAX_LENGTH} characters."
+                )
+            existing = self.repo.conn.execute(
+                "SELECT 1 FROM puzzles WHERE LOWER(name) = LOWER(?) AND id != ? LIMIT 1",
+                (name, int(puzzle_id)),
+            ).fetchone()
+            if existing:
+                raise ValidationError("Puzzle name already exists. Please choose a unique name.")
             set_clauses.append("name = ?")
             params.append(name)
 
         if "description" in payload:
+            description = payload.get("description", "") or ""
+            if len(description) > settings.PUZZLE_DESCRIPTION_MAX_LENGTH:
+                raise ValidationError(
+                    f"Puzzle description must be at most {settings.PUZZLE_DESCRIPTION_MAX_LENGTH} characters."
+                )
             set_clauses.append("description = ?")
-            params.append(payload.get("description", "") or "")
+            params.append(description)
 
         if "instructions" in payload:
+            instructions = payload.get("instructions", "") or ""
+            if len(instructions.encode("utf-8")) > settings.PUZZLE_INSTRUCTIONS_MAX_BYTES:
+                raise ValidationError(
+                    f"Puzzle instructions must be at most {settings.PUZZLE_INSTRUCTIONS_MAX_BYTES} bytes."
+                )
             set_clauses.append("instructions = ?")
-            params.append(payload.get("instructions", "") or "")
+            params.append(instructions)
 
         if set_clauses:
             params.append(int(puzzle_id))

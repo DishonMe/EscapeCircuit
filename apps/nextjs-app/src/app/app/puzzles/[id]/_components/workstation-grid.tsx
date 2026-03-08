@@ -50,8 +50,8 @@ export type SelectedComponentState =
   | { mode: 'none' }
   | { mode: 'placing'; componentId: string; rotation: 0 | 90 };
 
-const GRID_ROWS = 15;
-const GRID_COLS = 30;
+const DEFAULT_GRID_ROWS = 15;
+const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 
 // Visual Feature: Dynamic Wire Coloring
@@ -110,6 +110,8 @@ export const WorkstationGrid = ({
   onPlacedChange,
   onWiresChange,
   draggedPaletteComponentId,
+  boardRows = DEFAULT_GRID_ROWS,
+  boardCols = DEFAULT_GRID_COLS,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -122,7 +124,11 @@ export const WorkstationGrid = ({
   onPlacedChange: (next: PlacedGridComponent[]) => void;
   onWiresChange: (next: Wire[]) => void;
   draggedPaletteComponentId?: string | null;
+  boardRows?: number;
+  boardCols?: number;
 }) => {
+  const gridRows = Math.max(1, boardRows);
+  const gridCols = Math.max(1, boardCols);
   const notifications = useNotifications();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -181,8 +187,8 @@ export const WorkstationGrid = ({
         if (el) {
           const rect = el.getBoundingClientRect();
           const fit = Math.min(
-            rect.width / ((GRID_COLS + 4) * CELL_PX),
-            rect.height / ((GRID_ROWS + 4) * CELL_PX),
+            rect.width / ((gridCols + 4) * CELL_PX),
+            rect.height / ((gridRows + 4) * CELL_PX),
           );
           setZoom(fit);
         }
@@ -192,7 +198,7 @@ export const WorkstationGrid = ({
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY]);
+  }, [STORAGE_KEY, gridCols, gridRows]);
 
   useEffect(() => {
     try {
@@ -209,11 +215,11 @@ export const WorkstationGrid = ({
 
     const updateFit = () => {
       const rect = el.getBoundingClientRect();
-      // Account for IO ports: Inputs at col -1, Outputs at row GRID_ROWS.
-      // We want to see from col -2 to GRID_COLS + 1, and row -1 to GRID_ROWS + 2.
+      // Account for IO ports: Inputs at col -1, Outputs at row gridRows.
+      // We want to see from col -2 to gridCols + 1, and row -1 to gridRows + 2.
       const fit = Math.min(
-        rect.width / ((GRID_COLS + 4) * CELL_PX),
-        rect.height / ((GRID_ROWS + 4) * CELL_PX),
+        rect.width / ((gridCols + 4) * CELL_PX),
+        rect.height / ((gridRows + 4) * CELL_PX),
       );
       setMinZoom(fit);
       return fit;
@@ -254,7 +260,7 @@ export const WorkstationGrid = ({
 
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY]);
+  }, [STORAGE_KEY, gridCols, gridRows]);
 
   const componentRects = useMemo(() => {
     return placed.map((p) => {
@@ -378,10 +384,10 @@ export const WorkstationGrid = ({
     const topLeft = screenToWorld({ x: 0, y: 0 });
     const bottomRight = screenToWorld({ x: rect.width, y: rect.height });
 
-    const c0 = clamp(Math.floor(topLeft.col) - 2, 0, GRID_COLS - 1);
-    const r0 = clamp(Math.floor(topLeft.row) - 2, 0, GRID_ROWS - 1);
-    const c1 = clamp(Math.ceil(bottomRight.col) + 2, 0, GRID_COLS - 1);
-    const r1 = clamp(Math.ceil(bottomRight.row) + 2, 0, GRID_ROWS - 1);
+    const c0 = clamp(Math.floor(topLeft.col) - 2, 0, gridCols - 1);
+    const r0 = clamp(Math.floor(topLeft.row) - 2, 0, gridRows - 1);
+    const c1 = clamp(Math.ceil(bottomRight.col) + 2, 0, gridCols - 1);
+    const r1 = clamp(Math.ceil(bottomRight.row) + 2, 0, gridRows - 1);
 
     return { r0, r1, c0, c1 };
   };
@@ -418,8 +424,8 @@ export const WorkstationGrid = ({
 
     const size = rotatedSize(def.size, rotation);
     if (origin.row < 0 || origin.col < 0) return false;
-    if (origin.row + size.h > GRID_ROWS) return false;
-    if (origin.col + size.w > GRID_COLS) return false;
+    if (origin.row + size.h > gridRows) return false;
+    if (origin.col + size.w > gridCols) return false;
 
     // no component overlap
     for (const rect of componentRects) {
@@ -590,7 +596,7 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < inputs.length; i++) {
       const id = `IO:IN:${inputs[i]}`;
-      const row = Math.min(i * 0.8, GRID_ROWS - 1); // Reduced spacing: 0.8 rows per input
+      const row = Math.min(i * 0.8, gridRows - 1); // Reduced spacing: 0.8 rows per input
       const anchor = toScreenCenter(row, -1); // just left of col 0
       inputsPos[id] = { x: anchor.x, y: anchor.y };
     }
@@ -598,16 +604,16 @@ export const WorkstationGrid = ({
     for (let i = 0; i < outputs.length; i++) {
       const id = `IO:OUT:${outputs[i]}`;
       // Distribute along the bottom (Layout Update: Outputs to Bottom)
-      const colStep = GRID_COLS / (outputs.length + 1);
+      const colStep = gridCols / (outputs.length + 1);
       // Center based on step
       const col = (i + 1) * colStep - 0.5;
-      const row = GRID_ROWS + 0.5;
+      const row = gridRows + 0.5;
       const anchor = toScreenCenter(row, col);
       outputsPos[id] = { x: anchor.x, y: anchor.y };
     }
 
     return { inputs: inputsPos, outputs: outputsPos };
-  }, [inputs, outputs, pan.x, pan.y, zoom]);
+  }, [inputs, outputs, pan.x, pan.y, zoom, gridCols, gridRows]);
 
   const onWheel = (e: ReactWheelEvent) => {
     e.preventDefault();
@@ -628,8 +634,8 @@ export const WorkstationGrid = ({
 
     // Apply pan limits - allow full scrolling of the grid
     if (rect) {
-      const gridWidthPx = (GRID_COLS + 1) * CELL_PX * nextZoom;
-      const gridHeightPx = (GRID_ROWS + 1) * CELL_PX * nextZoom;
+      const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
+      const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
       
       const minPanX = Math.min(0, rect.width - gridWidthPx);
       const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
@@ -702,8 +708,8 @@ export const WorkstationGrid = ({
     if (el) {
       const rect = el.getBoundingClientRect();
       // Allow panning the full grid - left edge should show col -1, right edge should show the grid
-      const gridWidthPx = (GRID_COLS + 1) * CELL_PX * zoom;
-      const gridHeightPx = (GRID_ROWS + 1) * CELL_PX * zoom;
+      const gridWidthPx = (gridCols + 1) * CELL_PX * zoom;
+      const gridHeightPx = (gridRows + 1) * CELL_PX * zoom;
       
       // Pan limits: ensure grid fits properly in view with margins
       const minPanX = Math.min(0, rect.width - gridWidthPx);
@@ -885,7 +891,7 @@ export const WorkstationGrid = ({
           Working Area
         </div>
         <div className="text-xs text-gray-600">
-          15×30 grid. Wheel to zoom. Drag background to pan. Click/drag ports to
+          {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan. Click/drag ports to
           wire. While placing, press R to rotate.
         </div>
       </div>
@@ -907,8 +913,8 @@ export const WorkstationGrid = ({
           const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
           const world = screenToWorld(local);
           const origin = {
-            row: clamp(Math.floor(world.row), 0, GRID_ROWS - 1),
-            col: clamp(Math.floor(world.col), 0, GRID_COLS - 1),
+            row: clamp(Math.floor(world.row), 0, gridRows - 1),
+            col: clamp(Math.floor(world.col), 0, gridCols - 1),
           };
           setDropPreview(origin);
         }}
@@ -924,8 +930,8 @@ export const WorkstationGrid = ({
           const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
           const world = screenToWorld(local);
           const origin = {
-            row: clamp(Math.floor(world.row), 0, GRID_ROWS - 1),
-            col: clamp(Math.floor(world.col), 0, GRID_COLS - 1),
+            row: clamp(Math.floor(world.row), 0, gridRows - 1),
+            col: clamp(Math.floor(world.col), 0, gridCols - 1),
           };
 
           const rotation =

@@ -8,6 +8,9 @@ import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
 import { useUser } from "@/lib/auth";
 
 export default function UploadPuzzlePage() {
+  const MAX_PUZZLE_NAME_LENGTH = 100;
+  const MAX_PUZZLE_DESCRIPTION_LENGTH = 2000;
+  const MAX_PUZZLE_INSTRUCTIONS_BYTES = 5 * 1024;
   const queryClient = useQueryClient();
   const router = useRouter();
   const user = useUser();
@@ -58,13 +61,33 @@ export default function UploadPuzzlePage() {
     setStatus("uploading");
     setMessage("");
 
-    const formData = new FormData();
-    formData.append("config_file", files.config!);
-    formData.append("sample_solution_file", files.solution!);
-    formData.append("instructions_file", files.instructions!);
-    formData.append("difficulty", difficulty);
-
     try {
+      const configText = await files.config!.text();
+      const configJson = JSON.parse(configText);
+      const puzzle = configJson?.puzzle ?? {};
+      const puzzleName = typeof puzzle.name === "string" ? puzzle.name.trim() : "";
+      const description = typeof puzzle.description === "string" ? puzzle.description : "";
+      const instructionsText = await files.instructions!.text();
+
+      if (!puzzleName) {
+        throw new Error("Puzzle name is required");
+      }
+      if (puzzleName.length > MAX_PUZZLE_NAME_LENGTH) {
+        throw new Error(`Puzzle name must be at most ${MAX_PUZZLE_NAME_LENGTH} characters`);
+      }
+      if (description.length > MAX_PUZZLE_DESCRIPTION_LENGTH) {
+        throw new Error(`Puzzle description must be at most ${MAX_PUZZLE_DESCRIPTION_LENGTH} characters`);
+      }
+      if (new TextEncoder().encode(instructionsText).length > MAX_PUZZLE_INSTRUCTIONS_BYTES) {
+        throw new Error(`Puzzle instructions must be at most ${MAX_PUZZLE_INSTRUCTIONS_BYTES} bytes`);
+      }
+
+      const formData = new FormData();
+      formData.append("config_file", files.config!);
+      formData.append("sample_solution_file", files.solution!);
+      formData.append("instructions_file", files.instructions!);
+      formData.append("difficulty", difficulty);
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
       const baseUrl = apiUrl.replace(/\/api\/?$/, "");
       const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);

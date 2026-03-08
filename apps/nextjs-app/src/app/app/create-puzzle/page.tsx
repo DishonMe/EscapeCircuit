@@ -14,6 +14,7 @@ import MarkdownIt from "markdown-it";
 import markdownItKatex from "markdown-it-katex";
 import DOMPurify from "isomorphic-dompurify";
 import "katex/dist/katex.min.css";
+import { InfoPopup } from "@/components/ui/info-popup";
 import {
   WorkstationGrid,
   type ComponentDef,
@@ -37,6 +38,8 @@ interface BasicInfo {
   gateSet: string[];
   inputs: string[];
   outputs: string[];
+  boardRows: number;
+  boardCols: number;
 }
 
 interface TestCase {
@@ -86,6 +89,14 @@ const availableGates = [
   "XNOR",
   "DFF",
 ];
+
+const MAX_PUZZLE_NAME_LENGTH = 100;
+const MAX_PUZZLE_DESCRIPTION_LENGTH = 2000;
+const MAX_PUZZLE_INSTRUCTIONS_BYTES = 5 * 1024;
+const DEFAULT_BOARD_ROWS = 15;
+const DEFAULT_BOARD_COLS = 30;
+
+const utf8ByteLength = (value: string) => new TextEncoder().encode(value).length;
 
 // Convert LaTeX to Markdown for preview rendering
 const latexToMarkdown = (latex: string): string => {
@@ -237,6 +248,8 @@ export default function CreatePuzzleForm() {
       gateSet: [],
       inputs: [],
       outputs: [],
+      boardRows: DEFAULT_BOARD_ROWS,
+      boardCols: DEFAULT_BOARD_COLS,
     },
     testCases: [],
     instructions: "",
@@ -560,11 +573,12 @@ export default function CreatePuzzleForm() {
           
           // Extract outputs for each cycle and build eval_map
           for (let cycleIdx = 0; cycleIdx < tc.inputStream.length; cycleIdx++) {
-            const cycleInput = tc.inputStream[cycleIdx];
+            const cycleInput = (tc.inputStream[cycleIdx] || {}) as Record<string, number>;
+            const expectedOutputStream = tc.expectedOutputStream || {};
             
             // Get expected outputs for this cycle
             const cycleExpectedOutputs = Object.fromEntries(
-              Object.entries(tc.expectedOutputStream).map(([outName, outValues]: [string, any]) => [
+              Object.entries(expectedOutputStream).map(([outName, outValues]: [string, any]) => [
                 outName,
                 Array.isArray(outValues) ? outValues[cycleIdx] : outValues,
               ])
@@ -584,8 +598,8 @@ export default function CreatePuzzleForm() {
             console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(reorderedCycleOutputs)}`);
             
             // Create eval_map key for this input - MUST be sorted for backend lookup
-            const sortedInputKeys = Object.keys(cycleInput).sort();
-            const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, cycleInput[k]])), undefined, '');
+            const sortedInputKeys: string[] = Object.keys(cycleInput).sort();
+            const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, cycleInput[k]])), undefined, '');
             
             // For sequential circuits, the same input can appear in different cycles
             // with different outputs due to state. We'll use the first occurrence.
@@ -614,9 +628,11 @@ export default function CreatePuzzleForm() {
       } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
         // === BLACKBOX TEST CASE ===
         console.log('[EXPORT-BLACKBOX] Processing blackbox test case:', tc);
-        
-        const sortedInputKeys = Object.keys(tc.inputs).sort();
-        const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
+        const testInputs = tc.inputs || {};
+        const expectedOutputs = tc.expectedOutputs || {};
+
+        const sortedInputKeys: string[] = Object.keys(testInputs).sort();
+        const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, testInputs[k]])), undefined, '');
         
         console.log('[EXPORT-BLACKBOX] Eval key:', key);
         
@@ -645,7 +661,7 @@ export default function CreatePuzzleForm() {
           
           // Reorder simulated outputs to match expected outputs key order
           const reorderedOutputs: Record<string, number> = {};
-          const expectedKeys = Object.keys(tc.expectedOutputs);
+          const expectedKeys = Object.keys(expectedOutputs);
           for (const key of expectedKeys) {
             reorderedOutputs[key] = simulatedOutputs[key];
           }
@@ -657,13 +673,13 @@ export default function CreatePuzzleForm() {
           evalMap[key] = reorderedOutputs;
           
           // Check if it matches expected
-          const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(tc.expectedOutputs);
-          console.log('[EXPORT-BLACKBOX] Expected:', tc.expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
+          const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(expectedOutputs);
+          console.log('[EXPORT-BLACKBOX] Expected:', expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
           
           if (!matches) {
             simulationErrors.push(
-              `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
-              `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
+              `Test ${Object.keys(testInputs).map((k: string) => `${k}=${testInputs[k]}`).join(',')}: ` +
+              `Expected ${JSON.stringify(expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
             );
             hasSimulationErrors = true;
           }
@@ -745,6 +761,14 @@ export default function CreatePuzzleForm() {
       alert("Puzzle name is required");
       return;
     }
+    if (data.basic.name.trim().length > MAX_PUZZLE_NAME_LENGTH) {
+      alert(`Puzzle name must be at most ${MAX_PUZZLE_NAME_LENGTH} characters`);
+      return;
+    }
+    if (data.basic.description.length > MAX_PUZZLE_DESCRIPTION_LENGTH) {
+      alert(`Description must be at most ${MAX_PUZZLE_DESCRIPTION_LENGTH} characters`);
+      return;
+    }
     if (data.basic.gateSet.length === 0) {
       alert("Select at least one gate type");
       return;
@@ -759,6 +783,10 @@ export default function CreatePuzzleForm() {
     }
     if (!data.instructions.trim()) {
       alert("Add instructions for the puzzle");
+      return;
+    }
+    if (utf8ByteLength(data.instructions) > MAX_PUZZLE_INSTRUCTIONS_BYTES) {
+      alert(`Instructions must be at most ${MAX_PUZZLE_INSTRUCTIONS_BYTES} bytes`);
       return;
     }
     if (!data.solutionJSON.trim()) {
@@ -802,7 +830,7 @@ export default function CreatePuzzleForm() {
       }
       
       // ADD: Add total gate count limit test case if specified
-      if (data.basic.totalGateCount > 0) {
+      if ((data.basic.totalGateCount ?? 0) > 0) {
         convertedTestCases.push({
           kind: 'gate_count_limit',
           max_gate_count: data.basic.totalGateCount,
@@ -823,6 +851,10 @@ export default function CreatePuzzleForm() {
           max_cycles: data.basic.maxCycles,
           total_gate_count: data.basic.totalGateCount,
           gate_quotas: Object.keys(data.basic.gateQuotas).length > 0 ? data.basic.gateQuotas : undefined,
+          board: {
+            rows: data.basic.boardRows,
+            cols: data.basic.boardCols,
+          },
         },
         test_cases: convertedTestCases,
       };
@@ -923,9 +955,13 @@ export default function CreatePuzzleForm() {
                 type="text"
                 value={data.basic.name}
                 onChange={(e) => handleBasicChange("name", e.target.value)}
+                maxLength={MAX_PUZZLE_NAME_LENGTH}
                 className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="e.g., Binary Adder"
               />
+              <div className="mt-1 text-right text-[11px] text-muted-foreground">
+                {data.basic.name.length}/{MAX_PUZZLE_NAME_LENGTH}
+              </div>
             </div>
 
             <div>
@@ -935,15 +971,26 @@ export default function CreatePuzzleForm() {
                 onChange={(e) =>
                   handleBasicChange("description", e.target.value)
                 }
+                maxLength={MAX_PUZZLE_DESCRIPTION_LENGTH}
                 className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={3}
                 placeholder="Brief description of the puzzle"
               />
+              <div className="mt-1 text-right text-[11px] text-muted-foreground">
+                {data.basic.description.length}/{MAX_PUZZLE_DESCRIPTION_LENGTH}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">Budget *</label>
+                <label className="flex items-center gap-1 text-[13px] font-medium text-foreground mb-2">
+                  Budget *
+                  <InfoPopup>
+                    <p className="font-medium text-foreground mb-1">Budget</p>
+                    <p>The max total gate cost solvers can use. Solvers who exceed this cannot submit.</p>
+                    <p className="mt-1"><span className="font-medium text-foreground">Tight Budget</span> (125% of budget) is auto-calculated — solvers within it earn better medals.</p>
+                  </InfoPopup>
+                </label>
                 <input
                   type="number"
                   value={data.basic.budget}
@@ -987,6 +1034,50 @@ export default function CreatePuzzleForm() {
                 className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="Leave empty for no limit"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-1 text-[13px] font-medium text-foreground mb-2">
+                  Board Rows
+                  <InfoPopup>
+                    <p className="font-medium text-foreground mb-1">Board Size</p>
+                    <p>The circuit grid dimensions for solvers. Default is 15 rows x 30 columns.</p>
+                    <p className="mt-1">Larger boards give solvers more room. Smaller boards increase difficulty.</p>
+                  </InfoPopup>
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="60"
+                  value={data.basic.boardRows}
+                  onChange={(e) =>
+                    handleBasicChange(
+                      "boardRows",
+                      Math.max(5, Math.min(60, parseInt(e.target.value || `${DEFAULT_BOARD_ROWS}`, 10)))
+                    )
+                  }
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-foreground mb-2">
+                  Board Columns
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="80"
+                  value={data.basic.boardCols}
+                  onChange={(e) =>
+                    handleBasicChange(
+                      "boardCols",
+                      Math.max(10, Math.min(80, parseInt(e.target.value || `${DEFAULT_BOARD_COLS}`, 10)))
+                    )
+                  }
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -1419,6 +1510,9 @@ export default function CreatePuzzleForm() {
               <div className="text-[13px] text-muted-foreground">
                 Use LaTeX syntax: {'\\section*'}, {'\\subsection*'}, {'\\textbf{}'}, {'\\textit{}'}, $...$ for math, {'\\begin{itemize}'} for lists, {'\\begin{tabular}'} for tables
               </div>
+              <div className="text-right text-[11px] text-muted-foreground">
+                {utf8ByteLength(data.instructions)}/{MAX_PUZZLE_INSTRUCTIONS_BYTES} bytes
+              </div>
             </div>
             <div className="space-y-4">
               <label className="block font-semibold">Live Preview</label>
@@ -1504,6 +1598,8 @@ export default function CreatePuzzleForm() {
                 onPlacedChange={setPlaced}
                 onWiresChange={setWires}
                 draggedPaletteComponentId={draggedPaletteComponentId}
+                boardRows={data.basic.boardRows}
+                boardCols={data.basic.boardCols}
               />
             </div>
 

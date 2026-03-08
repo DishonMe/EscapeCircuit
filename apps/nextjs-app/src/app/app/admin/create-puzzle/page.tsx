@@ -561,11 +561,12 @@ export default function CreatePuzzleForm() {
           
           // Extract outputs for each cycle and build eval_map
           for (let cycleIdx = 0; cycleIdx < tc.inputStream.length; cycleIdx++) {
-            const cycleInput = tc.inputStream[cycleIdx];
+            const cycleInput = (tc.inputStream[cycleIdx] || {}) as Record<string, number>;
+            const expectedOutputStream = tc.expectedOutputStream || {};
             
             // Get expected outputs for this cycle
             const cycleExpectedOutputs = Object.fromEntries(
-              Object.entries(tc.expectedOutputStream).map(([outName, outValues]: [string, any]) => [
+              Object.entries(expectedOutputStream).map(([outName, outValues]: [string, any]) => [
                 outName,
                 Array.isArray(outValues) ? outValues[cycleIdx] : outValues,
               ])
@@ -585,8 +586,8 @@ export default function CreatePuzzleForm() {
             console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(reorderedCycleOutputs)}`);
             
             // Create eval_map key for this input - MUST be sorted for backend lookup
-            const sortedInputKeys = Object.keys(cycleInput).sort();
-            const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, cycleInput[k]])), undefined, '');
+            const sortedInputKeys: string[] = Object.keys(cycleInput).sort();
+            const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, cycleInput[k]])), undefined, '');
             
             // For sequential circuits, the same input can appear in different cycles
             // with different outputs due to state. We'll use the first occurrence.
@@ -615,9 +616,11 @@ export default function CreatePuzzleForm() {
       } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
         // === BLACKBOX TEST CASE ===
         console.log('[EXPORT-BLACKBOX] Processing blackbox test case:', tc);
-        
-        const sortedInputKeys = Object.keys(tc.inputs).sort();
-        const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map(k => [k, tc.inputs![k]])), undefined, '');
+        const testInputs = tc.inputs || {};
+        const expectedOutputs = tc.expectedOutputs || {};
+
+        const sortedInputKeys: string[] = Object.keys(testInputs).sort();
+        const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, testInputs[k]])), undefined, '');
         
         console.log('[EXPORT-BLACKBOX] Eval key:', key);
         
@@ -646,7 +649,7 @@ export default function CreatePuzzleForm() {
           
           // Reorder simulated outputs to match expected outputs key order
           const reorderedOutputs: Record<string, number> = {};
-          const expectedKeys = Object.keys(tc.expectedOutputs);
+          const expectedKeys = Object.keys(expectedOutputs);
           for (const key of expectedKeys) {
             reorderedOutputs[key] = simulatedOutputs[key];
           }
@@ -658,13 +661,13 @@ export default function CreatePuzzleForm() {
           evalMap[key] = reorderedOutputs;
           
           // Check if it matches expected
-          const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(tc.expectedOutputs);
-          console.log('[EXPORT-BLACKBOX] Expected:', tc.expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
+          const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(expectedOutputs);
+          console.log('[EXPORT-BLACKBOX] Expected:', expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
           
           if (!matches) {
             simulationErrors.push(
-              `Test ${Object.keys(tc.inputs).map(k => `${k}=${tc.inputs![k]}`).join(',')}: ` +
-              `Expected ${JSON.stringify(tc.expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
+              `Test ${Object.keys(testInputs).map((k: string) => `${k}=${testInputs[k]}`).join(',')}: ` +
+              `Expected ${JSON.stringify(expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
             );
             hasSimulationErrors = true;
           }

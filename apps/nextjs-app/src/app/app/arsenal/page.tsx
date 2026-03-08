@@ -21,6 +21,7 @@ import {
   useRenameArsenalPiece,
   ArsenalPiece,
 } from '@/features/arsenal/api';
+import { InfoPopup } from '@/components/ui/info-popup';
 
 const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [
   [2, 5],
@@ -153,16 +154,26 @@ export default function ArsenalPage() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
-          <p className="text-muted-foreground">
-            {isAdmin
-              ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
-              : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
-          </p>
-          {!isAdmin && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Capacity by level: 1-2 => 5, 3-4 => 10, 5-6 => 20, 7-8 => 35, 9+ => 50.
-            </p>
-          )}
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <span>
+              {isAdmin
+                ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
+                : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
+            </span>
+            {!isAdmin && (
+              <InfoPopup>
+                <p className="font-medium text-foreground mb-1">Arsenal Capacity</p>
+                <p>Your arsenal slots increase as you level up:</p>
+                <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                  <li>Level 1-2: 5 slots</li>
+                  <li>Level 3-4: 10 slots</li>
+                  <li>Level 5-6: 20 slots</li>
+                  <li>Level 7-8: 35 slots</li>
+                  <li>Level 9+: 50 slots</li>
+                </ul>
+              </InfoPopup>
+            )}
+          </div>
         </div>
         <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
           + Create New Piece
@@ -184,7 +195,15 @@ export default function ArsenalPage() {
               <thead className="bg-muted">
                 <tr>
                   <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Name</th>
-                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Cost</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      Cost
+                      <InfoPopup>
+                        <p className="font-medium text-foreground mb-1">Piece Cost</p>
+                        <p>The total gate cost when this piece is used in a puzzle. Counts toward the puzzle's budget limit.</p>
+                      </InfoPopup>
+                    </span>
+                  </th>
                   <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Basic Gates</th>
                   <th className="px-6 py-3 text-right text-[13px] font-medium text-muted-foreground">Actions</th>
                 </tr>

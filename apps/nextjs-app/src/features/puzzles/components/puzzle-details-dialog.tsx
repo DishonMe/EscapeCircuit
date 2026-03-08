@@ -11,10 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Puzzle } from '@/types/api';
-import { useMemo } from 'react';
-import MarkdownIt from 'markdown-it';
-import markdownItKatex from 'markdown-it-katex';
-import DOMPurify from 'isomorphic-dompurify';
+import { useEffect, useState } from 'react';
 import 'katex/dist/katex.min.css';
 
 type PuzzleDetailsDialogProps = {
@@ -30,18 +27,18 @@ const latexToMarkdown = (latex: string): string => {
   
   // Convert tabular environments to markdown tables
   const tabularyRegex = /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
-  markdown = markdown.replace(tabularyRegex, (match, content) => {
+  markdown = markdown.replace(tabularyRegex, (_match: string, content: string) => {
     // Split by \\ to get rows
     const rows = content
       .split('\\\\')
-      .map(row => row.replace(/\\hline/g, '').trim())
-      .filter(row => row.length > 0);
+      .map((row: string) => row.replace(/\\hline/g, '').trim())
+      .filter((row: string) => row.length > 0);
     
     if (rows.length === 0) return '';
     
     // Split each row by & to get cells
-    const mdRows = rows.map(row => {
-      const cells = row.split('&').map(cell => cell.trim());
+    const mdRows = rows.map((row: string) => {
+      const cells = row.split('&').map((cell: string) => cell.trim());
       return '| ' + cells.join(' | ') + ' |';
     });
     
@@ -97,28 +94,42 @@ export const PuzzleDetailsDialog = ({
   onOpenChange,
   showLink = true,
 }: PuzzleDetailsDialogProps) => {
-  const renderedHtml = useMemo(() => {
-    if (!puzzle?.instructions) return null;
-    
-    // Convert LaTeX to Markdown
-    const markdown = latexToMarkdown(puzzle.instructions);
-    
-    // Use markdown-it with katex plugin
-    const md = new MarkdownIt({ html: true }).use(markdownItKatex);
-    const html = md.render(markdown);
-    
-    // Sanitize the resulting HTML
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [
-        'p', 'strong', 'em', 'u', 'code', 'pre', 'blockquote',
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li',
-        'table', 'thead', 'tbody', 'tr', 'th', 'td',
-        'a', 'span', 'div', 'i', 'br', 'sup', 'sub',
-        'annotation', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mtext',
-        'mfrac', 'msup', 'msub', 'mroot', 'msqrt'
-      ],
-      ALLOWED_ATTR: ['class', 'style', 'href', 'data-*']
+  // Render markdown on the client only. These libraries (markdown-it,
+  // markdown-it-katex, isomorphic-dompurify) crash during SSR, so we
+  // dynamically import them inside useEffect and store the rendered HTML.
+  const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!puzzle?.instructions) {
+      setRenderedHtml(null);
+      return;
+    }
+
+    Promise.all([
+      import('markdown-it'),
+      import('markdown-it-katex'),
+      import('dompurify'),
+    ]).then(([MarkdownItMod, katexMod, DOMPurifyMod]) => {
+      const MarkdownIt = MarkdownItMod.default;
+      const markdownItKatex = katexMod.default;
+      const DOMPurify = DOMPurifyMod.default || DOMPurifyMod;
+
+      const md = new MarkdownIt({ html: true }).use(markdownItKatex);
+      const markdown = latexToMarkdown(puzzle.instructions!);
+      const html = md.render(markdown);
+
+      setRenderedHtml(DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: [
+          'p', 'strong', 'em', 'u', 'code', 'pre', 'blockquote',
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'ul', 'ol', 'li',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td',
+          'a', 'span', 'div', 'i', 'br', 'sup', 'sub',
+          'annotation', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mtext',
+          'mfrac', 'msup', 'msub', 'mroot', 'msqrt'
+        ],
+        ALLOWED_ATTR: ['class', 'style', 'href', 'data-*']
+      }));
     });
   }, [puzzle?.instructions]);
 

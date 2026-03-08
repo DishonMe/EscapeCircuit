@@ -33,6 +33,8 @@ import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 import { CircuitDebugger } from '@/components/circuit-debugger';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
+import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
+import { InfoPopup } from '@/components/ui/info-popup';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -78,6 +80,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
@@ -761,6 +764,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
               Debug
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowLeaderboard(true)}>
+              Leaderboard
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
               Puzzle Info
             </Button>
@@ -771,14 +777,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
-          <div>
+          <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Budget:</span> {budgetLimit}
-          </div>
-          <div>
             <span className="text-muted-foreground">Tight:</span> {tightBudget}
-          </div>
-          <div>
             <span className="text-muted-foreground">Cost:</span> {currentCost}
+            <InfoPopup>
+              <p className="font-medium text-foreground mb-1">Circuit Cost Limits</p>
+              <p><span className="font-medium text-foreground">Budget</span> — Max gate cost allowed. Your circuit must stay within this limit.</p>
+              <p className="mt-1"><span className="font-medium text-foreground">Tight</span> — 125% of budget. Stay within for a better medal.</p>
+              <p className="mt-1"><span className="font-medium text-foreground">Cost</span> — Your current circuit's total gate cost.</p>
+            </InfoPopup>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -1137,6 +1145,36 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               disabled={!postCheck.open}
             >
               Browse puzzles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leaderboard Dialog */}
+      <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <svg className="size-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                <path d="M4 22h16" />
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+              </svg>
+              Leaderboard
+            </DialogTitle>
+            <DialogDescription>
+              Fastest solvers for this puzzle
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <PuzzleLeaderboard puzzleId={puzzleId} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaderboard(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

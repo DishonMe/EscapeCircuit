@@ -31,6 +31,44 @@ class TestPuzzleCreate:
         assert "id" in body
         assert body["name"] == "Test Puzzle"
 
+    def test_create_puzzle_rejects_duplicate_name(self, client, conn):
+        token = _register_creator(client, conn)
+        _create_puzzle(client, token, "Unique Puzzle")
+
+        resp = client.post("/puzzles", json={
+            "name": "Unique Puzzle",
+            "description": "Another puzzle",
+            "budget": 100,
+            "default_gate_set": ["AND", "OR", "NOT"],
+            "difficulty": "EASY",
+        }, headers=auth_header(token))
+        assert resp.status_code == 400
+        assert "already exists" in resp.json()["detail"]
+
+    def test_create_puzzle_rejects_name_too_long(self, client, conn):
+        token = _register_creator(client, conn)
+        resp = client.post("/puzzles", json={
+            "name": "x" * 101,
+            "description": "Y",
+            "budget": 10,
+            "default_gate_set": ["AND"],
+            "difficulty": "EASY",
+        }, headers=auth_header(token))
+        assert resp.status_code == 400
+        assert "100 characters" in resp.json()["detail"]
+
+    def test_create_puzzle_rejects_description_too_long(self, client, conn):
+        token = _register_creator(client, conn)
+        resp = client.post("/puzzles", json={
+            "name": "Long Description Puzzle",
+            "description": "d" * 2001,
+            "budget": 10,
+            "default_gate_set": ["AND"],
+            "difficulty": "EASY",
+        }, headers=auth_header(token))
+        assert resp.status_code == 400
+        assert "2000 characters" in resp.json()["detail"]
+
     def test_create_puzzle_no_auth(self, client):
         resp = client.post("/puzzles", json={
             "name": "X", "description": "Y", "budget": 10,
