@@ -186,6 +186,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
 
     puzzle_data = config['puzzle']
     test_cases = config.get('test_cases', [])
+    basic_circuits = config.get('basic_circuits', []) or puzzle_data.get('basic_circuits', [])
     
     # Determine gates JSON
     gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
@@ -343,6 +344,39 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
             gate_limit,
             utcnow()
         ))
+
+    if basic_circuits:
+        for basic_circuit in basic_circuits:
+            name = (basic_circuit.get('name') or '').strip()
+            if not name:
+                continue
+            c.execute(
+                "DELETE FROM circuits WHERE user_id=? AND name=? AND is_arsenal=0",
+                (int(creator_id), name),
+            )
+            structure = basic_circuit.get('structure') or basic_circuit.get('structure_json') or {
+                "placedComponents": [],
+                "wires": [],
+            }
+            structure_json = structure if isinstance(structure, str) else json.dumps(structure)
+            c.execute(
+                """
+                INSERT INTO circuits(
+                    user_id, name, cost, structure_json, is_arsenal,
+                    basic_gates, truth_table, num_inputs, num_outputs
+                ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+                """,
+                (
+                    int(creator_id),
+                    name,
+                    int(basic_circuit.get('value', basic_circuit.get('cost', 0)) or 0),
+                    structure_json,
+                    json.dumps(basic_circuit.get('basic_gates', [])),
+                    json.dumps(basic_circuit.get('truth_table', {})),
+                    int(basic_circuit.get('num_inputs', 0) or 0),
+                    int(basic_circuit.get('num_outputs', 0) or 0),
+                ),
+            )
         
     conn.commit()
     print(f"Inserted: {puzzle_data['name']}")

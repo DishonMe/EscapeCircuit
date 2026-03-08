@@ -38,6 +38,14 @@ def build_rating_router(rating_service: RatingService) -> APIRouter:
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    @router.put("/puzzle/{puzzle_id}")
+    def update_rating(puzzle_id: int, req: RateReq, token: str = Depends(verify_token)):
+        try:
+            payload = req.model_dump()
+            return rating_service.update_rating(token, puzzle_id, payload)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     @router.delete("/puzzle/{puzzle_id}")
     def delete_rating(puzzle_id: int, token: str = Depends(verify_token)):
         """Remove the current user's rating for a puzzle."""

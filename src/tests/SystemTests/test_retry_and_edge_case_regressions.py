@@ -119,7 +119,7 @@ class TestRatingOverlapSafety:
         assert solver_xp_after_first > solver_xp_before
         assert creator_xp_after_first > creator_xp_before
 
-        second = client.post(
+        second = client.put(
             f"/ratings/puzzle/{pid}",
             json={"difficulty": 5, "fun": 5, "clearness": 5, "elapsed_seconds": 300},
             headers=auth_header(solver_token),
@@ -188,7 +188,7 @@ class TestRetrySafety:
             json={"difficulty": 4, "fun": 4, "clearness": 4, "elapsed_seconds": 300},
             headers=auth_header(solver_token),
         )
-        assert second.status_code == 200, second.text
+        assert second.status_code == 400
 
         ratings = client.get(f"/ratings/puzzle/{pid}", headers=auth_header(solver_token))
         assert ratings.status_code == 200

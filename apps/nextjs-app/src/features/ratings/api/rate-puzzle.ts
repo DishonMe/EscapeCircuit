@@ -10,6 +10,7 @@ export type RatePuzzleInput = {
   fun: number;
   clearness: number;
   elapsed_seconds?: number;
+  mode?: 'create' | 'update';
 };
 
 export const ratePuzzle = ({
@@ -18,8 +19,10 @@ export const ratePuzzle = ({
   fun,
   clearness,
   elapsed_seconds,
+  mode = 'create',
 }: RatePuzzleInput): Promise<RatingEntry> => {
-  return api.post(`/ratings/puzzle/${puzzleId}`, {
+  const method = mode === 'update' ? api.put : api.post;
+  return method(`/ratings/puzzle/${puzzleId}`, {
     difficulty,
     fun,
     clearness,

@@ -112,6 +112,7 @@ export const RatingDialog = ({
         difficulty,
         fun,
         clearness,
+        mode: existingRating ? 'update' : 'create',
         elapsed_seconds: startTime
           ? Math.floor((Date.now() - startTime) / 1000)
           : undefined,

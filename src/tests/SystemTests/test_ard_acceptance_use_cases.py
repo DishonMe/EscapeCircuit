@@ -4,8 +4,10 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 import Backend.APILayer.PuzzleController as puzzle_controller_module
+from insert_riddles import insert_riddle
 
 from .conftest import (
     auth_header,
@@ -326,9 +328,58 @@ class TestUseCase4CreateAndPublishPuzzle:
         assert publish.json()["difficulty"] == "HARD"
 
     # UC4-AT2 - Successful basic circuits allowed
-    @pytest.mark.skip(reason="Puzzle-only basic circuits are not exposed by the current backend API.")
-    def test_uc4_at2_successful_basic_circuits_allowed(self):
-        pass
+    def test_uc4_at2_successful_basic_circuits_allowed(self, tmp_path):
+        config_path = tmp_path / "uc4_basic_config.json"
+        instructions_path = tmp_path / "uc4_basic_instructions.tex"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "puzzle": {
+                        "name": "UC4 Basic Circuit Upload",
+                        "description": "desc",
+                        "budget": 5,
+                        "default_gate_set": ["AND", "OR"],
+                        "inputs": ["A"],
+                        "outputs": ["out"],
+                    },
+                    "test_cases": [
+                        {
+                            "kind": "blackbox",
+                            "inputs": {"A": 0},
+                            "expected_outputs": {"out": 0},
+                        }
+                    ],
+                    "basic_circuits": [
+                        {
+                            "name": "PuzzleOnlyAdder",
+                            "value": 3,
+                            "structure": {"placedComponents": [], "wires": []},
+                            "num_inputs": 1,
+                            "num_outputs": 1,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        instructions_path.write_text("instructions", encoding="utf-8")
+
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        PuzzleRepo(conn)
+        CircuitRepo(conn)
+
+        try:
+            insert_riddle(conn, str(config_path), str(instructions_path), creator_id=1)
+            row = conn.execute(
+                "SELECT name, is_arsenal FROM circuits WHERE user_id = 1 AND name = ?",
+                ("PuzzleOnlyAdder",),
+            ).fetchone()
+            assert row is not None
+            assert row["name"] == "PuzzleOnlyAdder"
+            assert int(row["is_arsenal"]) == 0
+        finally:
+            conn.close()
 
     # UC4-AT3 - Unsuccessful self-solve fails
     def test_uc4_at3_unsuccessful_self_solve_fails(self, client, conn):
@@ -472,7 +523,7 @@ class TestUseCase5RateAPuzzle:
         xp_after_first = get_user_xp(client, solver_token)
         assert xp_after_first > xp_before
 
-        second = client.post(
+        second = client.put(
             f"/ratings/puzzle/{pid}",
             json={"difficulty": 5, "fun": 5, "clearness": 4, "elapsed_seconds": 300},
             headers=auth_header(solver_token),
@@ -985,9 +1036,57 @@ class TestAddedAcceptanceTestsDuplicates:
 
     # UC4-AT2 - Successful basic circuits allowed
     # Description: Circuits stored as puzzle-only, solvers cannot save.
-    @pytest.mark.skip(reason="Puzzle-only basic circuits are not exposed by the current backend API.")
-    def test_add_uc4_at2_successful_basic_circuits_allowed(self):
-        pass
+    def test_add_uc4_at2_successful_basic_circuits_allowed(self, tmp_path):
+        config_path = tmp_path / "add_uc4_basic_config.json"
+        instructions_path = tmp_path / "add_uc4_basic_instructions.tex"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "puzzle": {
+                        "name": "ADD UC4 Basic Circuit Upload",
+                        "description": "desc",
+                        "budget": 5,
+                        "default_gate_set": ["AND", "OR"],
+                        "inputs": ["A"],
+                        "outputs": ["out"],
+                    },
+                    "test_cases": [
+                        {
+                            "kind": "blackbox",
+                            "inputs": {"A": 1},
+                            "expected_outputs": {"out": 1},
+                        }
+                    ],
+                    "basic_circuits": [
+                        {
+                            "name": "AddPuzzleOnlyAdder",
+                            "value": 4,
+                            "structure": {"placedComponents": [], "wires": []},
+                            "num_inputs": 1,
+                            "num_outputs": 1,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        instructions_path.write_text("instructions", encoding="utf-8")
+
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        PuzzleRepo(conn)
+        CircuitRepo(conn)
+
+        try:
+            insert_riddle(conn, str(config_path), str(instructions_path), creator_id=1)
+            row = conn.execute(
+                "SELECT name, is_arsenal FROM circuits WHERE user_id = 1 AND name = ?",
+                ("AddPuzzleOnlyAdder",),
+            ).fetchone()
+            assert row is not None
+            assert int(row["is_arsenal"]) == 0
+        finally:
+            conn.close()
 
     # UC4-AT3 - Unsuccessful self-solve fails
     # Description: Upload blocked if creator cannot self-solve within limits.
@@ -1202,7 +1301,7 @@ class TestAddedAcceptanceTestsDuplicates:
         xp_after_first = get_user_xp(client, solver_token)
         assert xp_after_first > xp_before
 
-        second = client.post(
+        second = client.put(
             f"/ratings/puzzle/{pid}",
             json={"difficulty": 5, "fun": 5, "clearness": 4, "elapsed_seconds": 300},
             headers=auth_header(solver_token),
@@ -1226,9 +1325,25 @@ class TestAddedAcceptanceTestsDuplicates:
 
     # UC5-AT6 - Unsuccessful duplicate rating
     # Description: User 123 has already rated this puzzle. User 123 submits a new rating (not via edit).
-    @pytest.mark.skip(reason="Current API treats repeated rating submission as edit-in-place; duplicate-create rejection flow is not exposed.")
-    def test_add_uc5_at6_unsuccessful_duplicate_rating(self):
-        pass
+    def test_add_uc5_at6_unsuccessful_duplicate_rating(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc5_creator_duplicate")
+        pid, _ = create_and_publish_puzzle(client, conn, creator_token, name="ADD UC5 Duplicate")
+
+        solver_token = register_and_login(client, "add_uc5_solver_duplicate")
+        first = client.post(
+            f"/ratings/puzzle/{pid}",
+            json={"difficulty": 2, "fun": 3, "clearness": 4, "elapsed_seconds": 300},
+            headers=auth_header(solver_token),
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.post(
+            f"/ratings/puzzle/{pid}",
+            json={"difficulty": 5, "fun": 5, "clearness": 5, "elapsed_seconds": 300},
+            headers=auth_header(solver_token),
+        )
+        assert second.status_code == 400
+        assert "edit flow" in second.json()["detail"].lower()
 
     # UC6-AT1 - Successful standard XP
     # Description: XP awarded per difficulty tier.
@@ -1523,15 +1638,51 @@ class TestAddedAcceptanceTestsUC9ToUC12:
 
     # UC10-AT1 - Successful Profile Load
     # Description: System displays profile progress metrics.
-    @pytest.mark.skip(reason="Current /users/me API does not expose medal aggregates or saved-puzzle profile sections.")
-    def test_add_uc10_at1_successful_profile_load(self):
-        pass
+    def test_add_uc10_at1_successful_profile_load(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc10_creator")
+        pid, _ = create_and_publish_puzzle(
+            client, conn, creator_token, name="ADD UC10 Medal Puzzle", budget=1, time_limit=60
+        )
+
+        solver_token = register_and_login(client, "add_uc10_solver")
+        before = get_user_info(client, solver_token)
+        me = before
+        conn.execute("UPDATE users SET xp = 500 WHERE id = ?", (me["id"],))
+        validate_solution(client, solver_token, pid, _and_solution(), time_taken=10)
+
+        profile = client.get("/users/me", headers=auth_header(solver_token))
+        assert profile.status_code == 200, profile.text
+        body = profile.json()
+        assert body["xp"] >= 500
+        assert body["level"] >= before["level"]
+        assert body["medals"]["gold"] >= 1
 
     # UC10-AT2 - Successful Puzzle Access
     # Description: System displays a clickable list of saved puzzles from the profile page.
-    @pytest.mark.skip(reason="Saved-for-later puzzles are not exposed by the current backend profile contract.")
-    def test_add_uc10_at2_successful_puzzle_access(self):
-        pass
+    def test_add_uc10_at2_successful_puzzle_access(self, client, conn):
+        creator_token = make_creator(client, conn, "add_uc10_saved_creator")
+        solver_token = register_and_login(client, "add_uc10_saved_solver")
+        solver_info = get_user_info(client, solver_token)
+
+        saved_ids = []
+        for idx in range(3):
+            pid, _ = create_and_publish_puzzle(
+                client,
+                conn,
+                creator_token,
+                name=f"ADD UC10 Saved Puzzle {idx}",
+            )
+            saved_ids.append(pid)
+            conn.execute(
+                "INSERT INTO saved_puzzles(user_id, puzzle_id, created_at) VALUES (?, ?, datetime('now'))",
+                (int(solver_info["id"]), int(pid)),
+            )
+
+        profile = client.get("/users/me", headers=auth_header(solver_token))
+        assert profile.status_code == 200, profile.text
+        body = profile.json()
+        assert len(body["saved_puzzles"]) == 3
+        assert {int(p["id"]) for p in body["saved_puzzles"]} == set(saved_ids)
 
     # UC11-AT1 - Successful Sandbox Save
     # Description: User 123 builds a valid circuit and saves it as "MyAdder".

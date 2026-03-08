@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface InfoPopupProps {
   children: React.ReactNode;
@@ -9,22 +10,56 @@ interface InfoPopupProps {
 
 export const InfoPopup = ({ children, className = '' }: InfoPopupProps) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popupWidth = 256; // w-64 = 16rem = 256px
+    let left = rect.left + rect.width / 2 - popupWidth / 2;
+    const top = rect.bottom + 6; // 6px gap below trigger
+
+    // Keep within viewport horizontally
+    if (left < 8) left = 8;
+    if (left + popupWidth > window.innerWidth - 8) {
+      left = window.innerWidth - popupWidth - 8;
+    }
+
+    setPos({ top, left });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    updatePosition();
+
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        popupRef.current?.contains(target)
+      )
+        return;
+      setOpen(false);
     };
+
+    const handleScrollOrResize = () => updatePosition();
+
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [open, updatePosition]);
 
   return (
-    <div ref={ref} className={`relative inline-flex items-center ${className}`}>
+    <span className={`inline-flex items-center ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors"
@@ -43,12 +78,29 @@ export const InfoPopup = ({ children, className = '' }: InfoPopupProps) => {
           />
         </svg>
       </button>
-      {open && (
-        <div className="absolute left-1/2 top-full z-50 mt-1.5 w-64 -translate-x-1/2 rounded-lg border border-border/60 bg-card p-3 text-xs leading-relaxed text-muted-foreground shadow-lg backdrop-blur-sm">
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 border-l border-t border-border/60 bg-card" />
-          {children}
-        </div>
-      )}
-    </div>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={popupRef}
+            className="fixed z-[9999] w-64 rounded-lg border border-border/60 bg-card p-3 text-xs leading-relaxed text-muted-foreground shadow-lg backdrop-blur-sm"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            <div
+              className="absolute -top-1.5 size-3 rotate-45 border-l border-t border-border/60 bg-card"
+              style={{
+                left: triggerRef.current
+                  ? triggerRef.current.getBoundingClientRect().left +
+                    triggerRef.current.getBoundingClientRect().width / 2 -
+                    pos.left -
+                    6
+                  : '50%',
+              }}
+            />
+            {children}
+          </div>,
+          document.body
+        )}
+    </span>
   );
 };

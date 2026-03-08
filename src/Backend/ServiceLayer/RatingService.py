@@ -25,8 +25,13 @@ class RatingService:
         return self.list_ratings_for_puzzle(token, puzzle_id)
 
     def submit_rating(self, token: str, puzzle_id: int, payload: dict) -> dict:
-        # The test likely passes a dict payload with keys: difficulty, fun, clearness
-        rating = self.rate_puzzle(
+        rating = self.create_rating(token, puzzle_id, payload)
+        if hasattr(rating, "to_dict"):
+            return rating.to_dict()
+        return dict(rating)
+
+    def update_rating(self, token: str, puzzle_id: int, payload: dict) -> dict:
+        rating = self.edit_rating(
             token,
             puzzle_id,
             payload["difficulty"],
@@ -63,11 +68,27 @@ class RatingService:
         effective_time = max(total_time, client_elapsed)
         return effective_time >= settings.RATING_MIN_ATTEMPT_SECONDS
 
-    def rate_puzzle(self, token: str, puzzle_id: int, difficulty: int, fun: int, clearness: int, client_elapsed: int | None = None) -> Rating:
+    def _store_rating(
+        self,
+        token: str,
+        puzzle_id: int,
+        difficulty: int,
+        fun: int,
+        clearness: int,
+        client_elapsed: int | None = None,
+        *,
+        allow_existing: bool,
+    ) -> Rating:
         user_id = self.auth.require_user_id(token)
         puzzle = self.puzzle_repo.get_by_id(int(puzzle_id))
         if not puzzle:
             raise ValidationError("puzzle not found")
+
+        existing = self.rating_repo.get_by_puzzle_user(int(puzzle_id), int(user_id))
+        if existing and not allow_existing:
+            raise ValidationError("You already rated this puzzle. Use the edit flow instead.")
+        if not existing and allow_existing:
+            raise ValidationError("rating not found")
 
         if not self._can_rate(user_id, int(puzzle_id), client_elapsed=int(client_elapsed or 0)):
             raise ValidationError("You must solve the puzzle or attempt it for at least 5 minutes to rate.")
@@ -116,6 +137,39 @@ class RatingService:
                 pass  # notification is best-effort
 
         return saved
+
+    def rate_puzzle(self, token: str, puzzle_id: int, difficulty: int, fun: int, clearness: int, client_elapsed: int | None = None) -> Rating:
+        return self._store_rating(
+            token,
+            puzzle_id,
+            difficulty,
+            fun,
+            clearness,
+            client_elapsed=client_elapsed,
+            allow_existing=True,
+        )
+
+    def create_rating(self, token: str, puzzle_id: int, payload: dict) -> Rating:
+        return self._store_rating(
+            token,
+            puzzle_id,
+            payload["difficulty"],
+            payload["fun"],
+            payload["clearness"],
+            client_elapsed=payload.get("elapsed_seconds"),
+            allow_existing=False,
+        )
+
+    def edit_rating(self, token: str, puzzle_id: int, difficulty: int, fun: int, clearness: int, client_elapsed: int | None = None) -> Rating:
+        return self._store_rating(
+            token,
+            puzzle_id,
+            difficulty,
+            fun,
+            clearness,
+            client_elapsed=client_elapsed,
+            allow_existing=True,
+        )
 
     def remove_rating(self, token: str, puzzle_id: int) -> bool:
         user_id = self.auth.require_user_id(token)
