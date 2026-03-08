@@ -142,6 +142,7 @@ export type Puzzle = Entity<{
   best_time?: number | null;
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
+  is_saved?: boolean; // Whether user has saved this puzzle
 
   // Difficulty ratings (injected by backend)
   avg_difficulty?: number;

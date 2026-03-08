@@ -389,3 +389,20 @@ class UserService:
         self.user_repo.update_role(target_user_id, role)
         self.user_repo.conn.commit()
         return {"ok": True}
+
+    def update_user_bio(self, user_id: int, bio: str) -> dict:
+        """Update user bio"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        
+        if len(bio) > 500:
+            raise ValidationError("Bio must be 500 characters or less")
+        
+        user.bio = bio
+        # Update in database by executing SQL directly
+        conn = self.user_repo.conn
+        conn.execute("UPDATE users SET bio = ? WHERE id = ?", (bio, user_id))
+        conn.commit()
+        
+        return {"ok": True, "bio": bio}

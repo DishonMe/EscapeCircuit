@@ -23,6 +23,7 @@ class PuzzleRepo:
             creator_user_id INTEGER NOT NULL,
             description TEXT NOT NULL,
             instructions TEXT,
+            creator_comment TEXT,
             status TEXT NOT NULL,
             budget INTEGER NOT NULL,
             time_limit_seconds INTEGER,
@@ -51,6 +52,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN min_cycles INTEGER;")
             if "max_cycles" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN max_cycles INTEGER;")
+            if "creator_comment" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_comment TEXT;")
         except Exception:
             pass
         self.conn.execute("""
@@ -129,8 +132,9 @@ class PuzzleRepo:
                 budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
+                creator_comment,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
@@ -147,6 +151,7 @@ class PuzzleRepo:
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
+            puzzle.creator_comment,
             puzzle.created_at.isoformat(),
         ))
         puzzle.id = int(cur.lastrowid)
@@ -163,6 +168,7 @@ class PuzzleRepo:
                 creator_user_id=?,
                 description=?,
                 instructions=?,
+                creator_comment=?,
                 status=?,
                 budget=?,
                 time_limit_seconds=?,
@@ -181,6 +187,7 @@ class PuzzleRepo:
             puzzle.creator_user_id,
             puzzle.description,
             puzzle.instructions,
+            puzzle.creator_comment,
             puzzle.status.value,
             puzzle.budget,
             puzzle.time_limit_seconds,
@@ -622,6 +629,15 @@ class PuzzleRepo:
         cur = self.conn.execute("DELETE FROM puzzles WHERE id=?", (int(puzzle_id),))
         return cur.rowcount > 0
 
+    def unpublish_puzzle(self, puzzle_id: int) -> bool:
+        """Set puzzle status to unpublished. Returns True if updated."""
+        cur = self.conn.execute(
+            "UPDATE puzzles SET status = ? WHERE id = ?",
+            (PuzzleStatus.UNPUBLISHED.value, int(puzzle_id))
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def list_all_for_admin(
         self,
         limit: int = 50,
@@ -832,6 +848,11 @@ class PuzzleRepo:
             instructions_val = row["instructions"]
         except (IndexError, KeyError):
             instructions_val = None
+        # Safely read creator_comment — may be missing in old DBs
+        try:
+            creator_comment_val = row["creator_comment"]
+        except (IndexError, KeyError):
+            creator_comment_val = None
         # Safely read constraint fields — may be missing in old DBs
         try:
             total_gate_count = row["total_gate_count"]
@@ -851,6 +872,7 @@ class PuzzleRepo:
             "creator_user_id": int(row["creator_user_id"]),
             "description": row["description"],
             "instructions": instructions_val,
+            "creator_comment": creator_comment_val,
             "status": row["status"],
             "budget": int(row["budget"]),
             "time_limit_seconds": row["time_limit_seconds"],

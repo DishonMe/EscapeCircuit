@@ -13,6 +13,7 @@ class Puzzle:
     creator_user_id: int
     description: str = ""
     instructions: Optional[str] = None
+    creator_comment: Optional[str] = None
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
     budget: int = 0
@@ -74,6 +75,7 @@ class Puzzle:
             "creator_user_id": int(self.creator_user_id),
             "description": self.description,
             "instructions": self.instructions,
+            "creatorComment": self.creator_comment,
             "status": self.status.value,
             "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
@@ -107,6 +109,7 @@ class Puzzle:
             creator_user_id=int(d["creator_user_id"]),
             description=d.get("description", ""),
             instructions=d.get("instructions"),
+            creator_comment=d.get("creator_comment"),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
             time_limit_seconds=d.get("time_limit_seconds", None),

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useLeaderboard } from '@/features/puzzles/api/get-leaderboard';
 import { useUser } from '@/lib/auth';
 import { InfoPopup } from '@/components/ui/info-popup';
@@ -33,9 +34,18 @@ const formatTime = (seconds: number) => {
   return `${h}h ${rm}m ${s}s`;
 };
 
+const getMetricDisplay = (entry: any, type: "time" | "cost") => {
+  if (type === "time") {
+    return formatTime(entry.best_time);
+  } else {
+    return `${entry.best_cost} cost`;
+  }
+};
+
 export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
+  const [leaderboardType, setLeaderboardType] = useState<"time" | "cost">("time");
   const user = useUser();
-  const leaderboardQuery = useLeaderboard({ puzzleId });
+  const leaderboardQuery = useLeaderboard({ puzzleId, type: leaderboardType });
   const entries = leaderboardQuery.data?.data ?? [];
 
   if (leaderboardQuery.isLoading) {
@@ -61,7 +71,32 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
   const currentUserId = (user.data as any)?.id;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-3">
+      {/* Leaderboard Type Tabs */}
+      <div className="flex gap-2 border-b border-border">
+        <button
+          onClick={() => setLeaderboardType("time")}
+          className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+            leaderboardType === "time"
+              ? 'text-foreground border-b-2 border-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ⏱️ Fastest Time
+        </button>
+        <button
+          onClick={() => setLeaderboardType("cost")}
+          className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+            leaderboardType === "cost"
+              ? 'text-foreground border-b-2 border-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          💰 Lowest Cost
+        </button>
+      </div>
+
+      {/* Leaderboard Content */}
       {/* Top 3 podium */}
       {entries.length >= 3 && (
         <div className="mb-4 flex items-end justify-center gap-2 px-2 pt-2">
@@ -74,7 +109,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               </span>
             </div>
             <div className="w-full rounded-b bg-slate-400/20 px-1 py-0.5 text-center text-[10px] font-semibold text-muted-foreground tabular-nums">
-              {formatTime(entries[1].best_time)}
+              {getMetricDisplay(entries[1], leaderboardType)}
             </div>
           </div>
           {/* 1st place */}
@@ -86,7 +121,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               </span>
             </div>
             <div className="w-full rounded-b bg-amber-400/20 px-1 py-0.5 text-center text-[10px] font-bold text-amber-700 tabular-nums">
-              {formatTime(entries[0].best_time)}
+              {getMetricDisplay(entries[0], leaderboardType)}
             </div>
           </div>
           {/* 3rd place */}
@@ -98,7 +133,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               </span>
             </div>
             <div className="w-full rounded-b bg-orange-400/20 px-1 py-0.5 text-center text-[10px] font-semibold text-muted-foreground tabular-nums">
-              {formatTime(entries[2].best_time)}
+              {getMetricDisplay(entries[2], leaderboardType)}
             </div>
           </div>
         </div>
@@ -157,10 +192,10 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                 )}
               </div>
 
-              {/* Time */}
+              {/* Metric */}
               <div className="shrink-0 text-right">
                 <div className="text-sm font-bold tabular-nums">
-                  {formatTime(entry.best_time)}
+                  {getMetricDisplay(entry, leaderboardType)}
                 </div>
               </div>
             </div>
@@ -170,12 +205,25 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
 
       {/* Footer */}
       <div className="flex items-center justify-center gap-1 pt-2 text-[10px] text-muted-foreground/60">
-        Ranked by fastest solve time
-        <InfoPopup>
-          <p className="font-medium text-foreground mb-1">Leaderboard & Medals</p>
-          <p>Rank is determined by your <span className="font-medium text-foreground">fastest solve time</span> across all attempts.</p>
-          <p className="mt-1">Medals (Gold, Silver, Bronze) are earned based on your <span className="font-medium text-foreground">solve performance</span> — staying within time and budget limits — not your leaderboard position.</p>
-        </InfoPopup>
+        {leaderboardType === "time" ? (
+          <>
+            Ranked by fastest solve time
+            <InfoPopup>
+              <p className="font-medium text-foreground mb-1">Leaderboard & Medals</p>
+              <p>Rank is determined by your <span className="font-medium text-foreground">fastest solve time</span> across all attempts.</p>
+              <p className="mt-1">Medals (Gold, Silver, Bronze) are earned based on your <span className="font-medium text-foreground">solve performance</span> — staying within time and budget limits — not your leaderboard position.</p>
+            </InfoPopup>
+          </>
+        ) : (
+          <>
+            Ranked by lowest cost solution
+            <InfoPopup>
+              <p className="font-medium text-foreground mb-1">Leaderboard & Medals</p>
+              <p>Rank is determined by your <span className="font-medium text-foreground">lowest cost solution</span> across all attempts.</p>
+              <p className="mt-1">Medals (Gold, Silver, Bronze) are earned based on your <span className="font-medium text-foreground">solve performance</span> — staying within time and budget limits — not your leaderboard position.</p>
+            </InfoPopup>
+          </>
+        )}
       </div>
     </div>
   );

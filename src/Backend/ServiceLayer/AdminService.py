@@ -1,4 +1,6 @@
 from typing import List, Optional
+import pathlib
+import os
 
 from Backend import settings
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus, AuditActionType
@@ -45,6 +47,34 @@ class AdminService:
         if not admin or admin.role != UserRole.ADMIN:
             raise ValidationError("admin required")
         return admin_id
+
+    def _delete_riddle_files(self, puzzle_name: str) -> None:
+        """Delete riddle files from the riddles directory matching the puzzle name."""
+        try:
+            # Get riddles directory path
+            current_file = pathlib.Path(__file__).resolve()
+            root_dir = current_file.parent.parent.parent.parent
+            riddles_dir = root_dir / 'riddles'
+            
+            if not riddles_dir.exists():
+                return
+            
+            # Search for all files containing the puzzle name (case-insensitive match)
+            # Pattern: riddle_XX_puzzle_name_*.ext
+            deleted_count = 0
+            for file in riddles_dir.iterdir():
+                if file.is_file() and("_" + puzzle_name.lower() + "_") in file.name.lower():
+                    try:
+                        file.unlink()
+                        deleted_count += 1
+                        print(f"[DELETE] Removed riddle file: {file.name}")
+                    except Exception as e:
+                        print(f"[WARNING] Failed to delete {file.name}: {e}")
+            
+            if deleted_count > 0:
+                print(f"[DELETE] Removed {deleted_count} riddle file(s) for puzzle: {puzzle_name}")
+        except Exception as e:
+            print(f"[WARNING] Error during riddle file cleanup: {e}")
 
     def _require_admin_or_creator(self, session_token: str) -> int:
         """Validate session and ensure user is admin or creator. Returns user_id."""
@@ -274,6 +304,9 @@ class AdminService:
             # Track admin deletion to prevent re-import by insert_riddles
             self.puzzle_repo.track_admin_deletion(puzzle_name)
             # COMMIT at context-manager exit
+
+        # Delete riddle files from riddles directory
+        self._delete_riddle_files(puzzle_name)
 
         # Audit log (req 7.5)
         self.audit_log.create(

@@ -45,6 +45,7 @@ class UpdatePuzzleReq(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     instructions: Optional[str] = None
+    creator_comment: Optional[str] = None
 
 
 class AddTestCaseReq(BaseModel):
@@ -218,6 +219,11 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             try:
                 from Backend.ServiceLayer.AuthService import AuthService
                 user_id = puzzle_service.auth.require_user_id(token)
+                
+                # Get saved puzzles for this user
+                saved_puzzles = puzzle_service.repo.list_saved_puzzles(user_id)
+                saved_puzzle_ids = {int(p.id) for p in saved_puzzles}
+                
                 if puzzle_service.solve_repo:
                     status_map = puzzle_service.solve_repo.get_solve_status_map(user_id)
                     solved_counts = puzzle_service.solve_repo.get_solved_counts()
@@ -254,6 +260,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                                     p["user_rating"] = user_rating.to_dict()
                             except Exception:
                                 pass
+                        # Inject saved status
+                        p["is_saved"] = pid in saved_puzzle_ids if pid else False
                         # Inject rating metrics
                         _inject_rating_metrics(p)
             except Exception:
@@ -371,6 +379,9 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 payload["description"] = req.description
             if req.instructions is not None:
                 payload["instructions"] = req.instructions
+            # Always include creator_comment if it was in the request (even if None for deletion)
+            if "creator_comment" in req.model_fields_set or req.creator_comment is not None:
+                payload["creator_comment"] = req.creator_comment
             return puzzle_service.update_puzzle(token, puzzle_id, payload)
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
@@ -411,10 +422,13 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             raise HTTPException(status_code=400, detail=str(e))
 
     @router.get("/{puzzle_id}/leaderboard")
-    def leaderboard(puzzle_id: int, limit: int = 50, token: str = Depends(verify_token)):
+    def leaderboard(puzzle_id: int, type: str = "time", limit: int = 50, token: str = Depends(verify_token)):
         try:
             puzzle_service.auth.require_user_id(token)
-            entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
+            if type == "cost":
+                entries = puzzle_service.solve_repo.get_leaderboard_by_cost(puzzle_id, limit=limit)
+            else:
+                entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
             return {"data": entries}
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
@@ -851,7 +865,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
 
-                insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id)
+                insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id, status='unpublished')
 
                 return {"message": "Puzzle created successfully"}
         except ValidationError as e:
@@ -863,5 +877,33 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             raise HTTPException(status_code=500, detail=str(e))
         finally:
             conn.close()
+
+    # ------------------------------------------------------------------ #
+    #  Save/Bookmark puzzle
+    # ------------------------------------------------------------------ #
+    @router.post("/{puzzle_id}/save")
+    def toggle_save_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            # Check if puzzle is already saved
+            saved = puzzle_service.repo.list_saved_puzzles(user_id)
+            is_saved = any(p.id == puzzle_id for p in saved)
+            
+            if is_saved:
+                # Remove from saved
+                puzzle_service.repo.remove_saved_puzzle(user_id, puzzle_id)
+                puzzle_service.repo.conn.commit()
+                return {"puzzle_id": puzzle_id, "is_saved": False}
+            else:
+                # Add to saved
+                from datetime import datetime
+                created_at = datetime.utcnow().isoformat()
+                puzzle_service.repo.save_for_later(user_id, puzzle_id, created_at)
+                puzzle_service.repo.conn.commit()
+                return {"puzzle_id": puzzle_id, "is_saved": True}
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router

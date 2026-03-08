@@ -15,8 +15,10 @@ import {
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
+import { SETTINGS } from '@/config/settings';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
+import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
 import { api } from '@/lib/api-client';
@@ -81,6 +83,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showCreatorComment, setShowCreatorComment] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
@@ -756,6 +759,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <div className="text-[13px] text-muted-foreground">
               by {puzzle.creator?.username ?? ''}
             </div>
+            {puzzle.description && (
+              <div className="text-[13px] text-muted-foreground">
+                {puzzle.description}
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <WorkstationTimer
@@ -767,8 +775,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" size="sm" onClick={() => setShowLeaderboard(true)}>
               Leaderboard
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowCreatorComment(true)}>
+              Creator Comment
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
-              Puzzle Info
+              Instructions
             </Button>
             <Button size="sm" onClick={checkSolution} isLoading={isChecking}>
               Check Solution
@@ -1179,6 +1190,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Puzzle Details Dialog */}
+      <PuzzleDetailsDialog
+        puzzle={puzzle}
+        open={showPuzzleInfo}
+        onOpenChange={setShowPuzzleInfo}
+        showLink={false}
+      />
+
+      {/* Creator Comment Dialog */}
+      <CreatorCommentDialog
+        open={showCreatorComment}
+        onOpenChange={setShowCreatorComment}
+        puzzle={puzzle}
+        showLink={false}
+      />
 
     </div>
   );

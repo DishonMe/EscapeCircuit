@@ -1,5 +1,7 @@
 import sqlite3
 from typing import Dict, Any, List
+import pathlib
+import os
 
 from Backend import settings
 from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
@@ -25,6 +27,35 @@ class PuzzleService:
         self.solve_repo = solve_repo
         self.arsenal_service = arsenal_service
 
+    def _delete_riddle_files(self, puzzle_name: str) -> None:
+        """Delete riddle files from the riddles directory matching the puzzle name."""
+        try:
+            # Get riddles directory path
+            import sys
+            current_file = pathlib.Path(__file__).resolve()
+            root_dir = current_file.parent.parent.parent.parent
+            riddles_dir = root_dir / 'riddles'
+            
+            if not riddles_dir.exists():
+                return
+            
+            # Search for all files containing the puzzle name (case-insensitive match)
+            # Pattern: riddle_XX_puzzle_name_*.ext
+            deleted_count = 0
+            for file in riddles_dir.iterdir():
+                if file.is_file() and("_" + puzzle_name.lower() + "_") in file.name.lower():
+                    try:
+                        file.unlink()
+                        deleted_count += 1
+                        print(f"[DELETE] Removed riddle file: {file.name}")
+                    except Exception as e:
+                        print(f"[WARNING] Failed to delete {file.name}: {e}")
+            
+            if deleted_count > 0:
+                print(f"[DELETE] Removed {deleted_count} riddle file(s) for puzzle: {puzzle_name}")
+        except Exception as e:
+            print(f"[WARNING] Error during riddle file cleanup: {e}")
+
     def _enrich_puzzle(self, p_dict: dict) -> dict:
         # Helper to attach creator object
         creator_id = p_dict.get("creator_user_id")
@@ -32,6 +63,21 @@ class PuzzleService:
             user = self.user_repo.get_by_id(int(creator_id))
             if user:
                 p_dict["creator"] = user.to_dict()
+        
+        # Count actual solves (including creator's solves)
+        puzzle_id = p_dict.get("id")
+        if puzzle_id is not None and self.solve_repo:
+            try:
+                # Count distinct users who have passed this puzzle
+                count = self.solve_repo.conn.execute(
+                    "SELECT COUNT(DISTINCT user_id) as cnt FROM solve_attempts WHERE puzzle_id = ? AND passed = 1",
+                    (int(puzzle_id),)
+                ).fetchone()
+                if count:
+                    p_dict["solvedCount"] = count[0]
+            except Exception:
+                pass
+        
         return p_dict
 
     def browse(
@@ -178,37 +224,130 @@ class PuzzleService:
         
         d = self._enrich_puzzle(p.to_dict())
         
+        # Add gate limits (allowed gates that player can use)
+        # Get all available gates and filter to only those in default_gate_set
+        from Backend.DomainLayer.Enums import GateType
+        all_gates = {g.value for g in GateType}
+        allowed_gates = {g.value for g in p.default_gate_set}
+        blocked_gates = sorted(list(all_gates - allowed_gates))
+        d["filteredBasicComponents"] = blocked_gates if blocked_gates else []
+        
+        # Add gate-specific limits from test cases
+        # Format: { "gate_name": limit_value_or_null }
+        gate_limits = {}
+        try:
+            tcs = self.repo.list_test_cases(puzzle_id)
+            for tc in tcs:
+                if tc.gate_name and tc.gate_name in allowed_gates:
+                    if tc.gate_name not in gate_limits:
+                        # Store the limit (None means unlimited)
+                        gate_limits[tc.gate_name] = tc.gate_limit
+            
+            # Ensure all allowed gates are in the dict
+            for gate in allowed_gates:
+                if gate not in gate_limits:
+                    gate_limits[gate] = None
+        except Exception:
+            # If something fails, just set all allowed gates as unlimited
+            gate_limits = {gate: None for gate in allowed_gates}
+        
+        d["gateLimits"] = gate_limits
+        
+        # Add times saved count
+        if puzzle_id is not None and self.solve_repo:
+            try:
+                saved_count = self.solve_repo.conn.execute(
+                    "SELECT COUNT(*) as cnt FROM saved_puzzles WHERE puzzle_id = ?",
+                    (int(puzzle_id),)
+                ).fetchone()
+                if saved_count:
+                    d["timesSaved"] = saved_count[0]
+            except Exception:
+                d["timesSaved"] = 0
+        else:
+            d["timesSaved"] = 0
+        
+        # Add medal distribution (count of users who earned each medal level)
+        if puzzle_id is not None and self.solve_repo:
+            try:
+                medal_dist = self.solve_repo.conn.execute(
+                    """SELECT best_medal, COUNT(*) as cnt FROM puzzle_progress 
+                       WHERE puzzle_id = ? GROUP BY best_medal""",
+                    (int(puzzle_id),)
+                ).fetchall()
+                medal_counts = {"none": 0, "bronze": 0, "silver": 0, "gold": 0}
+                for medal_level, count in medal_dist:
+                    if medal_level == 0:
+                        medal_counts["none"] = count
+                    elif medal_level == 1:
+                        medal_counts["bronze"] = count
+                    elif medal_level == 2:
+                        medal_counts["silver"] = count
+                    elif medal_level == 3:
+                        medal_counts["gold"] = count
+                d["medalDistribution"] = medal_counts
+            except Exception:
+                d["medalDistribution"] = {"none": 0, "bronze": 0, "silver": 0, "gold": 0}
+        else:
+            d["medalDistribution"] = {"none": 0, "bronze": 0, "silver": 0, "gold": 0}
+        
         # Populate inputs/outputs from test cases if not present
         # This is needed because Puzzle model doesn't store them, but Frontend needs them.
         tcs = self.repo.list_test_cases(puzzle_id)
         if tcs:
-            # Assume all test cases have same inputs/outputs keys. Take the first one.
+            # Return all test cases as array for frontend display
+            test_cases_data = []
+            for tc in tcs:
+                # Extract actual data - don't default to empty dict if data exists
+                inputs = tc.inputs if tc.inputs else {}
+                outputs = tc.expected_outputs if tc.expected_outputs else {}
+                
+                # For stream test cases, use the stream data
+                if hasattr(tc, 'input_stream') and tc.input_stream:
+                    inputs = tc.input_stream
+                if hasattr(tc, 'expected_output_stream') and tc.expected_output_stream:
+                    outputs = tc.expected_output_stream
+                
+                tc_obj = {
+                    "inputs": inputs,
+                    "outputs": outputs,
+                }
+                test_cases_data.append(tc_obj)
+            
+            d["test_cases"] = test_cases_data if test_cases_data else []
+            
+            # For backward compatibility, also extract input/output array from first test case
             first_tc = tcs[0]
-            # For stream test cases, inputs/expected_outputs are empty, so check if we have them from config
             if first_tc.inputs:
-                d["inputs"] = list(first_tc.inputs.keys())
+                d["inputs"] = list(first_tc.inputs.values()) if first_tc.inputs else []
+            elif first_tc.input_stream and isinstance(first_tc.input_stream, list) and len(first_tc.input_stream) > 0:
+                # For stream test cases, get first input as string
+                first_input = first_tc.input_stream[0]
+                if isinstance(first_input, dict):
+                    d["inputs"] = list(first_input.values())
+                elif isinstance(first_input, (str, int)):
+                    d["inputs"] = [str(first_input)]
+                else:
+                    d["inputs"] = [str(first_input)]
+            
             if first_tc.expected_outputs:
-                d["outputs"] = list(first_tc.expected_outputs.keys())
-            
-            # For stream test cases, extract from input_stream/expected_output_stream structure
-            if not d.get("inputs") and first_tc.input_stream:
-                # input_stream is a list of dicts, extract keys from first dict
-                if isinstance(first_tc.input_stream, list) and len(first_tc.input_stream) > 0:
-                    if isinstance(first_tc.input_stream[0], dict):
-                        d["inputs"] = list(first_tc.input_stream[0].keys())
-            
-            if not d.get("outputs") and first_tc.expected_output_stream:
-                # expected_output_stream is a dict of lists, extract keys directly
-                d["outputs"] = list(first_tc.expected_output_stream.keys())
+                d["outputs"] = list(first_tc.expected_outputs.values()) if first_tc.expected_outputs else []
+            elif first_tc.expected_output_stream:
+                if isinstance(first_tc.expected_output_stream, dict):
+                    # Get values from the dict
+                    d["outputs"] = list(first_tc.expected_output_stream.values()) if first_tc.expected_output_stream else []
+                elif isinstance(first_tc.expected_output_stream, (str, int)):
+                    d["outputs"] = [str(first_tc.expected_output_stream)]
+                else:
+                    d["outputs"] = [str(first_tc.expected_output_stream)]
         
         # Add available arsenal pieces if arsenal service is available
         if self.arsenal_service:
             try:
-                allowed_gates = set(p.default_gate_set) if p.default_gate_set else set()
-                allowed_gates_str = {g.value for g in allowed_gates}
+                allowed_gates = {g.value for g in p.default_gate_set}
                 # Note: get_available_pieces_for_puzzle expects session_token
                 # But we already have user_id, so we use it directly
-                pieces = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates_str)
+                pieces = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates)
                 d["specialComponents"] = pieces
             except Exception:
                 # If arsenal service fails, just don't include pieces
@@ -280,6 +419,7 @@ class PuzzleService:
         except sqlite3.IntegrityError:
             raise ValidationError("Puzzle name already exists. Please choose a unique name.")
         self.repo.conn.commit()
+        
         return self._enrich_puzzle(created.to_dict())
 
     def publish(self, session_token: str, puzzle_id: int) -> dict:
@@ -381,6 +521,9 @@ class PuzzleService:
         self.repo.track_user_deletion(puzzle_name)
         self.repo.conn.commit()
         
+        # Delete riddle files from riddles directory
+        self._delete_riddle_files(puzzle_name)
+        
         if not deleted:
             raise ValidationError("Failed to delete puzzle")
         return {"success": True, "message": "Puzzle deleted successfully"}
@@ -437,6 +580,18 @@ class PuzzleService:
                 )
             set_clauses.append("instructions = ?")
             params.append(instructions)
+
+        if "creator_comment" in payload:
+            creator_comment = payload.get("creator_comment")
+            # Allow None to clear the comment
+            if creator_comment is not None and isinstance(creator_comment, str):
+                creator_comment = creator_comment.strip() or None
+                if creator_comment and len(creator_comment) > settings.PUZZLE_CREATOR_COMMENT_MAX_LENGTH:
+                    raise ValidationError(
+                        f"Creator comment must be at most {settings.PUZZLE_CREATOR_COMMENT_MAX_LENGTH} characters."
+                    )
+            set_clauses.append("creator_comment = ?")
+            params.append(creator_comment)
 
         if set_clauses:
             params.append(int(puzzle_id))
