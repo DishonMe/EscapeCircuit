@@ -101,6 +101,7 @@ class PuzzleService:
             description=payload.get("description", "") or "",
             status=PuzzleStatus.DRAFT,
             budget=int(payload.get("budget", 0)),
+            creator_budget=int(payload["creator_budget"]) if payload.get("creator_budget") is not None else None,
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
         )

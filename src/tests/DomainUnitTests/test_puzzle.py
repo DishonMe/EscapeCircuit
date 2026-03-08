@@ -66,6 +66,30 @@ class TestPuzzleCreation:
             Puzzle(id=1, name="Test", creator_user_id=1, budget=-10)
         assert "Puzzle.budget cannot be negative" in str(exc_info.value)
 
+    def test_create_puzzle_with_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=50)
+        assert puzzle.budget == 100
+        assert puzzle.creator_budget == 50
+
+    def test_create_puzzle_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100)
+        assert puzzle.creator_budget is None
+
+    def test_create_puzzle_budget_not_greater_than_creator_budget(self):
+        with pytest.raises(ValidationError) as exc_info:
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=50, creator_budget=50)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
+
+    def test_create_puzzle_budget_less_than_creator_budget(self):
+        with pytest.raises(ValidationError) as exc_info:
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=40, creator_budget=50)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
+
+    def test_create_puzzle_negative_creator_budget(self):
+        with pytest.raises(ValidationError) as exc_info:
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=-5)
+        assert "Puzzle.creator_budget cannot be negative" in str(exc_info.value)
+
     def test_create_puzzle_invalid_time_limit(self):
         with pytest.raises(ValidationError) as exc_info:
             Puzzle(id=1, name="Test", creator_user_id=1, time_limit_seconds=0)
@@ -189,6 +213,7 @@ class TestPuzzleSerialization:
         assert d["description"] == "Desc"
         assert d["status"] == "published"
         assert d["budget"] == 100
+        assert d["creatorBudget"] is None
         assert d["timeLimit"] == 300
         assert d["rating_count"] == 5
         assert d["createdAt"] == int(now.timestamp() * 1000)
@@ -241,6 +266,7 @@ class TestPuzzleSerialization:
             description="Detailed description",
             status=PuzzleStatus.PUBLISHED,
             budget=250,
+            creator_budget=100,
             time_limit_seconds=600,
             default_gate_set={GateType.AND, GateType.OR, GateType.NOT},
             rating_count=15,
@@ -254,8 +280,50 @@ class TestPuzzleSerialization:
         assert restored.name == original.name
         assert restored.creator_user_id == original.creator_user_id
         assert restored.budget == original.budget
+        assert restored.creator_budget == original.creator_budget
         assert restored.status == original.status
         assert restored.rating_count == original.rating_count
+
+    def test_to_dict_with_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=200, creator_budget=80)
+        d = puzzle.to_dict()
+        assert d["creator_budget"] == 80
+        assert d["creatorBudget"] == 80
+
+    def test_to_dict_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=200)
+        d = puzzle.to_dict()
+        assert d["creator_budget"] is None
+        assert d["creatorBudget"] is None
+
+    def test_from_dict_with_creator_budget(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        d = {
+            "id": 1,
+            "name": "Test",
+            "creator_user_id": 1,
+            "budget": 200,
+            "creator_budget": 80,
+            "created_at": now.isoformat()
+        }
+        puzzle = Puzzle.from_dict(d)
+        assert puzzle.budget == 200
+        assert puzzle.creator_budget == 80
+
+    def test_from_dict_without_creator_budget(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        d = {
+            "id": 1,
+            "name": "Test",
+            "creator_user_id": 1,
+            "budget": 200,
+            "created_at": now.isoformat()
+        }
+        puzzle = Puzzle.from_dict(d)
+        assert puzzle.budget == 200
+        assert puzzle.creator_budget is None
 
 class TestPuzzleBranches:
     """Test missing branches in Puzzle.py"""
@@ -339,7 +407,15 @@ class TestPuzzleGetters:
     def test_get_budget(self):
         puzzle = Puzzle(id=1, name="test", creator_user_id=1, budget=500)
         assert puzzle.get_budget() == 500
-    
+
+    def test_get_creator_budget(self):
+        puzzle = Puzzle(id=1, name="test", creator_user_id=1, budget=500, creator_budget=200)
+        assert puzzle.get_creator_budget() == 200
+
+    def test_get_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="test", creator_user_id=1, budget=500)
+        assert puzzle.get_creator_budget() is None
+
     def test_get_time_limit_seconds(self):
         puzzle = Puzzle(id=1, name="test", creator_user_id=1, time_limit_seconds=300)
         assert puzzle.get_time_limit_seconds() == 300
@@ -432,6 +508,21 @@ class TestPuzzleSetters:
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         with pytest.raises(ValidationError):
             puzzle.set_budget(-10)
+
+    def test_set_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250)
+        puzzle.set_creator_budget(100)
+        assert puzzle.creator_budget == 100
+
+    def test_set_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250, creator_budget=100)
+        puzzle.set_creator_budget(None)
+        assert puzzle.creator_budget is None
+
+    def test_set_creator_budget_negative(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250)
+        with pytest.raises(ValidationError):
+            puzzle.set_creator_budget(-10)
 
     def test_set_time_limit_seconds(self):
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1)

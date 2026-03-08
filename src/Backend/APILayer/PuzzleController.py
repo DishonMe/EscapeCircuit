@@ -13,6 +13,8 @@ class CreatePuzzleReq(BaseModel):
     title: str = "" # also accept title directly
     description: str = ""
     budget: int = 0
+    creator_budget: Optional[int] = None
+    creatorBudget: Optional[int] = None # alias
     time_limit_seconds: Optional[int] = None
     timeLimit: Optional[int] = None # alias
     default_gate_set: list[str] = []
@@ -22,6 +24,7 @@ class CreatePuzzleReq(BaseModel):
             "name": self.title if self.title else self.name,
             "description": self.description,
             "budget": self.budget,
+            "creator_budget": self.creatorBudget if self.creatorBudget is not None else self.creator_budget,
             "time_limit_seconds": self.timeLimit if self.timeLimit is not None else self.time_limit_seconds,
             "default_gate_set": self.default_gate_set
         }

@@ -55,8 +55,8 @@ export const PuzzleDetailsDialog = ({
                 {puzzle.budgetLimit}
               </div>
               <div>
-                <span className="font-medium text-gray-900">Tight budget:</span>{' '}
-                {puzzle.tightBudgetLimit ?? '—'}
+                <span className="font-medium text-gray-900">Creator Budget:</span>{' '}
+                {puzzle.creatorBudget ?? '—'}
               </div>
             </div>
 
