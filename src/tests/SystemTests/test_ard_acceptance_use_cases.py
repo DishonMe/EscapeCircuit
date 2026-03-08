@@ -112,6 +112,7 @@ class _CopyGuard:
         self.calls += 1
         raise AssertionError("copy2 should not be called on validation failure")
 
+##ARD-ADDED-TESTS
 
 class TestUseCase1BrowseAndSearchPuzzles:
     # UC1-AT1 - Successful Search
