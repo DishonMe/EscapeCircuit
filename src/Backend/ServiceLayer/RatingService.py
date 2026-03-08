@@ -213,6 +213,19 @@ class RatingService:
 
         ratings = self.rating_repo.list_by_puzzle(int(puzzle_id))
         count = len(ratings)
+        
+        # Calculate rating distribution (count of each star level for each rating type)
+        difficulty_dist = [0] * 6  # indices 0-5, we use 1-5
+        fun_dist = [0] * 6
+        clearness_dist = [0] * 6
+        
+        for r in ratings:
+            if 1 <= r.difficulty <= 5:
+                difficulty_dist[int(r.difficulty)] += 1
+            if 1 <= r.fun <= 5:
+                fun_dist[int(r.fun)] += 1
+            if 1 <= r.clearness <= 5:
+                clearness_dist[int(r.clearness)] += 1
 
         # Creator difficulty mapping
         creator_diff_str = puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty)
@@ -267,6 +280,11 @@ class RatingService:
             "weighted_difficulty": round(weighted_difficulty, 1),
             "avg_fun": round(avg_fun, 2) if avg_fun is not None else None,
             "avg_clearness": round(avg_clearness, 2) if avg_clearness is not None else None,
+            "rating_distribution": {
+                "difficulty": difficulty_dist[1:],  # Only indices 1-5
+                "fun": fun_dist[1:],
+                "clearness": clearness_dist[1:]
+            },
             "experienced_metrics": experienced_metrics,
             # Backward-compatible alias retained for existing clients.
             "experienced": {

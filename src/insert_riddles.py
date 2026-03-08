@@ -172,7 +172,7 @@ def get_or_create_admin(conn):
     conn.commit()
     return c.lastrowid
 
-def insert_riddle(conn, config_path, instructions_path, creator_id):
+def insert_riddle(conn, config_path, instructions_path, creator_id, status='published'):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
     
@@ -247,7 +247,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id):
             creator_id,
             description,
             instructions_text,
-            'published',
+            status,
             puzzle_data.get('budget', 0),
             puzzle_data.get('time_limit_seconds'),
             difficulty,

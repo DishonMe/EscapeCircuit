@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Filter,
   X,
+  Bookmark,
+  Trophy,
 } from 'lucide-react';
 import { useMemo, useState, ChangeEvent, useEffect } from 'react';
 
@@ -30,8 +32,11 @@ import type { Puzzle } from '@/types/api';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 
 import { usePuzzles, PuzzleFilters } from '../api/get-puzzles';
+import { useToggleSavePuzzle } from '../api/save-puzzle';
 import { CreatorCommentDialog } from './creator-comment-dialog';
 import { PuzzleDetailsDialog } from './puzzle-details-dialog';
+import { PuzzleLeaderboard } from './puzzle-leaderboard';
+import { cn } from '@/utils/cn';
 
 function useDebouncedValue<T>(value: T, delay: number = 400): T {
   const [debounced, setDebounced] = useState(value);
@@ -47,6 +52,7 @@ function useDebouncedValue<T>(value: T, delay: number = 400): T {
 export const PuzzlesList = () => {
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
+  const [leaderboardPuzzleId, setLeaderboardPuzzleId] = useState<string | null>(null);
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1 });
@@ -116,6 +122,11 @@ export const PuzzlesList = () => {
     if (!commentPuzzleId || !puzzles) return undefined;
     return puzzles.find((p) => p.id === commentPuzzleId);
   }, [commentPuzzleId, puzzles]);
+
+  const selectedLeaderboardPuzzle: Puzzle | undefined = useMemo(() => {
+    if (!leaderboardPuzzleId || !puzzles) return undefined;
+    return puzzles.find((p) => p.id === leaderboardPuzzleId);
+  }, [leaderboardPuzzleId, puzzles]);
 
   const isEmpty = !filteredPuzzles || filteredPuzzles.length === 0;
 
@@ -388,7 +399,13 @@ export const PuzzlesList = () => {
       {!puzzlesQuery.isLoading && !isEmpty && (
         <div className="relative">
           <div className={`grid grid-cols-1 gap-6 transition-opacity md:grid-cols-2 lg:grid-cols-3 ${isRefetching ? 'opacity-50' : 'opacity-100'}`}>
-          {filteredPuzzles!.map((puzzle) => (
+          {filteredPuzzles!.map((puzzle) => {
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const saveMutation = useToggleSavePuzzle({
+              puzzleId: puzzle.id,
+            });
+
+            return (
             <div
               key={puzzle.id}
               className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
@@ -412,6 +429,11 @@ export const PuzzlesList = () => {
                   by{' '}
                   {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
                 </p>
+                {puzzle.description && (
+                  <p className="mt-2 text-[13px] text-muted-foreground line-clamp-2">
+                    {puzzle.description}
+                  </p>
+                )}
               </div>
               {puzzle.is_solved ? (
                 <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-[11px] font-medium">
@@ -448,33 +470,61 @@ export const PuzzlesList = () => {
               />
             </div>
 
-            {/* Difficulty, plays, and details */}
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
-                  puzzle.difficulty,
-                )}`}
-              >
-                {puzzle.difficulty.charAt(0) +
-                  puzzle.difficulty.slice(1).toLowerCase()}
-              </span>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Users className="size-3.5" />
-                <span className="text-[13px]">
-                  {puzzle.solvedCount || 0} solved
+            {/* Difficulty, plays, and save button row */}
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
+                    puzzle.difficulty,
+                  )}`}
+                >
+                  {puzzle.difficulty.charAt(0) +
+                    puzzle.difficulty.slice(1).toLowerCase()}
                 </span>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Users className="size-3.5" />
+                  <span className="text-[13px]">
+                    {puzzle.solvedCount || 0} solved
+                  </span>
+                </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-auto w-full shadow-none ring-0 text-[13px] sm:w-40"
-                onClick={() => setDetailsPuzzleId(puzzle.id)}
+                className={cn(
+                  'text-[13px] flex items-center gap-2',
+                  puzzle.is_saved && 'border-yellow-200/60 bg-yellow-50/50'
+                )}
+                onClick={() => saveMutation.mutate({ puzzleId: puzzle.id })}
+                isLoading={saveMutation.isPending}
               >
-                <Info className="mr-2 size-4" /> Puzzle details
+                {puzzle.is_saved ? '⭐' : '🔖'} {puzzle.is_saved ? 'Saved' : 'Save'}
               </Button>
             </div>
 
-            {/* Rating and creator comment */}
+            {/* Instructions and Comment buttons row */}
+            <div className={`mb-3 flex flex-wrap items-center ${puzzle.creatorComment ? 'gap-6' : 'justify-center'}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`text-[13px] flex items-center ${puzzle.creatorComment ? 'flex-1' : ''}`}
+                onClick={() => setDetailsPuzzleId(puzzle.id)}
+              >
+                📋 Instructions
+              </Button>
+              {puzzle.creatorComment && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-[13px] flex items-center gap-2 flex-1 shadow-none ring-0 whitespace-nowrap"
+                  onClick={() => setCommentPuzzleId(puzzle.id)}
+                >
+                  💬 Comment
+                </Button>
+              )}
+            </div>
+
+            {/* Rating and leaderboard */}
             <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3">
               {/* Already Rated Badge */}
               {puzzle.user_rating && (
@@ -596,18 +646,14 @@ export const PuzzlesList = () => {
                 </div>
               </button>
 
-              <div className="ml-auto">
+              <div className="w-full flex justify-center">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex items-center w-full text-[13px] sm:w-40"
-                  disabled={!puzzle.creatorComment}
-                  onClick={() => {
-                    if (puzzle.creatorComment) setCommentPuzzleId(puzzle.id);
-                  }}
+                  className="flex items-center gap-2 text-[13px] sm:w-40 whitespace-nowrap"
+                  onClick={() => setLeaderboardPuzzleId(puzzle.id)}
                 >
-                  <MessageSquare className="mr-2 size-4" />
-                  {puzzle.creatorComment ? 'Creator comment' : 'No creator comment'}
+                  🏆 Leaderboard
                 </Button>
               </div>
             </div>
@@ -622,7 +668,8 @@ export const PuzzlesList = () => {
               </Link>
             </div>
             </div>
-          ))}
+          );
+          })}
           </div>
         </div>
       )}
@@ -644,6 +691,32 @@ export const PuzzlesList = () => {
         }}
         showLink={true}
       />
+
+      {leaderboardPuzzleId && selectedLeaderboardPuzzle && (
+        <Dialog open={true} onOpenChange={(open) => {
+          if (!open) setLeaderboardPuzzleId(null);
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="size-5 text-amber-500" />
+                Leaderboard
+              </DialogTitle>
+              <DialogDescription>
+                Top solvers for this puzzle
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <PuzzleLeaderboard puzzleId={selectedLeaderboardPuzzle.id} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLeaderboardPuzzleId(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {ratingPuzzleId && (
         <RatingDialog

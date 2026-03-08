@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Trash2, Edit2 } from 'lucide-react';
+import { Trash2, MessageSquare } from 'lucide-react';
 
 import { useUser } from '@/lib/auth';
 import { useMyPuzzles } from '@/features/puzzles/api/get-my-puzzles';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
+import { PuzzleViewDialog } from './puzzle-view-dialog';
 
 const PUZZLE_MAX_PUBLISHED_PER_USER = 10;
 
@@ -28,11 +29,10 @@ export const MyPuzzles = () => {
   const user = useUser();
   const [page, setPage] = useState(1);
   const [showPublished, setShowPublished] = useState(true);
-  const [editingPuzzle, setEditingPuzzle] = useState<Puzzle | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editInstructions, setEditInstructions] = useState('');
+  const [commentingPuzzle, setCommentingPuzzle] = useState<Puzzle | null>(null);
+  const [creatorComment, setCreatorComment] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [viewingPuzzle, setViewingPuzzle] = useState<Puzzle | null>(null);
 
   const userId = user.data?.id;
   
@@ -64,25 +64,34 @@ export const MyPuzzles = () => {
 
   const isEmpty = !isLoading && filteredPuzzles.length === 0;
 
-  const openEditDialog = (puzzle: Puzzle) => {
-    setEditingPuzzle(puzzle);
-    setEditName(puzzle.title || puzzle.name || '');
-    setEditDescription(puzzle.description || '');
-    setEditInstructions(puzzle.instructions || '');
+  const openCommentDialog = (puzzle: Puzzle) => {
+    setCommentingPuzzle(puzzle);
+    setCreatorComment(puzzle.creatorComment || '');
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingPuzzle) return;
+  const handleSaveComment = async () => {
+    if (!commentingPuzzle) return;
     try {
       await updateMutation.mutateAsync({
-        puzzleId: editingPuzzle.id,
-        name: editName,
-        description: editDescription,
-        instructions: editInstructions,
+        puzzleId: commentingPuzzle.id,
+        creator_comment: creatorComment.trim() || null,
       });
-      setEditingPuzzle(null);
+      setCommentingPuzzle(null);
     } catch (error) {
-      console.error('Failed to update puzzle:', error);
+      console.error('Failed to update creator comment:', error);
+    }
+  };
+
+  const handleDeleteComment = async () => {
+    if (!commentingPuzzle) return;
+    try {
+      await updateMutation.mutateAsync({
+        puzzleId: commentingPuzzle.id,
+        creator_comment: null,
+      });
+      setCommentingPuzzle(null);
+    } catch (error) {
+      console.error('Failed to delete creator comment:', error);
     }
   };
 
@@ -145,12 +154,6 @@ export const MyPuzzles = () => {
               Upload Puzzle Files
             </Link>
           )}
-          <Link
-            href={paths.app.puzzles.getHref()}
-            className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
-          >
-            Browse All Puzzles
-          </Link>
         </div>
 
         {/* Published/Unpublished Toggle */}
@@ -276,18 +279,18 @@ export const MyPuzzles = () => {
                   {/* Action Buttons */}
                   <div className="flex flex-col gap-2">
                     <div className="flex gap-2">
-                      <Link
-                        href={paths.app.puzzle.getHref(String(puzzle.id))}
+                      <button
+                        onClick={() => setViewingPuzzle(puzzle)}
                         className="flex-1 rounded-lg bg-foreground px-3 py-2 text-center text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
                       >
                         View
-                      </Link>
+                      </button>
                       <button
-                        onClick={() => openEditDialog(puzzle)}
+                        onClick={() => openCommentDialog(puzzle)}
                         className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-center text-[13px] font-medium text-foreground hover:bg-secondary transition-colors flex items-center justify-center gap-1"
                       >
-                        <Edit2 className="size-4" />
-                        Edit
+                        <MessageSquare className="size-4" />
+                        Comment
                       </button>
                     </div>
                     
@@ -324,63 +327,56 @@ export const MyPuzzles = () => {
           </div>
         )}
 
-        {/* Edit Dialog */}
-        {editingPuzzle && (
-          <Dialog open={Boolean(editingPuzzle)} onOpenChange={(open) => {
-            if (!open) setEditingPuzzle(null);
+        {/* Creator Comment Dialog */}
+        {commentingPuzzle && (
+          <Dialog open={Boolean(commentingPuzzle)} onOpenChange={(open) => {
+            if (!open) setCommentingPuzzle(null);
           }}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Edit Puzzle</DialogTitle>
+                <DialogTitle>Creator Comment</DialogTitle>
                 <DialogDescription>
-                  Update your puzzle's name, description, and instructions
+                  Leave a message for solvers (e.g., note about corrections or clarifications)
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[13px] font-medium text-foreground">Puzzle Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder="Enter puzzle name"
-                  />
-                </div>
-                <div>
-                  <label className="text-[13px] font-medium text-foreground">Description</label>
+                  <label className="text-[13px] font-medium text-foreground">Your Comment</label>
                   <textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
+                    value={creatorComment}
+                    onChange={(e) => setCreatorComment(e.target.value)}
                     className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder="Enter puzzle description"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="text-[13px] font-medium text-foreground">Instructions</label>
-                  <textarea
-                    value={editInstructions}
-                    onChange={(e) => setEditInstructions(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder="Enter puzzle instructions (supports Markdown and LaTeX)"
+                    placeholder="Enter a message for people solving this puzzle..."
                     rows={4}
                   />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    • Only one comment allowed per puzzle
+                    • Use this to note corrections or provide important clarifications
+                  </p>
                 </div>
               </div>
               <DialogFooter>
                 <button
-                  onClick={() => setEditingPuzzle(null)}
+                  onClick={() => setCommentingPuzzle(null)}
                   className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
                 >
                   Cancel
                 </button>
+                {commentingPuzzle?.creatorComment && (
+                  <button
+                    onClick={handleDeleteComment}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? 'Deleting...' : 'Delete'}
+                  </button>
+                )}
                 <button
-                  onClick={handleSaveEdit}
+                  onClick={handleSaveComment}
                   disabled={updateMutation.isPending}
                   className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
                 >
-                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  {updateMutation.isPending ? 'Saving...' : 'Save'}
                 </button>
               </DialogFooter>
             </DialogContent>
@@ -402,7 +398,7 @@ export const MyPuzzles = () => {
               <DialogFooter>
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+                  className="rounded-lg border border-border px-4 py-2 text[13px] font-medium text-foreground hover:bg-secondary transition-colors"
                 >
                   Cancel
                 </button>
@@ -417,6 +413,15 @@ export const MyPuzzles = () => {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Puzzle View Dialog */}
+        <PuzzleViewDialog
+          puzzle={viewingPuzzle}
+          open={Boolean(viewingPuzzle)}
+          onOpenChange={(open) => {
+            if (!open) setViewingPuzzle(null);
+          }}
+        />
       </div>
     </div>
   );

@@ -900,13 +900,17 @@ export default function CreatePuzzleForm() {
         throw new Error(errorMessage);
       }
 
+      const navigate = async () => {
+        setIsSubmitting(false);
+        await queryClient.invalidateQueries({ queryKey: ["puzzles"] });
+        router.push("/app/puzzles");
+      };
+      
       setShowConfirm(null);
       alert("Puzzle created successfully!");
-      await queryClient.invalidateQueries({ queryKey: ["puzzles"] });
-      router.push("/app/puzzles");
+      navigate();
     } catch (err: any) {
       alert("Error: " + (err.message || "Failed to create puzzle"));
-    } finally {
       setIsSubmitting(false);
     }
   };

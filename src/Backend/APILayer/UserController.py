@@ -29,6 +29,10 @@ class GoogleCompleteRegistrationReq(BaseModel):
     password: str
 
 
+class UpdateBioReq(BaseModel):
+    bio: str = ""
+
+
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
@@ -217,5 +221,16 @@ def build_user_router(user_service: UserService, notification_service: Notificat
             return notification_service.mark_all_read(token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
+
+    @router.patch("/me")
+    def update_user(req: UpdateBioReq, token: str = Depends(verify_token)):
+        try:
+            user_id = user_service.auth.require_user_id(token)
+            result = user_service.update_user_bio(user_id, req.bio)
+            return result
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router
