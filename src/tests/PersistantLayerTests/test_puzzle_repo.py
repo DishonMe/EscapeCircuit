@@ -216,3 +216,38 @@ def test_testcase_cascade_delete(conn, repo):
     # delete puzzle row -> ON DELETE CASCADE
     conn.execute("DELETE FROM puzzles WHERE id=?", (p.id,))
     assert repo.list_test_cases(p.id) == []
+
+
+# ---------- count_by_creator_and_status ----------
+
+def test_count_by_creator_and_status_empty(repo):
+    assert repo.count_by_creator_and_status(42, PuzzleStatus.DRAFT) == 0
+    assert repo.count_by_creator_and_status(42, PuzzleStatus.PUBLISHED) == 0
+    assert repo.count_by_creator_and_status(42, PuzzleStatus.UNPUBLISHED) == 0
+
+
+def test_count_by_creator_and_status_counts_correctly(repo):
+    # Creator 1 has 2 drafts, 1 published, 0 unpublished
+    repo.create(make_puzzle("Draft1", creator_user_id=1, status=PuzzleStatus.DRAFT))
+    repo.create(make_puzzle("Draft2", creator_user_id=1, status=PuzzleStatus.DRAFT))
+    repo.create(make_puzzle("Pub1", creator_user_id=1, status=PuzzleStatus.PUBLISHED))
+
+    # Creator 2 has 1 draft, 1 published
+    repo.create(make_puzzle("Other1", creator_user_id=2, status=PuzzleStatus.DRAFT))
+    repo.create(make_puzzle("Other2", creator_user_id=2, status=PuzzleStatus.PUBLISHED))
+
+    assert repo.count_by_creator_and_status(1, PuzzleStatus.DRAFT) == 2
+    assert repo.count_by_creator_and_status(1, PuzzleStatus.PUBLISHED) == 1
+    assert repo.count_by_creator_and_status(1, PuzzleStatus.UNPUBLISHED) == 0
+
+    assert repo.count_by_creator_and_status(2, PuzzleStatus.DRAFT) == 1
+    assert repo.count_by_creator_and_status(2, PuzzleStatus.PUBLISHED) == 1
+
+
+def test_count_by_creator_and_status_unpublished(repo):
+    p = repo.create(make_puzzle("ToUnpublish", creator_user_id=1, status=PuzzleStatus.PUBLISHED))
+    p.unpublish()
+    repo.update(p)
+
+    assert repo.count_by_creator_and_status(1, PuzzleStatus.UNPUBLISHED) == 1
+    assert repo.count_by_creator_and_status(1, PuzzleStatus.PUBLISHED) == 0

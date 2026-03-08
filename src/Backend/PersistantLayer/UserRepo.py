@@ -26,9 +26,17 @@ class UserRepo:
             xp INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             pw_salt BLOB,
-            pw_hash BLOB
+            pw_hash BLOB,
+            puzzle_limit_published INTEGER DEFAULT NULL,
+            puzzle_limit_unpublished INTEGER DEFAULT NULL
         );
         """)
+        # Migration: add columns to existing databases that pre-date these fields
+        for col in ("puzzle_limit_published", "puzzle_limit_unpublished"):
+            try:
+                self.conn.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT NULL")
+            except Exception:
+                pass  # Column already exists
 
     @staticmethod
     def _hash_password(password: str, salt: bytes) -> bytes:
@@ -58,6 +66,8 @@ class UserRepo:
             "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
+            "puzzle_limit_published": row["puzzle_limit_published"],
+            "puzzle_limit_unpublished": row["puzzle_limit_unpublished"],
         }) if row else None
 
     def get_by_username(self, username: str) -> Optional[User]:
@@ -70,6 +80,8 @@ class UserRepo:
             "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
+            "puzzle_limit_published": row["puzzle_limit_published"],
+            "puzzle_limit_unpublished": row["puzzle_limit_unpublished"],
         }) if row else None
 
     def verify_login(self, username: str, password: str) -> Optional[User]:
@@ -87,6 +99,8 @@ class UserRepo:
             "bio": row["bio"],
             "xp": int(row["xp"]),
             "created_at": row["created_at"],
+            "puzzle_limit_published": row["puzzle_limit_published"],
+            "puzzle_limit_unpublished": row["puzzle_limit_unpublished"],
         })
 
     def update_xp(self, user_id: int, xp: int) -> None:
@@ -96,6 +110,24 @@ class UserRepo:
 
     def update_role(self, user_id: int, role: UserRole) -> None:
         self.conn.execute("UPDATE users SET role=? WHERE id=?", (role.value, int(user_id)))
+
+    def update_puzzle_limits(
+        self, user_id: int,
+        max_published: Optional[int],
+        max_unpublished: Optional[int],
+    ) -> None:
+        """Set admin-configurable puzzle capacity overrides for a user.
+
+        Pass ``None`` to reset a limit back to the level-based default.
+        """
+        self.conn.execute(
+            "UPDATE users SET puzzle_limit_published=?, puzzle_limit_unpublished=? WHERE id=?",
+            (
+                int(max_published) if max_published is not None else None,
+                int(max_unpublished) if max_unpublished is not None else None,
+                int(user_id),
+            ),
+        )
 
     def list_all(self, limit: int = 200, offset: int = 0) -> List[User]:
         rows = self.conn.execute(
@@ -111,6 +143,8 @@ class UserRepo:
                 "bio": r["bio"],
                 "xp": int(r["xp"]),
                 "created_at": r["created_at"],
+                "puzzle_limit_published": r["puzzle_limit_published"],
+                "puzzle_limit_unpublished": r["puzzle_limit_unpublished"],
             })
             for r in rows
         ]

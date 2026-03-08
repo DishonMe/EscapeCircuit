@@ -89,7 +89,8 @@ def create_app() -> FastAPI:
         puzzle_repo,
         user_repo,
         auth_service,
-        solve_repo
+        solve_repo,
+        xp_service
     )
 
     # Rating Service

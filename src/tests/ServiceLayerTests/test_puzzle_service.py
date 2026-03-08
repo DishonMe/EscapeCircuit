@@ -139,6 +139,8 @@ class TestPuzzleServiceCreatePuzzle:
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+        # Default: user has no existing puzzles (well within any limit)
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 0
 
     def test_create_puzzle_success(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -242,6 +244,8 @@ class TestPuzzleServicePublish:
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+        # Default: user has no existing published puzzles (well within any limit)
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 0
 
     def test_publish_success_by_creator(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -329,6 +333,8 @@ class TestPuzzleServiceAddTestCase:
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+        # Default: user has no existing unpublished puzzles (well within any limit)
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 0
 
     def test_add_test_case_success(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -517,3 +523,166 @@ class TestPuzzleServiceBranches:
             result = self.service.add_test_case("valid_token", 1, payload)
 
         assert result["puzzle_id"] == 1
+
+class TestPuzzleServicePuzzleLimitEnforcement:
+    """Tests that puzzle creation/publishing is blocked when limits are exceeded."""
+
+    def _make_service(self):
+        from unittest.mock import Mock
+        from Backend.ServiceLayer.XPService import XPService
+        mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        mock_user_repo = Mock(spec=UserRepo)
+        mock_auth = Mock(spec=AuthService)
+        mock_xp = Mock(spec=XPService)
+        service = PuzzleService(mock_puzzle_repo, mock_user_repo, mock_auth, xp_service=mock_xp)
+        return service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp
+
+    # --- create_puzzle: unpublished limit ---
+
+    def test_create_puzzle_blocked_at_unpublished_limit(self):
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        mock_user_repo.get_by_id.return_value = creator
+
+        # Effective unpublished limit = 5, and user already has 3 drafts + 2 unpublished = 5
+        mock_xp.get_puzzle_published_limit.return_value = 5
+        mock_xp.get_puzzle_unpublished_limit.return_value = 5
+        mock_puzzle_repo.count_by_creator_and_status.side_effect = lambda uid, status: \
+            3 if status == PuzzleStatus.DRAFT else 2
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.create_puzzle("token", {"name": "New"})
+        assert "unpublished puzzle limit reached" in str(exc_info.value)
+
+    def test_create_puzzle_allowed_below_unpublished_limit(self):
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        mock_user_repo.get_by_id.return_value = creator
+
+        mock_xp.get_puzzle_published_limit.return_value = 5
+        mock_xp.get_puzzle_unpublished_limit.return_value = 5
+        # user has 2 drafts + 2 unpublished = 4, limit is 5 → allowed
+        mock_puzzle_repo.count_by_creator_and_status.side_effect = lambda uid, status: \
+            2 if status == PuzzleStatus.DRAFT else 2
+
+        created = Puzzle(id=99, name="New", creator_user_id=1)
+        mock_puzzle_repo.create.return_value = created
+
+        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_cls:
+            mock_inst = Mock(spec=Puzzle)
+            mock_inst.to_dict.return_value = created.to_dict()
+            mock_cls.return_value = mock_inst
+            result = service.create_puzzle("token", {"name": "New", "default_gate_set": []})
+
+        assert result["id"] == str(created.id)
+
+    def test_create_puzzle_admin_bypasses_unpublished_limit(self):
+        """Admin users are never subject to puzzle creation limits."""
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        admin = User(id=1, username="admin", role=UserRole.ADMIN)
+        mock_user_repo.get_by_id.return_value = admin
+
+        created = Puzzle(id=99, name="New", creator_user_id=1)
+        mock_puzzle_repo.create.return_value = created
+
+        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_cls:
+            mock_inst = Mock(spec=Puzzle)
+            mock_inst.to_dict.return_value = created.to_dict()
+            mock_cls.return_value = mock_inst
+            result = service.create_puzzle("token", {"name": "New", "default_gate_set": []})
+
+        assert result["id"] == str(created.id)
+        mock_puzzle_repo.count_by_creator_and_status.assert_not_called()
+
+    # --- publish: published limit ---
+
+    def test_publish_blocked_at_published_limit(self):
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        mock_user_repo.get_by_id.return_value = creator
+
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+        mock_puzzle_repo.list_test_cases.return_value = [Mock()]  # has test cases
+
+        mock_xp.get_puzzle_published_limit.return_value = 5
+        mock_xp.get_puzzle_unpublished_limit.return_value = 5
+        # Already at the limit
+        mock_puzzle_repo.count_by_creator_and_status.return_value = 5
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.publish("token", 1)
+        assert "published puzzle limit reached" in str(exc_info.value)
+
+    def test_publish_admin_bypasses_published_limit(self):
+        """Admin publishing is never blocked by capacity limits."""
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        admin = User(id=1, username="admin", role=UserRole.ADMIN)
+        mock_user_repo.get_by_id.return_value = admin
+
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+        mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+
+        result = service.publish("token", 1)
+        assert result["status"] == PuzzleStatus.PUBLISHED.value
+        mock_puzzle_repo.count_by_creator_and_status.assert_not_called()
+
+    # --- add_test_case: edit blocked when over unpublished limit ---
+
+    def test_add_test_case_blocked_when_over_unpublished_limit(self):
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        mock_user_repo.get_by_id.return_value = creator
+
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        mock_xp.get_puzzle_published_limit.return_value = 5
+        mock_xp.get_puzzle_unpublished_limit.return_value = 5
+        # User is OVER the limit (admin reduced it)
+        mock_puzzle_repo.count_by_creator_and_status.side_effect = lambda uid, status: \
+            4 if status == PuzzleStatus.DRAFT else 3  # 7 total > limit of 5
+
+        payload = {"kind": "blackbox", "inputs": {"A": 1}, "expected_outputs": {"Q": 1}}
+        with pytest.raises(ValidationError) as exc_info:
+            service.add_test_case("token", 1, payload)
+        assert "unpublished puzzle limit exceeded" in str(exc_info.value)
+
+    def test_add_test_case_allowed_at_or_below_limit(self):
+        service, mock_puzzle_repo, mock_user_repo, mock_auth, mock_xp = self._make_service()
+
+        mock_auth.require_user_id.return_value = 1
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        mock_user_repo.get_by_id.return_value = creator
+
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        mock_xp.get_puzzle_published_limit.return_value = 5
+        mock_xp.get_puzzle_unpublished_limit.return_value = 5
+        # Exactly at limit (not over) → should still be allowed to edit
+        mock_puzzle_repo.count_by_creator_and_status.side_effect = lambda uid, status: \
+            3 if status == PuzzleStatus.DRAFT else 2  # 5 total == limit of 5
+
+        saved_tc = Mock(spec=PuzzleTestCase)
+        saved_tc.to_dict.return_value = {"id": 1, "puzzle_id": 1, "kind": "blackbox",
+                                         "inputs": {}, "expected_outputs": {}}
+        mock_puzzle_repo.add_test_case.return_value = saved_tc
+
+        payload = {"kind": "blackbox", "inputs": {"A": 1}, "expected_outputs": {"Q": 1}}
+        with patch('Backend.DomainLayer.PuzzleTestCase.PuzzleTestCase'):
+            result = service.add_test_case("token", 1, payload)
+        assert result["id"] == 1

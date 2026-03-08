@@ -138,3 +138,46 @@ def test_list_all_order_and_pagination(repo):
     assert len(page) == 2
     assert page[0].id == all_users[1].id
     assert page[1].id == all_users[2].id
+
+
+# ---------- puzzle limit columns ----------
+
+def test_puzzle_limits_default_to_none(repo):
+    u = make_user("creator1", role=UserRole.CREATOR)
+    created = repo.create(u, password="pw")
+    fetched = repo.get_by_id(created.id)
+    assert fetched.puzzle_limit_published is None
+    assert fetched.puzzle_limit_unpublished is None
+
+
+def test_update_puzzle_limits_sets_values(repo):
+    u = make_user("creator2", role=UserRole.CREATOR)
+    created = repo.create(u, password="pw")
+
+    repo.update_puzzle_limits(created.id, max_published=10, max_unpublished=8)
+    fetched = repo.get_by_id(created.id)
+    assert fetched.puzzle_limit_published == 10
+    assert fetched.puzzle_limit_unpublished == 8
+
+
+def test_update_puzzle_limits_reset_to_none(repo):
+    u = make_user("creator3", role=UserRole.CREATOR)
+    created = repo.create(u, password="pw")
+
+    repo.update_puzzle_limits(created.id, max_published=7, max_unpublished=7)
+    repo.update_puzzle_limits(created.id, max_published=None, max_unpublished=None)
+    fetched = repo.get_by_id(created.id)
+    assert fetched.puzzle_limit_published is None
+    assert fetched.puzzle_limit_unpublished is None
+
+
+def test_puzzle_limits_included_in_list_all(repo):
+    u = make_user("creator4", role=UserRole.CREATOR)
+    created = repo.create(u, password="pw")
+    repo.update_puzzle_limits(created.id, max_published=3, max_unpublished=None)
+
+    all_users = repo.list_all()
+    target = next((x for x in all_users if x.id == created.id), None)
+    assert target is not None
+    assert target.puzzle_limit_published == 3
+    assert target.puzzle_limit_unpublished is None

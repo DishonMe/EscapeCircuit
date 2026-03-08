@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 
 from .Enums import UserRole
 from .Exceptions import ValidationError
@@ -15,6 +16,9 @@ class User:
     bio: str = ""
     xp: int = 0
     created_at: datetime = field(default_factory=utcnow)
+    # Admin-configurable puzzle capacity overrides (None = use level-based default)
+    puzzle_limit_published: Optional[int] = None
+    puzzle_limit_unpublished: Optional[int] = None
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("User.id", self.id)
@@ -48,6 +52,8 @@ class User:
             "level": self.level,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
+            "puzzle_limit_published": self.puzzle_limit_published,
+            "puzzle_limit_unpublished": self.puzzle_limit_unpublished,
         }
 
     @staticmethod
@@ -61,6 +67,8 @@ class User:
             bio=d.get("bio", ""),
             xp=int(d.get("xp", 0)),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
+            puzzle_limit_published=d.get("puzzle_limit_published"),
+            puzzle_limit_unpublished=d.get("puzzle_limit_unpublished"),
         )
 
     # --- getters ---

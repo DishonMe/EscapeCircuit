@@ -14,11 +14,13 @@ class PuzzleService:
     """
     All actions must call AuthService.
     """
-    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService, solve_repo: SolveRepo | None = None):
+    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService,
+                 solve_repo: SolveRepo | None = None, xp_service=None):
         self.repo = puzzle_repo
         self.user_repo = user_repo
         self.auth = auth_service
         self.solve_repo = solve_repo
+        self.xp = xp_service
 
     def _enrich_puzzle(self, p_dict: dict) -> dict:
         # Helper to attach creator object
@@ -28,6 +30,22 @@ class PuzzleService:
             if user:
                 p_dict["creator"] = user.to_dict()
         return p_dict
+
+    def _get_effective_limits(self, user):
+        """Return (published_limit, unpublished_limit) for *user*.
+
+        Uses admin-set overrides when present, otherwise falls back to the
+        XPService level-based defaults (if XPService is wired up) or the
+        hard-coded base of 5.
+        """
+        if self.xp is not None:
+            pub = self.xp.get_puzzle_published_limit(user.xp, user.puzzle_limit_published)
+            unpub = self.xp.get_puzzle_unpublished_limit(user.xp, user.puzzle_limit_unpublished)
+        else:
+            # Fallback when XPService is not injected (e.g. tests that don't need limits)
+            pub = user.puzzle_limit_published if user.puzzle_limit_published is not None else 5
+            unpub = user.puzzle_limit_unpublished if user.puzzle_limit_unpublished is not None else 5
+        return pub, unpub
 
     def browse(self, session_token: str, limit: int = 50, offset: int = 0) -> dict:
         _ = self.auth.require_user_id(session_token)
@@ -84,6 +102,17 @@ class PuzzleService:
         if user.role not in (UserRole.CREATOR, UserRole.ADMIN):
             raise ValidationError("creator required")
 
+        # Enforce unpublished (draft/unpublished) puzzle capacity for creators
+        if user.role == UserRole.CREATOR:
+            _, unpub_limit = self._get_effective_limits(user)
+            draft_count = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.DRAFT)
+            unpub_count = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.UNPUBLISHED)
+            if draft_count + unpub_count >= unpub_limit:
+                raise ValidationError(
+                    f"unpublished puzzle limit reached ({unpub_limit}); "
+                    "remove or publish existing puzzles before creating new ones"
+                )
+
         from Backend.DomainLayer.Puzzle import Puzzle
         from Backend.DomainLayer.Enums import GateType
 
@@ -131,6 +160,16 @@ class PuzzleService:
             if not self.solve_repo.has_passed(user_id, puzzle_id):
                 raise ValidationError("creator must solve the puzzle before publishing")
 
+        # 3) enforce published puzzle capacity for creators
+        if user.role == UserRole.CREATOR:
+            pub_limit, _ = self._get_effective_limits(user)
+            current_published = self.repo.count_by_creator_and_status(p.creator_user_id, PuzzleStatus.PUBLISHED)
+            if current_published >= pub_limit:
+                raise ValidationError(
+                    f"published puzzle limit reached ({pub_limit}); "
+                    "unpublish or remove existing puzzles before publishing new ones"
+                )
+
         # treat created_at as upload datetime
         p.created_at = utcnow()
 
@@ -167,6 +206,17 @@ class PuzzleService:
 
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
+
+        # Block creators who are over their unpublished limit from editing draft/unpublished puzzles
+        if user.role == UserRole.CREATOR and p.status in (PuzzleStatus.DRAFT, PuzzleStatus.UNPUBLISHED):
+            _, unpub_limit = self._get_effective_limits(user)
+            draft_count = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.DRAFT)
+            unpub_count = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.UNPUBLISHED)
+            if draft_count + unpub_count > unpub_limit:
+                raise ValidationError(
+                    f"unpublished puzzle limit exceeded ({unpub_limit}); "
+                    "remove puzzles before editing"
+                )
 
         from Backend.DomainLayer.PuzzleTestCase import PuzzleTestCase
         from Backend.DomainLayer.Enums import TestCaseKind

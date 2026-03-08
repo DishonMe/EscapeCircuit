@@ -121,6 +121,15 @@ class PuzzleRepo:
         row = cur.fetchone()
         return row[0] if row else 0
 
+    def count_by_creator_and_status(self, creator_user_id: int, status: PuzzleStatus) -> int:
+        """Return the number of puzzles owned by *creator_user_id* with the given *status*."""
+        cur = self.conn.execute(
+            "SELECT COUNT(*) FROM puzzles WHERE creator_user_id=? AND status=?",
+            (int(creator_user_id), status.value),
+        )
+        row = cur.fetchone()
+        return row[0] if row else 0
+
     def search_by_name(self, q: str, only_published: bool = True, limit: int = 50) -> List[Puzzle]:
         like = f"%{q}%"
         if only_published:

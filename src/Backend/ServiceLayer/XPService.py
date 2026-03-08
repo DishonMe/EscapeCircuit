@@ -4,6 +4,11 @@ from typing import Optional
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
 
+# Base puzzle capacity for creators (levels 1-9)
+_PUZZLE_CAPACITY_BASE = 5
+# Each level from 10 to 15 adds +2; cap at level 15
+_PUZZLE_CAPACITY_MAX_INCREMENTS = 6  # levels 10, 11, 12, 13, 14, 15
+
 
 @dataclass(slots=True)
 class XPService:
@@ -30,7 +35,9 @@ class XPService:
 
     # Level thresholds (index = level, value = min XP)
     # Level 1 starts at 0, Level 5 at 2000 -> matches ARD "Level 5 experienced"
-    level_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000]
+    # Levels 11-15 are needed for the puzzle capacity scaling (increases by 2 per level from 10 to 15)
+    level_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000,
+                        7800, 9800, 12000, 14500, 17000]
 
     def calculate_level(self, xp_total: int) -> int:
         xp_total = int(xp_total)
@@ -74,6 +81,31 @@ class XPService:
         if lvl <= 8:
             return 35
         return 50
+
+    def get_puzzle_published_limit(self, xp_total: int, override: Optional[int] = None) -> int:
+        """Max number of published puzzles a creator may have.
+
+        Base is 5 for levels 1-9.  From level 10 to level 15 the limit
+        grows by +2 per level (capped at level 15).
+        An admin-set override supersedes the level-based calculation.
+        """
+        if override is not None:
+            return max(0, override)
+        lvl = self.calculate_level(int(xp_total))
+        if lvl < 10:
+            return _PUZZLE_CAPACITY_BASE
+        increments = min(lvl - 9, _PUZZLE_CAPACITY_MAX_INCREMENTS)
+        return _PUZZLE_CAPACITY_BASE + increments * 2
+
+    def get_puzzle_unpublished_limit(self, xp_total: int, override: Optional[int] = None) -> int:
+        """Max number of draft/unpublished puzzles a creator may have.
+
+        Uses the same formula as published limit.  The admin-set override
+        for unpublished is independent of the published one.
+        """
+        if override is not None:
+            return max(0, override)
+        return self.get_puzzle_published_limit(xp_total)
 
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:

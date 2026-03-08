@@ -289,7 +289,8 @@ class TestXPServiceLevelThresholds:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_level_thresholds_are_correct(self):
-        expected_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000]
+        expected_thresholds = [0, 250, 600, 1100, 1700, 2000, 2600, 3400, 4500, 6000,
+                               7800, 9800, 12000, 14500, 17000]
         assert self.service.level_thresholds == expected_thresholds
 
     def test_level_thresholds_are_increasing(self):
@@ -301,3 +302,61 @@ class TestXPServiceLevelThresholds:
         # Experienced users require level 5, which is at index 4, but at XP 1700 (index 4 threshold)
         # Actually, level 5 is at index 4 of the array which means level 5
         assert self.service.level_thresholds[4] == 1700
+
+
+class TestXPServicePuzzleLimits:
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    # --- published limit ---
+
+    def test_published_limit_default_low_level(self):
+        # Levels 1-9 → base of 5
+        assert self.service.get_puzzle_published_limit(0) == 5
+        assert self.service.get_puzzle_published_limit(5999) == 5
+
+    def test_published_limit_level_10(self):
+        # 6000 XP → level 10 → 5 + 2 = 7
+        assert self.service.get_puzzle_published_limit(6000) == 7
+
+    def test_published_limit_level_11(self):
+        # 7800 XP → level 11 → 5 + 4 = 9
+        assert self.service.get_puzzle_published_limit(7800) == 9
+
+    def test_published_limit_level_12(self):
+        assert self.service.get_puzzle_published_limit(9800) == 11
+
+    def test_published_limit_level_13(self):
+        assert self.service.get_puzzle_published_limit(12000) == 13
+
+    def test_published_limit_level_14(self):
+        assert self.service.get_puzzle_published_limit(14500) == 15
+
+    def test_published_limit_level_15_cap(self):
+        # Level 15 → 5 + 12 = 17; higher XP stays at 17
+        assert self.service.get_puzzle_published_limit(17000) == 17
+        assert self.service.get_puzzle_published_limit(99999) == 17
+
+    def test_published_limit_admin_override(self):
+        # Override supersedes level-based calculation
+        assert self.service.get_puzzle_published_limit(99999, override=3) == 3
+        assert self.service.get_puzzle_published_limit(0, override=20) == 20
+
+    def test_published_limit_override_zero(self):
+        assert self.service.get_puzzle_published_limit(6000, override=0) == 0
+
+    def test_published_limit_override_none_uses_level(self):
+        assert self.service.get_puzzle_published_limit(6000, override=None) == 7
+
+    # --- unpublished limit ---
+
+    def test_unpublished_limit_matches_published_by_default(self):
+        for xp in [0, 500, 6000, 9800, 17000]:
+            assert self.service.get_puzzle_unpublished_limit(xp) == \
+                   self.service.get_puzzle_published_limit(xp)
+
+    def test_unpublished_limit_independent_override(self):
+        # The two limits use separate overrides
+        assert self.service.get_puzzle_unpublished_limit(6000, override=10) == 10
+        assert self.service.get_puzzle_published_limit(6000, override=None) == 7

@@ -22,6 +22,14 @@ export type User = Entity<{
   bio: string;
   xp: number;
   level: number;
+  /** Admin-set override for max published puzzles (null = use level-based default). */
+  puzzle_limit_published: number | null;
+  /** Admin-set override for max unpublished/draft puzzles (null = use level-based default). */
+  puzzle_limit_unpublished: number | null;
+  /** Effective published puzzle limit (level-based default or admin override). */
+  effective_published_limit: number;
+  /** Effective unpublished/draft puzzle limit (level-based default or admin override). */
+  effective_unpublished_limit: number;
 }>;
 
 export type AuthResponse = {

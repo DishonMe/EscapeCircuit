@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.UserService import UserService
@@ -20,6 +21,11 @@ class LoginReq(BaseModel):
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
+
+
+class UpdatePuzzleLimitsReq(BaseModel):
+    max_published: Optional[int] = None
+    max_unpublished: Optional[int] = None
 
 
 def build_user_router(user_service: UserService) -> APIRouter:
@@ -67,6 +73,13 @@ def build_user_router(user_service: UserService) -> APIRouter:
     def set_role(req: SetRoleReq, token: str = Depends(verify_token)):
         try:
             return user_service.set_role(token, req.model_dump())
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.patch("/{user_id}/puzzle-limits")
+    def update_puzzle_limits(user_id: int, req: UpdatePuzzleLimitsReq, token: str = Depends(verify_token)):
+        try:
+            return user_service.update_puzzle_limits(token, user_id, req.model_dump())
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
 
