@@ -76,7 +76,7 @@ PUZZLE_INSTRUCTIONS_MAX_BYTES: int = 5 * 1024
 PUZZLE_CREATOR_COMMENT_MAX_LENGTH: int = 1000
 # ── Rating system ─────────────────────────────────────────────────────────────
 # Minimum puzzle-attempt time (seconds) to unlock rating without having solved
-RATING_MIN_ATTEMPT_SECONDS: int = 300  # 5 minutes
+RATING_MIN_ATTEMPT_SECONDS: int = 300  # 300 seconds = 5 minutes
 
 # Number of *user* ratings (excluding creator) that shifts the weighting model
 RATING_USER_COUNT_THRESHOLD: int = 10

@@ -63,6 +63,9 @@ class SolvingService:
 
         attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
         created_attempt = self.solve_repo.create_attempt(attempt)
+        # Persist the started attempt so later requests (e.g., rating eligibility)
+        # can read elapsed attempt time from the database.
+        self.conn.commit()
         
         result = created_attempt.to_dict() if hasattr(created_attempt, 'to_dict') else dict(created_attempt)
         if 'puzzle_id' not in result: result['puzzle_id'] = int(puzzle_id)

@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
-import { SETTINGS } from '@/config/settings';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
+import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
 import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
@@ -36,6 +36,7 @@ import { WorkstationTimer } from './workstation-timer';
 import { CircuitDebugger } from '@/components/circuit-debugger';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
+import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
@@ -84,9 +85,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [showDebugger, setShowDebugger] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatorComment, setShowCreatorComment] = useState(false);
+  const [showRating, setShowRating] = useState(false);
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
   );
@@ -97,6 +100,37 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       setIsSolved(true);
     }
   }, [puzzle?.is_solved]);
+
+  useEffect(() => {
+    const tick = () => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
+    };
+
+    tick();
+    const intervalId = window.setInterval(tick, 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const startAttempt = async () => {
+      try {
+        if (!puzzle?.id) return;
+        await startPuzzleAttempt({ puzzleId: puzzle.id });
+      } catch {
+        // Best-effort only: rating still falls back to client elapsed on submit.
+      }
+    };
+
+    if (!cancelled) {
+      startAttempt();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [puzzle?.id]);
 
   const notifications = useNotifications();
 
@@ -497,6 +531,21 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [STATE_KEY, placed, wires]);
 
+  const ratingMinAttemptSeconds = puzzle?.rating_min_attempt_seconds ?? 10;
+  const hasAttemptedMinTime = elapsedSeconds >= ratingMinAttemptSeconds;
+  const canRatePuzzle = Boolean(puzzle?.can_rate) || isSolved || hasAttemptedMinTime;
+
+  useEffect(() => {
+    if (!puzzle?.id) return;
+    if (!hasAttemptedMinTime) return;
+    if (puzzle.can_rate) return;
+
+    // Refresh cached puzzle/list data once threshold is reached so rating
+    // options update without a manual page reload.
+    queryClient.invalidateQueries({ queryKey: ['puzzle', { id: puzzle.id }], refetchType: 'active' });
+    queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'active' });
+  }, [hasAttemptedMinTime, puzzle?.id, puzzle?.can_rate, queryClient]);
+
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
   }
@@ -778,6 +827,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" size="sm" onClick={() => setShowCreatorComment(true)}>
               Creator Comment
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canRatePuzzle}
+              title={canRatePuzzle ? 'Rate this puzzle' : `Available after solving or ${ratingMinAttemptSeconds} seconds of trying`}
+              onClick={() => setShowRating(true)}
+            >
+              Rate Puzzle
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
               Instructions
             </Button>
@@ -1025,6 +1083,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {showRating && (
+        <RatingDialog
+          puzzleId={puzzle.id}
+          open={showRating}
+          onOpenChange={setShowRating}
+          startTime={startTime.current}
+        />
+      )}
       <PuzzleDetailsDialog
         puzzle={puzzle}
         open={showPuzzleInfo}

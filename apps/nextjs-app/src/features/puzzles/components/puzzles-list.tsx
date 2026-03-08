@@ -89,6 +89,7 @@ export const PuzzlesList = () => {
   const meta = puzzlesQuery.data?.meta;
   const isRefetching = puzzlesQuery.isFetching && !puzzlesQuery.isLoading;
   const isBusyLoading = puzzlesQuery.isLoading || isRefetching;
+  const saveMutation = useToggleSavePuzzle({});
 
   // Filter puzzles based on medal filter (client-side, based on best_medal)
   const filteredPuzzles = useMemo(() => {
@@ -400,11 +401,6 @@ export const PuzzlesList = () => {
         <div className="relative">
           <div className={`grid grid-cols-1 gap-6 transition-opacity md:grid-cols-2 lg:grid-cols-3 ${isRefetching ? 'opacity-50' : 'opacity-100'}`}>
           {filteredPuzzles!.map((puzzle) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
-            const saveMutation = useToggleSavePuzzle({
-              puzzleId: puzzle.id,
-            });
-
             return (
             <div
               key={puzzle.id}
@@ -542,7 +538,11 @@ export const PuzzlesList = () => {
                     ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
-                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                title={
+                  puzzle.can_rate
+                    ? 'Click to rate this puzzle'
+                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
@@ -574,7 +574,11 @@ export const PuzzlesList = () => {
                     ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
-                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                title={
+                  puzzle.can_rate
+                    ? 'Click to rate this puzzle'
+                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
@@ -612,7 +616,11 @@ export const PuzzlesList = () => {
                     ? 'cursor-pointer hover:bg-secondary/80'
                     : 'cursor-default opacity-80'
                 }`}
-                title={puzzle.can_rate ? 'Click to rate this puzzle' : 'Solve or spend 5 min to rate'}
+                title={
+                  puzzle.can_rate
+                    ? 'Click to rate this puzzle'
+                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
                 }}
