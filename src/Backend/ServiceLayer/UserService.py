@@ -84,6 +84,17 @@ class UserService:
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
         d["is_experienced"] = self.xp.is_experienced(user.xp)
+        # Expose effective puzzle limits
+        d["effective_published_limit"] = (
+            user.puzzle_limit_published
+            if user.puzzle_limit_published is not None
+            else self.xp.get_puzzle_published_limit(user.xp)
+        )
+        d["effective_unpublished_limit"] = (
+            user.puzzle_limit_unpublished
+            if user.puzzle_limit_unpublished is not None
+            else self.xp.get_puzzle_unpublished_limit(user.xp)
+        )
         conn = self.user_repo.conn
 
         medal_rows = conn.execute(
@@ -202,11 +213,51 @@ class UserService:
             d = u.to_dict()
             d["level"] = self.xp.calculate_level(u.xp)
             d["is_experienced"] = self.xp.is_experienced(u.xp)
+            d["effective_published_limit"] = (
+                u.puzzle_limit_published
+                if u.puzzle_limit_published is not None
+                else self.xp.get_puzzle_published_limit(u.xp)
+            )
+            d["effective_unpublished_limit"] = (
+                u.puzzle_limit_unpublished
+                if u.puzzle_limit_unpublished is not None
+                else self.xp.get_puzzle_unpublished_limit(u.xp)
+            )
             out.append(d)
 
         return {"data": out, "total": total, "limit": limit, "offset": offset}
 
-    def google_login(self, token: str) -> dict:
+    def update_puzzle_limits(
+        self,
+        session_token: str,
+        target_user_id: int,
+        puzzle_limit_published: Optional[int],
+        puzzle_limit_unpublished: Optional[int],
+    ) -> dict:
+        """Admin-only: set per-user puzzle limit overrides."""
+        caller_id = self.auth.require_user_id(session_token)
+        caller = self.user_repo.get_by_id(caller_id)
+        if not caller or caller.role != UserRole.ADMIN:
+            raise ValidationError("admin required")
+        user = self.user_repo.get_by_id(target_user_id)
+        if not user:
+            raise ValidationError("user not found")
+        self.user_repo.update_puzzle_limits(target_user_id, puzzle_limit_published, puzzle_limit_unpublished)
+        updated = self.user_repo.get_by_id(target_user_id)
+        d = updated.to_dict()
+        d["level"] = self.xp.calculate_level(updated.xp)
+        d["is_experienced"] = self.xp.is_experienced(updated.xp)
+        d["effective_published_limit"] = (
+            updated.puzzle_limit_published
+            if updated.puzzle_limit_published is not None
+            else self.xp.get_puzzle_published_limit(updated.xp)
+        )
+        d["effective_unpublished_limit"] = (
+            updated.puzzle_limit_unpublished
+            if updated.puzzle_limit_unpublished is not None
+            else self.xp.get_puzzle_unpublished_limit(updated.xp)
+        )
+        return d
         """Verify a Google id_token, find-or-create the user, and return a session."""
         if not token:
             raise ValidationError("token is required")

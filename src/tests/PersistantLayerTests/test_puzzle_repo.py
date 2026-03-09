@@ -1874,3 +1874,31 @@ class TestDifficultyToLevel:
         """Test boundary between MEDIUM and HARD"""
         level = PuzzleRepo._difficulty_to_level(2.5)
         assert level == "MEDIUM"
+
+
+class TestPuzzleRepoCountByCreatorAndStatus:
+    """Tests for count_by_creator_and_status() efficient COUNT query."""
+
+    def test_count_returns_zero_when_no_puzzles(self, repo):
+        count = repo.count_by_creator_and_status(creator_id=999, status=PuzzleStatus.DRAFT)
+        assert count == 0
+
+    def test_count_draft_puzzles_for_creator(self, repo):
+        p1 = make_puzzle("puzzle-draft-1", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        p2 = make_puzzle("puzzle-draft-2", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        p3 = make_puzzle("puzzle-pub-1", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        repo.create(p1)
+        repo.create(p2)
+        repo.create(p3)
+        count = repo.count_by_creator_and_status(creator_id=1, status=PuzzleStatus.DRAFT)
+        assert count == 2
+
+    def test_count_published_puzzles_for_creator(self, repo):
+        p1 = make_puzzle("pub-a", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        p2 = make_puzzle("draft-a", creator_user_id=2, status=PuzzleStatus.DRAFT)
+        repo.create(p1)
+        repo.create(p2)
+        count = repo.count_by_creator_and_status(creator_id=2, status=PuzzleStatus.PUBLISHED)
+        assert count == 1
+        count_draft = repo.count_by_creator_and_status(creator_id=2, status=PuzzleStatus.DRAFT)
+        assert count_draft == 1

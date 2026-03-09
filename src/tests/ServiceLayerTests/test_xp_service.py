@@ -242,37 +242,37 @@ class TestXPServiceMedalCalculation:
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_medal_not_passed(self):
-        medal = self.service.calculate_medal(passed=False, time_taken=10, time_limit=60, cost_used=5, budget=10)
+        medal = self.service.calculate_medal(passed=False, time_taken=10, time_limit=60, cost_used=5, creator_budget=10)
         assert medal == Medal.NONE
 
     def test_medal_bronze_no_conditions(self):
         # Solved but neither timer beaten nor budget met
-        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=15, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=15, creator_budget=10)
         assert medal == Medal.BRONZE
 
     def test_medal_silver_timer_only(self):
         # Beats timer but over budget
-        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=15, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=15, creator_budget=10)
         assert medal == Medal.SILVER
 
     def test_medal_silver_budget_only(self):
         # Under budget but over timer
-        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=5, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=5, creator_budget=10)
         assert medal == Medal.SILVER
 
     def test_medal_gold_both_conditions(self):
         # Both conditions met
-        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, creator_budget=10)
         assert medal == Medal.GOLD
 
     def test_medal_bronze_no_time_limit(self):
         # No time limit set, over budget -> only budget condition could count
-        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=15, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=15, creator_budget=10)
         assert medal == Medal.BRONZE
 
     def test_medal_silver_no_time_limit_but_under_budget(self):
         # No time limit, under budget -> 1 condition
-        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, creator_budget=10)
         assert medal == Medal.SILVER
 
 class TestXPServiceArsenalCapacity:
@@ -421,3 +421,61 @@ class TestXPServiceIsExperienced:
         high_xp = settings.EXPERIENCED_LEVEL_MIN * settings.EXPERIENCED_LEVEL_MIN * settings.LEVEL_XP_DIVISOR
         experienced = self.service.is_experienced(high_xp)
         assert experienced
+
+class TestXPServicePuzzleLimits:
+    """Tests for per-user puzzle publication limit calculation."""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    # Level 10 = (10-1)^2 * 100 = 8100 XP
+    # Level 15 = (15-1)^2 * 100 = 19600 XP
+
+    def test_published_limit_level_1(self):
+        assert self.service.get_puzzle_published_limit(0) == 5
+
+    def test_published_limit_level_5(self):
+        # Level 5 = 1600 XP
+        assert self.service.get_puzzle_published_limit(1600) == 5
+
+    def test_published_limit_level_9(self):
+        # Level 9 = (9-1)^2 * 100 = 6400 XP
+        assert self.service.get_puzzle_published_limit(6400) == 5
+
+    def test_published_limit_level_10(self):
+        # Level 10 = 8100 XP → 5 + 2*(10-9) = 7
+        assert self.service.get_puzzle_published_limit(8100) == 7
+
+    def test_published_limit_level_11(self):
+        # Level 11 = 10000 XP → 5 + 2*(11-9) = 9
+        assert self.service.get_puzzle_published_limit(10000) == 9
+
+    def test_published_limit_level_12(self):
+        # Level 12 = 12100 XP → 5 + 2*(12-9) = 11
+        assert self.service.get_puzzle_published_limit(12100) == 11
+
+    def test_published_limit_level_13(self):
+        # Level 13 = 14400 XP → 5 + 2*(13-9) = 13
+        assert self.service.get_puzzle_published_limit(14400) == 13
+
+    def test_published_limit_level_14(self):
+        # Level 14 = 16900 XP → 5 + 2*(14-9) = 15
+        assert self.service.get_puzzle_published_limit(16900) == 15
+
+    def test_published_limit_level_15(self):
+        # Level 15 = 19600 XP → 5 + 2*(15-9) = 17 (cap)
+        assert self.service.get_puzzle_published_limit(19600) == 17
+
+    def test_published_limit_level_16_capped_at_17(self):
+        # Level 16 = (16-1)^2 * 100 = 22500 XP → capped at 17
+        assert self.service.get_puzzle_published_limit(22500) == 17
+
+    def test_unpublished_limit_mirrors_published_limit(self):
+        # Unpublished (draft) limit uses same formula
+        for xp in [0, 1600, 6400, 8100, 10000, 19600, 22500]:
+            assert self.service.get_puzzle_unpublished_limit(xp) == self.service.get_puzzle_published_limit(xp)
+
+    def test_published_limit_very_high_xp_capped_at_17(self):
+        # Very high XP should still be capped at 17
+        assert self.service.get_puzzle_published_limit(1_000_000) == 17

@@ -22,6 +22,10 @@ export type User = Entity<{
   bio: string;
   xp: number;
   level: number;
+  puzzle_limit_published?: number | null;
+  puzzle_limit_unpublished?: number | null;
+  effective_published_limit?: number;
+  effective_unpublished_limit?: number;
 }>;
 
 export type AuthResponse = {

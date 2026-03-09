@@ -144,6 +144,7 @@ class TestPuzzleServiceCreatePuzzle:
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
         self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.count_by_creator_and_status = Mock(return_value=0)
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -295,6 +296,7 @@ class TestPuzzleServicePublish:
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
         self.mock_puzzle_repo.count_published.return_value = 0
+        self.mock_puzzle_repo.count_by_creator_and_status = Mock(return_value=0)
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -365,7 +367,8 @@ class TestPuzzleServicePublish:
         draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
         self.mock_puzzle_repo.get_by_id.return_value = draft_puzzle
         self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
-        self.mock_puzzle_repo.count_published.return_value = PUZZLE_MAX_PUBLISHED_PER_USER
+        # With no xp_service wired, PuzzleService falls back to PUZZLE_MAX_PUBLISHED_PER_USER
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = PUZZLE_MAX_PUBLISHED_PER_USER
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.publish("valid_token", 1)
@@ -391,7 +394,7 @@ class TestPuzzleServicePublish:
         result = self.service.publish("valid_token", 1)
 
         assert result["status"] == PuzzleStatus.PUBLISHED.value
-        self.mock_puzzle_repo.count_published.assert_not_called()
+        self.mock_puzzle_repo.count_by_creator_and_status.assert_not_called()
 
 
 class TestPuzzleServiceUnpublish:
@@ -433,6 +436,7 @@ class TestPuzzleServiceAddTestCase:
     def setup_method(self):
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.count_by_creator_and_status = Mock(return_value=0)
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -633,6 +637,7 @@ class TestPuzzleServicePublish:
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
         self.mock_puzzle_repo.count_published.return_value = 0
+        self.mock_puzzle_repo.count_by_creator_and_status = Mock(return_value=0)
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -959,3 +964,125 @@ class TestPuzzleServiceUpdatePuzzle:
         with pytest.raises(ValidationError) as exc_info:
             self.service.update_puzzle("valid_token", 1, {"name": "New"})
         assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServicePuzzleLimitEnforcement:
+    """Tests for per-user puzzle limit enforcement in create_puzzle, publish, and add_test_case."""
+
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.count_by_creator_and_status = Mock(return_value=0)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+
+        from Backend.ServiceLayer.XPService import XPService
+        self.mock_xp_service = Mock(spec=XPService)
+        self.mock_xp_service.get_puzzle_published_limit.return_value = 5
+        self.mock_xp_service.get_puzzle_unpublished_limit.return_value = 5
+
+        self.service = PuzzleService(
+            self.mock_puzzle_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            xp_service=self.mock_xp_service,
+        )
+
+    def test_create_puzzle_allowed_below_unpublished_limit(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 4  # below limit of 5
+
+        created_puzzle = Puzzle(id=1, name="New Puzzle", creator_user_id=1)
+        self.mock_puzzle_repo.create.return_value = created_puzzle
+
+        result = self.service.create_puzzle("valid_token", {"name": "New Puzzle"})
+        assert result["name"] == "New Puzzle"
+
+    def test_create_puzzle_blocked_at_unpublished_limit(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 5  # at limit
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", {"name": "Too Many"})
+        assert "maximum limit of 5 draft puzzles" in str(exc_info.value)
+
+    def test_create_puzzle_admin_bypasses_unpublished_limit(self):
+        admin_user = User(id=1, username="admin", role=UserRole.ADMIN, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin_user
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 100  # way over limit
+
+        created_puzzle = Puzzle(id=2, name="Admin Puzzle", creator_user_id=1)
+        self.mock_puzzle_repo.create.return_value = created_puzzle
+
+        result = self.service.create_puzzle("valid_token", {"name": "Admin Puzzle"})
+        assert result["name"] == "Admin Puzzle"
+
+    def test_publish_uses_per_user_published_limit(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=8100)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_xp_service.get_puzzle_published_limit.return_value = 7  # level 10
+
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.get_by_id.return_value = draft_puzzle
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 7  # at limit
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("valid_token", 1)
+        assert "maximum limit of 7 published puzzles" in str(exc_info.value)
+
+    def test_publish_allowed_below_per_user_published_limit(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=8100)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_xp_service.get_puzzle_published_limit.return_value = 7
+
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
+        self.mock_puzzle_repo.get_by_id.side_effect = [draft_puzzle, published_puzzle]
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 6  # below limit
+
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        self.mock_puzzle_repo.conn.execute.return_value = mock_cursor
+
+        result = self.service.publish("valid_token", 1)
+        assert result["status"] == PuzzleStatus.PUBLISHED.value
+
+    def test_create_puzzle_uses_override_limit(self):
+        # User with puzzle_limit_unpublished override of 2
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        creator_user.puzzle_limit_unpublished = 2
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 2  # at override limit
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("valid_token", {"name": "Blocked"})
+        assert "maximum limit of 2 draft puzzles" in str(exc_info.value)
+
+    def test_add_test_case_blocked_when_over_draft_limit(self):
+        creator_user = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator_user
+
+        draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.get_by_id.return_value = draft_puzzle
+        # Simulate being OVER limit (count > limit, not >=)
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 6  # > 5
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.add_test_case("valid_token", 1, {
+                "kind": "TRUTH_TABLE",
+                "inputs": [[0]],
+                "expected_outputs": [[0]],
+            })
+        assert "exceeded" in str(exc_info.value)

@@ -27,16 +27,23 @@ class UserRepo:
             xp INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             pw_salt BLOB,
-            pw_hash BLOB
+            pw_hash BLOB,
+            puzzle_limit_published INTEGER,
+            puzzle_limit_unpublished INTEGER
         );
         """)
         # Migration: add is_discussion_banned column if missing
         cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
         if "is_discussion_banned" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN is_discussion_banned INTEGER NOT NULL DEFAULT 0")
+        if "puzzle_limit_published" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN puzzle_limit_published INTEGER")
+        if "puzzle_limit_unpublished" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN puzzle_limit_unpublished INTEGER")
 
     @staticmethod
     def _row_to_user(row) -> User:
+        keys = row.keys() if hasattr(row, "keys") else []
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
@@ -44,7 +51,9 @@ class UserRepo:
             "role": row["role"],
             "bio": row["bio"],
             "xp": int(row["xp"]),
-            "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in row.keys() else False,
+            "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in keys else False,
+            "puzzle_limit_published": row["puzzle_limit_published"] if "puzzle_limit_published" in keys else None,
+            "puzzle_limit_unpublished": row["puzzle_limit_unpublished"] if "puzzle_limit_unpublished" in keys else None,
             "created_at": row["created_at"],
         })
 
@@ -251,4 +260,17 @@ class UserRepo:
 
     def unban_from_discussions(self, user_id: int) -> None:
         self.conn.execute("UPDATE users SET is_discussion_banned=0 WHERE id=?", (int(user_id),))
+        self.conn.commit()
+
+    def update_puzzle_limits(
+        self,
+        user_id: int,
+        puzzle_limit_published: Optional[int],
+        puzzle_limit_unpublished: Optional[int],
+    ) -> None:
+        """Set per-user puzzle limit overrides. Pass None to remove the override."""
+        self.conn.execute(
+            "UPDATE users SET puzzle_limit_published=?, puzzle_limit_unpublished=? WHERE id=?",
+            (puzzle_limit_published, puzzle_limit_unpublished, int(user_id)),
+        )
         self.conn.commit()

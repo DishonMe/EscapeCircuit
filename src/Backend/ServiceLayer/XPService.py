@@ -75,12 +75,16 @@ class XPService:
         time_taken: int,
         time_limit: Optional[int],
         cost_used: int,
-        budget: int,
+        creator_budget: int = 0,
+        budget: int = 0,  # kept for backward compat; used as fallback if creator_budget is 0
     ) -> Medal:
         """
         Bronze = solved the puzzle.
-        Silver = solved + 1 bonus condition (beats timer OR tight budget).
+        Silver = solved + 1 bonus condition (beats timer OR beats creator's solution cost).
         Gold   = solved + both bonus conditions.
+
+        creator_budget: the creator's solution cost (formerly called "tight budget").
+                        A player beats this by achieving cost_used <= creator_budget.
         """
         if not passed:
             return Medal.NONE
@@ -91,8 +95,9 @@ class XPService:
         if time_limit is not None and time_limit > 0 and time_taken <= time_limit:
             bonus_count += 1
 
-        # Condition 2: Tight budget (cost <= budget)
-        if budget > 0 and cost_used <= budget:
+        # Condition 2: Beats creator's solution cost (creator budget)
+        effective_creator_budget = creator_budget if creator_budget else budget
+        if effective_creator_budget > 0 and cost_used <= effective_creator_budget:
             bonus_count += 1
 
         if bonus_count >= 2:
@@ -125,6 +130,22 @@ class XPService:
             if lvl <= max_level:
                 return slots
         return settings.ARSENAL_XP_MAX_SLOTS
+
+    # ---- Per-user puzzle publication limits ----
+    def get_puzzle_published_limit(self, xp_total: int) -> int:
+        """Return max published puzzles allowed for a user with the given XP.
+        Levels 1–9: 5; levels 10–15: +2 per level above 9; cap 17.
+        """
+        lvl = self.calculate_level(int(xp_total))
+        if lvl < 10:
+            return 5
+        return min(17, 5 + 2 * (lvl - 9))
+
+    def get_puzzle_unpublished_limit(self, xp_total: int) -> int:
+        """Return max draft (unpublished) puzzles allowed for a user with the given XP.
+        Uses the same formula as get_puzzle_published_limit.
+        """
+        return self.get_puzzle_published_limit(xp_total)
 
     # ---- Internal: apply XP delta to user ----
     def _apply_xp(self, user_id: int, delta: int) -> int:

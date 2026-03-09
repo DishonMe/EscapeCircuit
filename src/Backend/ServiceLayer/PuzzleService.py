@@ -1,10 +1,9 @@
 import sqlite3
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 import pathlib
 import os
 
 from Backend import settings
-from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 
@@ -20,12 +19,33 @@ class PuzzleService:
     """
     All actions must call AuthService.
     """
-    def __init__(self, puzzle_repo: PuzzleRepo, user_repo: UserRepo, auth_service: AuthService, solve_repo: SolveRepo | None = None, arsenal_service = None):
+    def __init__(
+        self,
+        puzzle_repo: PuzzleRepo,
+        user_repo: UserRepo,
+        auth_service: AuthService,
+        solve_repo: SolveRepo | None = None,
+        arsenal_service=None,
+        xp_service=None,
+    ):
         self.repo = puzzle_repo
         self.user_repo = user_repo
         self.auth = auth_service
         self.solve_repo = solve_repo
         self.arsenal_service = arsenal_service
+        self.xp_service = xp_service
+
+    def _get_effective_limits(self, user_id: int, user_xp: int, override_published: Optional[int], override_unpublished: Optional[int]) -> Tuple[int, int]:
+        """Return (effective_published_limit, effective_unpublished_limit) for a user."""
+        if self.xp_service is not None:
+            base_published = self.xp_service.get_puzzle_published_limit(user_xp)
+            base_unpublished = self.xp_service.get_puzzle_unpublished_limit(user_xp)
+        else:
+            base_published = settings.PUZZLE_MAX_PUBLISHED_PER_USER
+            base_unpublished = settings.PUZZLE_MAX_PUBLISHED_PER_USER
+        published_limit = override_published if override_published is not None else base_published
+        unpublished_limit = override_unpublished if override_unpublished is not None else base_unpublished
+        return published_limit, unpublished_limit
 
     def _delete_riddle_files(self, puzzle_name: str) -> None:
         """Delete riddle files from the riddles directory matching the puzzle name."""
@@ -393,6 +413,20 @@ class PuzzleService:
         if existing:
             raise ValidationError("Puzzle name already exists. Please choose a unique name.")
 
+        # Enforce per-user unpublished (draft) limit for non-admins
+        if user.role != UserRole.ADMIN:
+            _, unpublished_limit = self._get_effective_limits(
+                user_id, user.xp,
+                getattr(user, 'puzzle_limit_published', None),
+                getattr(user, 'puzzle_limit_unpublished', None),
+            )
+            current_drafts = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.DRAFT)
+            if current_drafts >= unpublished_limit:
+                raise ValidationError(
+                    f"You have reached the maximum limit of {unpublished_limit} draft puzzles. "
+                    "Please publish or delete an existing draft before creating a new one."
+                )
+
         default_gate_set_raw = payload.get("default_gate_set", [])
         gate_set = {GateType(x) for x in default_gate_set_raw}
 
@@ -409,6 +443,7 @@ class PuzzleService:
             description=description,
             status=PuzzleStatus.DRAFT,
             budget=int(payload.get("budget", 0)),
+            creator_budget=payload.get("creator_budget"),
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
             difficulty=difficulty,
@@ -455,10 +490,15 @@ class PuzzleService:
         now_iso = utcnow().isoformat()
         with transaction(self.repo.conn):
             if not is_admin:
-                current_count = self.repo.count_published(creator_id=user_id)
-                if p.status != PuzzleStatus.PUBLISHED and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER:
+                published_limit, _ = self._get_effective_limits(
+                    user_id, user.xp,
+                    getattr(user, 'puzzle_limit_published', None),
+                    getattr(user, 'puzzle_limit_unpublished', None),
+                )
+                current_count = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.PUBLISHED)
+                if p.status != PuzzleStatus.PUBLISHED and current_count >= published_limit:
                     raise ValidationError(
-                        f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
+                        f"You have reached the maximum limit of {published_limit} published puzzles."
                     )
 
             cur = self.repo.conn.execute(
@@ -616,6 +656,19 @@ class PuzzleService:
 
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
+
+        # Enforce unpublished limit for non-admins when the puzzle is still a draft
+        if user.role != UserRole.ADMIN and p.status == PuzzleStatus.DRAFT:
+            _, unpublished_limit = self._get_effective_limits(
+                user_id, user.xp,
+                getattr(user, 'puzzle_limit_published', None),
+                getattr(user, 'puzzle_limit_unpublished', None),
+            )
+            current_drafts = self.repo.count_by_creator_and_status(user_id, PuzzleStatus.DRAFT)
+            if current_drafts > unpublished_limit:
+                raise ValidationError(
+                    f"You have exceeded the maximum limit of {unpublished_limit} draft puzzles."
+                )
 
         from Backend.DomainLayer.PuzzleTestCase import PuzzleTestCase
         from Backend.DomainLayer.Enums import TestCaseKind

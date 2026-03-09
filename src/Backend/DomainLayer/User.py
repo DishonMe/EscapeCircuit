@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 
 from .Enums import UserRole
 from .Exceptions import ValidationError
@@ -15,6 +16,8 @@ class User:
     bio: str = ""
     xp: int = 0
     is_discussion_banned: bool = False
+    puzzle_limit_published: Optional[int] = None
+    puzzle_limit_unpublished: Optional[int] = None
     created_at: datetime = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
@@ -48,6 +51,8 @@ class User:
             "xp": self.xp,
             "level": self.level,
             "is_discussion_banned": self.is_discussion_banned,
+            "puzzle_limit_published": self.puzzle_limit_published,
+            "puzzle_limit_unpublished": self.puzzle_limit_unpublished,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
         }
@@ -63,6 +68,8 @@ class User:
             bio=d.get("bio", ""),
             xp=int(d.get("xp", 0)),
             is_discussion_banned=bool(d.get("is_discussion_banned", False)),
+            puzzle_limit_published=d.get("puzzle_limit_published"),
+            puzzle_limit_unpublished=d.get("puzzle_limit_unpublished"),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
         )
 

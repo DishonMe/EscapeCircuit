@@ -128,7 +128,8 @@ def create_app() -> FastAPI:
         user_repo,
         auth_service,
         solve_repo,
-        arsenal_service
+        arsenal_service,
+        xp_service,
     )
 
     # Rating Service
