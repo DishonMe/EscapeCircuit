@@ -272,9 +272,15 @@ export const PuzzleViewDialog = ({
                   )}
                 </div>
               </div>
-              {displayPuzzle.specialComponents && displayPuzzle.specialComponents.length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Arsenal Pieces</p>
+                <p className="text-[12px] text-foreground">
+                  {displayPuzzle.allowArsenal !== false ? "✓ Allowed" : "✗ Not allowed - Only basic gates permitted"}
+                </p>
+              </div>
+              {displayPuzzle.allowArsenal !== false && displayPuzzle.specialComponents && displayPuzzle.specialComponents.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Special Components</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Available Arsenal</p>
                   <div className="space-y-2">
                     {displayPuzzle.specialComponents.map((comp: any, idx: number) => (
                       <div key={idx} className="bg-secondary p-3 rounded text-[12px]">

@@ -30,7 +30,8 @@
     "type": "sequential_riddle",
     "total_gate_count": null,
     "min_cycles": 3,
-    "max_cycles": 3
+    "max_cycles": 3,
+    "allow_arsenal": true
   },
   "test_cases": [
     {

@@ -46,6 +46,7 @@ class UpdatePuzzleReq(BaseModel):
     description: Optional[str] = None
     instructions: Optional[str] = None
     creator_comment: Optional[str] = None
+    allow_arsenal: Optional[bool] = None
 
 
 class AddTestCaseReq(BaseModel):
@@ -67,6 +68,14 @@ class SimulateReq(BaseModel):
     solution: Dict[str, Any]
     inputs: Union[Dict[str, int], List[Dict[str, int]], Dict[str, List[int]]]
     isSequence: Optional[bool] = None
+
+
+class CreateCustomPieceReq(BaseModel):
+    name: str
+    cost: int
+    num_inputs: int
+    num_outputs: int
+    truth_table: Dict[str, Any]
 
 
 def get_db_conn():
@@ -384,6 +393,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             # Always include creator_comment if it was in the request (even if None for deletion)
             if "creator_comment" in req.model_fields_set or req.creator_comment is not None:
                 payload["creator_comment"] = req.creator_comment
+            if req.allow_arsenal is not None:
+                payload["allow_arsenal"] = req.allow_arsenal
             return puzzle_service.update_puzzle(token, puzzle_id, payload)
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
@@ -869,7 +880,14 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
 
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id, status='unpublished')
 
-                return {"message": "Puzzle created successfully"}
+                # Get the puzzle ID that was just created (most recent by puzzle_id)
+                puzzle_result = conn.execute("""
+                    SELECT id FROM puzzles WHERE name = ? ORDER BY id DESC LIMIT 1
+                """, (puzzle_name,)).fetchone()
+                
+                puzzle_id = puzzle_result[0] if puzzle_result else None
+
+                return {"message": "Puzzle created successfully", "puzzle_id": puzzle_id}
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
@@ -905,6 +923,128 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 return {"puzzle_id": puzzle_id, "is_saved": True}
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ------------------------------------------------------------------ #
+    #  Puzzle custom pieces (special gates for a puzzle)
+    # ------------------------------------------------------------------ #
+    @router.post("/{puzzle_id}/custom-pieces")
+    def create_custom_piece(
+        puzzle_id: int,
+        req: CreateCustomPieceReq,
+        token: str = Depends(verify_token)
+    ):
+        """Create a custom piece for a puzzle"""
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            
+            # Verify user is the puzzle creator
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            if puzzle.creator_user_id != user_id:
+                raise ValidationError("Only puzzle creator can add custom pieces")
+            
+            # Validate inputs/outputs limits
+            if req.num_inputs < settings.PUZZLE_CUSTOM_PIECES_MIN_INPUTS or req.num_inputs > settings.PUZZLE_CUSTOM_PIECES_MAX_INPUTS:
+                raise ValidationError(
+                    f"Inputs must be between {settings.PUZZLE_CUSTOM_PIECES_MIN_INPUTS} and {settings.PUZZLE_CUSTOM_PIECES_MAX_INPUTS}"
+                )
+            if req.num_outputs < settings.PUZZLE_CUSTOM_PIECES_MIN_OUTPUTS or req.num_outputs > settings.PUZZLE_CUSTOM_PIECES_MAX_OUTPUTS:
+                raise ValidationError(
+                    f"Outputs must be between {settings.PUZZLE_CUSTOM_PIECES_MIN_OUTPUTS} and {settings.PUZZLE_CUSTOM_PIECES_MAX_OUTPUTS}"
+                )
+            
+            if req.cost < 0:
+                raise ValidationError("Cost must be non-negative")
+            
+            # Validate piece name
+            if not req.name or not req.name.strip():
+                raise ValidationError("Piece name is required")
+            
+            # Check current count of custom pieces
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            existing_pieces = circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+            if len(existing_pieces) >= settings.PUZZLE_CUSTOM_PIECES_MAX_COUNT:
+                raise ValidationError(
+                    f"Cannot add more than {settings.PUZZLE_CUSTOM_PIECES_MAX_COUNT} custom pieces per puzzle"
+                )
+            
+            # Create the custom piece
+            from Backend.DomainLayer.Circuit import Circuit
+            
+            custom_piece = Circuit(
+                id=0,
+                user_id=user_id,
+                name=req.name,
+                cost=req.cost,
+                structure_json="",  # Empty structure for custom puzzle pieces
+                is_arsenal=True,
+                basic_gates="",  # Empty basic gates
+                truth_table=json.dumps(req.truth_table),
+                num_inputs=req.num_inputs,
+                num_outputs=req.num_outputs,
+                puzzle_id=puzzle_id,
+            )
+            
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            custom_piece = circuit_repo.create(custom_piece)
+            
+            return custom_piece.to_dict()
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.get("/{puzzle_id}/custom-pieces")
+    def list_custom_pieces(puzzle_id: int, token: str = Depends(verify_token)):
+        """Get all custom pieces for a puzzle"""
+        try:
+            puzzle_service.auth.require_user_id(token)
+            
+            # Verify puzzle exists
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            
+            # Get custom pieces for this puzzle
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            custom_pieces = circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+            
+            return {"data": [p.to_dict() for p in custom_pieces]}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.delete("/{puzzle_id}/custom-pieces/{piece_id}")
+    def delete_custom_piece(puzzle_id: int, piece_id: int, token: str = Depends(verify_token)):
+        """Delete a custom piece"""
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            
+            # Verify user is the puzzle creator
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            if puzzle.creator_user_id != user_id:
+                raise ValidationError("Only puzzle creator can delete custom pieces")
+            
+            # Verify piece belongs to this puzzle and delete it
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            piece = circuit_repo.get_by_id(piece_id)
+            
+            if not piece or piece.puzzle_id != puzzle_id:
+                raise ValidationError("Custom piece not found")
+            
+            circuit_repo.delete(piece_id, user_id)
+            return {"message": "Custom piece deleted successfully"}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

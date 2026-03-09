@@ -4,12 +4,13 @@
  */
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import Cookies from "js-cookie";
 import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
+import { api } from "@/lib/api-client";
 import MarkdownIt from "markdown-it";
 // @ts-ignore - markdown-it-katex doesn't have types
 import markdownItKatex from "markdown-it-katex";
@@ -31,7 +32,7 @@ import {
 import type { Wire } from "@/types/api";
 import { cn } from "@/utils/cn";
 
-type TabName = "basic" | "test-cases" | "instructions" | "solution";
+type TabName = "basic" | "test-cases" | "instructions" | "solution" | "custom-pieces";
 
 interface BasicInfo {
   name: string;
@@ -48,6 +49,7 @@ interface BasicInfo {
   outputs: string[];
   boardRows: number;
   boardCols: number;
+  allowArsenal: boolean;
 }
 
 interface TestCase {
@@ -353,6 +355,7 @@ export default function CreatePuzzleForm() {
       outputs: [],
       boardRows: DEFAULT_BOARD_ROWS,
       boardCols: DEFAULT_BOARD_COLS,
+      allowArsenal: true,
     },
     testCases: [],
     instructions: "",
@@ -373,6 +376,51 @@ export default function CreatePuzzleForm() {
 
   // State for truth table dialog
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<string | null>(null);
+
+  // State for custom pieces form
+  const [customPieceForm, setCustomPieceForm] = useState({
+    name: "",
+    cost: 0,
+    numInputs: 1,
+    numOutputs: 1,
+    truthTable: {} as Record<string, number | Record<string, number>>,
+  });
+  const [customPieces, setCustomPieces] = useState<any[]>([]);
+  const [prevNumInputs, setPrevNumInputs] = useState(1);
+  const [prevNumOutputs, setPrevNumOutputs] = useState(1);
+
+  // Initialize truth table when numInputs or numOutputs changes
+  useEffect(() => {
+    if (customPieceForm.numInputs !== prevNumInputs || customPieceForm.numOutputs !== prevNumOutputs) {
+      const numCombinations = Math.pow(2, customPieceForm.numInputs);
+      const newTruthTable: Record<string, number | Record<string, number>> = {};
+      
+      for (let i = 0; i < numCombinations; i++) {
+        const inputKey = i
+          .toString(2)
+          .padStart(customPieceForm.numInputs, '0')
+          .split('')
+          .join(',');
+        
+        if (customPieceForm.numOutputs === 1) {
+          newTruthTable[inputKey] = 0;
+        } else {
+          const outputObj: Record<string, number> = {};
+          for (let j = 0; j < customPieceForm.numOutputs; j++) {
+            outputObj[`OUT${j}`] = 0;
+          }
+          newTruthTable[inputKey] = outputObj;
+        }
+      }
+      
+      setCustomPieceForm((prev) => ({
+        ...prev,
+        truthTable: newTruthTable,
+      }));
+      setPrevNumInputs(customPieceForm.numInputs);
+      setPrevNumOutputs(customPieceForm.numOutputs);
+    }
+  }, [customPieceForm.numInputs, customPieceForm.numOutputs, prevNumInputs, prevNumOutputs]);
 
   const handleBasicChange = (
     field: keyof BasicInfo,
@@ -602,6 +650,7 @@ export default function CreatePuzzleForm() {
       },
     };
 
+    // Add basic gates
     for (const gateName of data.basic.gateSet) {
       const config = gateConfigs[gateName] || gateConfigs.AND;
       catalog[gateName] = {
@@ -612,8 +661,42 @@ export default function CreatePuzzleForm() {
         ports: config.ports,
       };
     }
+
+    // Add custom pieces to catalog
+    for (const piece of customPieces) {
+      // Generate ports based on num_inputs and num_outputs
+      const ports: any[] = [];
+      
+      // Add input ports on the left
+      for (let i = 0; i < piece.num_inputs; i++) {
+        ports.push({
+          id: `IN${i}`,
+          kind: 'input',
+          offset: { row: i, col: 0 },
+        });
+      }
+      
+      // Add output ports on the right (width is 3 for consistency with gates)
+      const maxPorts = Math.max(piece.num_inputs, piece.num_outputs);
+      for (let i = 0; i < piece.num_outputs; i++) {
+        ports.push({
+          id: `OUT${i}`,
+          kind: 'output',
+          offset: { row: i, col: 2 },
+        });
+      }
+      
+      catalog[piece.name] = {
+        id: piece.name,
+        label: piece.name,
+        cost: piece.cost,
+        size: { w: 3, h: Math.max(piece.num_inputs, piece.num_outputs) },
+        ports: ports,
+      };
+    }
+
     return catalog;
-  }, [data.basic.gateSet]);
+  }, [data.basic.gateSet, customPieces]);
 
   // Export solution from workstation
   const exportSolution = useCallback(async () => {
@@ -862,6 +945,50 @@ export default function CreatePuzzleForm() {
     }));
   };
 
+  const handleCreateCustomPiece = async () => {
+    if (!customPieceForm.name.trim()) {
+      alert("Piece name is required");
+      return;
+    }
+    if (customPieceForm.numInputs < 1 || customPieceForm.numInputs > 5) {
+      alert("Inputs must be between 1 and 5");
+      return;
+    }
+    if (customPieceForm.numOutputs < 1 || customPieceForm.numOutputs > 3) {
+      alert("Outputs must be between 1 and 3");
+      return;
+    }
+    if (Object.keys(customPieceForm.truthTable).length === 0) {
+      alert("Truth table is required - please define all input combinations");
+      return;
+    }
+
+    // Check max custom pieces limit (3 per puzzle)
+    if (customPieces.length >= 3) {
+      alert("Maximum 3 custom pieces per puzzle reached");
+      return;
+    }
+
+    // Add to local list (note: will be saved when puzzle is created)
+    const newPiece = {
+      name: customPieceForm.name,
+      cost: customPieceForm.cost,
+      num_inputs: customPieceForm.numInputs,
+      num_outputs: customPieceForm.numOutputs,
+      truth_table: customPieceForm.truthTable,
+    };
+
+    setCustomPieces([...customPieces, newPiece]);
+    setCustomPieceForm({
+      name: "",
+      cost: 0,
+      numInputs: 1,
+      numOutputs: 1,
+      truthTable: {},
+    });
+    alert("✓ Custom piece created! It will be saved with the puzzle.");
+  };
+
   const handleSubmit = async () => {
     if (!data.basic.name.trim()) {
       alert("Puzzle name is required");
@@ -957,6 +1084,7 @@ export default function CreatePuzzleForm() {
           max_cycles: data.basic.maxCycles,
           total_gate_count: data.basic.totalGateCount,
           gate_quotas: Object.keys(data.basic.gateQuotas).length > 0 ? data.basic.gateQuotas : undefined,
+          allow_arsenal: data.basic.allowArsenal,
           board: {
             rows: data.basic.boardRows,
             cols: data.basic.boardCols,
@@ -964,6 +1092,17 @@ export default function CreatePuzzleForm() {
         },
         test_cases: convertedTestCases,
       };
+
+      // Add custom pieces to config if any exist
+      if (customPieces.length > 0) {
+        configData.custom_pieces = customPieces.map((piece) => ({
+          name: piece.name,
+          cost: piece.cost,
+          num_inputs: piece.num_inputs,
+          num_outputs: piece.num_outputs,
+          truth_table: piece.truth_table,
+        }));
+      }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
       const baseUrl = apiUrl.replace(/\/api\/?$/, "");
@@ -1006,6 +1145,12 @@ export default function CreatePuzzleForm() {
         throw new Error(errorMessage);
       }
 
+      const createResponse = await res.json();
+      const puzzleId = createResponse.puzzle_id;
+
+      // Custom pieces are now saved via the config file during puzzle creation
+      // No need to save them separately
+
       const navigate = async () => {
         setIsSubmitting(false);
         await queryClient.invalidateQueries({ queryKey: ["puzzles"] });
@@ -1032,7 +1177,7 @@ export default function CreatePuzzleForm() {
 
       {/* Tabs */}
       <div className="flex border-b mb-6">
-        {(["basic", "test-cases", "instructions", "solution"] as TabName[]).map(
+        {(["basic", "test-cases", "custom-pieces", "instructions", "solution"] as TabName[]).map(
           (tab) => (
             <button
               key={tab}
@@ -1047,9 +1192,11 @@ export default function CreatePuzzleForm() {
                 ? "Basic Info"
                 : tab === "test-cases"
                   ? "Test Cases"
-                  : tab === "instructions"
-                    ? "Instructions"
-                    : "Solution"}
+                  : tab === "custom-pieces"
+                    ? "Custom Pieces"
+                    : tab === "instructions"
+                      ? "Instructions"
+                      : "Solution"}
             </button>
           )
         )}
@@ -1260,6 +1407,23 @@ export default function CreatePuzzleForm() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[13px] font-medium text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={data.basic.allowArsenal}
+                  onChange={(e) =>
+                    handleBasicChange("allowArsenal", e.target.checked)
+                  }
+                  className="rounded border border-border"
+                />
+                Allow Arsenal Pieces
+              </label>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                If unchecked, solvers can only use basic gates. If checked, custom arsenal pieces are available.
+              </p>
             </div>
 
             {data.basic.gateSet.length > 0 && (
@@ -1687,13 +1851,14 @@ export default function CreatePuzzleForm() {
               {/* Gate Palette Sidebar */}
               <div className="border-r p-3 overflow-y-auto bg-secondary/50">
                 <div className="text-[13px] font-semibold text-foreground mb-3">Available Gates</div>
-                {data.basic.gateSet.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab</p>
+                {data.basic.gateSet.length === 0 && customPieces.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab or create pieces in "Custom Pieces" tab</p>
                 ) : (
                   <div className="space-y-2">
+                    {/* Basic Gates */}
                     {data.basic.gateSet.map((gateName) => (
                       <div
-                        key={gateName}
+                        key={`gate-${gateName}`}
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.effectAllowed = 'copy';
@@ -1718,6 +1883,32 @@ export default function CreatePuzzleForm() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Custom Pieces */}
+                    {customPieces.length > 0 && data.basic.gateSet.length > 0 && 
+                      <div className="my-2 pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold text-muted-foreground mb-2">Custom Pieces</div>
+                        {customPieces.map((piece) => (
+                          <div
+                            key={`custom-${piece.name}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              setDraggedPaletteComponentId(piece.name);
+                            }}
+                            onDragEnd={() => setDraggedPaletteComponentId(null)}
+                            className="flex items-center gap-2 p-2 border border-border/60 bg-amber-50/30 rounded-lg cursor-move hover:bg-amber-50/60 transition"
+                          >
+                            <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
+                            <div className="flex-1" />
+                            <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                              cost {piece.cost} · pins {piece.numInputs + piece.numOutputs}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    }
                   </div>
                 )}
               </div>
@@ -1764,6 +1955,215 @@ export default function CreatePuzzleForm() {
                 />
               </div>
             </details>
+          </div>
+        )}
+
+        {activeTab === "custom-pieces" && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-secondary/50 p-4">
+              <h3 className="font-semibold mb-2">Create Custom Piece</h3>
+              <p className="text-[13px] text-muted-foreground mb-4">
+                Create special circuit pieces that solvers can use in this puzzle. Limited to 5 inputs and 3 outputs.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-foreground mb-2">Piece Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Majority Voter"
+                    value={customPieceForm.name}
+                    onChange={(e) => setCustomPieceForm({ ...customPieceForm, name: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-medium text-foreground mb-2">Cost *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={customPieceForm.cost}
+                      onChange={(e) => setCustomPieceForm({ ...customPieceForm, cost: parseInt(e.target.value) || 0 })}
+                      className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-foreground mb-2">Inputs (1-5) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5"
+                      placeholder="1"
+                      value={customPieceForm.numInputs}
+                      onChange={(e) => setCustomPieceForm({ ...customPieceForm, numInputs: parseInt(e.target.value) || 1 })}
+                      className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-foreground mb-2">Outputs (1-3) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="3"
+                      placeholder="1"
+                      value={customPieceForm.numOutputs}
+                      onChange={(e) => setCustomPieceForm({ ...customPieceForm, numOutputs: parseInt(e.target.value) || 1 })}
+                      className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                {customPieceForm.numInputs > 0 && customPieceForm.numOutputs > 0 && (
+                  <div>
+                    <label className="block text-[13px] font-medium text-foreground mb-3">Truth Table *</label>
+                    <p className="text-[11px] text-muted-foreground mb-3">
+                      Select the output value(s) for each input combination:
+                    </p>
+                    <div className="overflow-x-auto border border-border rounded-lg">
+                      <table className="w-full text-[13px]">
+                        <thead>
+                          <tr className="bg-secondary">
+                            {Array.from({ length: customPieceForm.numInputs }).map((_, i) => (
+                              <th key={`in-${i}`} className="border p-2 text-left">IN{i}</th>
+                            ))}
+                            {Array.from({ length: customPieceForm.numOutputs }).map((_, i) => (
+                              <th key={`out-${i}`} className="border p-2 text-left">OUT{i}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: Math.pow(2, customPieceForm.numInputs) }).map((_, rowIdx) => {
+                            // Generate binary input combination
+                            const inputs = rowIdx
+                              .toString(2)
+                              .padStart(customPieceForm.numInputs, '0')
+                              .split('')
+                              .map(Number);
+                            const inputKey = inputs.join(',');
+                            const currentOutputs = customPieceForm.truthTable[inputKey];
+                            
+                            return (
+                              <tr key={rowIdx} className="hover:bg-secondary/50">
+                                {inputs.map((bit, bitIdx) => (
+                                  <td key={`in-${rowIdx}-${bitIdx}`} className="border p-2 font-mono font-semibold">
+                                    {bit}
+                                  </td>
+                                ))}
+                                {Array.from({ length: customPieceForm.numOutputs }).map((_, outIdx) => {
+                                  const outKey = `OUT${outIdx}`;
+                                  let currentValue = 0;
+                                  if (typeof currentOutputs === 'object' && currentOutputs !== null) {
+                                    currentValue = (currentOutputs as Record<string, number>)[outKey] ?? 0;
+                                  } else if (customPieceForm.numOutputs === 1 && outIdx === 0) {
+                                    currentValue = (currentOutputs as number) ?? 0;
+                                  }
+                                  
+                                  return (
+                                    <td key={`out-${rowIdx}-${outIdx}`} className="border p-2">
+                                      <select
+                                        value={currentValue}
+                                        onChange={(e) => {
+                                          const newVal = parseInt(e.target.value);
+                                          setCustomPieceForm((prev) => {
+                                            const updated = { ...prev };
+                                            if (customPieceForm.numOutputs === 1) {
+                                              updated.truthTable = { ...prev.truthTable, [inputKey]: newVal };
+                                            } else {
+                                              const outputObj = (prev.truthTable[inputKey] as Record<string, number>) || {};
+                                              updated.truthTable = {
+                                                ...prev.truthTable,
+                                                [inputKey]: { ...outputObj, [outKey]: newVal },
+                                              };
+                                            }
+                                            return updated;
+                                          });
+                                        }}
+                                        className="rounded border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                                      >
+                                        <option value={0}>0</option>
+                                        <option value={1}>1</option>
+                                      </select>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleCreateCustomPiece}
+                  className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                >
+                  + Create Custom Piece
+                </button>
+              </div>
+            </div>
+
+            {customPieces.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-4">
+                  Custom Pieces ({customPieces.length})
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-secondary">
+                        <th className="border p-2 text-left">Name</th>
+                        <th className="border p-2 text-left">Cost</th>
+                        <th className="border p-2 text-left">Inputs</th>
+                        <th className="border p-2 text-left">Outputs</th>
+                        <th className="border p-2 text-left">Truth Table Preview</th>
+                        <th className="border p-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customPieces.map((piece, idx) => {
+                        // Parse truth table for preview
+                        let truthTablePreview = '';
+                        try {
+                          const truthTable = typeof piece.truth_table === 'string' 
+                            ? JSON.parse(piece.truth_table)
+                            : piece.truth_table;
+                          const entries = Object.entries(truthTable).slice(0, 2);
+                          truthTablePreview = entries.map(([k, v]) => `${k}→${v}`).join(', ');
+                          if (Object.keys(truthTable).length > 2) {
+                            truthTablePreview += ', ...';
+                          }
+                        } catch (e) {
+                          truthTablePreview = 'Invalid JSON';
+                        }
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-secondary/50">
+                            <td className="border p-2 font-medium text-[13px]">{piece.name}</td>
+                            <td className="border p-2 font-mono text-[11px]">{piece.cost}</td>
+                            <td className="border p-2 font-mono text-[11px]">{piece.num_inputs}</td>
+                            <td className="border p-2 font-mono text-[11px]">{piece.num_outputs}</td>
+                            <td className="border p-2 font-mono text-[11px] text-muted-foreground">{truthTablePreview}</td>
+                            <td className="border p-2 text-center">
+                              <button
+                                onClick={() => setCustomPieces(customPieces.filter((_, i) => i !== idx))}
+                                className="px-3 py-1 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

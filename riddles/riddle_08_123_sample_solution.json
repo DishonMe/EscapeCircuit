@@ -1,0 +1,122 @@
+{
+  "eval_map": {
+    "{\"input_0\":0,\"input_1\":0}": {
+      "and": 0,
+      "or": 0
+    },
+    "{\"input_0\":1,\"input_1\":0}": {
+      "or": 1,
+      "and": 0
+    },
+    "{\"input_0\":0,\"input_1\":1}": {
+      "or": 1,
+      "and": 0
+    },
+    "{\"input_0\":1,\"input_1\":1}": {
+      "and": 1,
+      "or": 1
+    }
+  },
+  "circuit": {
+    "placed": [
+      {
+        "id": "AND:1773096379313",
+        "componentId": "AND",
+        "origin": {
+          "row": 3,
+          "col": 0
+        },
+        "rotation": 0
+      },
+      {
+        "id": "OR:1773096381681",
+        "componentId": "OR",
+        "origin": {
+          "row": 3,
+          "col": 4
+        },
+        "rotation": 0
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire:1773096383425",
+        "from": {
+          "componentId": "OR:1773096381681",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:or",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      },
+      {
+        "id": "wire:1773096385490",
+        "from": {
+          "componentId": "AND:1773096379313",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:and",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      },
+      {
+        "id": "wire:1773096387009",
+        "from": {
+          "componentId": "IO:IN:input_0",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "OR:1773096381681",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1773096389034",
+        "from": {
+          "componentId": "IO:IN:input_0",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1773096379313",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1773096390444",
+        "from": {
+          "componentId": "IO:IN:input_1",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1773096379313",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1773096391900",
+        "from": {
+          "componentId": "IO:IN:input_1",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "OR:1773096381681",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      }
+    ]
+  }
+}

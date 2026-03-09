@@ -24,6 +24,7 @@ class CircuitRepo:
             truth_table TEXT NOT NULL DEFAULT '{}',
             num_inputs INTEGER NOT NULL DEFAULT 0,
             num_outputs INTEGER NOT NULL DEFAULT 0,
+            puzzle_id INTEGER,
             UNIQUE(user_id, name)
         );
         """)
@@ -41,15 +42,17 @@ class CircuitRepo:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN num_inputs INTEGER NOT NULL DEFAULT 0;")
             if "num_outputs" not in cols:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN num_outputs INTEGER NOT NULL DEFAULT 0;")
+            if "puzzle_id" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN puzzle_id INTEGER;")
             self.conn.commit()
         except Exception:
             pass
 
     def create(self, circuit: Circuit, commit: bool = True) -> Circuit:
         cur = self.conn.execute("""
-            INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs)
-            VALUES(?,?,?,?,?,?,?,?,?)
-        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs))
+            INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs, puzzle_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id))
         circuit.id = int(cur.lastrowid)
         if commit:
             self.conn.commit()
@@ -70,6 +73,7 @@ class CircuitRepo:
             truth_table=row["truth_table"] or "",
             num_inputs=int(row["num_inputs"] or 0),
             num_outputs=int(row["num_outputs"] or 0),
+            puzzle_id=int(row["puzzle_id"]) if row["puzzle_id"] else None,
         )
 
     def list_by_user(self, user_id: int) -> List[Circuit]:
@@ -88,6 +92,7 @@ class CircuitRepo:
                 truth_table=r["truth_table"] or "",
                 num_inputs=int(r["num_inputs"] or 0),
                 num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
             )
             for r in rows
         ]
@@ -114,6 +119,7 @@ class CircuitRepo:
                 truth_table=r["truth_table"] or "",
                 num_inputs=int(r["num_inputs"] or 0),
                 num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
             )
             for r in rows
         ]
@@ -122,12 +128,34 @@ class CircuitRepo:
         """Update an existing circuit"""
         cur = self.conn.execute("""
             UPDATE circuits 
-            SET name=?, cost=?, structure_json=?, is_arsenal=?, basic_gates=?, truth_table=?, num_inputs=?, num_outputs=?
+            SET name=?, cost=?, structure_json=?, is_arsenal=?, basic_gates=?, truth_table=?, num_inputs=?, num_outputs=?, puzzle_id=?
             WHERE id=? AND user_id=?
         """, (circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), 
-              circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.id, circuit.user_id))
+              circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.id, circuit.user_id))
         self.conn.commit()
         return cur.rowcount > 0
+
+    def list_custom_pieces_by_puzzle(self, puzzle_id: int) -> List[Circuit]:
+        """List custom pieces for a specific puzzle"""
+        rows = self.conn.execute("""
+            SELECT * FROM circuits WHERE puzzle_id=? ORDER BY id DESC
+        """, (puzzle_id,)).fetchall()
+        return [
+            Circuit(
+                id=int(r["id"]),
+                user_id=int(r["user_id"]),
+                name=r["name"],
+                cost=int(r["cost"]),
+                structure_json=r["structure_json"],
+                is_arsenal=bool(r["is_arsenal"]),
+                basic_gates=r["basic_gates"] or "",
+                truth_table=r["truth_table"] or "",
+                num_inputs=int(r["num_inputs"] or 0),
+                num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+            )
+            for r in rows
+        ]
 
     def count_user_components(self, user_id: int) -> int:
         row = self.conn.execute(

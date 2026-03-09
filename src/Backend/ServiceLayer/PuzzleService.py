@@ -347,17 +347,29 @@ class PuzzleService:
                 else:
                     d["outputs"] = [str(first_tc.expected_output_stream)]
         
-        # Add available arsenal pieces if arsenal service is available
-        if self.arsenal_service:
-            try:
+        # Add custom pieces (always available) and arsenal pieces (separately)
+        custom_components = []
+        arsenal_components = []
+        
+        try:
+            # Custom pieces are ALWAYS available for this puzzle, regardless of allow_arsenal setting
+            custom_components = self.arsenal_service.get_custom_pieces_for_puzzle(puzzle_id)
+            
+            # Arsenal pieces only available if arsenal is enabled for this puzzle
+            if self.arsenal_service and getattr(p, 'allow_arsenal', True):
                 allowed_gates = {g.value for g in p.default_gate_set}
-                # Note: get_available_pieces_for_puzzle expects session_token
-                # But we already have user_id, so we use it directly
-                pieces = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates)
-                d["specialComponents"] = pieces
-            except Exception:
-                # If arsenal service fails, just don't include pieces
-                d["specialComponents"] = []
+                arsenal_components = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates)
+            
+            # For backward compatibility, also include both in specialComponents
+            d["specialComponents"] = custom_components + arsenal_components
+            # New separate fields for categorization
+            d["customComponents"] = custom_components
+            d["arsenalComponents"] = arsenal_components
+        except Exception as e:
+            # If service fails, try to at least return custom pieces
+            d["specialComponents"] = custom_components if custom_components else []
+            d["customComponents"] = custom_components
+            d["arsenalComponents"] = arsenal_components
         
         return d
 
@@ -418,6 +430,7 @@ class PuzzleService:
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
             difficulty=difficulty,
+            allow_arsenal=payload.get("allow_arsenal", True),
         )
         p.instructions = instructions or None
         try:
@@ -598,6 +611,13 @@ class PuzzleService:
                     )
             set_clauses.append("creator_comment = ?")
             params.append(creator_comment)
+
+        if "allow_arsenal" in payload:
+            allow_arsenal = payload.get("allow_arsenal")
+            if not isinstance(allow_arsenal, bool):
+                raise ValidationError("allow_arsenal must be a boolean")
+            set_clauses.append("allow_arsenal = ?")
+            params.append(1 if allow_arsenal else 0)
 
         if set_clauses:
             params.append(int(puzzle_id))

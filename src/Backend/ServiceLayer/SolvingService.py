@@ -253,6 +253,16 @@ class SolvingService:
         if not test_cases:
             raise ValidationError("This puzzle has no test cases configured. Please contact the puzzle creator.")
         
+        # Check if arsenal pieces are allowed in this puzzle
+        if not getattr(p, 'allow_arsenal', True):
+            # Check if solution contains any arsenal pieces (numeric componentIds)
+            placed_components = solution_payload.get("placedComponents", []) or solution_payload.get("components", [])
+            for placed in placed_components:
+                component_id = placed.get("componentId")
+                # If componentId is numeric, it's an arsenal piece
+                if isinstance(component_id, int) or (isinstance(component_id, str) and component_id.isdigit()):
+                    raise ValidationError("Arsenal pieces are not allowed in this puzzle. Only basic gates (AND, OR, XOR, NOT, NAND, NOR, XNOR, DFF) are permitted.")
+        
         # Expand arsenal pieces in the solution
         expanded_solution = self._expand_arsenal_pieces(solution_payload)
             
@@ -738,7 +748,7 @@ class SolvingService:
         expanded_solution = self._expand_arsenal_pieces(solution_payload)
         
         # Build and simulate the circuit
-        return self._run_simulation(expanded_solution, inputs)
+        return self._run_simulation(puzzle_id, expanded_solution, inputs)
 
     def _simulate_sequence(self, puzzle_id: int, solution_payload: Dict[str, Any], input_sequences: Dict[str, list]) -> Dict[str, Any]:
         """Simulate a sequence of inputs and return results for each step."""
@@ -763,7 +773,7 @@ class SolvingService:
                 step_inputs[input_name] = sequence[step_idx]
             
             # Run simulation for this step
-            result = self._run_simulation(expanded_solution, step_inputs)
+            result = self._run_simulation(puzzle_id, expanded_solution, step_inputs)
             all_steps.append(result)
         
         # Combine results
@@ -772,7 +782,7 @@ class SolvingService:
             "success": True
         }
 
-    def _run_simulation(self, expanded_solution: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
+    def _run_simulation(self, puzzle_id: int, expanded_solution: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
         """Run a single simulation step with expanded solution and given inputs."""
         # Reconstruct Circuit for Logic Engine
         tcircuit = Circuit(
@@ -788,6 +798,25 @@ class SolvingService:
         placed = data.get("placedComponents", [])
         wires = data.get("wires", [])
         arsenal_pieces = data.get("_arsenal_pieces", {})
+        
+        # Add custom pieces from puzzle if puzzle_id > 0
+        if puzzle_id > 0:
+            try:
+                custom_pieces = self.circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+                for piece in custom_pieces:
+                    # Extract the piece name and data
+                    piece_data = json.loads(piece.structure_json) if piece.structure_json else {}
+                    piece_name = piece.name
+                    
+                    # Add to arsenal_pieces for simulation
+                    arsenal_pieces[piece_name] = {
+                        "truth_table": json.dumps(piece.truth_table) if piece.truth_table else "{}",
+                        "num_inputs": piece.num_inputs or 0,
+                        "num_outputs": piece.num_outputs or 0,
+                    }
+            except Exception as e:
+                # If we can't fetch custom pieces, just continue with what we have
+                print(f"[WARNING] Failed to fetch custom pieces for puzzle {puzzle_id}: {str(e)}")
         
         # DEBUG: Log what components we received
         print(f"[DEBUGGER] Total placed components: {len(placed)}")

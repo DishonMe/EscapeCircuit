@@ -20,11 +20,16 @@ class Puzzle:
     time_limit_seconds: Optional[int] = None
     difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
+    allow_arsenal: bool = True
 
     # Constraint fields
     total_gate_count: Optional[int] = None
     min_cycles: Optional[int] = None
     max_cycles: Optional[int] = None
+    
+    # Board dimensions (None = use defaults)
+    board_rows: Optional[int] = None
+    board_cols: Optional[int] = None
 
     rating_count: int = 0
     avg_difficulty: float = 0.0
@@ -85,9 +90,13 @@ class Puzzle:
             "difficulty": self.difficulty.value, # Creator-set difficulty
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
+            "allow_arsenal": self.allow_arsenal,
+            "allowArsenal": self.allow_arsenal,
             "total_gate_count": self.total_gate_count,
             "min_cycles": self.min_cycles,
             "max_cycles": self.max_cycles,
+            "board_rows": self.board_rows,
+            "board_cols": self.board_cols,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "solvedCount": 0, # Placeholder
@@ -118,6 +127,9 @@ class Puzzle:
             total_gate_count=d.get("total_gate_count"),
             min_cycles=d.get("min_cycles"),
             max_cycles=d.get("max_cycles"),
+            board_rows=d.get("board_rows"),
+            board_cols=d.get("board_cols"),
+            allow_arsenal=d.get("allow_arsenal", True),
             rating_count=int(d.get("rating_count", 0)),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
             avg_fun=float(d.get("avg_fun", 0.0)),
