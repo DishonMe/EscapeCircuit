@@ -52,9 +52,21 @@ export const MyPuzzles = () => {
   const meta = puzzlesQuery.data?.meta;
   const isLoading = puzzlesQuery.isLoading;
   const isAdmin = String(user.data?.role || '').toLowerCase() === 'admin';
-  const publishedCount = allPuzzles.filter(
-    (p) => (p as any).status === 'published' || (p as any).isPublished === true
+  const isPublishedPuzzle = (p: Puzzle) =>
+    (p as any).status === 'published' || (p as any).isPublished === true;
+
+  const isPopularPublishedPuzzle = (p: Puzzle) => {
+    if (!isPublishedPuzzle(p)) return false;
+    const ratingCount = Number((p as any).rating_count ?? 0);
+    const avgFun = Number((p as any).avg_fun ?? 0);
+    return ratingCount >= 20 && avgFun > 3.5;
+  };
+
+  const publishedCount = allPuzzles.filter(isPublishedPuzzle).length;
+  const effectivePublishedCount = allPuzzles.filter(
+    (p) => isPublishedPuzzle(p) && !isPopularPublishedPuzzle(p),
   ).length;
+  const popularPublishedCount = Math.max(0, publishedCount - effectivePublishedCount);
 
   // Filter by published status
   const filteredPuzzles = allPuzzles.filter((p) => {
@@ -134,8 +146,13 @@ export const MyPuzzles = () => {
           <p className="text-[12px] text-muted-foreground mt-1">
             {isAdmin
               ? `Publishing capacity: ${publishedCount}/Unlimited (Admin)`
-              : `Publishing capacity: ${publishedCount}/${PUZZLE_MAX_PUBLISHED_PER_USER}`}
+              : `Publishing capacity: ${effectivePublishedCount}/${PUZZLE_MAX_PUBLISHED_PER_USER}`}
           </p>
+          {!isAdmin && popularPublishedCount > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {popularPublishedCount} popular published puzzle(s) are excluded from this limit.
+            </p>
+          )}
         </div>
 
         {/* Create Puzzle Button - Only here */}

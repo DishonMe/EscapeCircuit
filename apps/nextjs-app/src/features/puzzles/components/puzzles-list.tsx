@@ -541,7 +541,9 @@ export const PuzzlesList = () => {
                 title={
                   puzzle.can_rate
                     ? 'Click to rate this puzzle'
-                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                    : puzzle.rating_min_attempt_seconds != null
+                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
+                      : 'Solve or spend the configured minimum time to rate'
                 }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
@@ -577,7 +579,9 @@ export const PuzzlesList = () => {
                 title={
                   puzzle.can_rate
                     ? 'Click to rate this puzzle'
-                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                    : puzzle.rating_min_attempt_seconds != null
+                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
+                      : 'Solve or spend the configured minimum time to rate'
                 }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
@@ -619,7 +623,9 @@ export const PuzzlesList = () => {
                 title={
                   puzzle.can_rate
                     ? 'Click to rate this puzzle'
-                    : `Solve or spend ${puzzle.rating_min_attempt_seconds ?? 10} sec to rate`
+                    : puzzle.rating_min_attempt_seconds != null
+                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
+                      : 'Solve or spend the configured minimum time to rate'
                 }
                 onClick={() => {
                   if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);

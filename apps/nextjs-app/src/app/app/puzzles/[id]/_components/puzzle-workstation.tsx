@@ -531,8 +531,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [STATE_KEY, placed, wires]);
 
-  const ratingMinAttemptSeconds = puzzle?.rating_min_attempt_seconds ?? 10;
-  const hasAttemptedMinTime = elapsedSeconds >= ratingMinAttemptSeconds;
+  const ratingMinAttemptSeconds = puzzle?.rating_min_attempt_seconds;
+  const hasAttemptedMinTime = ratingMinAttemptSeconds != null
+    ? elapsedSeconds >= ratingMinAttemptSeconds
+    : false;
   const canRatePuzzle = Boolean(puzzle?.can_rate) || isSolved || hasAttemptedMinTime;
 
   useEffect(() => {
