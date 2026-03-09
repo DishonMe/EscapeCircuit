@@ -26,6 +26,7 @@ class PuzzleRepo:
             creator_comment TEXT,
             status TEXT NOT NULL,
             budget INTEGER NOT NULL,
+            creator_budget INTEGER,
             time_limit_seconds INTEGER,
             difficulty TEXT NOT NULL DEFAULT 'EASY',
             default_gate_set TEXT NOT NULL,
@@ -54,6 +55,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN max_cycles INTEGER;")
             if "creator_comment" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_comment TEXT;")
+            if "creator_budget" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_budget INTEGER;")
         except Exception:
             pass
         self.conn.execute("""
@@ -129,18 +132,19 @@ class PuzzleRepo:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
                 name, creator_user_id, description, status,
-                budget, time_limit_seconds, difficulty, default_gate_set,
+                budget, creator_budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
                 creator_comment,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
@@ -171,6 +175,7 @@ class PuzzleRepo:
                 creator_comment=?,
                 status=?,
                 budget=?,
+                creator_budget=?,
                 time_limit_seconds=?,
                 difficulty=?,
                 default_gate_set=?,
@@ -190,6 +195,7 @@ class PuzzleRepo:
             puzzle.creator_comment,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
@@ -866,6 +872,11 @@ class PuzzleRepo:
             max_cycles = row["max_cycles"]
         except (IndexError, KeyError):
             max_cycles = None
+        # Safely read creator_budget — may be missing in old DBs
+        try:
+            creator_budget_val = row["creator_budget"]
+        except (IndexError, KeyError):
+            creator_budget_val = None
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -875,6 +886,7 @@ class PuzzleRepo:
             "creator_comment": creator_comment_val,
             "status": row["status"],
             "budget": int(row["budget"]),
+            "creator_budget": int(creator_budget_val) if creator_budget_val is not None else None,
             "time_limit_seconds": row["time_limit_seconds"],
             "difficulty": diff_val or "EASY",
             "default_gate_set": gate_values,
