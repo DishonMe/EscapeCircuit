@@ -7,6 +7,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { Info } from "lucide-react";
 import Cookies from "js-cookie";
 import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
 import MarkdownIt from "markdown-it";
@@ -16,12 +17,19 @@ import DOMPurify from "isomorphic-dompurify";
 import "katex/dist/katex.min.css";
 import { InfoPopup } from "@/components/ui/info-popup";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   WorkstationGrid,
   type ComponentDef,
   type PlacedGridComponent,
   type SelectedComponentState,
 } from "@/app/app/puzzles/[id]/_components/workstation-grid";
 import type { Wire } from "@/types/api";
+import { cn } from "@/utils/cn";
 
 type TabName = "basic" | "test-cases" | "instructions" | "solution";
 
@@ -89,6 +97,101 @@ const availableGates = [
   "XNOR",
   "DFF",
 ];
+
+// Gate properties: cost and pin count
+const GATE_PROPERTIES: Record<string, { cost: number; pins: number }> = {
+  AND: { cost: 1, pins: 3 },
+  OR: { cost: 1, pins: 3 },
+  NOT: { cost: 1, pins: 2 },
+  XOR: { cost: 1, pins: 3 },
+  NAND: { cost: 1, pins: 3 },
+  NOR: { cost: 1, pins: 3 },
+  XNOR: { cost: 1, pins: 3 },
+  DFF: { cost: 1, pins: 2 },
+};
+
+// Truth tables for each gate
+const TRUTH_TABLES: Record<
+  string,
+  { inputs: string[]; outputs: string[]; rows: string[][] }
+> = {
+  AND: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '1'],
+    ],
+  },
+  OR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '1'],
+    ],
+  },
+  NOT: {
+    inputs: ['IN'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '1'],
+      ['1', '0'],
+    ],
+  },
+  XOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '0'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '0'],
+    ],
+  },
+  NAND: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '1'],
+      ['1', '0', '1'],
+      ['1', '1', '0'],
+    ],
+  },
+  NOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '0'],
+    ],
+  },
+  XNOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '1'],
+    ],
+  },
+  DFF: {
+    inputs: ['IN'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0'],
+      ['1', '1'],
+    ],
+  },
+};
 
 const MAX_PUZZLE_NAME_LENGTH = 100;
 const MAX_PUZZLE_DESCRIPTION_LENGTH = 2000;
@@ -267,6 +370,9 @@ export default function CreatePuzzleForm() {
   // State for stream test case string representation
   const [streamInputStrings, setStreamInputStrings] = useState<Record<string, string>>({});
   const [streamOutputStrings, setStreamOutputStrings] = useState<Record<string, string>>({});
+
+  // State for truth table dialog
+  const [viewingTruthTableFor, setViewingTruthTableFor] = useState<string | null>(null);
 
   const handleBasicChange = (
     field: keyof BasicInfo,
@@ -1164,7 +1270,22 @@ export default function CreatePuzzleForm() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {data.basic.gateSet.map((gate) => (
                     <div key={gate} className="border p-2 rounded-lg bg-secondary/50">
-                      <label className="text-[11px] font-semibold text-foreground">{gate}</label>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex-1">
+                          <label className="text-[11px] font-semibold text-foreground">{gate}</label>
+                          <div className="text-[10px] text-muted-foreground">
+                            cost {GATE_PROPERTIES[gate]?.cost ?? 1} · pins {GATE_PROPERTIES[gate]?.pins ?? 3}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewingTruthTableFor(gate)}
+                          className="p-1 text-foreground/40 hover:text-foreground/70 transition-opacity"
+                          title="View Truth Table"
+                        >
+                          <Info size={14} />
+                        </button>
+                      </div>
                       <input
                         type="number"
                         min="1"
@@ -1580,9 +1701,21 @@ export default function CreatePuzzleForm() {
                           setDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setDraggedPaletteComponentId(null)}
-                        className="p-2 border border-border bg-card rounded-lg cursor-move hover:bg-secondary/50 font-medium text-[13px] text-foreground transition"
+                        className="flex items-center gap-2 p-2 border border-border bg-card rounded-lg cursor-move hover:bg-secondary/50 transition"
                       >
-                        {gateName}
+                        <button
+                          type="button"
+                          onClick={() => setViewingTruthTableFor(gateName)}
+                          className="p-0.5 text-foreground/40 hover:text-foreground/70 transition-opacity flex-shrink-0"
+                          title="View Truth Table"
+                        >
+                          <Info size={14} />
+                        </button>
+                        <span className="font-medium text-[13px] text-foreground">{gateName}</span>
+                        <div className="flex-1" />
+                        <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                          cost {GATE_PROPERTIES[gateName]?.cost ?? 1} · pins {GATE_PROPERTIES[gateName]?.pins ?? 3}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1704,6 +1837,56 @@ export default function CreatePuzzleForm() {
           </div>
         </div>
       )}
+
+      {/* Truth Table Dialog */}
+      <Dialog
+        open={Boolean(viewingTruthTableFor)}
+        onOpenChange={(open) => !open && setViewingTruthTableFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
+          </DialogHeader>
+          {viewingTruthTableFor && TRUTH_TABLES[viewingTruthTableFor] ? (
+            <div className="overflow-hidden rounded-lg border border-border/60">
+              <table className="w-full text-[13px] text-foreground">
+                <thead className="bg-secondary/50 text-[11px] font-medium uppercase text-muted-foreground">
+                  <tr>
+                    {TRUTH_TABLES[viewingTruthTableFor].inputs.map((i: string) => (
+                      <th key={i} className="px-3 py-2 text-center">
+                        {i}
+                      </th>
+                    ))}
+                    {TRUTH_TABLES[viewingTruthTableFor].outputs.map((o: string) => (
+                      <th
+                        key={o}
+                        className="border-l border-border px-3 py-2 text-center"
+                      >
+                        {o}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {TRUTH_TABLES[viewingTruthTableFor].rows.map((row: string[], idx: number) => (
+                    <tr key={idx} className="divide-x divide-border">
+                      {row.map((cell: string, cIdx: number) => (
+                        <td key={cIdx} className="px-3 py-2 text-center">
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-[13px] text-muted-foreground">
+              No truth table available for this component.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

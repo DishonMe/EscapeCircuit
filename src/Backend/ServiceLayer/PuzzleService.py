@@ -2,6 +2,7 @@ import sqlite3
 from typing import Dict, Any, List
 import pathlib
 import os
+import shutil
 
 from Backend import settings
 from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
@@ -28,10 +29,11 @@ class PuzzleService:
         self.arsenal_service = arsenal_service
 
     def _delete_riddle_files(self, puzzle_name: str) -> None:
-        """Delete riddle files from the riddles directory matching the puzzle name."""
+        """Delete riddle files/folders from the riddles directory matching the puzzle name.
+        Handles both: riddle_XX_puzzle_name_*.ext (files) and riddle_XX_puzzle_name/ (folders)
+        """
         try:
             # Get riddles directory path
-            import sys
             current_file = pathlib.Path(__file__).resolve()
             root_dir = current_file.parent.parent.parent.parent
             riddles_dir = root_dir / 'riddles'
@@ -39,22 +41,26 @@ class PuzzleService:
             if not riddles_dir.exists():
                 return
             
-            # Search for all files containing the puzzle name (case-insensitive match)
-            # Pattern: riddle_XX_puzzle_name_*.ext
+            # Search for all files/folders containing the puzzle name (case-insensitive match)
+            # Pattern: riddle_XX_puzzle_name_*.ext or riddle_XX_puzzle_name/
             deleted_count = 0
-            for file in riddles_dir.iterdir():
-                if file.is_file() and("_" + puzzle_name.lower() + "_") in file.name.lower():
+            for item in riddles_dir.iterdir():
+                if ("_" + puzzle_name.lower() + "_") in item.name.lower():
                     try:
-                        file.unlink()
+                        if item.is_file():
+                            item.unlink()
+                            print(f"[DELETE] Removed riddle file: {item.name}")
+                        elif item.is_dir():
+                            shutil.rmtree(item)
+                            print(f"[DELETE] Removed riddle folder: {item.name}")
                         deleted_count += 1
-                        print(f"[DELETE] Removed riddle file: {file.name}")
                     except Exception as e:
-                        print(f"[WARNING] Failed to delete {file.name}: {e}")
+                        print(f"[WARNING] Failed to delete {item.name}: {e}")
             
             if deleted_count > 0:
-                print(f"[DELETE] Removed {deleted_count} riddle file(s) for puzzle: {puzzle_name}")
+                print(f"[DELETE] Removed {deleted_count} riddle item(s) for puzzle: {puzzle_name}")
         except Exception as e:
-            print(f"[WARNING] Error during riddle file cleanup: {e}")
+            print(f"[WARNING] Error during riddle cleanup: {e}")
 
     def _enrich_puzzle(self, p_dict: dict) -> dict:
         # Helper to attach creator object
