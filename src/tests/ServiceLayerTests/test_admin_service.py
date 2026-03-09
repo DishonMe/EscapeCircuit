@@ -410,7 +410,7 @@ class TestAdminServiceSetCreatorPuzzleLimits:
 
         with pytest.raises(ValidationError) as exc:
             self.service.set_creator_puzzle_limits("token", 2, 5, 5)
-        assert "not a creator" in str(exc.value)
+        assert "not a creator" in str(exc.value)  # "not a creator or pending creator"
 
     def test_set_limits_negative_values_rejected(self):
         admin = self._make_admin()

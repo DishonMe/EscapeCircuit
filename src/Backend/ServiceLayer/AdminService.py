@@ -415,7 +415,7 @@ class AdminService:
         if not target:
             raise ValidationError("target user not found")
         if target.role not in (UserRole.CREATOR, UserRole.PENDING_CREATOR):
-            raise ValidationError("target user is not a creator")
+            raise ValidationError("target user is not a creator or pending creator")
 
         self.user_repo.update_puzzle_limits(target_user_id, max_published, max_unpublished)
         self.user_repo.conn.commit()
