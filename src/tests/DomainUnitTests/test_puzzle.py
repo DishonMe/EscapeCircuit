@@ -507,6 +507,23 @@ class TestPuzzleSetters:
         with pytest.raises(ValidationError):
             puzzle.set_budget(-10)
 
+    def test_set_budget_violates_creator_budget_constraint(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250, creator_budget=100)
+        with pytest.raises(ValidationError) as exc_info:
+            puzzle.set_budget(50)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
+
+    def test_set_budget_equal_to_creator_budget_raises(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250, creator_budget=100)
+        with pytest.raises(ValidationError) as exc_info:
+            puzzle.set_budget(100)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
+
+    def test_set_budget_no_creator_budget_allows_any_valid(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250)
+        puzzle.set_budget(10)
+        assert puzzle.budget == 10
+
     def test_set_creator_budget(self):
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250)
         puzzle.set_creator_budget(100)
@@ -521,6 +538,18 @@ class TestPuzzleSetters:
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=250)
         with pytest.raises(ValidationError):
             puzzle.set_creator_budget(-10)
+
+    def test_set_creator_budget_violates_budget_constraint(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100)
+        with pytest.raises(ValidationError) as exc_info:
+            puzzle.set_creator_budget(100)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
+
+    def test_set_creator_budget_exceeds_budget_raises(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100)
+        with pytest.raises(ValidationError) as exc_info:
+            puzzle.set_creator_budget(150)
+        assert "Puzzle.budget must be greater than creator_budget" in str(exc_info.value)
 
     def test_set_time_limit_seconds(self):
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1)

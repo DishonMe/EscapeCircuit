@@ -167,13 +167,19 @@ class Puzzle:
         self.status = value
 
     def set_budget(self, value: int) -> None:
-        self.budget = ensure_non_negative_int("Puzzle.budget", value)
+        new_budget = ensure_non_negative_int("Puzzle.budget", value)
+        if self.creator_budget is not None and new_budget <= self.creator_budget:
+            raise ValidationError("Puzzle.budget must be greater than creator_budget")
+        self.budget = new_budget
 
     def set_creator_budget(self, value: Optional[int]) -> None:
         if value is None:
             self.creator_budget = None
         else:
-            self.creator_budget = ensure_non_negative_int("Puzzle.creator_budget", value)
+            new_creator_budget = ensure_non_negative_int("Puzzle.creator_budget", value)
+            if self.budget <= new_creator_budget:
+                raise ValidationError("Puzzle.budget must be greater than creator_budget")
+            self.creator_budget = new_creator_budget
 
     def set_time_limit_seconds(self, value) -> None:
         self.time_limit_seconds = ensure_optional_positive_int("Puzzle.time_limit_seconds", value)
