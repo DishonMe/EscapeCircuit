@@ -126,12 +126,30 @@ class XPService:
                 return slots
         return settings.ARSENAL_XP_MAX_SLOTS
 
-    # ---- Internal: apply XP delta to user ----
+    # ---- Internal: apply XP delta to user (with level-up side-effects) ----
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:
             return 0
+        # Detect level-up before the atomic increment so we can read old XP.
+        user = self.user_repo.get_by_id(user_id)
+        if user is not None:
+            old_level = self.calculate_level(user.xp)
+            new_level = self.calculate_level(user.xp + delta)
+            if new_level > old_level:
+                self._handle_level_up(user_id, old_level, new_level)
         self.user_repo.increment_xp(user_id, delta)
         return delta
+
+    def _handle_level_up(self, user_id: int, old_level: int, new_level: int) -> None:
+        """Increment stored puzzle limits for each qualifying level crossed."""
+        qualifying = sum(
+            1 for lvl in range(old_level + 1, new_level + 1)
+            if settings.PUZZLE_CAPACITY_LEVEL_START <= lvl <= settings.PUZZLE_CAPACITY_LEVEL_END
+        )
+        if qualifying > 0:
+            self.user_repo.increment_puzzle_limits(
+                user_id, qualifying * settings.PUZZLE_CAPACITY_LEVEL_INCREMENT
+            )
 
     # ---- Public award methods ----
     def award_solve_xp(

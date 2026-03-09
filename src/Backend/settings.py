@@ -4,7 +4,7 @@ EscapeCircuit — centralised configuration / constants.
 Every magic number that controls business rules, performance tuning, or
 UI defaults lives here.  Import directly from this module:
 
-    from Backend.settings import XP_SOLVE_EASY, PUZZLE_MAX_PUBLISHED_PER_USER
+    from Backend.settings import XP_SOLVE_EASY, PUZZLE_DEFAULT_MAX_PUBLISHED
 
 This file has **no imports from the rest of the Backend** so it can be
 safely imported by any layer without creating circular dependencies.
@@ -69,16 +69,16 @@ ARSENAL_MIN_INPUTS: int = 1
 ARSENAL_MIN_OUTPUTS: int = 1
 
 # ── Puzzle publishing ─────────────────────────────────────────────────────────
-PUZZLE_MAX_PUBLISHED_PER_USER: int = 10  # Legacy global cap; per-user limits now used
-
-# Default per-creator puzzle capacity (when no admin override is set)
+# Initial capacity for new creators (stored in the DB, not recomputed each time).
 PUZZLE_DEFAULT_MAX_PUBLISHED: int = 5
 PUZZLE_DEFAULT_MAX_UNPUBLISHED: int = 5
 
-# Level-based capacity increase: starting at PUZZLE_CAPACITY_BASE_LEVEL,
-# capacity grows by PUZZLE_CAPACITY_LEVEL_INCREMENT per level above base.
-# Example: level 10 → 5, level 11 → 7, level 12 → 9, ...
-PUZZLE_CAPACITY_BASE_LEVEL: int = 10
+# Level-up capacity bonus: each time a creator's level crosses a threshold in
+# [PUZZLE_CAPACITY_LEVEL_START, PUZZLE_CAPACITY_LEVEL_END] (inclusive), their
+# stored max_published_puzzles and max_unpublished_puzzles each increase by
+# PUZZLE_CAPACITY_LEVEL_INCREMENT.
+PUZZLE_CAPACITY_LEVEL_START: int = 10   # first level that grants +capacity
+PUZZLE_CAPACITY_LEVEL_END: int = 15     # last level that grants +capacity
 PUZZLE_CAPACITY_LEVEL_INCREMENT: int = 2
 PUZZLE_NAME_MAX_LENGTH: int = 100
 PUZZLE_DESCRIPTION_MAX_LENGTH: int = 2000

@@ -4,7 +4,6 @@ import pathlib
 import os
 
 from Backend import settings
-from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 

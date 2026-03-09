@@ -35,13 +35,24 @@ class UserRepo:
         if "is_discussion_banned" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN is_discussion_banned INTEGER NOT NULL DEFAULT 0")
         if "max_published_puzzles" not in cols:
-            self.conn.execute("ALTER TABLE users ADD COLUMN max_published_puzzles INTEGER")
+            self.conn.execute("ALTER TABLE users ADD COLUMN max_published_puzzles INTEGER DEFAULT 5")
+        # Backfill NULL values (e.g. rows added before this column was mandatory)
+        self.conn.execute(
+            "UPDATE users SET max_published_puzzles = ? WHERE max_published_puzzles IS NULL",
+            (settings.PUZZLE_DEFAULT_MAX_PUBLISHED,),
+        )
         if "max_unpublished_puzzles" not in cols:
-            self.conn.execute("ALTER TABLE users ADD COLUMN max_unpublished_puzzles INTEGER")
+            self.conn.execute("ALTER TABLE users ADD COLUMN max_unpublished_puzzles INTEGER DEFAULT 5")
+        self.conn.execute(
+            "UPDATE users SET max_unpublished_puzzles = ? WHERE max_unpublished_puzzles IS NULL",
+            (settings.PUZZLE_DEFAULT_MAX_UNPUBLISHED,),
+        )
 
     @staticmethod
     def _row_to_user(row) -> User:
         keys = row.keys()
+        raw_pub = row["max_published_puzzles"] if "max_published_puzzles" in keys else None
+        raw_unpub = row["max_unpublished_puzzles"] if "max_unpublished_puzzles" in keys else None
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
@@ -51,8 +62,8 @@ class UserRepo:
             "xp": int(row["xp"]),
             "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in keys else False,
             "created_at": row["created_at"],
-            "max_published_puzzles": row["max_published_puzzles"] if "max_published_puzzles" in keys else None,
-            "max_unpublished_puzzles": row["max_unpublished_puzzles"] if "max_unpublished_puzzles" in keys else None,
+            "max_published_puzzles": int(raw_pub) if raw_pub is not None else None,
+            "max_unpublished_puzzles": int(raw_unpub) if raw_unpub is not None else None,
         })
 
     @staticmethod
@@ -67,12 +78,22 @@ class UserRepo:
             pw_hash = self._hash_password(password, salt)
 
         cur = self.conn.execute(
-            "INSERT INTO users(username, email, role, bio, xp, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?,?,?)",
-            (user.username, user.email, user.role.value, user.bio, user.xp, user.created_at.isoformat(), salt, pw_hash),
+            "INSERT INTO users(username, email, role, bio, xp, created_at, pw_salt, pw_hash, max_published_puzzles, max_unpublished_puzzles) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (user.username, user.email, user.role.value, user.bio, user.xp, user.created_at.isoformat(), salt, pw_hash, user.max_published_puzzles, user.max_unpublished_puzzles),
         )
         self.conn.commit()
         new_id = int(cur.lastrowid)
-        return User(id=new_id, username=user.username, email=user.email, role=user.role, bio=user.bio, xp=user.xp, created_at=user.created_at)
+        return User(
+            id=new_id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            bio=user.bio,
+            xp=user.xp,
+            created_at=user.created_at,
+            max_published_puzzles=user.max_published_puzzles,
+            max_unpublished_puzzles=user.max_unpublished_puzzles,
+        )
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
@@ -263,11 +284,26 @@ class UserRepo:
     def update_puzzle_limits(
         self,
         user_id: int,
-        max_published: Optional[int],
-        max_unpublished: Optional[int],
+        max_published: int,
+        max_unpublished: int,
     ) -> None:
-        """Set per-user puzzle capacity overrides. Pass None to reset to level-based default."""
+        """Set per-user puzzle capacity directly. Values are clamped to >= 0."""
         self.conn.execute(
             "UPDATE users SET max_published_puzzles=?, max_unpublished_puzzles=? WHERE id=?",
-            (max_published, max_unpublished, int(user_id)),
+            (max(0, int(max_published)), max(0, int(max_unpublished)), int(user_id)),
         )
+        self.conn.commit()
+
+    def increment_puzzle_limits(self, user_id: int, amount: int) -> None:
+        """Atomically increase both puzzle limits by *amount* (level-up bonus).
+        No-op if amount <= 0. Values will not be decremented below 0."""
+        if amount <= 0:
+            return
+        self.conn.execute(
+            "UPDATE users SET "
+            "max_published_puzzles = max_published_puzzles + ?, "
+            "max_unpublished_puzzles = max_unpublished_puzzles + ? "
+            "WHERE id=?",
+            (int(amount), int(amount), int(user_id)),
+        )
+        self.conn.commit()

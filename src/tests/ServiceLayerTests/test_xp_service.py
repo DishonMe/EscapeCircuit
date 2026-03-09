@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from typing import Dict, Any
 
 from Backend.ServiceLayer.XPService import XPService
-from Backend.DomainLayer.Enums import PuzzleDifficulty, Medal
+from Backend.DomainLayer.Enums import PuzzleDifficulty, Medal, UserRole
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
@@ -110,6 +110,8 @@ class TestXPServiceIsExperienced:
 class TestXPServiceApplyXP:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Default: return a low-XP user so no level-up thresholds are crossed
+        self.mock_user_repo.get_by_id.return_value = User(id=1, username="u", xp=0)
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_apply_xp_success(self):
@@ -132,6 +134,7 @@ class TestXPServiceApplyXP:
 
     def test_apply_xp_user_not_found(self):
         # increment_xp is a no-op for non-existent users (UPDATE affects 0 rows)
+        self.mock_user_repo.get_by_id.return_value = None
         delta = self.service._apply_xp(999, 50)
         assert delta == 50
         self.mock_user_repo.increment_xp.assert_called_once_with(999, 50)
@@ -188,6 +191,8 @@ class TestXPServiceAwardSolveXP:
 class TestXPServiceAwardRatingXP:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Return a low-XP user so no level-up thresholds are crossed
+        self.mock_user_repo.get_by_id.return_value = User(id=1, username="u", xp=0)
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_award_rating_xp_first_time(self):
@@ -295,6 +300,8 @@ class TestXPServiceArsenalCapacity:
 class TestXPServiceRewardCalculation:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        # Return a low-XP user so no level-up thresholds are crossed
+        self.mock_user_repo.get_by_id.return_value = User(id=1, username="u", xp=0)
         self.service = XPService(user_repo=self.mock_user_repo)
 
     def test_calculate_solve_xp_easy_no_medal(self):
@@ -421,3 +428,78 @@ class TestXPServiceIsExperienced:
         high_xp = settings.EXPERIENCED_LEVEL_MIN * settings.EXPERIENCED_LEVEL_MIN * settings.LEVEL_XP_DIVISOR
         experienced = self.service.is_experienced(high_xp)
         assert experienced
+
+class TestXPServiceLevelUpPuzzleLimits:
+    """Tests for the puzzle-limit side-effect of _apply_xp / _handle_level_up."""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = XPService(user_repo=self.mock_user_repo)
+
+    def _user_at_xp(self, xp: int) -> User:
+        return User(id=1, username="creator", role=UserRole.CREATOR, xp=xp)
+
+    def test_no_level_up_no_limit_change(self):
+        """XP award that keeps user on the same level does not touch puzzle limits."""
+        # Level 1 = 0 XP; 50 XP is still level 1
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(0)
+        self.service._apply_xp(1, 50)
+        self.mock_user_repo.increment_puzzle_limits.assert_not_called()
+
+    def test_level_up_below_threshold_no_limit_change(self):
+        """Level-up below level 10 does not trigger puzzle limit increase."""
+        # Level 2 threshold: 100 XP. Going from XP=50 to XP=100 crosses level 2.
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(50)
+        self.service._apply_xp(1, 50)  # 50 + 50 = 100 → level 2
+        self.mock_user_repo.increment_puzzle_limits.assert_not_called()
+
+    def test_level_up_to_level_10_increases_limits(self):
+        """Crossing level 10 for the first time gives +2 to puzzle limits."""
+        # Level 10 threshold (XPService formula): (10-1)^2 * 100 = 8100
+        xp_just_below_10 = 8099
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(xp_just_below_10)
+        # Award just enough to tip into level 10
+        self.service._apply_xp(1, 1)  # 8099 + 1 = 8100 → level 10
+        from Backend import settings
+        self.mock_user_repo.increment_puzzle_limits.assert_called_once_with(
+            1, settings.PUZZLE_CAPACITY_LEVEL_INCREMENT
+        )
+
+    def test_level_up_to_level_15_increases_limits(self):
+        """Crossing level 15 gives +2 to puzzle limits."""
+        # Level 15 threshold: (15-1)^2 * 100 = 19600
+        xp_just_below_15 = 19599
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(xp_just_below_15)
+        self.service._apply_xp(1, 1)  # → level 15
+        from Backend import settings
+        self.mock_user_repo.increment_puzzle_limits.assert_called_once_with(
+            1, settings.PUZZLE_CAPACITY_LEVEL_INCREMENT
+        )
+
+    def test_level_up_beyond_level_15_no_extra_increase(self):
+        """Levels above 15 do NOT increase puzzle limits."""
+        # Level 16 threshold: (16-1)^2 * 100 = 22500
+        xp_just_below_16 = 22499
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(xp_just_below_16)
+        self.service._apply_xp(1, 1)  # → level 16
+        self.mock_user_repo.increment_puzzle_limits.assert_not_called()
+
+    def test_skipping_multiple_qualifying_levels_adds_multiple_increments(self):
+        """A large XP award that skips levels 10 and 11 in one go gives +4."""
+        # Level 10 threshold = 8100, Level 11 = 10000
+        xp_below_10 = 8000
+        self.mock_user_repo.get_by_id.return_value = self._user_at_xp(xp_below_10)
+        # Award enough to reach level 11 in one step
+        self.service._apply_xp(1, 2100)  # 8000 + 2100 = 10100 → level 11
+        from Backend import settings
+        self.mock_user_repo.increment_puzzle_limits.assert_called_once_with(
+            1, 2 * settings.PUZZLE_CAPACITY_LEVEL_INCREMENT  # 4
+        )
+
+    def test_user_not_found_still_awards_xp(self):
+        """If user can't be fetched, XP is still awarded (level-up skipped safely)."""
+        self.mock_user_repo.get_by_id.return_value = None
+        delta = self.service._apply_xp(999, 8100)
+        assert delta == 8100
+        self.mock_user_repo.increment_xp.assert_called_once_with(999, 8100)
+        self.mock_user_repo.increment_puzzle_limits.assert_not_called()

@@ -11,7 +11,6 @@ from Backend.DomainLayer.User import User
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
-from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 import json
 
 
@@ -366,14 +365,13 @@ class TestPuzzleServicePublish:
         draft_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
         self.mock_puzzle_repo.get_by_id.return_value = draft_puzzle
         self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
-        self.mock_puzzle_repo.count_published.return_value = PUZZLE_MAX_PUBLISHED_PER_USER
+        # creator has default limit of 5 and already has 5 published
+        self.mock_puzzle_repo.count_published.return_value = creator_user.max_published_puzzles
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.publish("valid_token", 1)
 
-        assert str(exc_info.value) == (
-            f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
-        )
+        assert "maximum limit" in str(exc_info.value).lower()
 
     def test_publish_admin_bypasses_published_limit(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -987,7 +985,7 @@ class TestPuzzleServiceCapacityLimits:
         assert "maximum limit" in str(exc_info.value).lower()
 
     def test_create_puzzle_blocked_when_above_custom_unpublished_limit(self):
-        """Creator above their admin-set limit is blocked."""
+        """Creator above their stored limit is blocked."""
         creator = User(id=1, username="creator", role=UserRole.CREATOR, max_unpublished_puzzles=3)
         self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 3
         self.mock_auth.require_user_id.return_value = 1
@@ -1034,8 +1032,7 @@ class TestPuzzleServiceCapacityLimits:
         assert result["name"] == "AdminPuzzle"
 
     def test_publish_blocked_when_at_per_user_published_limit(self):
-        """Creator at their per-user published limit cannot publish more."""
-        # Set a custom published limit of 3
+        """Creator at their stored published limit cannot publish more."""
         creator = User(id=1, username="creator", role=UserRole.CREATOR, max_published_puzzles=3)
         self.mock_user_repo.get_by_id.return_value = creator
         self.mock_auth.require_user_id.return_value = 1
@@ -1056,25 +1053,17 @@ class TestPuzzleServiceCapacityLimits:
             self.service.publish("token", 1)
         assert "maximum limit" in str(exc_info.value).lower()
 
-    def test_level_based_capacity_increases_at_level_10(self):
-        """Level-based capacity: level 11 should give 7 (5 + 2*1)."""
-        # 1000 XP → level 11 (1 + 1000//100 = 11)
-        user = User(id=1, username="u", role=UserRole.CREATOR, xp=1000)
-        assert user.level == 11
-        assert user.effective_max_published == 7
-        assert user.effective_max_unpublished == 7
-
-    def test_level_below_10_uses_default(self):
-        """Level < 10 uses the base default of 5."""
-        user = User(id=1, username="u", role=UserRole.CREATOR, xp=0)
-        assert user.level == 1
+    def test_stored_field_default_is_five(self):
+        """New users start with the default capacity of 5."""
+        user = User(id=1, username="u", role=UserRole.CREATOR)
+        assert user.max_published_puzzles == 5
+        assert user.max_unpublished_puzzles == 5
         assert user.effective_max_published == 5
         assert user.effective_max_unpublished == 5
 
-    def test_admin_override_takes_precedence_over_level(self):
-        """Admin-set limit overrides level-based calculation."""
-        user = User(id=1, username="u", role=UserRole.CREATOR, xp=2000,
-                    max_published_puzzles=2, max_unpublished_puzzles=10)
-        # Level would be 21 (1 + 2000//100), default computed = 5+2*(21-10) = 27
-        assert user.effective_max_published == 2
-        assert user.effective_max_unpublished == 10
+    def test_stored_field_reflects_admin_override(self):
+        """The stored field is returned directly, no formula applied."""
+        user = User(id=1, username="u", role=UserRole.CREATOR,
+                    max_published_puzzles=8, max_unpublished_puzzles=3)
+        assert user.effective_max_published == 8
+        assert user.effective_max_unpublished == 3

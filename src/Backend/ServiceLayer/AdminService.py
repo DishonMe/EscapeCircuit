@@ -418,7 +418,7 @@ class AdminService:
             raise ValidationError("target user is not a creator or pending creator")
 
         self.user_repo.update_puzzle_limits(target_user_id, max_published, max_unpublished)
-        self.user_repo.conn.commit()
+        # (update_puzzle_limits commits internally)
 
         # Audit log
         self.audit_log.create(
