@@ -424,6 +424,15 @@ class PuzzleRepo:
         rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_puzzle(r) for r in rows]
 
+    def count_unpublished_for_creator(self, creator_id: int) -> int:
+        """Count non-published puzzles (draft + unpublished) for a given creator."""
+        cur = self.conn.execute(
+            "SELECT COUNT(*) FROM puzzles WHERE creator_user_id=? AND status IN (?, ?)",
+            (int(creator_id), PuzzleStatus.DRAFT.value, PuzzleStatus.UNPUBLISHED.value),
+        )
+        row = cur.fetchone()
+        return row[0] if row else 0
+
     def count_published(
         self,
         search: Optional[str] = None,

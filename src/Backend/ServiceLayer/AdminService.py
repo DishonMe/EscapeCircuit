@@ -396,6 +396,87 @@ class AdminService:
         }
 
     # ------------------------------------------------------------------ #
+    #  REQ (new)  —  Set per-creator puzzle capacity overrides
+    # ------------------------------------------------------------------ #
+    def set_creator_puzzle_limits(
+        self,
+        session_token: str,
+        target_user_id: int,
+        max_published: int,
+        max_unpublished: int,
+    ) -> dict:
+        """Allow an admin to set custom published/unpublished puzzle limits for a creator."""
+        admin_id = self._require_admin(session_token)
+
+        if max_published < 0 or max_unpublished < 0:
+            raise ValidationError("limits cannot be negative")
+
+        target = self.user_repo.get_by_id(target_user_id)
+        if not target:
+            raise ValidationError("target user not found")
+        if target.role not in (UserRole.CREATOR, UserRole.PENDING_CREATOR):
+            raise ValidationError("target user is not a creator")
+
+        self.user_repo.update_puzzle_limits(target_user_id, max_published, max_unpublished)
+        self.user_repo.conn.commit()
+
+        # Audit log
+        self.audit_log.create(
+            admin_user_id=admin_id,
+            action_type=AuditActionType.SET_PUZZLE_LIMITS.value,
+            target_user_id=target_user_id,
+            details={
+                "max_published": max_published,
+                "max_unpublished": max_unpublished,
+            },
+        )
+
+        updated = self.user_repo.get_by_id(target_user_id)
+        return {
+            "ok": True,
+            "user_id": target_user_id,
+            "max_published_puzzles": max_published,
+            "max_unpublished_puzzles": max_unpublished,
+            "effective_max_published": updated.effective_max_published,
+            "effective_max_unpublished": updated.effective_max_unpublished,
+        }
+
+    # ------------------------------------------------------------------ #
+    #  REQ (new)  —  Admin unpublish a puzzle (never deletes it)
+    # ------------------------------------------------------------------ #
+    def unpublish_puzzle(self, session_token: str, puzzle_id: int) -> dict:
+        """Admin action to unpublish a puzzle.
+
+        Unlike delete, this never removes the puzzle – it only changes its
+        status to UNPUBLISHED.  Even if the creator is already at their
+        unpublished capacity, the puzzle is still moved (the creator just
+        won't be able to create / edit until they reduce their count).
+        """
+        admin_id = self._require_admin(session_token)
+
+        puzzle = self.puzzle_repo.get_by_id(puzzle_id)
+        if not puzzle:
+            raise ValidationError("puzzle not found")
+
+        if puzzle.status != PuzzleStatus.PUBLISHED:
+            raise ValidationError("puzzle is not published")
+
+        puzzle.status = PuzzleStatus.UNPUBLISHED
+        self.puzzle_repo.update(puzzle)
+        self.puzzle_repo.conn.commit()
+
+        # Audit log
+        self.audit_log.create(
+            admin_user_id=admin_id,
+            action_type=AuditActionType.UNPUBLISH_PUZZLE.value,
+            target_puzzle_id=puzzle_id,
+            target_user_id=puzzle.creator_user_id,
+            details={"puzzle_name": puzzle.name},
+        )
+
+        return {"ok": True, "puzzle_id": puzzle_id, "new_status": PuzzleStatus.UNPUBLISHED.value}
+
+    # ------------------------------------------------------------------ #
     #  REQ 7.5  —  Audit Log Listing
     # ------------------------------------------------------------------ #
     def list_audit_log(

@@ -329,3 +329,162 @@ class TestAdminServiceModeration:
 
 
 
+
+
+class TestAdminServiceSetCreatorPuzzleLimits:
+    """Tests for AdminService.set_creator_puzzle_limits."""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock()
+        self.mock_puzzle_repo = Mock()
+        self.mock_solve_repo = Mock()
+        self.mock_rating_repo = Mock()
+        self.mock_audit_log = Mock()
+        self.mock_notification_repo = Mock()
+        self.mock_auth = Mock()
+
+        self.service = AdminService(
+            self.mock_user_repo,
+            self.mock_puzzle_repo,
+            self.mock_solve_repo,
+            self.mock_rating_repo,
+            self.mock_audit_log,
+            self.mock_notification_repo,
+            self.mock_auth,
+        )
+
+        self.mock_user_repo.conn = Mock()
+
+    def _make_admin(self):
+        a = Mock(spec=User)
+        a.role = UserRole.ADMIN
+        a.username = "admin"
+        return a
+
+    def _make_creator(self):
+        from Backend.DomainLayer.User import User as RealUser
+        return RealUser(id=2, username="creator", role=UserRole.CREATOR)
+
+    def test_set_limits_success(self):
+        admin = self._make_admin()
+        creator = self._make_creator()
+
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.side_effect = [admin, creator, creator]
+
+        result = self.service.set_creator_puzzle_limits("token", 2, max_published=8, max_unpublished=6)
+
+        assert result["ok"] is True
+        assert result["max_published_puzzles"] == 8
+        assert result["max_unpublished_puzzles"] == 6
+        self.mock_user_repo.update_puzzle_limits.assert_called_once_with(2, 8, 6)
+        self.mock_audit_log.create.assert_called_once()
+
+    def test_set_limits_non_admin_rejected(self):
+        solver = Mock(spec=User)
+        solver.role = UserRole.SOLVER
+
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = solver
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.set_creator_puzzle_limits("token", 2, 5, 5)
+        assert "admin required" in str(exc.value)
+
+    def test_set_limits_target_not_found(self):
+        admin = self._make_admin()
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.side_effect = [admin, None]
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.set_creator_puzzle_limits("token", 99, 5, 5)
+        assert "not found" in str(exc.value)
+
+    def test_set_limits_target_not_creator(self):
+        admin = self._make_admin()
+        solver = Mock(spec=User)
+        solver.role = UserRole.SOLVER
+
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.side_effect = [admin, solver]
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.set_creator_puzzle_limits("token", 2, 5, 5)
+        assert "not a creator" in str(exc.value)
+
+    def test_set_limits_negative_values_rejected(self):
+        admin = self._make_admin()
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.set_creator_puzzle_limits("token", 2, -1, 5)
+        assert "negative" in str(exc.value)
+
+
+class TestAdminServiceUnpublishPuzzle:
+    """Tests for AdminService.unpublish_puzzle."""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock()
+        self.mock_puzzle_repo = Mock()
+        self.mock_solve_repo = Mock()
+        self.mock_rating_repo = Mock()
+        self.mock_audit_log = Mock()
+        self.mock_notification_repo = Mock()
+        self.mock_auth = Mock()
+
+        self.service = AdminService(
+            self.mock_user_repo,
+            self.mock_puzzle_repo,
+            self.mock_solve_repo,
+            self.mock_rating_repo,
+            self.mock_audit_log,
+            self.mock_notification_repo,
+            self.mock_auth,
+        )
+
+        self.mock_puzzle_repo.conn = Mock()
+
+    def _make_admin(self):
+        a = Mock(spec=User)
+        a.role = UserRole.ADMIN
+        a.username = "admin"
+        return a
+
+    def test_unpublish_success(self):
+        admin = self._make_admin()
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+
+        puzzle = Puzzle(id=5, name="P", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        result = self.service.unpublish_puzzle("token", 5)
+
+        assert result["ok"] is True
+        assert result["new_status"] == PuzzleStatus.UNPUBLISHED.value
+        self.mock_puzzle_repo.update.assert_called_once()
+        self.mock_audit_log.create.assert_called_once()
+
+    def test_unpublish_puzzle_not_found(self):
+        admin = self._make_admin()
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+        self.mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.unpublish_puzzle("token", 99)
+        assert "not found" in str(exc.value)
+
+    def test_unpublish_already_unpublished(self):
+        admin = self._make_admin()
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+
+        puzzle = Puzzle(id=5, name="P", creator_user_id=2, status=PuzzleStatus.UNPUBLISHED)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError) as exc:
+            self.service.unpublish_puzzle("token", 5)
+        assert "not published" in str(exc.value)

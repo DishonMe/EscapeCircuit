@@ -69,7 +69,17 @@ ARSENAL_MIN_INPUTS: int = 1
 ARSENAL_MIN_OUTPUTS: int = 1
 
 # ── Puzzle publishing ─────────────────────────────────────────────────────────
-PUZZLE_MAX_PUBLISHED_PER_USER: int = 10
+PUZZLE_MAX_PUBLISHED_PER_USER: int = 10  # Legacy global cap; per-user limits now used
+
+# Default per-creator puzzle capacity (when no admin override is set)
+PUZZLE_DEFAULT_MAX_PUBLISHED: int = 5
+PUZZLE_DEFAULT_MAX_UNPUBLISHED: int = 5
+
+# Level-based capacity increase: starting at PUZZLE_CAPACITY_BASE_LEVEL,
+# capacity grows by PUZZLE_CAPACITY_LEVEL_INCREMENT per level above base.
+# Example: level 10 → 5, level 11 → 7, level 12 → 9, ...
+PUZZLE_CAPACITY_BASE_LEVEL: int = 10
+PUZZLE_CAPACITY_LEVEL_INCREMENT: int = 2
 PUZZLE_NAME_MAX_LENGTH: int = 100
 PUZZLE_DESCRIPTION_MAX_LENGTH: int = 2000
 PUZZLE_INSTRUCTIONS_MAX_BYTES: int = 5 * 1024

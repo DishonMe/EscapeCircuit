@@ -144,6 +144,7 @@ class TestPuzzleServiceCreatePuzzle:
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
         self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 0
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
@@ -959,3 +960,121 @@ class TestPuzzleServiceUpdatePuzzle:
         with pytest.raises(ValidationError) as exc_info:
             self.service.update_puzzle("valid_token", 1, {"name": "New"})
         assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServiceCapacityLimits:
+    """Tests for per-user puzzle capacity enforcement."""
+
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 0
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_create_puzzle_blocked_when_at_unpublished_limit(self):
+        """Creator at their unpublished limit cannot create new puzzles."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        # At default limit (5)
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 5
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.create_puzzle("token", {"name": "New"})
+        assert "maximum limit" in str(exc_info.value).lower()
+
+    def test_create_puzzle_blocked_when_above_custom_unpublished_limit(self):
+        """Creator above their admin-set limit is blocked."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, max_unpublished_puzzles=3)
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 3
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+
+        with pytest.raises(ValidationError):
+            self.service.create_puzzle("token", {"name": "New"})
+
+    def test_create_puzzle_allowed_when_below_unpublished_limit(self):
+        """Creator below their limit can create puzzles."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR)
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 2
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+
+        created = Puzzle(id=1, name="Ok", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.create.return_value = created
+
+        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_cls:
+            inst = Mock(spec=Puzzle)
+            inst.to_dict.return_value = created.to_dict()
+            mock_cls.return_value = inst
+            result = self.service.create_puzzle("token", {"name": "Ok"})
+
+        assert result["name"] == "Ok"
+
+    def test_admin_bypasses_unpublished_limit(self):
+        """Admins are never blocked by unpublished limits."""
+        admin = User(id=1, username="admin", role=UserRole.ADMIN)
+        # Even if count is huge, admin can still create
+        self.mock_puzzle_repo.count_unpublished_for_creator.return_value = 100
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+
+        created = Puzzle(id=1, name="AdminPuzzle", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.create.return_value = created
+
+        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_cls:
+            inst = Mock(spec=Puzzle)
+            inst.to_dict.return_value = created.to_dict()
+            mock_cls.return_value = inst
+            result = self.service.create_puzzle("token", {"name": "AdminPuzzle"})
+
+        assert result["name"] == "AdminPuzzle"
+
+    def test_publish_blocked_when_at_per_user_published_limit(self):
+        """Creator at their per-user published limit cannot publish more."""
+        # Set a custom published limit of 3
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, max_published_puzzles=3)
+        self.mock_user_repo.get_by_id.return_value = creator
+        self.mock_auth.require_user_id.return_value = 1
+
+        draft = Puzzle(id=1, name="Draft", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_puzzle_repo.get_by_id.return_value = draft
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+        self.mock_puzzle_repo.count_published.return_value = 3  # already at limit
+
+        # Mock the transaction context manager
+        mock_cursor = Mock()
+        mock_cursor.rowcount = 1
+        self.mock_puzzle_repo.conn.execute.return_value = mock_cursor
+        self.mock_puzzle_repo.conn.__enter__ = Mock(return_value=self.mock_puzzle_repo.conn)
+        self.mock_puzzle_repo.conn.__exit__ = Mock(return_value=False)
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.publish("token", 1)
+        assert "maximum limit" in str(exc_info.value).lower()
+
+    def test_level_based_capacity_increases_at_level_10(self):
+        """Level-based capacity: level 11 should give 7 (5 + 2*1)."""
+        # 1000 XP → level 11 (1 + 1000//100 = 11)
+        user = User(id=1, username="u", role=UserRole.CREATOR, xp=1000)
+        assert user.level == 11
+        assert user.effective_max_published == 7
+        assert user.effective_max_unpublished == 7
+
+    def test_level_below_10_uses_default(self):
+        """Level < 10 uses the base default of 5."""
+        user = User(id=1, username="u", role=UserRole.CREATOR, xp=0)
+        assert user.level == 1
+        assert user.effective_max_published == 5
+        assert user.effective_max_unpublished == 5
+
+    def test_admin_override_takes_precedence_over_level(self):
+        """Admin-set limit overrides level-based calculation."""
+        user = User(id=1, username="u", role=UserRole.CREATOR, xp=2000,
+                    max_published_puzzles=2, max_unpublished_puzzles=10)
+        # Level would be 21 (1 + 2000//100), default computed = 5+2*(21-10) = 27
+        assert user.effective_max_published == 2
+        assert user.effective_max_unpublished == 10

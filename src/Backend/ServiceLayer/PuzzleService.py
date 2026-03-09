@@ -393,6 +393,15 @@ class PuzzleService:
         if existing:
             raise ValidationError("Puzzle name already exists. Please choose a unique name.")
 
+        # Enforce per-user unpublished puzzle limit (drafts + unpublished) for creators
+        if not self._is_admin(user.role):
+            unpublished_count = self.repo.count_unpublished_for_creator(user_id)
+            if unpublished_count >= user.effective_max_unpublished:
+                raise ValidationError(
+                    f"You have reached the maximum limit of {user.effective_max_unpublished} unpublished puzzles. "
+                    "Remove or publish some puzzles before creating a new one."
+                )
+
         default_gate_set_raw = payload.get("default_gate_set", [])
         gate_set = {GateType(x) for x in default_gate_set_raw}
 
@@ -456,9 +465,9 @@ class PuzzleService:
         with transaction(self.repo.conn):
             if not is_admin:
                 current_count = self.repo.count_published(creator_id=user_id)
-                if p.status != PuzzleStatus.PUBLISHED and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER:
+                if p.status != PuzzleStatus.PUBLISHED and current_count >= user.effective_max_published:
                     raise ValidationError(
-                        f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
+                        f"You have reached the maximum limit of {user.effective_max_published} published puzzles."
                     )
 
             cur = self.repo.conn.execute(

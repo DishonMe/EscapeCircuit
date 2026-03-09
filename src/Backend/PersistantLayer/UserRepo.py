@@ -30,13 +30,18 @@ class UserRepo:
             pw_hash BLOB
         );
         """)
-        # Migration: add is_discussion_banned column if missing
+        # Migration: add columns if missing
         cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
         if "is_discussion_banned" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN is_discussion_banned INTEGER NOT NULL DEFAULT 0")
+        if "max_published_puzzles" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN max_published_puzzles INTEGER")
+        if "max_unpublished_puzzles" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN max_unpublished_puzzles INTEGER")
 
     @staticmethod
     def _row_to_user(row) -> User:
+        keys = row.keys()
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
@@ -44,8 +49,10 @@ class UserRepo:
             "role": row["role"],
             "bio": row["bio"],
             "xp": int(row["xp"]),
-            "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in row.keys() else False,
+            "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in keys else False,
             "created_at": row["created_at"],
+            "max_published_puzzles": row["max_published_puzzles"] if "max_published_puzzles" in keys else None,
+            "max_unpublished_puzzles": row["max_unpublished_puzzles"] if "max_unpublished_puzzles" in keys else None,
         })
 
     @staticmethod
@@ -252,3 +259,15 @@ class UserRepo:
     def unban_from_discussions(self, user_id: int) -> None:
         self.conn.execute("UPDATE users SET is_discussion_banned=0 WHERE id=?", (int(user_id),))
         self.conn.commit()
+
+    def update_puzzle_limits(
+        self,
+        user_id: int,
+        max_published: Optional[int],
+        max_unpublished: Optional[int],
+    ) -> None:
+        """Set per-user puzzle capacity overrides. Pass None to reset to level-based default."""
+        self.conn.execute(
+            "UPDATE users SET max_published_puzzles=?, max_unpublished_puzzles=? WHERE id=?",
+            (max_published, max_unpublished, int(user_id)),
+        )

@@ -30,6 +30,12 @@ class ConfirmRemoveCreatorReq(BaseModel):
     action: str  # "unpublish", "delete", or "leave"
 
 
+class SetCreatorPuzzleLimitsReq(BaseModel):
+    target_user_id: int
+    max_published: int
+    max_unpublished: int
+
+
 def get_db_conn():
     """Helper to get a fresh connection for the upload-puzzle script."""
     current_file = pathlib.Path(__file__).resolve()
@@ -214,6 +220,37 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
             )
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
+
+    # ------------------------------------------------------------------ #
+    #  Set per-creator puzzle capacity overrides
+    # ------------------------------------------------------------------ #
+    @router.post("/creator-puzzle-limits")
+    def set_creator_puzzle_limits(req: SetCreatorPuzzleLimitsReq, token: str = Depends(verify_token)):
+        try:
+            return admin_service.set_creator_puzzle_limits(
+                token,
+                req.target_user_id,
+                req.max_published,
+                req.max_unpublished,
+            )
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    # ------------------------------------------------------------------ #
+    #  Admin unpublish a puzzle (never deletes, ignores unpublished cap)
+    # ------------------------------------------------------------------ #
+    @router.post("/puzzles/{puzzle_id}/unpublish")
+    def admin_unpublish_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            return admin_service.unpublish_puzzle(token, puzzle_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
 
     # ------------------------------------------------------------------ #
     #  Create puzzle from form (available to admins and creators)
