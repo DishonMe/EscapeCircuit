@@ -301,12 +301,13 @@ class SolvingService:
             medal = Medal.BRONZE  # default: solved = Bronze
             if hasattr(self.xp_service, 'calculate_medal'):
                 raw_cb = getattr(p, 'creator_budget', None)
+                cb_int = int(raw_cb) if raw_cb is not None and isinstance(raw_cb, (int, float)) else 0
                 medal = self.xp_service.calculate_medal(
                     passed=True,
                     time_taken=time_taken_s,
                     time_limit=getattr(p, 'time_limit_seconds', None),
                     cost_used=cost_used,
-                    creator_budget=int(raw_cb) if isinstance(raw_cb, int) else 0,
+                    creator_budget=cb_int,
                     budget=getattr(p, 'budget', 0),
                 )
 
@@ -365,7 +366,9 @@ class SolvingService:
                     if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
                         timer_upgraded = True
                     raw_cb = getattr(p, 'creator_budget', None)
-                    effective_creator_budget = (int(raw_cb) if isinstance(raw_cb, int) else 0) or getattr(p, 'budget', 0)
+                    cb_int = int(raw_cb) if raw_cb is not None and isinstance(raw_cb, (int, float)) else 0
+                    # Fall back to budget if creator_budget is not set (0 or None)
+                    effective_creator_budget = cb_int if cb_int > 0 else getattr(p, 'budget', 0)
                     if isinstance(effective_creator_budget, int) and effective_creator_budget > 0 and cost_used <= effective_creator_budget:
                         tight_upgraded = True
                     self.solve_repo.upsert_progress(PuzzleProgress(

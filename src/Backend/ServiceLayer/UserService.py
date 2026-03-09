@@ -258,6 +258,8 @@ class UserService:
             else self.xp.get_puzzle_unpublished_limit(updated.xp)
         )
         return d
+
+    def google_login(self, token: str) -> dict:
         """Verify a Google id_token, find-or-create the user, and return a session."""
         if not token:
             raise ValidationError("token is required")
