@@ -2,8 +2,10 @@ import sqlite3
 from typing import Any, Dict, List
 
 from Backend.DomainLayer.Circuit import Circuit
-from Backend.DomainLayer.Enums import GateType
+from Backend.DomainLayer.Enums import GateType, UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.settings import ARSENAL_XP_LEVEL_TIERS, ARSENAL_XP_MAX_SLOTS
+from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -40,20 +42,19 @@ class CircuitService:
 
         name = (payload.get("name") or "").strip()
         if not name:
-            raise ValidationError("name required")
+            raise ValidationError("Circuit name is required. Please provide a name for your circuit.")
 
         structure_json = payload.get("structure_json") or ""
         if not isinstance(structure_json, str) or not structure_json.strip():
-            raise ValidationError("structure_json required")
+            raise ValidationError("Circuit structure (JSON) is required. Please provide a valid circuit structure.")
 
-        # Enforce arsenal limit based on XP/level.
+        # Enforce arsenal limit based on XP/level using SQL COUNT to prevent TOCTOU bypass.
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            raise ValidationError("user not found")
-        limit = self.xp.get_arsenal_limit(user.xp)
-        current = self.repo.list_by_user(user_id)
-        if len(current) >= limit:
-            raise ValidationError(f"arsenal limit reached ({limit})")
+            raise ValidationError("Your user account could not be found. Please log in again.")
+        is_admin = self._is_admin(user.role)
+        user_level = self.xp.calculate_level(user.xp)
+        limit = self._resolve_max_slots_for_level(user_level)
 
         # Validate gate usage & compute cost server-side.
         allowed_basic = {g.value for g in GateType}
@@ -68,11 +69,22 @@ class CircuitService:
             structure_json=structure_json,
         )
 
+        # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU
         try:
-            saved = self.repo.create(c)
+            with transaction(self.repo.conn):
+                if not is_admin:
+                    count_row = self.repo.conn.execute(
+                        "SELECT COUNT(*) FROM circuits WHERE user_id = ?", (int(user_id),)
+                    ).fetchone()
+                    current_count = count_row[0] if count_row else 0
+                    if current_count >= limit:
+                        raise ValidationError(
+                            f"Arsenal capacity reached ({current_count}/{limit}). Level up to unlock more slots!"
+                        )
+                saved = self.repo.create(c, commit=False)
         except sqlite3.IntegrityError:
             # UNIQUE(user_id, name)
-            raise ValidationError("circuit name already exists")
+            raise ValidationError("A circuit with this name already exists. Please choose a different name or delete the existing one.")
 
         return saved.to_dict()
 
@@ -85,14 +97,27 @@ class CircuitService:
         user_id = self.auth.require_user_id(session_token)
         c = self.repo.get_by_id(circuit_id)
         if not c:
-            raise ValidationError("circuit not found")
+            raise ValidationError("Circuit not found. It may have been deleted.")
         if c.user_id != user_id:
-            raise ValidationError("forbidden")
+            raise ValidationError("You do not have permission to access this circuit.")
         return c.to_dict()
 
     def delete_circuit(self, session_token: str, circuit_id: int) -> dict:
         user_id = self.auth.require_user_id(session_token)
         ok = self.repo.delete(circuit_id, user_id)
         if not ok:
-            raise ValidationError("circuit not found or not owned by user")
+            raise ValidationError("Circuit not found or you do not own this circuit. Please verify the circuit ID and try again.")
         return {"ok": True}
+
+    @staticmethod
+    def _is_admin(role: Any) -> bool:
+        if isinstance(role, UserRole):
+            return role == UserRole.ADMIN
+        return str(role).strip().lower() == UserRole.ADMIN.value
+
+    @staticmethod
+    def _resolve_max_slots_for_level(user_level: int) -> int:
+        for max_level_inclusive, slot_count in ARSENAL_XP_LEVEL_TIERS:
+            if int(user_level) <= int(max_level_inclusive):
+                return int(slot_count)
+        return int(ARSENAL_XP_MAX_SLOTS)

@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, PanelLeft, Folder, Users, User2, Gamepad2 } from 'lucide-react';
+import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -15,9 +15,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown';
 import { Link } from '@/components/ui/link';
+import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
+import { CreatorInviteBanner } from '@/features/admin/components/creator-invite-banner';
 
 type SideNavigationItem = {
   name: string;
@@ -28,10 +30,12 @@ type SideNavigationItem = {
 const Logo = () => {
   return (
     <Link
-      className="flex items-center text-gray-900"
+      className="flex items-center gap-1.5"
       href={paths.home.getHref()}
     >
-      <span className="text-lg font-bold text-gray-900">EscapeCircuit</span>
+      <span className="text-[15px] font-semibold tracking-tight text-foreground">
+        EscapeCircuit
+      </span>
     </Link>
   );
 };
@@ -43,23 +47,39 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const logout = useLogout({
     onSuccess: () => router.push(paths.auth.login.getHref(pathname)),
   });
+  const userRole = user.data?.role?.toLowerCase() || '';
+  const isExperienced = (user.data?.level ?? 0) >= 5;
   const navigation = [
-    { name: 'Dashboard', to: paths.app.root.getHref(), icon: Home },
     { name: 'Puzzles', to: paths.app.puzzles.getHref(), icon: Gamepad2 },
-    { name: 'Discussions', to: paths.app.discussions.getHref(), icon: Folder },
-    user.data?.role === 'ADMIN' && {
-      name: 'Users',
+    (userRole === 'creator' || userRole === 'admin') && {
+      name: 'My Puzzles',
+      to: paths.app.myPuzzles.getHref(),
+      icon: Folder,
+    },
+    { name: 'Arsenal', to: paths.app.arsenal.root.getHref(), icon: Zap },
+    {
+      name: 'Discussions',
+      to: paths.app.discussions.getHref(),
+      icon: MessageSquare,
+    },
+    (userRole === 'creator' || userRole === 'admin') && {
+      name: 'Notifications',
+      to: paths.app.notifications.getHref(),
+      icon: Bell,
+    },
+    userRole === 'admin' && {
+      name: 'Admin',
       to: paths.app.users.getHref(),
-      icon: Users,
+      icon: Shield,
     },
   ].filter(Boolean) as SideNavigationItem[];
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-gray-50">
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-gray-300 bg-white px-4">
-        <div className="flex items-center gap-6">
+    <div className="flex min-h-screen w-full flex-col bg-background">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-card/80 backdrop-blur-sm px-5">
+        <div className="flex items-center gap-8">
           <Logo />
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="hidden sm:flex items-center gap-0.5">
             {navigation.map((item) => {
               const isActive = pathname === item.to;
               return (
@@ -67,15 +87,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   key={item.name}
                   href={item.to}
                   className={cn(
-                    'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-                    'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive && 'bg-blue-50 text-blue-700',
+                    'text-muted-foreground hover:text-foreground',
+                    'group flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
+                    isActive && 'bg-secondary text-foreground',
                   )}
                 >
                   <item.icon
                     className={cn(
-                      'text-gray-400 group-hover:text-gray-500 mr-2 size-4 shrink-0',
-                      isActive && 'text-blue-500',
+                      'text-muted-foreground/60 group-hover:text-foreground/70 mr-1.5 size-3.5 shrink-0',
+                      isActive && 'text-foreground/70',
                     )}
                     aria-hidden="true"
                   />
@@ -85,20 +105,34 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             })}
           </nav>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <XPBar currentXP={user.data?.xp ?? 0} />
+          <div className="hidden md:flex items-center gap-2 text-[13px]">
+            <span className="font-medium text-foreground">{user.data?.username}</span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground capitalize">{user.data?.role}</span>
+            {isExperienced && (
+              <>
+                <span className="text-border">|</span>
+                <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  Experienced
+                </span>
+              </>
+            )}
+          </div>
           <Drawer>
             <DrawerTrigger asChild>
-              <Button size="icon" variant="outline" className="sm:hidden">
-                <PanelLeft className="size-5" />
+              <Button size="icon" variant="ghost" className="sm:hidden size-8">
+                <PanelLeft className="size-4" />
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </DrawerTrigger>
             <DrawerContent
               side="left"
-              className="bg-white pt-10 text-gray-900 sm:max-w-60"
+              className="bg-card pt-10 text-foreground sm:max-w-60"
             >
-              <nav className="grid gap-6 text-lg font-medium">
-                <div className="flex h-16 shrink-0 items-center px-4">
+              <nav className="grid gap-1 px-3 text-sm font-medium">
+                <div className="flex h-12 shrink-0 items-center px-2 mb-4">
                   <Logo />
                 </div>
                 {navigation.map((item) => {
@@ -108,15 +142,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                       key={item.name}
                       href={item.to}
                       className={cn(
-                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-                        'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                        isActive && 'bg-blue-50 text-blue-700',
+                        'text-muted-foreground hover:text-foreground hover:bg-secondary',
+                        'group flex items-center rounded-md px-3 py-2 text-[13px] font-medium transition-colors',
+                        isActive && 'bg-secondary text-foreground',
                       )}
                     >
                       <item.icon
                         className={cn(
-                          'text-gray-400 group-hover:text-gray-500 mr-3 size-5 shrink-0',
-                          isActive && 'text-blue-500',
+                          'text-muted-foreground/60 group-hover:text-foreground/70 mr-2.5 size-4 shrink-0',
+                          isActive && 'text-foreground/70',
                         )}
                         aria-hidden="true"
                       />
@@ -130,24 +164,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="overflow-hidden rounded-full"
+                className="size-8 rounded-full"
               >
                 <span className="sr-only">Open user menu</span>
-                <User2 className="size-6 rounded-full" />
+                <User2 className="size-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => router.push(paths.app.profile.getHref())}
-                className={cn('block px-4 py-2 text-sm text-gray-700')}
+                className={cn('block px-3 py-1.5 text-[13px] text-foreground cursor-pointer')}
               >
                 Your Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className={cn('block px-4 py-2 text-sm text-gray-700 w-full')}
+                className={cn('block px-3 py-1.5 text-[13px] text-foreground w-full cursor-pointer')}
                 onClick={() => logout.mutate()}
               >
                 Sign Out
@@ -156,7 +190,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </DropdownMenu>
         </div>
       </header>
-      <main className="grid flex-1 items-start gap-4 p-4 md:gap-8">
+      <main className="flex-1 px-5 py-5 md:px-8 md:py-6">
+          <CreatorInviteBanner />
           {children}
         </main>
     </div>

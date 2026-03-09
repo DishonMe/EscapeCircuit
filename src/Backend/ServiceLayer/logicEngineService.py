@@ -20,7 +20,8 @@ class logicEngineService:
         # Check if this is a simulation-ready circuit (from frontend solution)
         # It will have 'wires' and 'placedComponents' (or 'components')
         if "wires" in data and ("placedComponents" in data or "components" in data):
-            return self.simulate(data, inputs)
+            arsenal_pieces = data.get("_arsenal_pieces", {})
+            return self.simulate(data, inputs, arsenal_pieces)
             
         key = json.dumps(inputs, sort_keys=True, separators=(',', ':')) 
 
@@ -59,12 +60,15 @@ class logicEngineService:
         raise ValidationError("logic engine format not supported")
 
     # ---------- Simulation Logic ----------
-    def simulate(self, data: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, int]:
+    def simulate(self, data: Dict[str, Any], inputs: Dict[str, int], arsenal_pieces: Dict[str, Any] = None) -> Dict[str, int]:
         """
         Simulates combinatorial circuit.
         data: parsed JSON containing 'placedComponents' and 'wires'.
         inputs: dict {"A": 0, "B": 1...}
+        arsenal_pieces: dict mapping placed component ID -> arsenal piece metadata
         """
+        if arsenal_pieces is None:
+            arsenal_pieces = {}
         # 1. Build Graph
         # Nodes are (componentId, portId) -> value (0/1/None)
         # But wires connect (componentId, pinIndex)??
@@ -208,6 +212,48 @@ class logicEngineService:
                     
                     v0 = net_values.get(p0)
                     inputs_vals = [v0]
+                elif cid in arsenal_pieces:
+                    # Check if this is an arsenal piece
+                    arsenal_info = arsenal_pieces[cid]
+                    truth_table_str = arsenal_info.get("truth_table", "{}")
+                    num_inputs = arsenal_info.get("num_inputs", 0)
+                    num_outputs = arsenal_info.get("num_outputs", 0)
+                    
+                    try:
+                        truth_table = json.loads(truth_table_str) if isinstance(truth_table_str, str) else truth_table_str
+                        
+                        # Build input key for the truth table
+                        # Truth table keys are binary strings like "00", "01", "10", "11"
+                        input_bits = []
+                        for i in range(num_inputs):
+                            pk = find(f"{cid}#{i}") if f"{cid}#{i}" in parent else None
+                            val = net_values.get(pk)
+                            if val is None:
+                                break
+                            input_bits.append(str(int(val)))
+                        
+                        if len(input_bits) == num_inputs:
+                            # Look up in truth table using binary string key
+                            key = "".join(input_bits)  # e.g. "0011" for inputs 0,0,1,1
+                            if key in truth_table:
+                                outputs = truth_table[key]
+                                # Set all output pins based on the truth table
+                                if isinstance(outputs, dict):
+                                    for out_idx in range(num_outputs):
+                                        out_key = f"out{out_idx}"
+                                        if out_key in outputs:
+                                            new_out = outputs[out_key]
+                                            pk_out = f"{cid}#{num_inputs + out_idx}"
+                                            if pk_out in parent:
+                                                root = find(pk_out)
+                                                if net_values.get(root) != new_out:
+                                                    net_values[root] = new_out
+                                                    changed = True
+                    except Exception as e:
+                        # If truth table evaluation fails, skip this component
+                        pass
+                    # Skip to next component (don't compute gate)
+                    continue
                 else:
                     # Unknown or IO -> skip
                     continue
@@ -329,6 +375,46 @@ class logicEngineService:
 
         # fallback: no info
         return set()
+
+    def extract_gate_counts(self, structure_json: str) -> dict:
+        """
+        Extract actual gate counts from circuit structure.
+        Returns dict like {"AND": 3, "OR": 2, "NOT": 1}
+        
+        Supported shapes:
+        - {"gates_counts": {"AND":3,"NOT":2}}
+        - {"components":[{"type":"AND"}, {"type":"AND"}, ...]}
+        - {"placedComponents":[{"componentId":"AND"}, ...]}
+        """
+        data = self._load(structure_json)
+        counts = {}
+        
+        # Priority 1: Direct gates_counts field
+        if isinstance(data.get("gates_counts"), dict):
+            for gate_name, count in data["gates_counts"].items():
+                counts[str(gate_name)] = int(count)
+            return counts
+        
+        # Priority 2: Count from components array
+        if isinstance(data.get("components"), list):
+            for c in data["components"]:
+                if isinstance(c, dict) and "type" in c:
+                    gate_type = str(c["type"])
+                    counts[gate_type] = counts.get(gate_type, 0) + 1
+            return counts
+        
+        # Priority 3: Count from placedComponents (user circuit)
+        if isinstance(data.get("placedComponents"), list):
+            for c in data["placedComponents"]:
+                if isinstance(c, dict):
+                    gate_type = c.get("componentId") or c.get("type")
+                    if gate_type:
+                        gate_type = str(gate_type)
+                        counts[gate_type] = counts.get(gate_type, 0) + 1
+            return counts
+        
+        # fallback: empty counts
+        return {}
 
     def compute_cost(self, structure_json: str) -> int:
         """

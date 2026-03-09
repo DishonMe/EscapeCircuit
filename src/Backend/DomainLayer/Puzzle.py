@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Set
 
-from .Enums import GateType, PuzzleStatus
+from .Enums import GateType, PuzzleStatus, PuzzleDifficulty
 from .Exceptions import ValidationError
 from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_optional_positive_int, ensure_gate_set
 
@@ -12,11 +12,19 @@ class Puzzle:
     name: str
     creator_user_id: int
     description: str = ""
+    instructions: Optional[str] = None
+    creator_comment: Optional[str] = None
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
     budget: int = 0
     time_limit_seconds: Optional[int] = None
+    difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
+
+    # Constraint fields
+    total_gate_count: Optional[int] = None
+    min_cycles: Optional[int] = None
+    max_cycles: Optional[int] = None
 
     rating_count: int = 0
     avg_difficulty: float = 0.0
@@ -60,29 +68,26 @@ class Puzzle:
             self.status = PuzzleStatus.UNPUBLISHED
 
     def to_dict(self) -> dict:
-        # Helper to map avg_difficulty (float 0-10 or similar) to Enum strings
-        # Assuming: <3 EASY, <7 MEDIUM, >=7 HARD. Adjust logic as needed.
-        diff_str = "EASY"
-        if self.avg_difficulty >= 7:
-            diff_str = "HARD"
-        elif self.avg_difficulty >= 4:
-            diff_str = "MEDIUM"
-        
         return {
             "id": str(self.id), # Frontend often expects string IDs or handles both
             "name": self.name,
             "title": self.name, # Alias for frontend
             "creator_user_id": int(self.creator_user_id),
             "description": self.description,
+            "instructions": self.instructions,
+            "creatorComment": self.creator_comment,
             "status": self.status.value,
             "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
             "budgetLimit": self.budget,
             "time_limit_seconds": self.time_limit_seconds,
             "timeLimit": self.time_limit_seconds, # Alias for frontend
-            "difficulty": diff_str, # Mapped for frontend
+            "difficulty": self.difficulty.value, # Creator-set difficulty
             "default_gate_set": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
+            "total_gate_count": self.total_gate_count,
+            "min_cycles": self.min_cycles,
+            "max_cycles": self.max_cycles,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "solvedCount": 0, # Placeholder
@@ -103,10 +108,16 @@ class Puzzle:
             name=d["name"],
             creator_user_id=int(d["creator_user_id"]),
             description=d.get("description", ""),
+            instructions=d.get("instructions"),
+            creator_comment=d.get("creator_comment"),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
             time_limit_seconds=d.get("time_limit_seconds", None),
+            difficulty=PuzzleDifficulty(d["difficulty"]) if "difficulty" in d else PuzzleDifficulty.EASY,
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
+            total_gate_count=d.get("total_gate_count"),
+            min_cycles=d.get("min_cycles"),
+            max_cycles=d.get("max_cycles"),
             rating_count=int(d.get("rating_count", 0)),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
             avg_fun=float(d.get("avg_fun", 0.0)),

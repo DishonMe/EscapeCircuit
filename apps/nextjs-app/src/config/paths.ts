@@ -12,14 +12,17 @@ export const paths = {
       getHref: (redirectTo?: string | null | undefined) =>
         `/auth/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
     },
+    completeGoogle: {
+      getHref: () => `/auth/complete-google`,
+    },
   },
 
   app: {
     root: {
-      getHref: () => '/app',
+      getHref: () => '/app/puzzles',
     },
     dashboard: {
-      getHref: () => '/app',
+      getHref: () => '/app/puzzles',
     },
     puzzles: {
       getHref: () => '/app/puzzles',
@@ -27,17 +30,37 @@ export const paths = {
     puzzle: {
       getHref: (id: string) => `/app/puzzles/${id}`,
     },
+    createPuzzle: {
+      getHref: () => '/app/create-puzzle',
+    },
+    myPuzzles: {
+      getHref: () => '/app/my-puzzles',
+    },
+    arsenal: {
+      root: {
+        getHref: () => '/app/arsenal',
+      },
+      creator: {
+        getHref: () => '/app/arsenal/creator',
+      },
+    },
     discussions: {
       getHref: () => '/app/discussions',
     },
     discussion: {
       getHref: (id: string) => `/app/discussions/${id}`,
     },
+    newDiscussion: {
+      getHref: () => '/app/discussions/new',
+    },
     users: {
       getHref: () => '/app/users',
     },
     profile: {
       getHref: () => '/app/profile',
+    },
+    notifications: {
+      getHref: () => '/app/notifications',
     },
   },
   public: {

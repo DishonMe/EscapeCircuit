@@ -119,3 +119,62 @@ def test_list_by_puzzle_empty_then_ordered(repo):
 
     user_ids = {r.user_id for r in lst}
     assert user_ids == {1, 2, 3}
+
+
+def test_delete_existing_rating(repo):
+    """Test delete method removes a rating"""
+    r = repo.upsert(make_rating(10, 20))
+    assert repo.get_by_puzzle_user(10, 20) is not None
+    
+    result = repo.delete(10, 20)
+    assert result is True
+    assert repo.get_by_puzzle_user(10, 20) is None
+
+
+def test_delete_nonexistent_rating(repo):
+    """Test delete method returns False for nonexistent rating"""
+    result = repo.delete(999, 999)
+    assert result is False
+
+
+def test_delete_by_puzzle(repo):
+    """Test delete_by_puzzle removes all ratings for a puzzle"""
+    repo.upsert(make_rating(5, 1))
+    repo.upsert(make_rating(5, 2))
+    repo.upsert(make_rating(6, 3))
+    
+    # Delete all ratings for puzzle 5
+    repo.delete_by_puzzle(5)
+    
+    # Puzzle 5 ratings should be gone
+    assert repo.list_by_puzzle(5) == []
+    
+    # Puzzle 6 rating should still exist
+    assert len(repo.list_by_puzzle(6)) == 1
+
+
+def test_try_mark_xp_awarded_first_time(repo):
+    """Test try_mark_xp_awarded returns True on first call"""
+    r = repo.upsert(make_rating(10, 20))
+    
+    # First time should succeed
+    result = repo.try_mark_xp_awarded(10, 20)
+    assert result is True
+
+
+def test_try_mark_xp_awarded_second_time_fails(repo):
+    """Test try_mark_xp_awarded returns False on second call (already awarded)"""
+    r = repo.upsert(make_rating(10, 20))
+    
+    # Mark as awarded first time
+    repo.try_mark_xp_awarded(10, 20)
+    
+    #Second time should fail (idempotent guard)
+    result = repo.try_mark_xp_awarded(10, 20)
+    assert result is False
+
+
+def test_try_mark_xp_awarded_nonexistent(repo):
+    """Test try_mark_xp_awarded returns False for nonexistent rating"""
+    result = repo.try_mark_xp_awarded(999, 999)
+    assert result is False

@@ -73,6 +73,26 @@ const TRUTH_TABLES: Record<
       ['1', '1', '0'],
     ],
   },
+  NOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '0'],
+    ],
+  },
+  XNOR: {
+    inputs: ['A', 'B'],
+    outputs: ['OUT'],
+    rows: [
+      ['0', '0', '1'],
+      ['0', '1', '0'],
+      ['1', '0', '0'],
+      ['1', '1', '1'],
+    ],
+  },
   DFF: {
     inputs: ['IN'],
     outputs: ['OUT'],
@@ -102,8 +122,8 @@ const Category = ({
   children: React.ReactNode;
 }) => {
   return (
-    <div className="rounded-md border border-gray-300 bg-white p-3">
-      <div className="mb-2 text-sm font-medium text-gray-900">{title}</div>
+    <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+      <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
       {children}
     </div>
   );
@@ -127,10 +147,10 @@ const DraggableItem = ({
   return (
     <div
       className={cn(
-        'group flex w-full items-center gap-2 rounded border px-2 py-2 text-left text-sm text-gray-700',
+        'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-colors',
         isSelected
-          ? 'border-blue-300 bg-blue-50'
-          : 'border-gray-200 bg-gray-50 hover:bg-gray-100',
+          ? 'border-foreground/20 bg-foreground/5 shadow-subtle'
+          : 'border-border/60 bg-secondary/30 hover:bg-secondary/60',
       )}
     >
       <button
@@ -140,7 +160,7 @@ const DraggableItem = ({
           onInfoClick?.();
         }}
         className={cn(
-          'text-blue-500 hover:text-blue-700 transition-opacity',
+          'text-foreground/40 hover:text-foreground/70 transition-opacity',
           isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         )}
         title="View Truth Table"
@@ -161,8 +181,8 @@ const DraggableItem = ({
         onClick={() => onSelect?.(component.id)}
         className="flex flex-1 cursor-pointer items-center justify-between"
       >
-        <span className="font-medium text-gray-900">{component.type}</span>
-        <span className="text-xs text-gray-600">
+        <span className="font-medium text-foreground">{component.type}</span>
+        <span className="text-xs text-muted-foreground">
           cost {component.cost} · pins {component.pins}
         </span>
       </div>
@@ -193,6 +213,7 @@ export const WorkstationMenu = ({
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<
     string | null
   >(null);
+  const [viewingTruthTableData, setViewingTruthTableData] = useState<any>(null);
 
   useEffect(() => {
     if (!allowArsenal) return;
@@ -206,6 +227,32 @@ export const WorkstationMenu = ({
       c.usedBasicTypes.every((t) => !filtered.has(t)),
     );
   }, [allowArsenal, arsenal, filteredBasicTypes]);
+
+  const handleInfoClick = (componentId: string, component: CircuitComponent) => {
+    setViewingTruthTableFor(component.type || componentId);
+    
+    // Check if component has truth_table data (from API arsenal pieces)
+    const truthTableSource = TRUTH_TABLES[component.type || componentId];
+    const apiData = (component as any).truth_table;
+    
+    if (apiData) {
+      // Parse the truth table from API data
+      try {
+        const parsedTT = typeof apiData === 'string' ? JSON.parse(apiData) : apiData;
+        // Convert to the expected format
+        const inputKeys = Object.keys(parsedTT)[0]?.split(',') || [];
+        setViewingTruthTableData({
+          inputs: inputKeys,
+          outputs: Object.keys(parsedTT[Object.keys(parsedTT)[0]] || {}),
+          rows: Object.entries(parsedTT).map(([input, output]: any) => [input, ...Object.values(output)]),
+        });
+      } catch {
+        setViewingTruthTableData(truthTableSource);
+      }
+    } else {
+      setViewingTruthTableData(truthTableSource);
+    }
+  };
 
   const truthTable = viewingTruthTableFor
     ? TRUTH_TABLES[viewingTruthTableFor]
@@ -222,7 +269,7 @@ export const WorkstationMenu = ({
                 component={c}
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onInfoClick={() => handleInfoClick(c.id, c)}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
@@ -232,7 +279,10 @@ export const WorkstationMenu = ({
       ) : null}
 
       {special.length ? (
-        <Category title="Special">
+        <Category title="Arsenal">
+          <div className="text-[11px] text-muted-foreground mb-2">
+            Custom circuit pieces available for this puzzle
+          </div>
           <div className="flex flex-col gap-2">
             {special.map((c) => (
               <DraggableItem
@@ -240,7 +290,7 @@ export const WorkstationMenu = ({
                 component={c}
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => setViewingTruthTableFor(c.type)}
+                onInfoClick={() => handleInfoClick(c.id, c)}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
@@ -251,7 +301,7 @@ export const WorkstationMenu = ({
 
       {allowArsenal && visibleArsenal.length ? (
         <Category title="Saved">
-          <div className="text-xs text-gray-600">
+          <div className="text-[11px] text-muted-foreground">
             Saved circuits are shown only if they don’t use filtered-out basic
             gates.
           </div>
@@ -259,13 +309,13 @@ export const WorkstationMenu = ({
             {visibleArsenal.map((c) => (
               <div
                 key={c.id}
-                className="rounded border border-gray-200 bg-gray-50 p-2 text-sm text-gray-700"
+                className="rounded border border-border bg-secondary/50 p-2 text-[13px] text-foreground"
               >
-                <div className="font-medium text-gray-900">{c.name}</div>
-                <div className="text-xs text-gray-600">
+                <div className="font-medium text-foreground">{c.name}</div>
+                <div className="text-[11px] text-muted-foreground">
                   Uses: {c.usedBasicTypes.join(', ') || 'none'}
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-[11px] text-muted-foreground">
                   (Loading saved circuits into the board will be added next.)
                 </div>
               </div>
@@ -282,30 +332,30 @@ export const WorkstationMenu = ({
           <DialogHeader>
             <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
           </DialogHeader>
-          {truthTable ? (
-            <div className="overflow-hidden rounded border border-gray-200">
-              <table className="w-full text-sm text-gray-700">
-                <thead className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+          {viewingTruthTableData ? (
+            <div className="overflow-hidden rounded-lg border border-border/60">
+              <table className="w-full text-[13px] text-foreground">
+                <thead className="bg-secondary/50 text-[11px] font-medium uppercase text-muted-foreground">
                   <tr>
-                    {truthTable.inputs.map((i) => (
+                    {viewingTruthTableData.inputs.map((i: string) => (
                       <th key={i} className="px-3 py-2 text-center">
                         {i}
                       </th>
                     ))}
-                    {truthTable.outputs.map((o) => (
+                    {viewingTruthTableData.outputs.map((o: string) => (
                       <th
                         key={o}
-                        className="border-l border-gray-200 px-3 py-2 text-center"
+                        className="border-l border-border px-3 py-2 text-center"
                       >
                         {o}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {truthTable.rows.map((row, idx) => (
-                    <tr key={idx} className="divide-x divide-gray-200">
-                      {row.map((cell, cIdx) => (
+                <tbody className="divide-y divide-border">
+                  {viewingTruthTableData.rows.map((row: string[], idx: number) => (
+                    <tr key={idx} className="divide-x divide-border">
+                      {row.map((cell: string, cIdx: number) => (
                         <td key={cIdx} className="px-3 py-2 text-center">
                           {cell}
                         </td>
@@ -316,7 +366,7 @@ export const WorkstationMenu = ({
               </table>
             </div>
           ) : (
-            <div className="text-sm text-gray-500">
+            <div className="text-[13px] text-muted-foreground">
               No truth table available for this component.
             </div>
           )}

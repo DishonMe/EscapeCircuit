@@ -280,7 +280,7 @@ class TestCircuitSerialization:
         structure = json.dumps({"gates": ["XOR"]})
         circuit = Circuit(id=7, user_id=8, name="Complex", cost=15, structure_json=structure)
         d = circuit.to_dict()
-        assert set(d.keys()) == {"id", "user_id", "name", "cost", "structure_json"}
+        assert set(d.keys()) == {"id", "user_id", "name", "cost", "structure_json", "num_inputs", "num_outputs", "is_arsenal", "truth_table", "basic_gates"}
 
     def test_from_dict_missing_field_raises_error(self):
         d = {"id": 1, "user_id": 2, "name": "Test"}  # Missing cost and structure_json
@@ -345,3 +345,303 @@ class TestCircuitEdgeCases:
         structure = json.dumps({"gates": []})
         circuit = Circuit(id=1, user_id=0, name="Test", cost=0, structure_json=structure)
         assert circuit.get_user_id() == 0
+
+
+class TestCircuitArsenalPiece:
+    """Test arsenal piece creation and validation"""
+    
+    def test_create_arsenal_piece_valid(self):
+        """Test creating a valid arsenal piece with all required fields"""
+        structure = json.dumps({"gates": ["AND", "OR"]})
+        basic_gates = json.dumps(["AND", "OR"])
+        truth_table = json.dumps({"0": "1", "1": "0"})
+        
+        circuit = Circuit(
+            id=1,
+            user_id=1,
+            name="ArsenalGate",
+            cost=5,
+            structure_json=structure,
+            is_arsenal=True,
+            basic_gates=basic_gates,
+            truth_table=truth_table,
+            num_inputs=2,
+            num_outputs=1
+        )
+        assert circuit.is_arsenal is True
+        assert circuit.basic_gates == basic_gates
+        assert circuit.truth_table == truth_table
+        assert circuit.num_inputs == 2
+        assert circuit.num_outputs == 1
+    
+    def test_arsenal_piece_missing_basic_gates(self):
+        """Test that arsenal piece requires basic_gates"""
+        structure = json.dumps({"gates": []})
+        truth_table = json.dumps({"0": "1"})
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=None,
+                truth_table=truth_table
+            )
+        assert "basic_gates" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_empty_basic_gates(self):
+        """Test that arsenal piece basic_gates cannot be empty string"""
+        structure = json.dumps({"gates": []})
+        truth_table = json.dumps({"0": "1"})
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates="",
+                truth_table=truth_table
+            )
+        assert "basic_gates" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_whitespace_basic_gates(self):
+        """Test that arsenal piece basic_gates cannot be whitespace only"""
+        structure = json.dumps({"gates": []})
+        truth_table = json.dumps({"0": "1"})
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates="   ",
+                truth_table=truth_table
+            )
+        assert "basic_gates" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_missing_truth_table(self):
+        """Test that arsenal piece requires truth_table"""
+        structure = json.dumps({"gates": []})
+        basic_gates = json.dumps(["AND"])
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=basic_gates,
+                truth_table=None
+            )
+        assert "truth_table" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_empty_truth_table(self):
+        """Test that arsenal piece truth_table cannot be empty string"""
+        structure = json.dumps({"gates": []})
+        basic_gates = json.dumps(["AND"])
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=basic_gates,
+                truth_table=""
+            )
+        assert "truth_table" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_whitespace_truth_table(self):
+        """Test that arsenal piece truth_table cannot be whitespace only"""
+        structure = json.dumps({"gates": []})
+        basic_gates = json.dumps(["AND"])
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=basic_gates,
+                truth_table="   "
+            )
+        assert "truth_table" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_invalid_basic_gates_json(self):
+        """Test that arsenal piece basic_gates must be valid JSON"""
+        structure = json.dumps({"gates": []})
+        truth_table = json.dumps({"0": "1"})
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates="not valid json",
+                truth_table=truth_table
+            )
+        assert "basic_gates" in str(exc_info.value).lower()
+        assert "json" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_basic_gates_not_list(self):
+        """Test that arsenal piece basic_gates must be a JSON list"""
+        structure = json.dumps({"gates": []})
+        truth_table = json.dumps({"0": "1"})
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates='{"gates": "AND"}',  # dict, not list
+                truth_table=truth_table
+            )
+        assert "list" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_invalid_truth_table_json(self):
+        """Test that arsenal piece truth_table must be valid JSON"""
+        structure = json.dumps({"gates": []})
+        basic_gates = json.dumps(["AND"])
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=basic_gates,
+                truth_table="not valid json"
+            )
+        assert "truth_table" in str(exc_info.value).lower()
+        assert "json" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_truth_table_not_dict(self):
+        """Test that arsenal piece truth_table must be a JSON dict"""
+        structure = json.dumps({"gates": []})
+        basic_gates = json.dumps(["AND"])
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Circuit(
+                id=1,
+                user_id=1,
+                name="Bad",
+                cost=0,
+                structure_json=structure,
+                is_arsenal=True,
+                basic_gates=basic_gates,
+                truth_table='["0", "1"]'  # list, not dict
+            )
+        assert "dict" in str(exc_info.value).lower()
+    
+    def test_arsenal_piece_complex_truth_table(self):
+        """Test arsenal piece with complex truth table"""
+        structure = json.dumps({"gates": ["AND", "OR"]})
+        basic_gates = json.dumps(["AND", "OR", "NOT"])
+        truth_table = json.dumps({
+            "00": "0",
+            "01": "1",
+            "10": "1",
+            "11": "1"
+        })
+        
+        circuit = Circuit(
+            id=2,
+            user_id=1,
+            name="ComplexArsenal",
+            cost=10,
+            structure_json=structure,
+            is_arsenal=True,
+            basic_gates=basic_gates,
+            truth_table=truth_table,
+            num_inputs=2,
+            num_outputs=1
+        )
+        assert circuit.is_arsenal is True
+    
+    def test_non_arsenal_piece_ignores_basic_gates_and_truth_table(self):
+        """Test that non-arsenal pieces don't require basic_gates and truth_table"""
+        structure = json.dumps({"gates": ["AND"]})
+        
+        circuit = Circuit(
+            id=1,
+            user_id=1,
+            name="NonArsenal",
+            cost=5,
+            structure_json=structure,
+            is_arsenal=False,
+            basic_gates=None,
+            truth_table=None
+        )
+        assert circuit.is_arsenal is False
+    
+    def test_arsenal_piece_to_circuit_component(self):
+        """Test converting arsenal piece to circuit component format"""
+        structure = json.dumps({"gates": ["AND"]})
+        basic_gates = json.dumps(["AND"])
+        truth_table = json.dumps({"0": "1", "1": "0"})
+        
+        circuit = Circuit(
+            id=99,
+            user_id=1,
+            name="ArsenalComponent",
+            cost=7,
+            structure_json=structure,
+            is_arsenal=True,
+            basic_gates=basic_gates,
+            truth_table=truth_table,
+            num_inputs=2,
+            num_outputs=1
+        )
+        component = circuit.to_circuit_component()
+        
+        assert component["id"] == "99"
+        assert component["type"] == "ArsenalComponent"
+        assert component["cost"] == 7
+        assert component["pins"] == 3  # 2 inputs + 1 output
+        assert component["is_arsenal"] is True
+        assert component["num_inputs"] == 2
+        assert component["num_outputs"] == 1
+    
+    def test_arsenal_piece_with_max_pins(self):
+        """Test arsenal piece with maximum pins"""
+        structure = json.dumps({"gates": ["AND", "OR"]})
+        basic_gates = json.dumps(["AND", "OR"])
+        truth_table = json.dumps({})
+        
+        circuit = Circuit(
+            id=1,
+            user_id=1,
+            name="MaxPins",
+            cost=0,
+            structure_json=structure,
+            is_arsenal=True,
+            basic_gates=basic_gates,
+            truth_table=truth_table,
+            num_inputs=10,
+            num_outputs=8
+        )
+        component = circuit.to_circuit_component()
+        assert component["pins"] == 18

@@ -4,29 +4,33 @@
     "description": "Design a circuit that compares two 2-bit binary numbers A and B. Output 1 on the corresponding line if A > B (GT), A = B (EQ), or A < B (LT).",
     "budget": 250,
     "time_limit_seconds": 90,
+    "difficulty": "HARD",
     "default_gate_set": ["AND", "OR", "NOT", "XOR", "NAND", "NOR"],
     "inputs": ["A1", "A0", "B1", "B0"],
-    "outputs": ["GT", "EQ", "LT"]
+    "outputs": ["GT", "EQ", "LT"],
+    "total_gate_count": null,
+    "min_cycles": null,
+    "max_cycles": null
   },
   "test_cases": [
-      { "inputs": {"A1":0, "A0":0, "B1":0, "B0":0}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
-      { "inputs": {"A1":0, "A0":0, "B1":0, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
-      { "inputs": {"A1":0, "A0":0, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
-      { "inputs": {"A1":0, "A0":0, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":0, "B1":0, "B0":0}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":0, "B1":0, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":0, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":0, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
       
-      { "inputs": {"A1":0, "A0":1, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":0, "A0":1, "B1":0, "B0":1}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
-      { "inputs": {"A1":0, "A0":1, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
-      { "inputs": {"A1":0, "A0":1, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":1, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":1, "B1":0, "B0":1}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":1, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":0, "A0":1, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
 
-      { "inputs": {"A1":1, "A0":0, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":1, "A0":0, "B1":0, "B0":1}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":1, "A0":0, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
-      { "inputs": {"A1":1, "A0":0, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":0, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":0, "B1":0, "B0":1}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":0, "B1":1, "B0":0}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":0, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":0, "LT":1} },
 
-      { "inputs": {"A1":1, "A0":1, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":1, "A0":1, "B1":0, "B0":1}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":1, "A0":1, "B1":1, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
-      { "inputs": {"A1":1, "A0":1, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} }
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":1, "B1":0, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":1, "B1":0, "B0":1}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":1, "B1":1, "B0":0}, "expected_outputs": {"GT":1, "EQ":0, "LT":0} },
+      { "kind": "blackbox", "inputs": {"A1":1, "A0":1, "B1":1, "B0":1}, "expected_outputs": {"GT":0, "EQ":1, "LT":0} }
   ]
 }

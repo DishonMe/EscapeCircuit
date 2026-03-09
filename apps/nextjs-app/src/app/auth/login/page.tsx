@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { paths } from '@/config/paths';
 import { LoginForm } from '@/features/auth/components/login-form';
+import { useNavigationLoading } from '@/components/ui/navigation-loading/navigation-loading';
 import { useNotifications } from '@/components/ui/notifications';
 
 const LoginPage = () => {
@@ -11,6 +12,7 @@ const LoginPage = () => {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
   const { addNotification } = useNotifications();
+  const { startNavigation } = useNavigationLoading();
 
   return (
     <LoginForm
@@ -20,9 +22,9 @@ const LoginPage = () => {
           title: 'Login Successful',
           message: 'Welcome back!',
         });
-        router.push(
-          redirectTo ? decodeURIComponent(redirectTo) : paths.app.puzzles.getHref(),
-        );
+        const destination = redirectTo ? decodeURIComponent(redirectTo) : paths.app.puzzles.getHref();
+        startNavigation(destination);
+        router.push(destination);
       }}
     />
   );

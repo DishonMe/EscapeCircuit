@@ -1,0 +1,27 @@
+\section*{Palindrome Detector Instructions}
+
+\subsection*{Objective}
+Design a digital circuit that checks if a 4-bit input sequence ($b_1, b_2, b_3, b_4$) is a palindrome.
+
+\subsection*{What is a Palindrome?}
+A palindrome is a sequence that reads the same forwards and backwards.
+For a 4-bit sequence $b_1 b_2 b_3 b_4$, it is a palindrome if:
+\begin{itemize}
+  \item $b_1 = b_4$
+  \item AND
+  \item $b_2 = b_3$
+\end{itemize}
+
+\subsection*{Examples}
+\begin{itemize}
+  \item \texttt{0110} $\to$ \textbf{True} (reads 0110 backwards)
+  \item \texttt{1001} $\to$ \textbf{True} (reads 1001 backwards)
+  \item \texttt{0000} $\to$ \textbf{True}
+  \item \texttt{1100} $\to$ \textbf{False} (reads 0011 backwards)
+  \item \texttt{1010} $\to$ \textbf{False} (reads 0101 backwards)
+\end{itemize}
+
+\subsection*{Outputs}
+\begin{itemize}
+  \item \textbf{is\_palindrome}: 1 if the input is a palindrome, 0 otherwise
+\end{itemize}

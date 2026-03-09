@@ -2,41 +2,60 @@ import { queryOptions, useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
-import { Discussion, Meta } from '@/types/api';
+import { Discussion, ThreadCategory } from '@/types/api';
+
+export type DiscussionFilters = {
+  limit?: number;
+  offset?: number;
+  category?: ThreadCategory;
+  puzzle_id?: number;
+  author_id?: number;
+  bookmarkedOnly?: boolean;
+  sort?: 'newest' | 'oldest' | 'most_replies' | 'most_upvotes' | 'trending';
+  search?: string;
+};
 
 export const getDiscussions = (
-  { page }: { page?: number } = { page: 1 },
+  filters: DiscussionFilters = {},
 ): Promise<{
-  data: Discussion[];
-  meta: Meta;
+  discussions: Discussion[];
+  total: number;
+  limit: number;
+  offset: number;
 }> => {
   return api.get(`/discussions`, {
     params: {
-      page,
+      limit: filters.limit ?? 20,
+      offset: filters.offset ?? 0,
+      category: filters.category,
+      puzzle_id: filters.puzzle_id,
+      author_id: filters.author_id,
+      bookmarked_only: filters.bookmarkedOnly ?? false,
+      sort: filters.sort ?? 'newest',
+      search: filters.search || undefined,
     },
   });
 };
 
-export const getDiscussionsQueryOptions = ({
-  page = 1,
-}: { page?: number } = {}) => {
+export const getDiscussionsQueryOptions = (filters: DiscussionFilters = {}) => {
   return queryOptions({
-    queryKey: ['discussions', { page }],
-    queryFn: () => getDiscussions({ page }),
+    queryKey: ['discussions', filters],
+    queryFn: () => getDiscussions(filters),
+    staleTime: 1000 * 30, // 30s — mutations invalidate on change; avoids re-fetch on rapid navigation
   });
 };
 
 type UseDiscussionsOptions = {
-  page?: number;
+  filters?: DiscussionFilters;
   queryConfig?: QueryConfig<typeof getDiscussionsQueryOptions>;
 };
 
 export const useDiscussions = ({
+  filters = {},
   queryConfig,
-  page,
-}: UseDiscussionsOptions) => {
+}: UseDiscussionsOptions = {}) => {
   return useQuery({
-    ...getDiscussionsQueryOptions({ page }),
+    ...getDiscussionsQueryOptions(filters),
     ...queryConfig,
   });
 };

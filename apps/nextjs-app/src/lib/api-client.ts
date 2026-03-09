@@ -89,34 +89,54 @@ async function fetchApi<T>(
 
   const fullUrl = buildUrlWithParams(`${env.API_URL}${url}`, params);
 
-  const response = await fetch(fullUrl, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...headers,
-      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-    cache,
-    next,
-  });
-
-  if (!response.ok) {
-    const message = (await response.json()).message || response.statusText;
-    if (typeof window !== 'undefined' && !suppressErrorNotification) {
-      useNotifications.getState().addNotification({
-        type: 'error',
-        title: 'Error',
-        message,
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(fullUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...headers,
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include',
+        cache,
+        next,
       });
+
+      if (!response.ok) {
+        let message = '';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || errorData.detail || response.statusText;
+        } catch {
+          message = response.statusText || 'An error occurred';
+        }
+        
+        if (typeof window !== 'undefined' && !suppressErrorNotification) {
+          useNotifications.getState().addNotification({
+            type: 'error',
+            title: message || response.statusText,
+          });
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (attempt < maxRetries && error instanceof TypeError && error.message.includes('fetch')) {
+        // Retry on network errors with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 1000));
+        continue;
+      }
+      throw error;
     }
-    throw new Error(message);
   }
 
-  return response.json();
+  throw new Error('Request failed after retries');
 }
 
 export const api = {

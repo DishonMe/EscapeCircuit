@@ -1,18 +1,18 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import Cookies from 'js-cookie';
 
 import { Link } from '@/components/ui/link';
 import { paths } from '@/config/paths';
-import { useUser } from '@/lib/auth';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 type LayoutProps = {
   children: ReactNode;
 };
 
 export const AuthLayout = ({ children }: LayoutProps) => {
-  const user = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const isLoginPage = pathname === paths.auth.login.getHref();
@@ -23,36 +23,58 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
 
-  const isAuthed = user.status === 'success' && !!user.data?.id;
+  const [hasCheckedToken, setHasCheckedToken] = useState(false);
 
   useEffect(() => {
-    // Redirect only when the auth query succeeds with a user to avoid loops on 401/errored states
-    if (isAuthed) {
-      router.replace(
-        `${redirectTo ? `${decodeURIComponent(redirectTo)}` : paths.app.dashboard.getHref()}`,
-      );
-    }
-  }, [isAuthed, router, redirectTo]);
+    // Check if user has a valid token by verifying with the API
+    const checkAuth = async () => {
+      try {
+        const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
+        if (token) {
+          // Verify the token is still valid with the API
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const res = await fetch(`${apiUrl}/users/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            // Token is valid — redirect to dashboard
+            const destination = redirectTo
+              ? decodeURIComponent(redirectTo)
+              : paths.app.puzzles.getHref();
+            router.replace(destination);
+            return;
+          }
+          // Token is invalid/expired — clear it and stay on login page
+          Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+        }
+      } catch (error) {
+        // Network error — clear potentially stale cookie
+        Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+      }
+      setHasCheckedToken(true);
+    };
+    checkAuth();
+  }, [router, redirectTo]);
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen flex-col justify-center bg-background py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <Link
-            className="flex items-center text-white"
+            className="flex items-center"
             href={paths.home.getHref()}
           >
-            <img className="h-24 w-auto" src="/logo.svg" alt="Workflow" />
+            <img className="h-20 w-auto" src="/logo.svg" alt="Workflow" />
           </Link>
         </div>
 
-        <h2 className="mt-3 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-4 text-center text-2xl font-semibold tracking-tight text-foreground">
           {title}
         </h2>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
+        <div className="rounded-xl border border-border bg-card px-6 py-8 shadow-card sm:px-10">
           {children}
         </div>
       </div>

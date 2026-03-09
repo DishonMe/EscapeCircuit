@@ -3,14 +3,16 @@ import json
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
+from Backend.PersistantLayer._db import transaction
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
-from Backend.DomainLayer.Enums import PuzzleStatus
+from Backend.DomainLayer.Enums import PuzzleStatus, PuzzleDifficulty, Medal
 
 
 class SolvingService:
@@ -23,14 +25,18 @@ class SolvingService:
         auth: AuthService,
         logic_engine: logicEngineService,
         xp_service: XPService,
+        user_repo: UserRepo | None = None,
+        notification_service=None,
     ):
         self.conn = conn
         self.solve_repo = solve_repo
         self.puzzle_repo = puzzle_repo
         self.circuit_repo = circuit_repo
+        self.user_repo = user_repo
         self.auth = auth
         self.logic_engine = logic_engine
         self.xp_service = xp_service
+        self.notification_service = notification_service
 
     @property
     def engine(self):
@@ -71,7 +77,7 @@ class SolvingService:
 
         circuit_id = payload["circuit_id"] if isinstance(payload, dict) and "circuit_id" in payload else payload
         if not circuit_id:
-            raise ValidationError("circuit_id required")
+            raise ValidationError("Circuit ID is required. Please provide your saved circuit to validate.")
 
         attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
         if not attempt:
@@ -80,16 +86,16 @@ class SolvingService:
 
         circuit = self.circuit_repo.get_by_id(int(circuit_id))
         if not circuit:
-            raise ValidationError("circuit not found")
+            raise ValidationError("Circuit not found. Please save your circuit design first.")
         if int(circuit.user_id) != int(user_id):
-            raise ValidationError("forbidden")
+            raise ValidationError("You do not have permission to use this circuit. Only your own circuits can be submitted.")
 
         test_cases = self.puzzle_repo.list_test_cases(int(puzzle_id))
         if not test_cases:
             raise ValidationError("puzzle has no test cases")
 
         # --- CORE VALIDATION LOGIC ---
-        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases)
+        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
         # -----------------------------
 
         attempt.passed = passed
@@ -168,9 +174,11 @@ class SolvingService:
                 pass
 
         # Budget Check
-        if hasattr(p, 'budget') and int(circuit.cost) > int(getattr(p, 'budget', 999999)):
+        puzzle_budget = int(getattr(p, 'budget', 999999))
+        circuit_cost = int(circuit.cost)
+        if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
             attempt.passed = False
-            attempt.fail_reason = "over budget"
+            attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
             attempt.circuit_id = int(circuit_id)
             self.solve_repo.update_attempt(attempt)
             return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
@@ -215,6 +223,9 @@ class SolvingService:
                     self.conn.execute("ROLLBACK")
                 raise
 
+        # Commit all writes (attempts, progress, xp) in this legacy path
+        self.conn.commit()
+
         return {
             "attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt),
             "passed": True,
@@ -224,11 +235,12 @@ class SolvingService:
         }
 
     # ---------- New Validation Logic (Stateless) ----------
-    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], time_taken: int = 0) -> Dict[str, Any]:
         """
         Stateless validation of a solution attempt.
+        If the solution passes, calculate medal, persist solve with delta XP, award creator XP.
         """
-        _ = self.auth.require_user_id(token)
+        user_id = self.auth.require_user_id(token)
         
         p = self.puzzle_repo.get_by_id(puzzle_id)
         if not p:
@@ -236,35 +248,279 @@ class SolvingService:
             
         test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
         if not test_cases:
-            raise ValidationError("puzzle has no test cases")
+            raise ValidationError("This puzzle has no test cases configured. Please contact the puzzle creator.")
+        
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
             
         # Reconstruct "Structure JSON" for Logic Engine
         tcircuit = Circuit(
             id=0,
             user_id=0,
             name="Validation Check",
-            cost=solution_payload.get("totalCost", 0),
-            structure_json=json.dumps(solution_payload)
+            cost=expanded_solution.get("totalCost", 0),
+            structure_json=json.dumps(expanded_solution)
         )
         
-        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases)
+        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p)
         
         if passed:
-            return {"solved": True, "message": "All test cases passed!"}
+            cost_used = int(solution_payload.get("totalCost", 0))
+            time_taken_s = max(0, int(time_taken))
+
+            # --- Determine difficulty tier for XP ---
+            # Use creator-set puzzle difficulty first so XP/medal rewards stay
+            # stable and do not drift with community rating changes.
+            difficulty = PuzzleDifficulty.EASY
+            difficulty_from_puzzle = False
+            puzzle_difficulty = getattr(p, 'difficulty', None)
+            if puzzle_difficulty is not None:
+                try:
+                    if isinstance(puzzle_difficulty, PuzzleDifficulty):
+                        difficulty = puzzle_difficulty
+                        difficulty_from_puzzle = True
+                    else:
+                        difficulty = PuzzleDifficulty(str(puzzle_difficulty).upper())
+                        difficulty_from_puzzle = True
+                except Exception:
+                    difficulty_from_puzzle = False
+            if not difficulty_from_puzzle and hasattr(self.xp_service, 'tier_from_avg_difficulty'):
+                difficulty = self.xp_service.tier_from_avg_difficulty(
+                    getattr(p, 'avg_difficulty', 0.0)
+                )
+            elif not difficulty_from_puzzle and hasattr(p, 'avg_difficulty') and p.avg_difficulty is not None:
+                if p.avg_difficulty >= 7.0:
+                    difficulty = PuzzleDifficulty.HARD
+                elif p.avg_difficulty >= 4.0:
+                    difficulty = PuzzleDifficulty.MEDIUM
+
+            # --- Calculate medal ---
+            medal = Medal.BRONZE  # default: solved = Bronze
+            if hasattr(self.xp_service, 'calculate_medal'):
+                medal = self.xp_service.calculate_medal(
+                    passed=True,
+                    time_taken=time_taken_s,
+                    time_limit=getattr(p, 'time_limit_seconds', None),
+                    cost_used=cost_used,
+                    budget=getattr(p, 'budget', 0),
+                )
+
+            # --- Compute raw XP for this solve (base + medal bonus, no delta) ---
+            raw_xp = 0
+            if hasattr(self.xp_service, 'calculate_solve_xp'):
+                raw_xp = self.xp_service.calculate_solve_xp(
+                    difficulty=difficulty,
+                    medal=medal,
+                    previous_best_xp=0,  # pass 0 to get the raw (base+bonus) value
+                )
+            else:
+                raw_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
+
+            # --- Read current progress for medal/upgrade tracking and max XP check ---
+            from Backend.PersistantLayer.SolveRepo import PuzzleProgress
+            from Backend.DomainLayer.Utils import utcnow
+            old_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+            is_first_time_solve = (
+                old_progress is None
+                or (
+                    int(getattr(old_progress, 'best_medal', 0) or 0) == 0
+                    and int(getattr(old_progress, 'best_xp', 0) or 0) == 0
+                    and not getattr(old_progress, 'first_solved_at', None)
+                )
+            )
+
+            # --- Compute max possible XP for this puzzle's difficulty (Gold medal) ---
+            base_xp = getattr(self.xp_service, 'BASE_XP', {}).get(difficulty, 100)
+            gold_bonus = getattr(self.xp_service, 'MEDAL_BONUS', {}).get(Medal.GOLD, 50)
+            max_possible_xp = base_xp + gold_bonus
+
+            # Determine whether max has been reached (SQL will handle best_xp via MAX)
+            old_best_xp = old_progress.best_xp if old_progress else 0
+            new_max_xp_reached = (max(old_best_xp, raw_xp) >= max_possible_xp)
+            achieved_max_xp_this_solve = raw_xp >= max_possible_xp
+
+            # --- Wrap the entire persist + XP pipeline in one IMMEDIATE
+            #     transaction (C2).  This prevents two concurrent solves of the
+            #     same puzzle from both reading stale progress and double-awarding XP.
+            with transaction(self.conn):
+                attempt_id = None
+                if hasattr(self.solve_repo, 'add_solve'):
+                    attempt_id = self.solve_repo.add_solve(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        time_taken_seconds=time_taken_s,
+                        xp_earned=raw_xp,
+                        medal=medal.value if isinstance(medal, Medal) else int(medal),
+                    )
+
+                if hasattr(self.solve_repo, 'upsert_progress'):
+                    new_best_medal = medal.value if isinstance(medal, Medal) else int(medal)
+                    timer_upgraded = getattr(old_progress, 'timer_upgraded', False)
+                    tight_upgraded = getattr(old_progress, 'tight_upgraded', False)
+                    if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
+                        timer_upgraded = True
+                    if p.budget > 0 and cost_used <= p.budget:
+                        tight_upgraded = True
+                    self.solve_repo.upsert_progress(PuzzleProgress(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        best_medal=new_best_medal,
+                        timer_upgraded=timer_upgraded,
+                        tight_upgraded=tight_upgraded,
+                        first_solved_at=old_progress.first_solved_at if old_progress and old_progress.first_solved_at else utcnow().isoformat(),
+                        max_xp_reached=new_max_xp_reached,
+                        best_xp=raw_xp,
+                        total_xp_awarded=0,
+                    ))
+
+                xp_earned = 0
+                if hasattr(self.solve_repo, 'claim_xp_delta'):
+                    xp_earned = self.solve_repo.claim_xp_delta(user_id, puzzle_id)
+                else:
+                    new_progress = self.solve_repo.get_progress(user_id, puzzle_id) if hasattr(self.solve_repo, 'get_progress') else None
+                    xp_earned = new_progress.total_xp_awarded if new_progress else 0
+                xp_earned = max(0, xp_earned)
+
+                # Prefer attempt-history truth for first-time solve detection.
+                if hasattr(self.solve_repo, 'has_passed_before_attempt') and attempt_id is not None:
+                    try:
+                        is_first_time_solve = not self.solve_repo.has_passed_before_attempt(user_id, puzzle_id, attempt_id)
+                    except Exception:
+                        pass
+
+                if self.user_repo is not None and xp_earned > 0:
+                    self.user_repo.increment_xp(user_id, int(xp_earned))
+
+                creator_id = int(p.creator_user_id)
+                if hasattr(self.xp_service, 'award_creator_solve_xp'):
+                    try:
+                        should_award = True
+                        if hasattr(self.solve_repo, 'try_award_creator_solve_xp'):
+                            should_award = self.solve_repo.try_award_creator_solve_xp(puzzle_id, user_id)
+
+                        if should_award:
+                            xp_awarded_creator = self.xp_service.award_creator_solve_xp(
+                                creator_user_id=creator_id,
+                                solver_user_id=user_id,
+                            )
+                            if xp_awarded_creator > 0 and self.notification_service:
+                                solver = self.user_repo.get_by_id(user_id) if self.user_repo else None
+                                solver_name = solver.username if solver else f"User #{user_id}"
+                                self.notification_service.notify_creator_solve(
+                                    creator_user_id=creator_id,
+                                    solver_username=solver_name,
+                                    puzzle_name=p.name,
+                                    xp_amount=xp_awarded_creator,
+                                )
+                    except Exception:
+                        pass  # creator XP is best-effort
+                # COMMIT at context-manager exit
+
+            medal_name = medal.name if isinstance(medal, Medal) else ["NONE", "BRONZE", "SILVER", "GOLD"][int(medal)]
+            best_xp_after_solve = max(old_best_xp, raw_xp)
+            xp_left_for_max = max(0, int(max_possible_xp) - int(best_xp_after_solve))
+            msg = "All test cases passed!"
+            if achieved_max_xp_this_solve and xp_left_for_max == 0 and xp_earned > 0:
+                if is_first_time_solve:
+                    msg += " First solve complete: you reached this puzzle's maximum XP."
+                else:
+                    msg += " Great solve: you reached this puzzle's maximum XP."
+            elif xp_left_for_max > 0:
+                msg += f" You have {xp_left_for_max} XP left for max."
+            elif xp_earned == 0:
+                msg += " No XP improvement this time."
+
+            return {
+                "solved": True,
+                "message": msg,
+                "xp_earned": xp_earned,
+                "puzzle_total_xp": int(best_xp_after_solve),
+                "xp_left_for_max": xp_left_for_max,
+                "time_taken": time_taken_s,
+                "medal": medal_name,
+                "medal_value": medal.value if isinstance(medal, Medal) else int(medal),
+            }
         else:
+            # Record failed attempt so time accumulates for rating eligibility
+            try:
+                from Backend.DomainLayer.Utils import utcnow
+                now = utcnow()
+                time_taken_s = max(0, int(time_taken))
+                attempt = SolveAttempt(
+                    id=0,
+                    puzzle_id=int(puzzle_id),
+                    user_id=int(user_id),
+                    started_at=now,
+                    submitted_at=now,
+                    passed=False,
+                    fail_reason=fail_msg or "wrong answer",
+                    time_used_seconds=time_taken_s,
+                )
+                self.solve_repo.create_attempt(attempt)
+                self.conn.commit()
+            except Exception:
+                pass  # best-effort; don't break the validation response
             return {"solved": False, "message": fail_msg, "details": details}
 
     # ---------- Helper: Centralized Evaluation ----------
-    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any]):
+    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None):
         """
         Evaluates circuit against test cases, handling both Combinatorial (single step)
         and Sequential (streams over time/cycles) logic.
+        Also validates gate limit constraints before testing logic.
         """
         try:
             structure = json.loads(circuit.structure_json)
         except:
             structure = {}
+
+        # --- GATE LIMIT VALIDATION (Check before logic tests) ---
+        # Extract actual gate counts from circuit
+        actual_gates = self.logic_engine.extract_gate_counts(circuit.structure_json)
+        
+        for i, tc in enumerate(test_cases):
+            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
             
+            # Check per-gate limits (GATE_LIMIT test case)
+            if tc_kind == "gate_limit":
+                gate_name = getattr(tc, "gate_name", None)
+                if gate_name is None and isinstance(tc, dict):
+                    gate_name = tc.get("gate_name")
+                
+                gate_limit = getattr(tc, "gate_limit", None)
+                if gate_limit is None and isinstance(tc, dict):
+                    gate_limit = tc.get("gate_limit")
+                
+                if gate_name and gate_limit is not None:
+                    actual_count = actual_gates.get(gate_name, 0)
+                    if actual_count > gate_limit:
+                        return False, f"Gate limit exceeded: Used {actual_count} {gate_name} gates but limit is {gate_limit}", [{
+                            "test_case_index": i,
+                            "gate_name": gate_name,
+                            "limit": gate_limit,
+                            "actual": actual_count,
+                            "error_type": "gate_limit_exceeded"
+                        }]
+            
+            # Check total gate count limit (GATE_COUNT_LIMIT test case)
+            if tc_kind == "gate_count_limit":
+                # Try test case first, then fall back to puzzle's total_gate_count
+                max_gate_count = getattr(tc, "max_gate_count", None)
+                if max_gate_count is None and puzzle:
+                    max_gate_count = getattr(puzzle, "total_gate_count", None)
+                
+                if max_gate_count is not None:
+                    total_gates = sum(actual_gates.values())
+                    if total_gates > max_gate_count:
+                        return False, f"Total gate count exceeded: Used {total_gates} gates but limit is {max_gate_count}", [{
+                            "test_case_index": i,
+                            "gate_limit": max_gate_count,
+                            "actual_total": total_gates,
+                            "gate_breakdown": actual_gates,
+                            "error_type": "gate_count_limit_exceeded"
+                        }]
+        
+        # --- LOGIC VALIDATION (Inputs/Outputs) ---
         placed = structure.get("placedComponents", [])
         if not placed:
             placed = structure.get("components", [])
@@ -289,17 +545,42 @@ class SolvingService:
             # Handle dictionary access if tc is a dict
             if input_stream is None and isinstance(tc, dict):
                 input_stream = tc.get("input_stream")
+            
+            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
                 
             if input_stream is not None and len(input_stream) > 0:
                 # === SEQUENTIAL SIMULATION (INJECTED LOGIC) ===
                 # 'current_state' acts as our look-back history
                 current_state = {str(did): 0 for did in dff_ids}
                 
-                expected_stream = getattr(tc, "expected_output_stream", None) or tc.get("expected_output_stream", {})
+                expected_stream = getattr(tc, "expected_output_stream", None) if hasattr(tc, "expected_output_stream") else (tc.get("expected_output_stream", {}) if isinstance(tc, dict) else {})
                 if not expected_stream:
                     return False, "Sequential test case has input_stream but no expected_output_stream", [{"error": "malformed test case"}]
                     
                 actual_stream = {k: [] for k in expected_stream.keys()}
+                actual_cycles = len(input_stream)
+                
+                # Check latency limits BEFORE simulation
+                tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
+                if tc_kind == "latency_limit":
+                    min_cycles = getattr(tc, "min_cycles", None) or (tc.get("min_cycles") if isinstance(tc, dict) else None)
+                    max_cycles = getattr(tc, "max_cycles", None) or (tc.get("max_cycles") if isinstance(tc, dict) else None)
+                    
+                    if min_cycles is not None and actual_cycles < min_cycles:
+                        return False, f"Insufficient cycles: Circuit uses {actual_cycles} cycles but minimum is {min_cycles}", [{
+                            "test_case_index": i,
+                            "actual_cycles": actual_cycles,
+                            "min_cycles": min_cycles,
+                            "error_type": "insufficient_cycles"
+                        }]
+                    
+                    if max_cycles is not None and actual_cycles > max_cycles:
+                        return False, f"Too many cycles: Circuit uses {actual_cycles} cycles but maximum is {max_cycles}", [{
+                            "test_case_index": i,
+                            "actual_cycles": actual_cycles,
+                            "max_cycles": max_cycles,
+                            "error_type": "excessive_cycles"
+                        }]
                 
                 # Loop through discrete time steps (cycles)
                 for step_idx, val in enumerate(input_stream):
@@ -332,19 +613,430 @@ class SolvingService:
                     }]
 
             else:
-                # === COMBINATORIAL SIMULATION ===
-                inputs = getattr(tc, "inputs", None) or tc.get("inputs")
-                expected = getattr(tc, "expected_outputs", None) or tc.get("expected_outputs")
+                # Only check inputs/outputs for BLACKBOX and WHITEBOX test cases
+                # Skip constraint-only test cases (GATE_LIMIT, GATE_COUNT_LIMIT, LATENCY_LIMIT)
+                is_logic_test = tc_kind not in ("gate_limit", "gate_count_limit", "latency_limit")
                 
-                try:
-                    out = self.logic_engine.evaluate(circuit, inputs)
-                    if out != expected:
-                        return False, "Wrong output", [{
-                            "inputs": inputs,
-                            "expected": expected,
-                            "actual": out
-                        }]
-                except Exception as e:
-                    return False, str(e), [{"error": str(e)}]
+                if is_logic_test:
+                    # === COMBINATORIAL SIMULATION ===
+                    inputs = getattr(tc, "inputs", None) if hasattr(tc, "inputs") else (tc.get("inputs") if isinstance(tc, dict) else None)
+                    expected = getattr(tc, "expected_outputs", None) if hasattr(tc, "expected_outputs") else (tc.get("expected_outputs") if isinstance(tc, dict) else None)
+                    
+                    try:
+                        out = self.logic_engine.evaluate(circuit, inputs)
+                        if out != expected:
+                            return False, "Wrong output", [{
+                                "inputs": inputs,
+                                "expected": expected,
+                                "actual": out
+                            }]
+                    except Exception as e:
+                        return False, str(e), [{"error": str(e)}]
 
         return True, None, []
+
+    def _expand_arsenal_pieces(self, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Expand arsenal pieces in the solution by adding their truth tables.
+        This allows the logic engine to evaluate them correctly.
+        """
+        # Make a deep copy to avoid modifying the original
+        expanded = json.loads(json.dumps(solution_payload))
+        
+        placed_components = expanded.get("placedComponents", []) or expanded.get("components", [])
+        
+        # Store arsenal piece info for quick lookup during evaluation
+        expanded["_arsenal_pieces"] = {}
+        
+        print(f"[ARSENAL EXPAND] Processing {len(placed_components)} components")
+        
+        for placed in placed_components:
+            component_id = placed.get("componentId")
+            placed_id = placed.get("id")
+            
+            print(f"[ARSENAL EXPAND]   Checking component: {component_id}")
+            
+            # Try to convert to int - could be numeric string or already an int
+            piece_id = None
+            try:
+                if isinstance(component_id, int):
+                    piece_id = component_id
+                    print(f"[ARSENAL EXPAND]     -> Is int: {piece_id}")
+                elif isinstance(component_id, str):
+                    piece_id = int(component_id)
+                    print(f"[ARSENAL EXPAND]     -> Converted string to int: {piece_id}")
+                else:
+                    print(f"[ARSENAL EXPAND]     -> Not numeric (type: {type(component_id).__name__})")
+            except (ValueError, TypeError):
+                # Not a numeric ID, skip
+                print(f"[ARSENAL EXPAND]     -> Failed to convert to int")
+                continue
+            
+            if piece_id is not None:
+                # Try to fetch the arsenal piece
+                try:
+                    arsenal_piece = self.circuit_repo.get_by_id(piece_id)
+                    if arsenal_piece:
+                        print(f"[ARSENAL EXPAND]     -> Found circuit {piece_id}, is_arsenal={arsenal_piece.is_arsenal}")
+                        if arsenal_piece.is_arsenal:
+                            # Get the truth table and parse if needed
+                            truth_table = arsenal_piece.truth_table
+                            if isinstance(truth_table, str):
+                                truth_table = json.loads(truth_table)
+                            
+                            print(f"[ARSENAL EXPAND]     -> Truth table keys: {list(truth_table.keys())[:3]}...")  # Show first 3 keys
+                            
+                            # Store the truth table and input/output info
+                            expanded["_arsenal_pieces"][placed_id] = {
+                                "id": piece_id,
+                                "name": arsenal_piece.name,
+                                "num_inputs": arsenal_piece.num_inputs,
+                                "num_outputs": arsenal_piece.num_outputs,
+                                "truth_table": truth_table,
+                            }
+                            print(f"[ARSENAL EXPAND]     -> Stored arsenal piece {arsenal_piece.name}")
+                    else:
+                        print(f"[ARSENAL EXPAND]     -> Circuit not found in database")
+                except Exception as e:
+                    # Failed to fetch arsenal piece, skip
+                    print(f"[ARSENAL EXPAND]     -> Error fetching: {str(e)}")
+        
+        print(f"[ARSENAL EXPAND] Total arsenal pieces loaded: {len(expanded['_arsenal_pieces'])}")
+        
+        return expanded
+
+    # ---------- Simulation for Debugger ----------
+    def simulate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], inputs: Dict[str, Any], is_sequence: bool = False) -> Dict[str, Any]:
+        """
+        Simulate a circuit with given inputs and return all gate outputs and puzzle outputs.
+        Used by the debugger to trace circuit behavior.
+        
+        If is_sequence is True, inputs is a dict of lists (sequences) instead of a dict of integers.
+        puzzle_id=0 is used for arsenal pieces (no puzzle validation).
+        """
+        user_id = self.auth.require_user_id(token)
+        
+        # Only validate puzzle exists if puzzle_id > 0 (puzzle_id=0 is for arsenal pieces)
+        if puzzle_id > 0:
+            p = self.puzzle_repo.get_by_id(puzzle_id)
+            if not p:
+                raise ValidationError("puzzle not found")
+        
+        if not is_sequence:
+            # Single-step simulation
+            return self._simulate_single_step(puzzle_id, solution_payload, inputs)
+        else:
+            # Sequence simulation
+            return self._simulate_sequence(puzzle_id, solution_payload, inputs)
+
+    def _simulate_single_step(self, puzzle_id: int, solution_payload: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
+        """Simulate a single step and return gate and puzzle outputs."""
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
+        
+        # Build and simulate the circuit
+        return self._run_simulation(expanded_solution, inputs)
+
+    def _simulate_sequence(self, puzzle_id: int, solution_payload: Dict[str, Any], input_sequences: Dict[str, list]) -> Dict[str, Any]:
+        """Simulate a sequence of inputs and return results for each step."""
+        # Expand arsenal pieces in the solution
+        expanded_solution = self._expand_arsenal_pieces(solution_payload)
+        
+        # Get sequence length
+        lengths = [len(v) for v in input_sequences.values()]
+        if not lengths:
+            raise ValidationError("No input sequences provided")
+        if len(set(lengths)) > 1:
+            raise ValidationError("All input sequences must have the same length")
+        
+        seq_length = lengths[0]
+        
+        # Simulate each step
+        all_steps = []
+        for step_idx in range(seq_length):
+            # Build input dict for this step
+            step_inputs = {}
+            for input_name, sequence in input_sequences.items():
+                step_inputs[input_name] = sequence[step_idx]
+            
+            # Run simulation for this step
+            result = self._run_simulation(expanded_solution, step_inputs)
+            all_steps.append(result)
+        
+        # Combine results
+        return {
+            "steps": all_steps,
+            "success": True
+        }
+
+    def _run_simulation(self, expanded_solution: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
+        """Run a single simulation step with expanded solution and given inputs."""
+        # Reconstruct Circuit for Logic Engine
+        tcircuit = Circuit(
+            id=0,
+            user_id=0,
+            name="Simulation",
+            cost=expanded_solution.get("totalCost", 0),
+            structure_json=json.dumps(expanded_solution)
+        )
+        
+        # Get the full circuit data with placed components and wires
+        data = json.loads(tcircuit.structure_json)
+        placed = data.get("placedComponents", [])
+        wires = data.get("wires", [])
+        arsenal_pieces = data.get("_arsenal_pieces", {})
+        
+        # DEBUG: Log what components we received
+        print(f"[DEBUGGER] Total placed components: {len(placed)}")
+        print(f"[DEBUGGER] Total arsenal pieces detected: {len(arsenal_pieces)}")
+        for pc in placed:
+            comp_id = pc.get("id")
+            comp_type = pc.get("componentId")
+            is_arsenal = comp_id in arsenal_pieces
+            print(f"[DEBUGGER]   Component: {comp_id} (type: {comp_type}, is_arsenal: {is_arsenal})")
+        
+        # Evaluate the circuit to get puzzle outputs
+        try:
+            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs)
+        except Exception as e:
+            raise ValidationError(f"Circuit evaluation failed: {str(e)}")
+        
+        # Build gate info by re-simulating through the logic engine with better tracing
+        gate_outputs = []
+        
+        # Map component ID -> type
+        comp_types = {}
+        for pc in placed:
+            comp_types[pc["id"]] = pc["componentId"]
+        
+        # Gate truth tables (matching existing definitions)
+        TRUTH_TABLES = {
+            "AND": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "1"]]},
+            "OR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "1"]]},
+            "NOT": {"inputs": ["IN"], "outputs": ["OUT"], "rows": [["0", "1"], ["1", "0"]]},
+            "XOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "0"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "0"]]},
+            "NAND": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "1"], ["1", "0", "1"], ["1", "1", "0"]]},
+            "NOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "0"]]},
+            "XNOR": {"inputs": ["A", "B"], "outputs": ["OUT"], "rows": [["0", "0", "1"], ["0", "1", "0"], ["1", "0", "0"], ["1", "1", "1"]]},
+            "DFF": {"inputs": ["IN"], "outputs": ["OUT"], "rows": [["0", "0"], ["1", "1"]]},
+        }
+        
+        # Helper function to get gate outputs by evaluating its truth table
+        def get_gate_output(gate_type, input_vals):
+            """Get output values for a gate based on its inputs."""
+            if gate_type not in TRUTH_TABLES:
+                return None
+            tt = TRUTH_TABLES[gate_type]
+            if len(input_vals) != len(tt["inputs"]):
+                return None
+            key = "".join(str(v) for v in input_vals)
+            for row in tt["rows"]:
+                row_inputs = "".join(row[:len(tt["inputs"])])
+                if row_inputs == key:
+                    return row[len(tt["inputs"]):]
+            return None
+        
+        # Cache for gate outputs as we compute them
+        gate_result_cache = {}  # comp_id -> output values
+        
+        def get_source_value(source_comp_id, source_pin):
+            """Get the output value from a source component/input."""
+            if source_comp_id.startswith("IO:IN:"):
+                input_name = source_comp_id.replace("IO:IN:", "")
+                return inputs.get(input_name, 0)
+            elif source_comp_id.startswith("IO:OUT:"):
+                output_name = source_comp_id.replace("IO:OUT:", "")
+                return puzzle_outputs.get(output_name, 0)
+            elif source_comp_id in gate_result_cache:
+                outputs = gate_result_cache[source_comp_id]
+                if source_pin < len(outputs):
+                    return int(outputs[source_pin])
+                return 0
+            else:
+                # Gate not yet computed
+                return None
+        
+        def evaluate_gate(comp_id, comp_type):
+            """Evaluate a single gate and return its outputs."""
+            if comp_id in gate_result_cache:
+                return gate_result_cache[comp_id]
+            
+            # Check if this is an arsenal piece
+            if comp_id in arsenal_pieces:
+                arsenal_info = arsenal_pieces[comp_id]
+                num_inputs = arsenal_info.get("num_inputs", 0)
+                num_outputs = arsenal_info.get("num_outputs", 0)
+                truth_table = arsenal_info.get("truth_table", {})
+                
+                print(f"[DEBUGGER] Evaluating arsenal piece {comp_id}: {num_inputs} inputs, {num_outputs} outputs")
+                
+                # Collect inputs from wires
+                gate_inputs = [None] * num_inputs
+                
+                for wire in wires:
+                    if wire["to"]["componentId"] == comp_id:
+                        to_pin = wire["to"]["pinIndex"]
+                        from_comp_id = wire["from"]["componentId"]
+                        from_pin = wire["from"]["pinIndex"]
+                        
+                        if to_pin < num_inputs:
+                            value = get_source_value(from_comp_id, from_pin)
+                            if value is not None:
+                                gate_inputs[to_pin] = value
+                
+                # Fill unconnected inputs with 0
+                gate_inputs = [v if v is not None else 0 for v in gate_inputs]
+                
+                print(f"[DEBUGGER]   Inputs: {gate_inputs}")
+                
+                # Try different key formats for the truth table lookup
+                try:
+                    # Build different key formats
+                    bin_key = "".join(str(int(v)) for v in gate_inputs)  # "001"
+                    
+                    input_dict = {}
+                    for i in range(num_inputs):
+                        input_dict[f"in{i}"] = int(gate_inputs[i])
+                    
+                    keys_to_try = [
+                        bin_key,  # "001" - most common format
+                        json.dumps(input_dict),  # {"in0": 0, "in1": 0, "in2": 1}
+                        json.dumps({str(i): int(gate_inputs[i]) for i in range(num_inputs)}),  # {"0": 0, "1": 0, "2": 1}
+                        ",".join(str(int(v)) for v in gate_inputs),  # 0,0,1
+                    ]
+                    
+                    print(f"[DEBUGGER]   Trying keys: {keys_to_try}")
+                    
+                    for key_attempt in keys_to_try:
+                        if key_attempt in truth_table:
+                            print(f"[DEBUGGER]   Found key: {key_attempt}")
+                            outputs_dict = truth_table[key_attempt]
+                            
+                            # Extract output values in order
+                            output_vals = []
+                            
+                            if isinstance(outputs_dict, str):
+                                # Output is a binary string like "01" - convert each character
+                                output_vals = list(outputs_dict)
+                                print(f"[DEBUGGER]   Outputs (from string): {output_vals}")
+                                gate_result_cache[comp_id] = output_vals
+                                return output_vals
+                            elif isinstance(outputs_dict, dict):
+                                # Output is a dict - extract values in order
+                                for i in range(num_outputs):
+                                    # Try different output key formats
+                                    found = False
+                                    for out_key in [f"out{i}", f"OUT{i}", f"output{i}", i, str(i)]:
+                                        if out_key in outputs_dict:
+                                            output_vals.append(str(outputs_dict[out_key]))
+                                            found = True
+                                            break
+                                    if not found:
+                                        output_vals.append("0")
+                                print(f"[DEBUGGER]   Outputs (from dict): {output_vals}")
+                                gate_result_cache[comp_id] = output_vals
+                                return output_vals
+                            elif isinstance(outputs_dict, (int, float)):
+                                # Single numeric output
+                                gate_result_cache[comp_id] = [str(int(outputs_dict))]
+                                print(f"[DEBUGGER]   Outputs: [{int(outputs_dict)}]")
+                                return [str(int(outputs_dict))]
+                            break
+                    
+                    print(f"[DEBUGGER]   No matching truth table entry found")
+                except Exception as e:
+                    print(f"[DEBUGGER]   Error evaluating: {str(e)}")
+                
+                return None
+            
+            # Regular gate
+            if comp_type not in TRUTH_TABLES:
+                return None
+            
+            tt = TRUTH_TABLES[comp_type]
+            num_inputs = len(tt["inputs"])
+            
+            # Collect inputs from wires
+            gate_inputs = [None] * num_inputs
+            
+            for wire in wires:
+                if wire["to"]["componentId"] == comp_id:
+                    to_pin = wire["to"]["pinIndex"]
+                    from_comp_id = wire["from"]["componentId"]
+                    from_pin = wire["from"]["pinIndex"]
+                    
+                    if to_pin < len(gate_inputs):
+                        value = get_source_value(from_comp_id, from_pin)
+                        if value is not None:
+                            gate_inputs[to_pin] = value
+            
+            # Fill unconnected inputs with 0
+            gate_inputs = [v if v is not None else 0 for v in gate_inputs]
+            
+            # Compute output
+            outputs = get_gate_output(comp_type, gate_inputs)
+            if outputs:
+                gate_result_cache[comp_id] = outputs
+                return outputs
+            
+            return None
+        
+        # Iteratively evaluate gates until stable
+        max_iterations = 100
+        iteration = 0
+        last_cache_size = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            
+            for pc in placed:
+                comp_id = pc["id"]
+                comp_type = comp_types.get(comp_id, "")
+                
+                # Check if it's an arsenal piece or a regular gate
+                is_arsenal = comp_id in arsenal_pieces
+                is_gate = comp_type in TRUTH_TABLES
+                
+                if (is_arsenal or is_gate) and comp_id not in gate_result_cache:
+                    result = evaluate_gate(comp_id, comp_type)
+                    if result:
+                        print(f"[DEBUGGER] Successfully evaluated {comp_id}: {result}")
+            
+            # Check if we've converged
+            if len(gate_result_cache) == last_cache_size:
+                print(f"[DEBUGGER] Converged after {iteration} iterations, {len(gate_result_cache)} gates evaluated")
+                break
+            last_cache_size = len(gate_result_cache)
+        
+        # Collect all evaluated gates/arsenal pieces into output list
+        for pc in placed:
+            comp_id = pc["id"]
+            comp_type = comp_types.get(comp_id, "")
+            
+            if comp_id in gate_result_cache:
+                outputs = gate_result_cache[comp_id]
+                
+                # Determine display label
+                if comp_id in arsenal_pieces:
+                    display_label = arsenal_pieces[comp_id].get("name", comp_type)
+                else:
+                    display_label = comp_type
+                
+                # Format output values
+                if isinstance(outputs, list):
+                    values_str = ";".join(str(o) for o in outputs)
+                else:
+                    values_str = str(outputs)
+                
+                gate_outputs.append({
+                    "placedId": comp_id,
+                    "componentId": comp_type,
+                    "displayLabel": display_label,
+                    "values": values_str
+                })
+        
+        return {
+            "gateOutputs": gate_outputs,
+            "puzzleOutputs": puzzle_outputs,
+            "success": True
+        }

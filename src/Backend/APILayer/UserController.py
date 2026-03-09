@@ -1,9 +1,11 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.ServiceLayer.UserService import UserService
+from Backend.ServiceLayer.NotificationService import NotificationService
 from Backend.APILayer.auth_utils import verify_token
 
 
@@ -18,6 +20,20 @@ class LoginReq(BaseModel):
     password: str
 
 
+class GoogleLoginReq(BaseModel):
+    token: str
+
+
+class GoogleCompleteRegistrationReq(BaseModel):
+    token: str
+    username: str
+    password: str
+
+
+class UpdateBioReq(BaseModel):
+    bio: str = ""
+
+
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
@@ -28,7 +44,7 @@ class UpdatePuzzleLimitsReq(BaseModel):
     max_unpublished: Optional[int] = None
 
 
-def build_user_router(user_service: UserService) -> APIRouter:
+def build_user_router(user_service: UserService, notification_service: NotificationService = None) -> APIRouter:
     router = APIRouter(prefix="/users", tags=["users"])
 
     @router.post("/register")
@@ -48,6 +64,20 @@ def build_user_router(user_service: UserService) -> APIRouter:
             else:
                 raise HTTPException(status_code=401, detail=str(e))
 
+    @router.post("/google-login")
+    def google_login(req: GoogleLoginReq):
+        try:
+            return user_service.google_login(req.token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/google-complete-registration")
+    def google_complete_registration(req: GoogleCompleteRegistrationReq):
+        try:
+            return user_service.google_complete_registration(req.model_dump())
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     @router.post("/logout")
     def logout(token: str = Depends(verify_token)):
         try:
@@ -63,11 +93,61 @@ def build_user_router(user_service: UserService) -> APIRouter:
             raise HTTPException(status_code=401, detail=str(e))
 
     @router.get("")
-    def list_users(token: str = Depends(verify_token), limit: int = 200, offset: int = 0):
+    def list_users(
+        token: str = Depends(verify_token),
+        limit: int = 50,
+        offset: int = 0,
+        username_search: Optional[str] = None,
+        role: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        min_level: Optional[int] = None,
+        max_level: Optional[int] = None,
+        experience_level: str = "all",
+        order_by: str = "created_at",
+        order_direction: str = "DESC"
+    ):
         try:
-            return user_service.list_users(token, limit=limit, offset=offset)
+            return user_service.list_users(
+                token,
+                limit=limit,
+                offset=offset,
+                username_search=username_search,
+                role=role,
+                date_from=date_from,
+                date_to=date_to,
+                min_level=min_level,
+                max_level=max_level,
+                experience_level=experience_level,
+                order_by=order_by,
+                order_direction=order_direction
+            )
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
+
+    @router.delete("/{user_id}")
+    def delete_user(user_id: int, token: str = Depends(verify_token)):
+        try:
+            return user_service.delete_user(token, user_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    @router.post("/me/accept-creator")
+    def accept_creator(token: str = Depends(verify_token)):
+        try:
+            return user_service.accept_creator_role(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @router.post("/me/decline-creator")
+    def decline_creator(token: str = Depends(verify_token)):
+        try:
+            return user_service.decline_creator_role(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     @router.post("/role")
     def set_role(req: SetRoleReq, token: str = Depends(verify_token)):
@@ -75,6 +155,89 @@ def build_user_router(user_service: UserService) -> APIRouter:
             return user_service.set_role(token, req.model_dump())
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
+
+    # --- Creator Notifications ---
+    @router.get("/me/notifications")
+    def get_notifications(
+        token: str = Depends(verify_token),
+        notif_type: Optional[str] = None,
+        puzzle_name: Optional[str] = None,
+        actor_username: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        limit: Optional[int] = None,
+        offset: int = 0
+    ):
+        if not notification_service:
+            return []
+        try:
+            return notification_service.get_unread(
+                token,
+                notif_type=notif_type,
+                puzzle_name=puzzle_name,
+                actor_username=actor_username,
+                date_from=date_from,
+                date_to=date_to,
+                order_by=order_by,
+                order_direction=order_direction,
+                limit=limit,
+                offset=offset
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.get("/me/notifications/history")
+    def get_notifications_history(
+        token: str = Depends(verify_token),
+        notif_type: Optional[str] = None,
+        puzzle_name: Optional[str] = None,
+        actor_username: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        limit: Optional[int] = None,
+        offset: int = 0
+    ):
+        if not notification_service:
+            return []
+        try:
+            return notification_service.get_all(
+                token,
+                notif_type=notif_type,
+                puzzle_name=puzzle_name,
+                actor_username=actor_username,
+                date_from=date_from,
+                date_to=date_to,
+                order_by=order_by,
+                order_direction=order_direction,
+                limit=limit,
+                offset=offset
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.patch("/me/notifications/read")
+    def mark_notifications_read(token: str = Depends(verify_token)):
+        if not notification_service:
+            return {"marked_read": 0}
+        try:
+            return notification_service.mark_all_read(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.patch("/me")
+    def update_user(req: UpdateBioReq, token: str = Depends(verify_token)):
+        try:
+            user_id = user_service.auth.require_user_id(token)
+            result = user_service.update_user_bio(user_id, req.bio)
+            return result
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @router.patch("/{user_id}/puzzle-limits")
     def update_puzzle_limits(user_id: int, req: UpdatePuzzleLimitsReq, token: str = Depends(verify_token)):

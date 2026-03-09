@@ -39,11 +39,13 @@ class AuthService:
         for t in expired:
             del self._sessions[t]
 
-    def login(self, username: str, password: str) -> str:
+    def login(self, username: str, password: str):
+        """Authenticate and return (token, user).  The caller gets the User
+        object for free, avoiding a second DB lookup."""
         username = (username or "").strip()
         password = password or ""
         if not username or not password:
-            raise ValidationError("username and password required")
+            raise ValidationError("Username and password are required for login.")
 
         user = self.user_repo.get_by_username(username)
         if not user:
@@ -63,6 +65,20 @@ class AuthService:
             self._cleanup_expired_locked()
             self._sessions[token] = SessionInfo(user_id=user.id, created_at=now, last_seen=now)
 
+        return token, user
+
+    def login_external(self, user_id: int) -> str:
+        """Create a session for a user verified by an external provider (e.g. Google).
+        Skips password verification – caller is responsible for identity validation."""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+
+        token = secrets.token_urlsafe(32)
+        now = time.time()
+        with self._lock:
+            self._cleanup_expired_locked()
+            self._sessions[token] = SessionInfo(user_id=user.id, created_at=now, last_seen=now)
         return token
 
     def logout(self, token: str) -> None:
