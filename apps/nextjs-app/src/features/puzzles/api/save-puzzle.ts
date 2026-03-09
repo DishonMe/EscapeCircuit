@@ -4,8 +4,6 @@ import { api } from '@/lib/api-client';
 import { MutationConfig } from '@/lib/react-query';
 import { Puzzle } from '@/types/api';
 
-import { getPuzzlesQueryOptions } from './get-puzzles';
-
 type PuzzlesResponse = {
   data: Puzzle[];
   meta: {
@@ -27,12 +25,10 @@ export const toggleSavePuzzle = ({
 };
 
 type UseToggleSavePuzzleOptions = {
-  puzzleId: string;
   mutationConfig?: MutationConfig<typeof toggleSavePuzzle>;
 };
 
 export const useToggleSavePuzzle = ({
-  puzzleId,
   mutationConfig,
 }: UseToggleSavePuzzleOptions) => {
   const queryClient = useQueryClient();
@@ -43,6 +39,7 @@ export const useToggleSavePuzzle = ({
     ...restConfig,
     mutationFn: toggleSavePuzzle,
     onMutate: async (variables) => {
+      const targetPuzzleId = variables.puzzleId;
       // Optimistically update the puzzle list
       await queryClient.cancelQueries({
         queryKey: ['puzzles'],
@@ -60,7 +57,7 @@ export const useToggleSavePuzzle = ({
           return {
             ...oldData,
             data: oldData.data.map((p) =>
-              p.id === puzzleId ? { ...p, is_saved: !p.is_saved } : p
+              p.id === targetPuzzleId ? { ...p, is_saved: !p.is_saved } : p
             ),
           };
         }
@@ -68,16 +65,16 @@ export const useToggleSavePuzzle = ({
 
       return { previousData };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, onMutateResult, context) => {
       // Invalidate user query to refresh their saved puzzles
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      onSuccess?.(data, variables, context);
+      onSuccess?.(data, variables, onMutateResult, context);
     },
     onError: (error, variables, context: any) => {
       // Revert optimistic update on error
       if (context?.previousData) {
-        context.previousData.forEach(({ queryKey }: any) => {
-          queryClient.setQueriesData(queryKey, (oldData: any) => oldData);
+        context.previousData.forEach(([queryKey, snapshot]: any) => {
+          queryClient.setQueryData(queryKey, snapshot);
         });
       }
     },

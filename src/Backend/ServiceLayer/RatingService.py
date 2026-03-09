@@ -60,12 +60,27 @@ class RatingService:
         if self.rating_repo.get_by_puzzle_user(int(puzzle_id), int(user_id)):
             return True
 
-        # Rule: allowed if user solved OR total time on puzzle >= 300s (5 mins)
+        # Rule: allowed if user solved OR total tracked time meets threshold.
         if self.solve_repo.has_passed(user_id, puzzle_id):
             return True
 
         total_time = self.solve_repo.get_total_time_on_puzzle(user_id, puzzle_id)
-        effective_time = max(total_time, client_elapsed)
+
+        # Fallback path: derive elapsed seconds from first started attempt in Python.
+        # This avoids edge cases where SQLite date parsing can undercount open attempts.
+        first_started_elapsed = 0
+        first_started_at = self.solve_repo.first_attempt_started_at(user_id, puzzle_id)
+        if first_started_at:
+            try:
+                started_dt = _parse_iso(first_started_at)
+                first_started_elapsed = max(
+                    0,
+                    int((datetime.now(timezone.utc) - started_dt).total_seconds()),
+                )
+            except Exception:
+                first_started_elapsed = 0
+
+        effective_time = max(total_time, client_elapsed, first_started_elapsed)
         return effective_time >= settings.RATING_MIN_ATTEMPT_SECONDS
 
     def _store_rating(
@@ -91,7 +106,9 @@ class RatingService:
             raise ValidationError("rating not found")
 
         if not self._can_rate(user_id, int(puzzle_id), client_elapsed=int(client_elapsed or 0)):
-            raise ValidationError("You must solve the puzzle or attempt it for at least 5 minutes to rate.")
+            raise ValidationError(
+                f"You must solve the puzzle or attempt it for at least {settings.RATING_MIN_ATTEMPT_SECONDS} seconds to rate."
+            )
 
         # Snapshot experienced status at rating time
         user = self.auth.user_repo.get_by_id(user_id)

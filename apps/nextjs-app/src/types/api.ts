@@ -139,6 +139,7 @@ export type Puzzle = Entity<{
   // Solve tracking (injected per-user by browse endpoint)
   is_solved?: boolean;
   can_rate?: boolean;
+  rating_min_attempt_seconds?: number;
   best_time?: number | null;
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold

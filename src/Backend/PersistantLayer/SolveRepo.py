@@ -215,11 +215,18 @@ class SolveRepo:
         return row["started_at"] if row else None
 
     def get_total_time_on_puzzle(self, user_id: int, puzzle_id: int) -> int:
-        """Sum time_used_seconds from solve_attempts for this user/puzzle.
-        Used for the 5-minute attempt eligibility rule."""
+        """Sum tracked attempt time for this user/puzzle.
+        Closed attempts use time_used_seconds; open attempts contribute elapsed
+        seconds since started_at so rating unlock can work without submission."""
         row = self.conn.execute(
             """
-            SELECT COALESCE(SUM(time_used_seconds), 0) AS total
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN submitted_at IS NULL THEN
+                        MAX(0, CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER))
+                    ELSE COALESCE(time_used_seconds, 0)
+                END
+            ), 0) AS total
             FROM solve_attempts
             WHERE user_id=? AND puzzle_id=?
             """,

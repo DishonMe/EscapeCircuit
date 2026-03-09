@@ -244,6 +244,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             p["best_medal"] = 0
                         # Global solved count (all users)
                         p["solvedCount"] = solved_counts.get(pid, 0) if pid else 0
+                        p["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
                         # Can-rate flag (solved OR 5 min spent)
                         if pid and rating_service:
                             try:
@@ -312,6 +313,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             # Inject per-user solve status (same as browse does)
             try:
                 user_id = puzzle_service.auth.require_user_id(token)
+                result["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
                 if puzzle_service.solve_repo:
                     is_passed = puzzle_service.solve_repo.has_passed(user_id, puzzle_id)
                     result["is_solved"] = is_passed
