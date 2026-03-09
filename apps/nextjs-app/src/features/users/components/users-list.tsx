@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent } from 'react';
-import { ChevronDown, ChevronUp, Filter, X } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -11,7 +11,6 @@ import { formatDate } from '@/utils/format';
 import { useUsers, UserFilters } from '../api/get-users';
 
 import { DeleteUser } from './delete-user';
-import { PuzzleLimitsEditor } from './puzzle-limits-editor';
 import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
 import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
 
@@ -28,7 +27,6 @@ function useDebouncedValue<T>(value: T, delay: number = 400): T {
 export const UsersList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<UserFilters>({});
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   // Debounce text inputs so the API isn't called on every keystroke
   const debouncedFilters = useDebouncedValue(filters);
@@ -116,45 +114,22 @@ export const UsersList = () => {
             title: 'Actions',
             field: 'id',
             Cell({ entry }: { entry: any }) {
-              const isCreator = entry.role === 'creator' || entry.role === 'pending_creator';
-              const isExpanded = expandedUserId === entry.id;
               return (
-                <div className="flex flex-col gap-1">
-                  <div className="flex gap-2 items-center">
-                    {entry.role === 'solver' && (
-                      <AssignCreatorButton
-                        userId={Number(entry.id)}
-                        username={entry.username}
-                      />
-                    )}
-                    {isCreator && (
-                      <RemoveCreatorButton
-                        userId={Number(entry.id)}
-                        username={entry.username}
-                        currentRole={entry.role}
-                      />
-                    )}
-                    <DeleteUser id={entry.id} />
-                    {isCreator && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1 text-[11px] text-muted-foreground"
-                        onClick={() =>
-                          setExpandedUserId(isExpanded ? null : entry.id)
-                        }
-                        title="More options"
-                      >
-                        {isExpanded ? (
-                          <ChevronUp className="size-3" />
-                        ) : (
-                          <ChevronDown className="size-3" />
-                        )}
-                        More
-                      </Button>
-                    )}
-                  </div>
-                  {isCreator && isExpanded && <PuzzleLimitsEditor user={entry} />}
+                <div className="flex gap-2 items-center">
+                  {entry.role === 'solver' && (
+                    <AssignCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                    />
+                  )}
+                  {(entry.role === 'creator' || entry.role === 'pending_creator') && (
+                    <RemoveCreatorButton
+                      userId={Number(entry.id)}
+                      username={entry.username}
+                      currentRole={entry.role}
+                    />
+                  )}
+                  <DeleteUser id={entry.id} />
                 </div>
               );
             },
@@ -272,4 +247,3 @@ export const UsersList = () => {
     </div>
   );
 };
-

@@ -131,22 +131,6 @@ class XPService:
                 return slots
         return settings.ARSENAL_XP_MAX_SLOTS
 
-    # ---- Per-user puzzle publication limits ----
-    def get_puzzle_published_limit(self, xp_total: int) -> int:
-        """Return max published puzzles allowed for a user with the given XP.
-        Levels 1–9: 5; levels 10–15: +2 per level above 9; cap 17.
-        """
-        lvl = self.calculate_level(int(xp_total))
-        if lvl < 10:
-            return 5
-        return min(17, 5 + 2 * (lvl - 9))
-
-    def get_puzzle_unpublished_limit(self, xp_total: int) -> int:
-        """Return max draft (unpublished) puzzles allowed for a user with the given XP.
-        Uses the same formula as get_puzzle_published_limit.
-        """
-        return self.get_puzzle_published_limit(xp_total)
-
     # ---- Internal: apply XP delta to user ----
     def _apply_xp(self, user_id: int, delta: int) -> int:
         if delta <= 0:

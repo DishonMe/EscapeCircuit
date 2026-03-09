@@ -450,31 +450,3 @@ class TestUserRepoBanning:
         got = repo.get_by_id(created.id)
         assert got.is_discussion_banned is False
 
-class TestUserRepoPuzzleLimits:
-    """Tests for puzzle limit columns and update_puzzle_limits()."""
-
-    def test_schema_has_puzzle_limit_columns(self, conn, repo):
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
-        assert "puzzle_limit_published" in cols
-        assert "puzzle_limit_unpublished" in cols
-
-    def test_puzzle_limits_default_to_none(self, repo):
-        created = repo.create(make_user("limituser"), password="pw")
-        got = repo.get_by_id(created.id)
-        assert got.puzzle_limit_published is None
-        assert got.puzzle_limit_unpublished is None
-
-    def test_update_puzzle_limits_sets_values(self, repo):
-        created = repo.create(make_user("limituser2"), password="pw")
-        repo.update_puzzle_limits(created.id, puzzle_limit_published=3, puzzle_limit_unpublished=7)
-        got = repo.get_by_id(created.id)
-        assert got.puzzle_limit_published == 3
-        assert got.puzzle_limit_unpublished == 7
-
-    def test_update_puzzle_limits_reset_to_none(self, repo):
-        created = repo.create(make_user("limituser3"), password="pw")
-        repo.update_puzzle_limits(created.id, puzzle_limit_published=5, puzzle_limit_unpublished=5)
-        repo.update_puzzle_limits(created.id, puzzle_limit_published=None, puzzle_limit_unpublished=None)
-        got = repo.get_by_id(created.id)
-        assert got.puzzle_limit_published is None
-        assert got.puzzle_limit_unpublished is None

@@ -33,11 +33,6 @@ class UpdateBioReq(BaseModel):
     bio: str = ""
 
 
-class UpdatePuzzleLimitsReq(BaseModel):
-    puzzle_limit_published: Optional[int] = None
-    puzzle_limit_unpublished: Optional[int] = None
-
-
 class SetRoleReq(BaseModel):
     target_user_id: int
     role: str  # "admin"/"creator"/"solver"
@@ -237,20 +232,5 @@ def build_user_router(user_service: UserService, notification_service: Notificat
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-
-    @router.patch("/{user_id}/puzzle-limits")
-    def update_puzzle_limits(user_id: int, req: UpdatePuzzleLimitsReq, token: str = Depends(verify_token)):
-        try:
-            return user_service.update_puzzle_limits(
-                token,
-                user_id,
-                req.puzzle_limit_published,
-                req.puzzle_limit_unpublished,
-            )
-        except ValidationError as e:
-            msg = str(e)
-            if "admin required" in msg:
-                raise HTTPException(status_code=403, detail=msg)
-            raise HTTPException(status_code=400, detail=msg)
 
     return router
