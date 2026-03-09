@@ -639,6 +639,7 @@ class TestPuzzleServicePublish:
         self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
         self.mock_puzzle_repo.conn = Mock()
         self.mock_puzzle_repo.count_published.return_value = 0
+        self.mock_puzzle_repo.count_by_creator_and_status.return_value = 0
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)

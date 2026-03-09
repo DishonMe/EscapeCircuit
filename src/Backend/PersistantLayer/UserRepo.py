@@ -27,7 +27,7 @@ class UserRepo:
             xp INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             pw_salt BLOB,
-            pw_hash BLOB
+            pw_hash BLOB,
             puzzle_limit_published INTEGER DEFAULT NULL,
             puzzle_limit_unpublished INTEGER DEFAULT NULL
         );
