@@ -38,6 +38,7 @@ interface BasicInfo {
   name: string;
   description: string;
   budget: number;
+  creator_budget: number | null;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   timeLimit: number | null;
   minCycles: number | null;
@@ -344,6 +345,7 @@ export default function CreatePuzzleForm() {
       name: "",
       description: "",
       budget: 0,
+      creator_budget: null,
       difficulty: "EASY",
       timeLimit: null,
       minCycles: null,
@@ -894,7 +896,13 @@ export default function CreatePuzzleForm() {
     }
     
     // All tests passed - create solution
+    const totalCost = placed.reduce((sum, p) => {
+      const comp = uiCatalog[p.componentId];
+      return sum + (comp?.cost ?? 1);
+    }, 0);
+
     const solution = {
+      totalCost,
       eval_map: evalMap,
       circuit: {
         placed: placed.map(p => ({
@@ -916,6 +924,9 @@ export default function CreatePuzzleForm() {
     setData((prev) => ({
       ...prev,
       solutionJSON: JSON.stringify(solution, null, 2),
+      basic: prev.basic.creator_budget === null
+        ? { ...prev.basic, creator_budget: totalCost }
+        : prev.basic,
     }));
     
     alert('✓ Circuit validated! All test cases passed. Solution exported.');
@@ -1026,6 +1037,14 @@ export default function CreatePuzzleForm() {
       alert("Provide a sample solution");
       return;
     }
+    if (
+      data.basic.creator_budget !== null &&
+      data.basic.budget > 0 &&
+      data.basic.budget <= data.basic.creator_budget
+    ) {
+      alert("Budget must be greater than Creator Budget");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1075,6 +1094,7 @@ export default function CreatePuzzleForm() {
           name: data.basic.name,
           description: data.basic.description,
           budget: data.basic.budget,
+          creator_budget: data.basic.creator_budget,
           time_limit_seconds: data.basic.timeLimit,
           difficulty: data.basic.difficulty,
           default_gate_set: data.basic.gateSet,
@@ -1245,7 +1265,7 @@ export default function CreatePuzzleForm() {
                   <InfoPopup>
                     <p className="font-medium text-foreground mb-1">Budget</p>
                     <p>The max total gate cost solvers can use. Solvers who exceed this cannot submit.</p>
-                    <p className="mt-1"><span className="font-medium text-foreground">Tight Budget</span> (125% of budget) is auto-calculated — solvers within it earn better medals.</p>
+                    <p className="mt-1"><span className="font-medium text-foreground">Creator Budget</span> is your solution&apos;s gate cost. Set it below — solvers who match or beat it earn a better medal.</p>
                   </InfoPopup>
                 </label>
                 <input
@@ -1276,6 +1296,29 @@ export default function CreatePuzzleForm() {
                   <option value="HARD">Hard</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1 text-[13px] font-medium text-foreground mb-2">
+                Creator Budget (optional)
+                <InfoPopup>
+                  <p className="font-medium text-foreground mb-1">Creator Budget</p>
+                  <p>Your solution&apos;s total gate cost. Must be less than the Budget.</p>
+                  <p className="mt-1">Solvers who match or beat this cost earn a better medal. Auto-filled when you export your solution.</p>
+                </InfoPopup>
+              </label>
+              <input
+                type="number"
+                value={data.basic.creator_budget ?? ""}
+                onChange={(e) =>
+                  handleBasicChange(
+                    "creator_budget",
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Auto-filled from your exported solution"
+              />
             </div>
 
             <div>

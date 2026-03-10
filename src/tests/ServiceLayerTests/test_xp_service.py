@@ -255,14 +255,14 @@ class TestXPServiceMedalCalculation:
         medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=15, budget=10)
         assert medal == Medal.SILVER
 
-    def test_medal_silver_budget_only(self):
-        # Under budget but over timer
-        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=5, budget=10)
+    def test_medal_silver_creator_budget_only(self):
+        # Beats creator budget but over timer — needs creator_budget param
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.SILVER
 
     def test_medal_gold_both_conditions(self):
-        # Both conditions met
-        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, budget=10)
+        # Both conditions met: beats timer AND beats creator budget
+        medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.GOLD
 
     def test_medal_bronze_no_time_limit(self):
@@ -270,10 +270,35 @@ class TestXPServiceMedalCalculation:
         medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=15, budget=10)
         assert medal == Medal.BRONZE
 
-    def test_medal_silver_no_time_limit_but_under_budget(self):
-        # No time limit, under budget -> 1 condition
-        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
+    def test_medal_silver_no_time_limit_but_beats_creator_budget(self):
+        # No time limit, beats creator budget -> 1 condition
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.SILVER
+
+    def test_medal_bronze_no_creator_budget_set(self):
+        # No creator_budget and no time limit -> no bonuses -> BRONZE
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
+        assert medal == Medal.BRONZE
+
+    def test_medal_bronze_creator_budget_not_met(self):
+        # cost exceeds creator_budget -> no budget bonus
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=12, budget=20, creator_budget=10)
+        assert medal == Medal.BRONZE
+
+    def test_medal_silver_creator_budget_exact_match(self):
+        # cost == creator_budget -> earns bonus ("match or beat")
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=10, budget=20, creator_budget=10)
+        assert medal == Medal.SILVER
+
+    def test_medal_creator_budget_zero_not_counted(self):
+        # creator_budget=0 should not award a bonus (guard against division/zero logic)
+        medal = self.service.calculate_medal(passed=True, time_taken=100, time_limit=60, cost_used=0, budget=20, creator_budget=0)
+        assert medal == Medal.BRONZE
+
+    def test_medal_gold_timer_and_creator_budget(self):
+        # Beats both timer and creator_budget -> GOLD
+        medal = self.service.calculate_medal(passed=True, time_taken=20, time_limit=60, cost_used=3, budget=20, creator_budget=5)
+        assert medal == Medal.GOLD
 
 class TestXPServiceArsenalCapacity:
     def setup_method(self):

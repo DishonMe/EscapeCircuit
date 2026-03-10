@@ -76,11 +76,15 @@ class XPService:
         time_limit: Optional[int],
         cost_used: int,
         budget: int,
+        creator_budget: Optional[int] = None,
     ) -> Medal:
         """
         Bronze = solved the puzzle.
-        Silver = solved + 1 bonus condition (beats timer OR tight budget).
+        Silver = solved + 1 bonus condition (beats timer OR matches/beats creator cost).
         Gold   = solved + both bonus conditions.
+
+        creator_budget: the creator's solution cost. If set, the solver earns a bonus
+                        by achieving cost <= creator_budget (beating the creator's cost).
         """
         if not passed:
             return Medal.NONE
@@ -91,8 +95,8 @@ class XPService:
         if time_limit is not None and time_limit > 0 and time_taken <= time_limit:
             bonus_count += 1
 
-        # Condition 2: Tight budget (cost <= budget)
-        if budget > 0 and cost_used <= budget:
+        # Condition 2: Creator Budget (cost <= creator's solution cost)
+        if creator_budget is not None and creator_budget > 0 and cost_used <= creator_budget:
             bonus_count += 1
 
         if bonus_count >= 2:

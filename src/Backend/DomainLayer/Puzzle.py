@@ -17,6 +17,7 @@ class Puzzle:
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
     budget: int = 0
+    creator_budget: Optional[int] = None  # Creator's solution cost (must be < budget when set)
     time_limit_seconds: Optional[int] = None
     difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
@@ -58,6 +59,13 @@ class Puzzle:
         self.creator_user_id = ensure_non_negative_int("Puzzle.creator_user_id", self.creator_user_id)
         if self.budget < 0:
             raise ValidationError("Puzzle.budget cannot be negative")
+        if self.creator_budget is not None:
+            if self.creator_budget < 1:
+                raise ValidationError("Puzzle.creator_budget must be >= 1 when set")
+            if self.budget > 0 and self.budget <= self.creator_budget:
+                raise ValidationError(
+                    f"Puzzle.budget ({self.budget}) must be greater than creator_budget ({self.creator_budget})"
+                )
         if self.time_limit_seconds is not None and self.time_limit_seconds <= 0:
             raise ValidationError("Puzzle.time_limit_seconds must be > 0 when set")
 
@@ -86,6 +94,8 @@ class Puzzle:
             "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
             "budgetLimit": self.budget,
+            "creator_budget": self.creator_budget,
+            "creatorBudget": self.creator_budget,
             "time_limit_seconds": self.time_limit_seconds,
             "timeLimit": self.time_limit_seconds, # Alias for frontend
             "difficulty": self.difficulty.value, # Creator-set difficulty
@@ -124,6 +134,9 @@ class Puzzle:
             creator_comment=d.get("creator_comment"),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
+            creator_budget=int(d["creator_budget"]) if d.get("creator_budget") is not None else (
+                int(d["creatorBudget"]) if d.get("creatorBudget") is not None else None
+            ),
             time_limit_seconds=d.get("time_limit_seconds", None),
             difficulty=PuzzleDifficulty(d["difficulty"]) if "difficulty" in d else PuzzleDifficulty.EASY,
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
@@ -149,6 +162,7 @@ class Puzzle:
     def get_description(self) -> str: return self.description
     def get_status(self) -> PuzzleStatus: return self.status
     def get_budget(self) -> int: return self.budget
+    def get_creator_budget(self) -> Optional[int]: return self.creator_budget
     def get_time_limit_seconds(self): return self.time_limit_seconds
     def get_default_gate_set(self): return self.default_gate_set
     def get_rating_count(self) -> int: return self.rating_count
@@ -174,6 +188,19 @@ class Puzzle:
 
     def set_budget(self, value: int) -> None:
         self.budget = ensure_non_negative_int("Puzzle.budget", value)
+
+    def set_creator_budget(self, value: Optional[int]) -> None:
+        if value is None:
+            self.creator_budget = None
+        else:
+            v = int(value)
+            if v < 1:
+                raise ValidationError("Puzzle.creator_budget must be >= 1 when set")
+            if self.budget > 0 and self.budget <= v:
+                raise ValidationError(
+                    f"Puzzle.budget ({self.budget}) must be greater than creator_budget ({v})"
+                )
+            self.creator_budget = v
 
     def set_time_limit_seconds(self, value) -> None:
         self.time_limit_seconds = ensure_optional_positive_int("Puzzle.time_limit_seconds", value)

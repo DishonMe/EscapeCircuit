@@ -420,6 +420,8 @@ class PuzzleService:
         except (ValueError, KeyError):
             difficulty = PuzzleDifficulty.EASY
 
+        raw_creator_budget = payload.get("creator_budget")
+        creator_budget = int(raw_creator_budget) if raw_creator_budget is not None else None
         p = Puzzle(
             id=0,
             name=name,
@@ -427,6 +429,7 @@ class PuzzleService:
             description=description,
             status=PuzzleStatus.DRAFT,
             budget=int(payload.get("budget", 0)),
+            creator_budget=creator_budget,
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
             difficulty=difficulty,

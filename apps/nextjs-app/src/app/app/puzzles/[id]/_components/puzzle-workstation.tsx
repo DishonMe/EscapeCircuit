@@ -138,7 +138,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
 
   const budgetLimit = puzzle?.budgetLimit ?? 0;
-  const tightBudget = Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
+  const creatorBudget = puzzle?.creatorBudget ?? null;
 
   const allowedGates = useMemo(() => {
     // Whitelist approach: if defaultGateSet is provided, use it.
@@ -864,13 +864,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Budget:</span> {budgetLimit}
-            <span className="text-muted-foreground">Tight:</span> {tightBudget}
-            <span className="text-muted-foreground">Cost:</span> {currentCost}
+            {creatorBudget !== null && (
+              <><span className="text-muted-foreground ml-2">Creator Cost:</span> {creatorBudget}</>
+            )}
+            <span className="text-muted-foreground ml-2">Cost:</span> {currentCost}
             <InfoPopup>
               <p className="font-medium text-foreground mb-1">Circuit Cost Limits</p>
               <p><span className="font-medium text-foreground">Budget</span> — Max gate cost allowed. Your circuit must stay within this limit.</p>
-              <p className="mt-1"><span className="font-medium text-foreground">Tight</span> — 125% of budget. Stay within for a better medal.</p>
-              <p className="mt-1"><span className="font-medium text-foreground">Cost</span> — Your current circuit's total gate cost.</p>
+              {creatorBudget !== null && (
+                <p className="mt-1"><span className="font-medium text-foreground">Creator Cost</span> — The creator&apos;s solution cost. Match or beat it to earn a better medal.</p>
+              )}
+              <p className="mt-1"><span className="font-medium text-foreground">Cost</span> — Your current circuit&apos;s total gate cost.</p>
             </InfoPopup>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-3">

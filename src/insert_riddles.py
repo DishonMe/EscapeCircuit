@@ -237,10 +237,10 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     
     if existing:
         puzzle_id = existing[0]
-        # Update description/budget/instructions/config but keep the same ID
+        # Update description/budget/creator_budget/instructions/config but keep the same ID
         c.execute("""
             UPDATE puzzles SET
-                description=?, instructions=?, budget=?, time_limit_seconds=?,
+                description=?, instructions=?, budget=?, creator_budget=?, time_limit_seconds=?,
                 default_gate_set=?, difficulty=?,
                 total_gate_count=?, min_cycles=?, max_cycles=?,
                 board_rows=?, board_cols=?
@@ -249,6 +249,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             description,
             instructions_text,
             puzzle_data.get('budget', 0),
+            puzzle_data.get('creator_budget'),
             puzzle_data.get('time_limit_seconds'),
             gates_json,
             difficulty,
@@ -265,13 +266,13 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         # INSERT new puzzle
         c.execute("""
             INSERT INTO puzzles (
-                name, creator_user_id, description, instructions, status, budget, 
+                name, creator_user_id, description, instructions, status, budget, creator_budget,
                 time_limit_seconds, difficulty, default_gate_set, rating_count, 
                 avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, board_rows, board_cols,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -279,6 +280,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             instructions_text,
             status,
             puzzle_data.get('budget', 0),
+            puzzle_data.get('creator_budget'),
             puzzle_data.get('time_limit_seconds'),
             difficulty,
             gates_json,
