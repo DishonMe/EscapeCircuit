@@ -20,7 +20,7 @@
     "min_cycles": null,
     "max_cycles": null,
     "total_gate_count": null,
-    "allow_arsenal": true,
+    "allow_arsenal": false,
     "board": {
       "rows": 5,
       "cols": 10
@@ -74,7 +74,7 @@
   ],
   "custom_pieces": [
     {
-      "name": "and-or",
+      "name": "or-and",
       "cost": 1,
       "num_inputs": 2,
       "num_outputs": 2,

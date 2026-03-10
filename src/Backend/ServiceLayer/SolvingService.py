@@ -243,6 +243,7 @@ class SolvingService:
         Stateless validation of a solution attempt.
         If the solution passes, calculate medal, persist solve with delta XP, award creator XP.
         """
+        print(f"[SOLVING_SERVICE] validate_solution called with puzzle_id={puzzle_id}")
         user_id = self.auth.require_user_id(token)
         
         p = self.puzzle_repo.get_by_id(puzzle_id)
@@ -537,6 +538,9 @@ class SolvingService:
         placed = structure.get("placedComponents", [])
         if not placed:
             placed = structure.get("components", [])
+        
+        # Note: arsenal_pieces are already in structure["_arsenal_pieces"] from _expand_arsenal_pieces
+        # The evaluate() method will extract them automatically during simulation
 
         # Identify DFF component IDs for state tracking
         dff_ids = []
@@ -636,13 +640,18 @@ class SolvingService:
                     expected = getattr(tc, "expected_outputs", None) if hasattr(tc, "expected_outputs") else (tc.get("expected_outputs") if isinstance(tc, dict) else None)
                     
                     try:
+                        print(f"[VALIDATION] Test case {i}: inputs={inputs}, expected={expected}")
                         out = self.logic_engine.evaluate(circuit, inputs)
+                        print(f"[VALIDATION] Test case {i}: actual output={out}")
                         if out != expected:
+                            print(f"[VALIDATION] MISMATCH! Expected {expected} but got {out}")
                             return False, "Wrong output", [{
                                 "inputs": inputs,
                                 "expected": expected,
                                 "actual": out
                             }]
+                        else:
+                            print(f"[VALIDATION] Test case {i}: PASS")
                     except Exception as e:
                         return False, str(e), [{"error": str(e)}]
 
@@ -690,8 +699,10 @@ class SolvingService:
                 try:
                     arsenal_piece = self.circuit_repo.get_by_id(piece_id)
                     if arsenal_piece:
-                        print(f"[ARSENAL EXPAND]     -> Found circuit {piece_id}, is_arsenal={arsenal_piece.is_arsenal}")
-                        if arsenal_piece.is_arsenal:
+                        print(f"[ARSENAL EXPAND]     -> Found circuit {piece_id}, is_arsenal={arsenal_piece.is_arsenal}, has_truth_table={bool(arsenal_piece.truth_table)}")
+                        # Check if it's a custom piece: has truth_table AND has input/output definitions
+                        is_custom = (arsenal_piece.truth_table and (arsenal_piece.num_inputs or arsenal_piece.num_outputs))
+                        if is_custom:
                             # Get the truth table and parse if needed
                             truth_table = arsenal_piece.truth_table
                             if isinstance(truth_table, str):
@@ -708,6 +719,8 @@ class SolvingService:
                                 "truth_table": truth_table,
                             }
                             print(f"[ARSENAL EXPAND]     -> Stored arsenal piece {arsenal_piece.name}")
+                        else:
+                            print(f"[ARSENAL EXPAND]     -> Not a custom piece (no truth_table or inputs/outputs)")
                     else:
                         print(f"[ARSENAL EXPAND]     -> Circuit not found in database")
                 except Exception as e:
@@ -803,17 +816,21 @@ class SolvingService:
         if puzzle_id > 0:
             try:
                 custom_pieces = self.circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+                print(f"[SOLVING_SERVICE] Custom pieces from DB for puzzle {puzzle_id}: {len(custom_pieces)}")
                 for piece in custom_pieces:
                     # Extract the piece name and data
-                    piece_data = json.loads(piece.structure_json) if piece.structure_json else {}
                     piece_name = piece.name
+                    print(f"[SOLVING_SERVICE]   Custom piece: name={piece_name}, num_inputs={piece.num_inputs}, num_outputs={piece.num_outputs}")
+                    print(f"[SOLVING_SERVICE]   Raw truth_table from DB: {piece.truth_table}")
                     
                     # Add to arsenal_pieces for simulation
+                    # truth_table is already a JSON string from the database
                     arsenal_pieces[piece_name] = {
-                        "truth_table": json.dumps(piece.truth_table) if piece.truth_table else "{}",
+                        "truth_table": piece.truth_table if piece.truth_table else "{}",
                         "num_inputs": piece.num_inputs or 0,
                         "num_outputs": piece.num_outputs or 0,
                     }
+                    print(f"[SOLVING_SERVICE]   Added to arsenal_pieces: {arsenal_pieces[piece_name]}")
             except Exception as e:
                 # If we can't fetch custom pieces, just continue with what we have
                 print(f"[WARNING] Failed to fetch custom pieces for puzzle {puzzle_id}: {str(e)}")
@@ -829,7 +846,7 @@ class SolvingService:
         
         # Evaluate the circuit to get puzzle outputs
         try:
-            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs)
+            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs, data={"_arsenal_pieces": arsenal_pieces})
         except Exception as e:
             raise ValidationError(f"Circuit evaluation failed: {str(e)}")
         

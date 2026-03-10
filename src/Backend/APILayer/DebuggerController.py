@@ -12,12 +12,14 @@ class SimulateCircuitReq(BaseModel):
     inputs: Dict[str, int]
     placed: List[Dict[str, Any]]
     wires: List[Dict[str, Any]]
+    custom_pieces: List[Dict[str, Any]] = []
 
 
 class SimulateSequenceReq(BaseModel):
     input_stream: List[Dict[str, int]]
     placed: List[Dict[str, Any]]
     wires: List[Dict[str, Any]]
+    custom_pieces: List[Dict[str, Any]] = []
 
 
 def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
@@ -30,6 +32,31 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
         Used by puzzle creators to validate their solution before saving.
         """
         try:
+            print(f"[DEBUGGER_SIM] === SIMULATE CIRCUIT ===")
+            print(f"[DEBUGGER_SIM] Inputs: {req.inputs}")
+            print(f"[DEBUGGER_SIM] Placed components: {len(req.placed)}")
+            print(f"[DEBUGGER_SIM] Wires: {len(req.wires)}")
+            print(f"[DEBUGGER_SIM] Custom pieces received: {len(req.custom_pieces)}")
+            for i, piece in enumerate(req.custom_pieces):
+                print(f"[DEBUGGER_SIM]   Piece {i}: name={piece.get('name')}, num_inputs={piece.get('num_inputs')}, num_outputs={piece.get('num_outputs')}")
+                print(f"[DEBUGGER_SIM]   Piece {i} truth_table: {piece.get('truth_table')}")
+            
+            # Convert custom pieces to arsenal format for the logic engine
+            arsenal_pieces = {}
+            for piece in req.custom_pieces:
+                piece_name = piece.get('name', '')
+                if piece_name:
+                    truth_table = piece.get('truth_table', {})
+                    print(f"[DEBUGGER_SIM] Converting piece '{piece_name}' to arsenal format")
+                    print(f"[DEBUGGER_SIM]   truth_table (before dump): {truth_table}")
+                    arsenal_pieces[piece_name] = {
+                        "truth_table": json.dumps(truth_table),
+                        "num_inputs": piece.get('num_inputs', 0),
+                        "num_outputs": piece.get('num_outputs', 0),
+                    }
+                    print(f"[DEBUGGER_SIM]   arsenalified: {arsenal_pieces[piece_name]}")
+            print(f"[DEBUGGER_SIM] Final arsenal_pieces keys: {list(arsenal_pieces.keys())}")
+            
             # Convert placed/wires to structure_json format expected by logicEngineService
             # The service expects "placedComponents" and "wires"
             structure_json = json.dumps({
@@ -47,8 +74,9 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
                 is_arsenal=False,
             )
             
-            # Call logic engine to simulate the circuit
-            outputs = logic_engine.evaluate(temp_circuit, req.inputs)
+            # Call logic engine to simulate the circuit, passing custom pieces as arsenal
+            outputs = logic_engine.evaluate(temp_circuit, req.inputs, data={"_arsenal_pieces": arsenal_pieces})
+            print(f"[DEBUGGER_SIM] Simulation outputs: {outputs}")
             
             return {"outputs": outputs}
         except ValidationError as e:
@@ -69,6 +97,18 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
             print(f"[DEBUGGER] Input stream: {req.input_stream}")
             print(f"[DEBUGGER] Placed components: {len(req.placed)}")
             print(f"[DEBUGGER] Wires: {len(req.wires)}")
+            print(f"[DEBUGGER] Custom pieces: {len(req.custom_pieces)}")
+            
+            # Convert custom pieces to arsenal format for the logic engine
+            arsenal_pieces = {}
+            for piece in req.custom_pieces:
+                piece_name = piece.get('name', '')
+                if piece_name:
+                    arsenal_pieces[piece_name] = {
+                        "truth_table": json.dumps(piece.get('truth_table', {})),
+                        "num_inputs": piece.get('num_inputs', 0),
+                        "num_outputs": piece.get('num_outputs', 0),
+                    }
             
             structure_json = json.dumps({
                 "placedComponents": req.placed,
@@ -108,8 +148,8 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
                 
                 print(f"[DEBUGGER]   Full inputs for eval: {full_inputs}")
                 
-                # Simulate this cycle
-                outputs = logic_engine.evaluate(temp_circuit, full_inputs)
+                # Simulate this cycle, passing custom pieces as arsenal
+                outputs = logic_engine.evaluate(temp_circuit, full_inputs, data={"_arsenal_pieces": arsenal_pieces})
                 
                 # Filter outputs: exclude DFF _next values (internal state), keep only puzzle outputs
                 filtered_outputs = {k: v for k, v in outputs.items() if not k.endswith('_next')}

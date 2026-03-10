@@ -398,16 +398,14 @@ export default function CreatePuzzleForm() {
       for (let i = 0; i < numCombinations; i++) {
         const inputKey = i
           .toString(2)
-          .padStart(customPieceForm.numInputs, '0')
-          .split('')
-          .join(',');
+          .padStart(customPieceForm.numInputs, '0');
         
         if (customPieceForm.numOutputs === 1) {
           newTruthTable[inputKey] = 0;
         } else {
           const outputObj: Record<string, number> = {};
           for (let j = 0; j < customPieceForm.numOutputs; j++) {
-            outputObj[`OUT${j}`] = 0;
+            outputObj[`out${j}`] = 0;
           }
           newTruthTable[inputKey] = outputObj;
         }
@@ -744,6 +742,7 @@ export default function CreatePuzzleForm() {
               input_stream: tc.inputStream,
               placed: placed,
               wires: wires,
+              custom_pieces: customPieces,
             }),
           });
           
@@ -834,6 +833,7 @@ export default function CreatePuzzleForm() {
               inputs: tc.inputs,
               placed: placed,
               wires: wires,
+              custom_pieces: customPieces,
             }),
           });
           
@@ -2042,7 +2042,7 @@ export default function CreatePuzzleForm() {
                               .padStart(customPieceForm.numInputs, '0')
                               .split('')
                               .map(Number);
-                            const inputKey = inputs.join(',');
+                            const inputKey = inputs.join('');
                             const currentOutputs = customPieceForm.truthTable[inputKey];
                             
                             return (
@@ -2053,7 +2053,7 @@ export default function CreatePuzzleForm() {
                                   </td>
                                 ))}
                                 {Array.from({ length: customPieceForm.numOutputs }).map((_, outIdx) => {
-                                  const outKey = `OUT${outIdx}`;
+                                  const outKey = `out${outIdx}`;
                                   let currentValue = 0;
                                   if (typeof currentOutputs === 'object' && currentOutputs !== null) {
                                     currentValue = (currentOutputs as Record<string, number>)[outKey] ?? 0;
