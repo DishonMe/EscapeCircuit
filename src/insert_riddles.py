@@ -101,6 +101,31 @@ def latex_to_html(latex_text: str) -> str:
     
     return html
 
+def normalize_truth_table(truth_table):
+    """
+    Normalize truth table format:
+    - Convert input keys from "0,0" format to "00" format (remove commas)
+    - Convert output keys from "OUT0" format to "out0" format (lowercase)
+    Handles both single output (number values) and multiple output (dict values)
+    """
+    if not truth_table:
+        return {}
+    
+    normalized = {}
+    for key, value in truth_table.items():
+        # Normalize input key: remove commas
+        new_key = key.replace(',', '')
+        
+        # Normalize output values
+        if isinstance(value, dict):
+            # Multiple outputs case: normalize output keys to lowercase
+            normalized[new_key] = {k.lower(): v for k, v in value.items()}
+        else:
+            # Single output case: keep as number
+            normalized[new_key] = value
+    
+    return normalized
+
 def get_seed_puzzle_names(riddles_dir):
     """
     Get the set of puzzle names that are defined in the riddles/ directory.
@@ -410,6 +435,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             num_inputs = custom_piece.get('num_inputs', 0)
             num_outputs = custom_piece.get('num_outputs', 0)
             cost = custom_piece.get('cost', 0)
+            
+            # Normalize truth table format
+            truth_table = normalize_truth_table(truth_table)
             
             c.execute(
                 """

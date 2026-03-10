@@ -216,12 +216,16 @@ class logicEngineService:
                     # Check if this is an arsenal/custom piece (by ID or by type/name)
                     arsenal_info = arsenal_pieces.get(cid) or arsenal_pieces.get(ctype)
                     if arsenal_info:
+                        print(f"[CUSTOM_PIECE_DEBUG] Found custom piece: cid={cid}, ctype={ctype}")
                         try:
                             truth_table_str = arsenal_info.get("truth_table", "{}")
                             num_inputs = arsenal_info.get("num_inputs", 0)
                             num_outputs = arsenal_info.get("num_outputs", 0)
+                            print(f"[CUSTOM_PIECE_DEBUG] num_inputs={num_inputs}, num_outputs={num_outputs}")
+                            print(f"[CUSTOM_PIECE_DEBUG] truth_table_str type={type(truth_table_str)}, value={truth_table_str}")
                             
                             truth_table = json.loads(truth_table_str) if isinstance(truth_table_str, str) else truth_table_str
+                            print(f"[CUSTOM_PIECE_DEBUG] truth_table keys={list(truth_table.keys()) if isinstance(truth_table, dict) else 'NOT_A_DICT'}")
                             
                             # Build input key for the truth table
                             # Truth table keys are binary strings like "00", "01", "10", "11"
@@ -229,15 +233,22 @@ class logicEngineService:
                             for i in range(num_inputs):
                                 pk = find(f"{cid}#{i}") if f"{cid}#{i}" in parent else None
                                 val = net_values.get(pk)
+                                print(f"[CUSTOM_PIECE_DEBUG] Input {i}: pk={pk}, val={val}")
                                 if val is None:
                                     break
                                 input_bits.append(str(int(val)))
                             
+                            print(f"[CUSTOM_PIECE_DEBUG] Collected input_bits={input_bits}, len={len(input_bits)}")
+                            
                             if len(input_bits) == num_inputs:
                                 # Look up in truth table using binary string key
                                 key = "".join(input_bits)  # e.g. "0011" for inputs 0,0,1,1
+                                print(f"[CUSTOM_PIECE_DEBUG] Looking up key={key} in truth_table")
+                                
                                 if key in truth_table:
+                                    print(f"[CUSTOM_PIECE_DEBUG] Key found in truth_table!")
                                     outputs = truth_table[key]
+                                    print(f"[CUSTOM_PIECE_DEBUG] outputs={outputs}, type={type(outputs)}")
                                     # Set all output pins based on the truth table
                                     if isinstance(outputs, dict):
                                         for out_idx in range(num_outputs):
@@ -245,11 +256,24 @@ class logicEngineService:
                                             if out_key in outputs:
                                                 new_out = outputs[out_key]
                                                 pk_out = f"{cid}#{num_inputs + out_idx}"
+                                                print(f"[CUSTOM_PIECE_DEBUG] Setting output {out_idx}: pk_out={pk_out}, new_out={new_out}")
                                                 if pk_out in parent:
                                                     root = find(pk_out)
                                                     if net_values.get(root) != new_out:
                                                         net_values[root] = new_out
                                                         changed = True
+                                    else:
+                                        # Single output case (outputs is just a number)
+                                        new_out = int(outputs)
+                                        pk_out = f"{cid}#{num_inputs}"
+                                        print(f"[CUSTOM_PIECE_DEBUG] Setting single output: pk_out={pk_out}, new_out={new_out}")
+                                        if pk_out in parent:
+                                            root = find(pk_out)
+                                            if net_values.get(root) != new_out:
+                                                net_values[root] = new_out
+                                                changed = True
+                                else:
+                                    print(f"[CUSTOM_PIECE_DEBUG] Key NOT found in truth_table. Keys available: {list(truth_table.keys())}")
                         except Exception as e:
                             # If truth table evaluation fails, skip this component
                             pass
