@@ -139,6 +139,7 @@ export type Puzzle = Entity<{
   solution?: CircuitSolution;
   status?: 'draft' | 'published' | 'unpublished'; // Puzzle publication status
   isPublished?: boolean; // Alias for frontend compat
+  is_hall_of_fame?: boolean;
 
   // Solve tracking (injected per-user by browse endpoint)
   is_solved?: boolean;

@@ -325,23 +325,23 @@ class PuzzleService:
             # For backward compatibility, also extract input/output array from first test case
             first_tc = tcs[0]
             if first_tc.inputs:
-                d["inputs"] = list(first_tc.inputs.values()) if first_tc.inputs else []
+                d["inputs"] = list(first_tc.inputs.keys()) if first_tc.inputs else []
             elif first_tc.input_stream and isinstance(first_tc.input_stream, list) and len(first_tc.input_stream) > 0:
-                # For stream test cases, get first input as string
+                # For stream test cases, get input names from first frame.
                 first_input = first_tc.input_stream[0]
                 if isinstance(first_input, dict):
-                    d["inputs"] = list(first_input.values())
+                    d["inputs"] = list(first_input.keys())
                 elif isinstance(first_input, (str, int)):
                     d["inputs"] = [str(first_input)]
                 else:
                     d["inputs"] = [str(first_input)]
             
             if first_tc.expected_outputs:
-                d["outputs"] = list(first_tc.expected_outputs.values()) if first_tc.expected_outputs else []
+                d["outputs"] = list(first_tc.expected_outputs.keys()) if first_tc.expected_outputs else []
             elif first_tc.expected_output_stream:
                 if isinstance(first_tc.expected_output_stream, dict):
-                    # Get values from the dict
-                    d["outputs"] = list(first_tc.expected_output_stream.values()) if first_tc.expected_output_stream else []
+                    # For stream outputs, dict keys are output names.
+                    d["outputs"] = list(first_tc.expected_output_stream.keys()) if first_tc.expected_output_stream else []
                 elif isinstance(first_tc.expected_output_stream, (str, int)):
                     d["outputs"] = [str(first_tc.expected_output_stream)]
                 else:
@@ -474,8 +474,34 @@ class PuzzleService:
         now_iso = utcnow().isoformat()
         with transaction(self.repo.conn):
             if not is_admin:
-                current_count = self.repo.count_published(creator_id=user_id)
-                if p.status != PuzzleStatus.PUBLISHED and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER:
+                published_rows = self.repo.conn.execute(
+                    """
+                    SELECT is_hall_of_fame, rating_count, avg_fun
+                    FROM puzzles
+                    WHERE creator_user_id = ? AND status = 'published'
+                    """,
+                    (int(user_id),),
+                ).fetchall()
+
+                current_count = 0
+                for row in published_rows:
+                    is_hall_of_fame = bool(int(row[0] or 0))
+                    rating_count = int(row[1] or 0)
+                    avg_fun = float(row[2] or 0.0)
+                    is_popular = is_hall_of_fame or (rating_count >= 20 and avg_fun > 3.5)
+                    if not is_popular:
+                        current_count += 1
+
+                target_is_popular = bool(getattr(p, "is_hall_of_fame", False)) or (
+                    int(getattr(p, "rating_count", 0) or 0) >= 20
+                    and float(getattr(p, "avg_fun", 0.0) or 0.0) > 3.5
+                )
+
+                if (
+                    p.status != PuzzleStatus.PUBLISHED
+                    and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER
+                    and not target_is_popular
+                ):
                     raise ValidationError(
                         f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
                     )

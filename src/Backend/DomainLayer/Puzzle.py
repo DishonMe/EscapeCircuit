@@ -32,6 +32,7 @@ class Puzzle:
     board_cols: Optional[int] = None
 
     rating_count: int = 0
+    is_hall_of_fame: bool = False
     avg_difficulty: float = 0.0
     avg_fun: float = 0.0
     avg_clearness: float = 0.0
@@ -99,6 +100,8 @@ class Puzzle:
             "board_cols": self.board_cols,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
+            "is_hall_of_fame": self.is_hall_of_fame,
+            "isHallOfFame": self.is_hall_of_fame,
             "solvedCount": 0, # Placeholder
             "inputs": [],     # Placeholder
             "outputs": [],    # Placeholder
@@ -131,6 +134,7 @@ class Puzzle:
             board_cols=d.get("board_cols"),
             allow_arsenal=d.get("allow_arsenal", True),
             rating_count=int(d.get("rating_count", 0)),
+            is_hall_of_fame=bool(d.get("is_hall_of_fame", d.get("isHallOfFame", False))),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
             avg_fun=float(d.get("avg_fun", 0.0)),
             avg_clearness=float(d.get("avg_clearness", 0.0)),

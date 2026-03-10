@@ -596,7 +596,8 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < inputs.length; i++) {
       const id = `IO:IN:${inputs[i]}`;
-      const row = Math.min(i * 0.8, gridRows - 1); // Reduced spacing: 0.8 rows per input
+      // Keep a stable vertical offset per input so labels do not overlap.
+      const row = i * 1.6;
       const anchor = toScreenCenter(row, -1); // just left of col 0
       inputsPos[id] = { x: anchor.x, y: anchor.y };
     }
