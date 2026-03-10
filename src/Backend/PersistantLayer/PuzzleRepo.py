@@ -55,6 +55,12 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN max_cycles INTEGER;")
             if "creator_comment" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_comment TEXT;")
+            if "allow_arsenal" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN allow_arsenal INTEGER NOT NULL DEFAULT 1;")
+            if "board_rows" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN board_rows INTEGER;")
+            if "board_cols" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN board_cols INTEGER;")
             if "is_hall_of_fame" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN is_hall_of_fame INTEGER NOT NULL DEFAULT 0;")
         except Exception:
@@ -135,7 +141,7 @@ class PuzzleRepo:
                 budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
-                creator_comment,
+                creator_comment, allow_arsenal,
                 created_at
             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
@@ -156,6 +162,7 @@ class PuzzleRepo:
             puzzle.min_cycles,
             puzzle.max_cycles,
             puzzle.creator_comment,
+            int(puzzle.allow_arsenal),
             puzzle.created_at.isoformat(),
         ))
         puzzle.id = int(cur.lastrowid)
@@ -185,7 +192,8 @@ class PuzzleRepo:
                 avg_clearness=?,
                 total_gate_count=?,
                 min_cycles=?,
-                max_cycles=?
+                max_cycles=?,
+                allow_arsenal=?
             WHERE id=?
         """, (
             puzzle.name,
@@ -206,6 +214,7 @@ class PuzzleRepo:
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
+            1 if puzzle.allow_arsenal else 0,
             puzzle.id
         ))
 
@@ -880,6 +889,20 @@ class PuzzleRepo:
             max_cycles = row["max_cycles"]
         except (IndexError, KeyError):
             max_cycles = None
+        # Safely read allow_arsenal — may be missing in old DBs
+        try:
+            allow_arsenal = bool(int(row["allow_arsenal"]))
+        except (IndexError, KeyError, TypeError):
+            allow_arsenal = True
+        # Safely read board dimensions — may be missing in old DBs
+        try:
+            board_rows = row["board_rows"]
+        except (IndexError, KeyError):
+            board_rows = None
+        try:
+            board_cols = row["board_cols"]
+        except (IndexError, KeyError):
+            board_cols = None
         try:
             is_hall_of_fame = bool(int(row["is_hall_of_fame"]))
         except (IndexError, KeyError, TypeError, ValueError):
@@ -899,6 +922,9 @@ class PuzzleRepo:
             "total_gate_count": total_gate_count,
             "min_cycles": min_cycles,
             "max_cycles": max_cycles,
+            "allow_arsenal": allow_arsenal,
+            "board_rows": board_rows,
+            "board_cols": board_cols,
             "rating_count": int(row["rating_count"]),
             "is_hall_of_fame": is_hall_of_fame,
             "avg_difficulty": float(row["avg_difficulty"]),

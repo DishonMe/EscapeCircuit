@@ -152,11 +152,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return new Set(allTypes.filter((t) => !blocked.has(t)));
   }, [puzzle?.defaultGateSet, puzzle?.filteredBasicComponents]);
 
-  const specialComponents = useMemo(() => {
-    return puzzle?.specialComponents ?? EMPTY_COMPONENTS;
-  }, [puzzle?.specialComponents]);
-
   const allowArsenal = puzzle?.allowArsenal ?? true;
+
+  const customComponents = useMemo(() => {
+    // Custom pieces are always available
+    return puzzle?.customComponents ?? EMPTY_COMPONENTS;
+  }, [puzzle?.customComponents]);
+
+  const arsenalComponents = useMemo(() => {
+    // Arsenal pieces only show if allowArsenal is true
+    if (!allowArsenal) {
+      return EMPTY_COMPONENTS;
+    }
+    return puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
+  }, [puzzle?.arsenalComponents, allowArsenal]);
+
+  const specialComponents = useMemo(() => {
+    // For backward compatibility with componentCatalog
+    return [...customComponents, ...arsenalComponents];
+  }, [customComponents, arsenalComponents]);
 
   const basicComponents = useMemo(() => {
     return BASIC_COMPONENTS.filter((c) => allowedGates.has(c.type));
@@ -897,7 +911,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
         <WorkstationMenu
           basic={visibleBasics}
-          special={specialComponents}
+          custom={customComponents}
+          arsenal={arsenalComponents}
           allowArsenal={allowArsenal}
           filteredBasicTypes={filteredBasicTypes}
           selectedComponentId={
@@ -924,6 +939,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onPlacedChange={onPlacedChange}
           onWiresChange={setWires}
           draggedPaletteComponentId={draggedPaletteComponentId}
+          boardRows={puzzle.board_rows}
+          boardCols={puzzle.board_cols}
         />
 
         <div className="flex flex-col gap-3">

@@ -232,6 +232,19 @@ class ArsenalService:
         
         return available
 
+    def get_custom_pieces_for_puzzle(self, puzzle_id: int) -> List[dict]:
+        """Get custom pieces created for a specific puzzle.
+        
+        Custom pieces are stored with puzzle_id set and is_arsenal=true.
+        They are unique to the puzzle and available to all solvers.
+        """
+        try:
+            pieces = self.repo.list_custom_pieces_by_puzzle(puzzle_id)
+            return [piece.to_circuit_component() for piece in pieces]
+        except Exception as e:
+            print(f"DEBUG: Error fetching custom pieces for puzzle {puzzle_id}: {e}")
+            return []
+
     def _resolve_max_slots_for_level(self, user_level: int) -> int:
         for max_level_inclusive, slot_count in ARSENAL_XP_LEVEL_TIERS:
             if user_level <= int(max_level_inclusive):

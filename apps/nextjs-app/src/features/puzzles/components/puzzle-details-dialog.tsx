@@ -98,6 +98,7 @@ export const PuzzleDetailsDialog = ({
   // markdown-it-katex, isomorphic-dompurify) crash during SSR, so we
   // dynamically import them inside useEffect and store the rendered HTML.
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'instructions' | 'custom'>('instructions');
 
   useEffect(() => {
     if (!puzzle?.instructions) {
@@ -145,58 +146,145 @@ export const PuzzleDetailsDialog = ({
 
         {puzzle ? (
           <div className="max-h-[60vh] overflow-y-auto">
-            {puzzle.instructions && renderedHtml ? (
-              <style>{`
-                .prose .katex {
-                  vertical-align: baseline !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  line-height: 1 !important;
-                  font-size: inherit;
-                  display: inline-block !important;
-                  white-space: nowrap;
-                  position: relative;
-                  top: -0.35em;
-                }
-                .prose .katex-html {
-                  vertical-align: baseline !important;
-                }
-                .prose .katex-display {
-                  margin: 0.5em 0;
-                  vertical-align: baseline;
-                  position: static;
-                  top: auto;
-                }
-                .prose table {
-                  border-collapse: collapse;
-                  width: 100%;
-                  margin: 1em 0;
-                }
-                .prose table td,
-                .prose table th {
-                  border: 1px solid currentColor;
-                  padding: 0.5em;
-                  text-align: center;
-                  vertical-align: middle;
-                  line-height: 1.4;
-                }
-                .prose table th {
-                  font-weight: bold;
-                  background-color: rgba(0, 0, 0, 0.05);
-                }
-                .prose u {
-                  text-decoration: underline;
-                  text-underline-offset: 4px;
-                }
-              `}</style>
+            {/* Tabs */}
+            {puzzle.customComponents && puzzle.customComponents.length > 0 ? (
+              <div className="flex gap-2 mb-4 border-b border-border">
+                <button
+                  onClick={() => setActiveTab('instructions')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'instructions'
+                      ? 'text-foreground border-b-2 border-foreground -mb-[2px]'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Instructions
+                </button>
+                <button
+                  onClick={() => setActiveTab('custom')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'custom'
+                      ? 'text-foreground border-b-2 border-foreground -mb-[2px]'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Custom Pieces ({puzzle.customComponents.length})
+                </button>
+              </div>
             ) : null}
-            {puzzle.instructions && renderedHtml ? (
-              <div
-                className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
-                dangerouslySetInnerHTML={{ __html: renderedHtml }}
-              />
-            ) : (
-              <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
+
+            {/* Instructions Tab */}
+            {activeTab === 'instructions' && (
+              <>
+                {puzzle.instructions && renderedHtml ? (
+                  <style>{`
+                    .prose .katex {
+                      vertical-align: baseline !important;
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      line-height: 1 !important;
+                      font-size: inherit;
+                      display: inline-block !important;
+                      white-space: nowrap;
+                      position: relative;
+                      top: -0.35em;
+                    }
+                    .prose .katex-html {
+                      vertical-align: baseline !important;
+                    }
+                    .prose .katex-display {
+                      margin: 0.5em 0;
+                      vertical-align: baseline;
+                      position: static;
+                      top: auto;
+                    }
+                    .prose table {
+                      border-collapse: collapse;
+                      width: 100%;
+                      margin: 1em 0;
+                    }
+                    .prose table td,
+                    .prose table th {
+                      border: 1px solid currentColor;
+                      padding: 0.5em;
+                      text-align: center;
+                      vertical-align: middle;
+                      line-height: 1.4;
+                    }
+                    .prose table th {
+                      font-weight: bold;
+                      background-color: rgba(0, 0, 0, 0.05);
+                    }
+                    .prose u {
+                      text-decoration: underline;
+                      text-underline-offset: 4px;
+                    }
+                  `}</style>
+                ) : null}
+                {puzzle.instructions && renderedHtml ? (
+                  <div
+                    className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+                    dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                  />
+                ) : (
+                  <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
+                )}
+              </>
+            )}
+
+            {/* Custom Pieces Tab */}
+            {activeTab === 'custom' && puzzle.customComponents && puzzle.customComponents.length > 0 && (
+              <div className="space-y-4">
+                {puzzle.customComponents.map((piece) => {
+                  const truthTable = piece.truth_table 
+                    ? (typeof piece.truth_table === 'string' 
+                        ? JSON.parse(piece.truth_table) 
+                        : piece.truth_table)
+                    : {};
+                  
+                  return (
+                    <div key={piece.id} className="border border-border rounded-lg p-4 bg-card">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-foreground">{piece.type}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Cost: {piece.cost} • Inputs: {piece.num_inputs} • Outputs: {piece.num_outputs}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {Object.keys(truthTable).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr>
+                                {Object.keys(truthTable[Object.keys(truthTable)[0]] || {}).map((key) => (
+                                  <th key={key} className="border border-border bg-secondary px-2 py-1 text-left font-medium">
+                                    {key}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(truthTable).map(([input, outputs]: [string, any]) => (
+                                <tr key={input}>
+                                  <td className="border border-border px-2 py-1 font-mono">{input}</td>
+                                  {Object.values(outputs).map((value: any, idx: number) => (
+                                    <td key={idx} className="border border-border px-2 py-1 font-mono text-center">
+                                      {String(value)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No truth table data available.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         ) : null}

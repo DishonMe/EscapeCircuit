@@ -376,7 +376,8 @@ export default function ArsenalCreatorPage() {
       <div className="flex-1 px-6 flex gap-4 min-h-0">
         <WorkstationMenu
           basic={BASIC_COMPONENTS}
-          special={[]}
+          custom={[]}
+          arsenal={[]}
           allowArsenal={false}
           filteredBasicTypes={[]}
           selectedComponentId={

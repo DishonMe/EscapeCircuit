@@ -1,6 +1,7 @@
 from typing import List, Optional
 import pathlib
 import os
+import shutil
 
 from Backend import settings
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus, AuditActionType
@@ -59,22 +60,26 @@ class AdminService:
             if not riddles_dir.exists():
                 return
             
-            # Search for all files containing the puzzle name (case-insensitive match)
-            # Pattern: riddle_XX_puzzle_name_*.ext
+            # Search for all files/folders containing the puzzle name (case-insensitive match)
+            # Pattern: riddle_XX_puzzle_name_*.ext or riddle_XX_puzzle_name/
             deleted_count = 0
-            for file in riddles_dir.iterdir():
-                if file.is_file() and("_" + puzzle_name.lower() + "_") in file.name.lower():
+            for item in riddles_dir.iterdir():
+                if ("_" + puzzle_name.lower() + "_") in item.name.lower():
                     try:
-                        file.unlink()
+                        if item.is_file():
+                            item.unlink()
+                            print(f"[DELETE] Removed riddle file: {item.name}")
+                        elif item.is_dir():
+                            shutil.rmtree(item)
+                            print(f"[DELETE] Removed riddle folder: {item.name}")
                         deleted_count += 1
-                        print(f"[DELETE] Removed riddle file: {file.name}")
                     except Exception as e:
-                        print(f"[WARNING] Failed to delete {file.name}: {e}")
+                        print(f"[WARNING] Failed to delete {item.name}: {e}")
             
             if deleted_count > 0:
-                print(f"[DELETE] Removed {deleted_count} riddle file(s) for puzzle: {puzzle_name}")
+                print(f"[DELETE] Removed {deleted_count} riddle item(s) for puzzle: {puzzle_name}")
         except Exception as e:
-            print(f"[WARNING] Error during riddle file cleanup: {e}")
+            print(f"[WARNING] Error during riddle cleanup: {e}")
 
     def _require_admin_or_creator(self, session_token: str) -> int:
         """Validate session and ensure user is admin or creator. Returns user_id."""

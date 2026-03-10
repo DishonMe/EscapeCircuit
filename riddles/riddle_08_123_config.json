@@ -1,0 +1,101 @@
+{
+  "puzzle": {
+    "name": "123",
+    "description": "123",
+    "budget": 123,
+    "time_limit_seconds": 122,
+    "difficulty": "EASY",
+    "default_gate_set": [
+      "AND",
+      "OR"
+    ],
+    "inputs": [
+      "input_0",
+      "input_1"
+    ],
+    "outputs": [
+      "and",
+      "or"
+    ],
+    "min_cycles": null,
+    "max_cycles": null,
+    "total_gate_count": null,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 5,
+      "cols": 10
+    }
+  },
+  "test_cases": [
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_0": 0,
+        "input_1": 0
+      },
+      "expected_outputs": {
+        "and": 0,
+        "or": 0
+      }
+    },
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_0": 1,
+        "input_1": 0
+      },
+      "expected_outputs": {
+        "or": 1,
+        "and": 0
+      }
+    },
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_1": 1,
+        "input_0": 0
+      },
+      "expected_outputs": {
+        "or": 1,
+        "and": 0
+      }
+    },
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_0": 1,
+        "input_1": 1
+      },
+      "expected_outputs": {
+        "and": 1,
+        "or": 1
+      }
+    }
+  ],
+  "custom_pieces": [
+    {
+      "name": "and-or",
+      "cost": 1,
+      "num_inputs": 2,
+      "num_outputs": 2,
+      "truth_table": {
+        "0,0": {
+          "OUT0": 0,
+          "OUT1": 0
+        },
+        "0,1": {
+          "OUT0": 1,
+          "OUT1": 0
+        },
+        "1,0": {
+          "OUT0": 1,
+          "OUT1": 0
+        },
+        "1,1": {
+          "OUT0": 1,
+          "OUT1": 1
+        }
+      }
+    }
+  ]
+}

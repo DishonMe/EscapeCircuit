@@ -192,7 +192,8 @@ const DraggableItem = ({
 
 export const WorkstationMenu = ({
   basic,
-  special,
+  custom,
+  arsenal,
   allowArsenal,
   filteredBasicTypes,
   selectedComponentId,
@@ -201,7 +202,8 @@ export const WorkstationMenu = ({
   onDragEnd,
 }: {
   basic: CircuitComponent[];
-  special: CircuitComponent[];
+  custom: CircuitComponent[];
+  arsenal: CircuitComponent[];
   allowArsenal: boolean;
   filteredBasicTypes: string[];
   selectedComponentId?: string;
@@ -209,7 +211,7 @@ export const WorkstationMenu = ({
   onDragStart?: (id: string) => void;
   onDragEnd?: () => void;
 }) => {
-  const [arsenal, setArsenal] = useState<ArsenalCircuit[]>([]);
+  const [loadedArsenal, setLoadedArsenal] = useState<ArsenalCircuit[]>([]);
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<
     string | null
   >(null);
@@ -217,16 +219,16 @@ export const WorkstationMenu = ({
 
   useEffect(() => {
     if (!allowArsenal) return;
-    setArsenal(loadArsenal());
+    setLoadedArsenal(loadArsenal());
   }, [allowArsenal]);
 
   const visibleArsenal = useMemo(() => {
     if (!allowArsenal) return [];
     const filtered = new Set(filteredBasicTypes);
-    return arsenal.filter((c) =>
+    return loadedArsenal.filter((c) =>
       c.usedBasicTypes.every((t) => !filtered.has(t)),
     );
-  }, [allowArsenal, arsenal, filteredBasicTypes]);
+  }, [allowArsenal, loadedArsenal, filteredBasicTypes]);
 
   const handleInfoClick = (componentId: string, component: CircuitComponent) => {
     setViewingTruthTableFor(component.type || componentId);
@@ -278,13 +280,36 @@ export const WorkstationMenu = ({
         </Category>
       ) : null}
 
-      {special.length ? (
-        <Category title="Arsenal">
+      {/* Custom Pieces Category (puzzle-specific) */}
+      {custom.length ? (
+        <Category title="Special Pieces">
           <div className="text-[11px] text-muted-foreground mb-2">
-            Custom circuit pieces available for this puzzle
+            Custom logic gates created for this puzzle
           </div>
           <div className="flex flex-col gap-2">
-            {special.map((c) => (
+            {custom.map((c) => (
+              <DraggableItem
+                key={c.id}
+                component={c}
+                isSelected={selectedComponentId === c.id}
+                onSelect={onSelectComponent}
+                onInfoClick={() => handleInfoClick(c.id, c)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+              />
+            ))}
+          </div>
+        </Category>
+      ) : null}
+
+      {/* Arsenal Category (user's saved pieces) */}
+      {allowArsenal && arsenal.length ? (
+        <Category title="Arsenal">
+          <div className="text-[11px] text-muted-foreground mb-2">
+            Your personal circuit pieces
+          </div>
+          <div className="flex flex-col gap-2">
+            {arsenal.map((c) => (
               <DraggableItem
                 key={c.id}
                 component={c}

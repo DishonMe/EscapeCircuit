@@ -187,6 +187,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     puzzle_data = config['puzzle']
     test_cases = config.get('test_cases', [])
     basic_circuits = config.get('basic_circuits', []) or puzzle_data.get('basic_circuits', [])
+    custom_pieces = config.get('custom_pieces', []) or puzzle_data.get('custom_pieces', [])
     
     # Determine gates JSON
     gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
@@ -216,7 +217,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             UPDATE puzzles SET
                 description=?, instructions=?, budget=?, time_limit_seconds=?,
                 default_gate_set=?, difficulty=?,
-                total_gate_count=?, min_cycles=?, max_cycles=?
+                total_gate_count=?, min_cycles=?, max_cycles=?,
+                board_rows=?, board_cols=?
             WHERE id=?
         """, (
             description,
@@ -228,6 +230,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('total_gate_count'),
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
+            puzzle_data.get('board', {}).get('rows'),
+            puzzle_data.get('board', {}).get('cols'),
             puzzle_id
         ))
         # Clear old test cases for this puzzle (they get re-imported below)
@@ -240,8 +244,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 time_limit_seconds, difficulty, default_gate_set, rating_count, 
                 avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
+                allow_arsenal, board_rows, board_cols,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -256,6 +261,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('total_gate_count'),
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
+            1 if puzzle_data.get('allow_arsenal', True) else 0,
+            puzzle_data.get('board', {}).get('rows'),
+            puzzle_data.get('board', {}).get('cols'),
             utcnow()
         ))
         puzzle_id = c.lastrowid
@@ -375,6 +383,51 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                     json.dumps(basic_circuit.get('truth_table', {})),
                     int(basic_circuit.get('num_inputs', 0) or 0),
                     int(basic_circuit.get('num_outputs', 0) or 0),
+                ),
+            )
+        
+    # Handle custom pieces from config (same as basic_circuits, but only if they exist)
+    if custom_pieces:
+        for custom_piece in custom_pieces:
+            name = (custom_piece.get('name') or '').strip()
+            if not name:
+                continue
+            # Check if custom piece already exists for this puzzle
+            existing = c.execute(
+                "SELECT id FROM circuits WHERE puzzle_id=? AND name=? AND is_arsenal=0",
+                (puzzle_id, name)
+            ).fetchone()
+            
+            if existing:
+                # Delete and recreate to ensure it's up to date
+                c.execute(
+                    "DELETE FROM circuits WHERE puzzle_id=? AND name=? AND is_arsenal=0",
+                    (puzzle_id, name)
+                )
+            
+            # Create the custom piece circuit
+            truth_table = custom_piece.get('truth_table', {})
+            num_inputs = custom_piece.get('num_inputs', 0)
+            num_outputs = custom_piece.get('num_outputs', 0)
+            cost = custom_piece.get('cost', 0)
+            
+            c.execute(
+                """
+                INSERT INTO circuits(
+                    user_id, name, cost, structure_json, is_arsenal,
+                    basic_gates, truth_table, num_inputs, num_outputs, puzzle_id
+                ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(creator_id),
+                    name,
+                    int(cost or 0),
+                    json.dumps({}),  # Custom pieces don't have a structure_json
+                    json.dumps([]),  # Custom pieces don't use basic_gates
+                    json.dumps(truth_table),
+                    int(num_inputs or 0),
+                    int(num_outputs or 0),
+                    puzzle_id,
                 ),
             )
         

@@ -10,7 +10,8 @@
     "outputs": ["S", "C_out"],
     "total_gate_count": null,
     "min_cycles": null,
-    "max_cycles": null
+    "max_cycles": null,
+    "allow_arsenal": true
   },
   "test_cases": [
     {

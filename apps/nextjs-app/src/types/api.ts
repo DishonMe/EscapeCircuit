@@ -128,7 +128,11 @@ export type Puzzle = Entity<{
   filteredBasicComponents?: string[];
   defaultGateSet?: string[];
   allowArsenal?: boolean;
-  specialComponents?: CircuitComponent[];
+  board_rows?: number | null;  // Board height (null = use default)
+  board_cols?: number | null;  // Board width (null = use default)
+  specialComponents?: CircuitComponent[];  // Backward compatibility (all special components)
+  customComponents?: CircuitComponent[];   // Custom pieces for this puzzle
+  arsenalComponents?: CircuitComponent[];  // User's arsenal pieces
   rating: number;
   solvedCount: number;
   isPublic: boolean;
@@ -159,6 +163,12 @@ export type CircuitComponent = {
   type: string;
   cost: number;
   pins: number;
+  num_inputs?: number;  // For arena/custom pieces
+  num_outputs?: number;  // For arsenal/custom pieces
+  puzzle_id?: number | null;  // Non-null indicates custom piece, null indicates arsenal piece
+  basic_gates?: string;  // For arsenal/custom pieces
+  truth_table?: string;  // For arsenal/custom pieces
+  is_arsenal?: boolean;
 };
 
 export type PlacedComponent = {
