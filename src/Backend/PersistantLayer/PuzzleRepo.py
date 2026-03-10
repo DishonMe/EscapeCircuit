@@ -63,6 +63,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN board_cols INTEGER;")
             if "is_hall_of_fame" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN is_hall_of_fame INTEGER NOT NULL DEFAULT 0;")
+            if "creator_budget" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_budget INTEGER;")
         except Exception:
             pass
         self.conn.execute("""
@@ -138,18 +140,19 @@ class PuzzleRepo:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
                 name, creator_user_id, description, status,
-                budget, time_limit_seconds, difficulty, default_gate_set,
+                budget, creator_budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
                 creator_comment, allow_arsenal,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
@@ -182,6 +185,7 @@ class PuzzleRepo:
                 creator_comment=?,
                 status=?,
                 budget=?,
+                creator_budget=?,
                 time_limit_seconds=?,
                 difficulty=?,
                 default_gate_set=?,
@@ -203,6 +207,7 @@ class PuzzleRepo:
             puzzle.creator_comment,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
@@ -907,6 +912,11 @@ class PuzzleRepo:
             is_hall_of_fame = bool(int(row["is_hall_of_fame"]))
         except (IndexError, KeyError, TypeError, ValueError):
             is_hall_of_fame = False
+        try:
+            creator_budget = row["creator_budget"]
+            creator_budget = int(creator_budget) if creator_budget is not None else None
+        except (IndexError, KeyError, TypeError, ValueError):
+            creator_budget = None
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -916,6 +926,7 @@ class PuzzleRepo:
             "creator_comment": creator_comment_val,
             "status": row["status"],
             "budget": int(row["budget"]),
+            "creator_budget": creator_budget,
             "time_limit_seconds": row["time_limit_seconds"],
             "difficulty": diff_val or "EASY",
             "default_gate_set": gate_values,

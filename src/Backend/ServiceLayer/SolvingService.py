@@ -317,6 +317,7 @@ class SolvingService:
                     time_limit=getattr(p, 'time_limit_seconds', None),
                     cost_used=cost_used,
                     budget=getattr(p, 'budget', 0),
+                    creator_budget=getattr(p, 'creator_budget', None),
                 )
 
             # --- Compute raw XP for this solve (base + medal bonus, no delta) ---
@@ -373,7 +374,8 @@ class SolvingService:
                     tight_upgraded = getattr(old_progress, 'tight_upgraded', False)
                     if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
                         timer_upgraded = True
-                    if p.budget > 0 and cost_used <= p.budget:
+                    p_creator_budget = getattr(p, 'creator_budget', None)
+                    if isinstance(p_creator_budget, int) and p_creator_budget > 0 and cost_used <= p_creator_budget:
                         tight_upgraded = True
                     self.solve_repo.upsert_progress(PuzzleProgress(
                         user_id=user_id,

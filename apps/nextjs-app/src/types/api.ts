@@ -119,6 +119,7 @@ export type Puzzle = Entity<{
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   timeLimit: number; // in seconds
   budgetLimit: number;
+  creatorBudget?: number | null;  // Creator's solution cost (for medal bonus condition)
   budget?: number; // Backend compat
   inputs: string[];
   outputs: string[];

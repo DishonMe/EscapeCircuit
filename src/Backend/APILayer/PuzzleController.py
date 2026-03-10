@@ -25,6 +25,7 @@ class CreatePuzzleReq(BaseModel):
     title: str = "" # also accept title directly
     description: str = ""
     budget: int = 0
+    creator_budget: Optional[int] = None  # Creator's solution cost; must be < budget when both set
     time_limit_seconds: Optional[int] = None
     timeLimit: Optional[int] = None # alias
     default_gate_set: list[str] = []
@@ -35,6 +36,7 @@ class CreatePuzzleReq(BaseModel):
             "name": self.title if self.title else self.name,
             "description": self.description,
             "budget": self.budget,
+            "creator_budget": self.creator_budget,
             "time_limit_seconds": self.timeLimit if self.timeLimit is not None else self.time_limit_seconds,
             "default_gate_set": self.default_gate_set,
             "difficulty": self.difficulty
@@ -146,6 +148,16 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
         raise ValidationError("Puzzle must have 'outputs' list")
     if not puzzle_config.get('default_gate_set'):
         raise ValidationError("Puzzle must have 'default_gate_set'")
+
+    budget = puzzle_config.get('budget', 0) or 0
+    creator_budget = puzzle_config.get('creator_budget')
+    if creator_budget is not None:
+        if creator_budget < 0:
+            raise ValidationError("creator_budget cannot be negative")
+        if budget > 0 and budget <= creator_budget:
+            raise ValidationError(
+                f"budget ({budget}) must be greater than creator_budget ({creator_budget})"
+            )
 
     test_cases = config_data.get('test_cases', [])
     if not test_cases:
@@ -541,6 +553,24 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 
                 if not isinstance(solution_data.get('eval_map'), dict):
                     raise ValidationError("Sample solution must have 'eval_map' field")
+
+                # Extract creator_budget from solution totalCost if not already set in config
+                solution_total_cost = solution_data.get('totalCost')
+                if solution_total_cost is not None:
+                    config_creator_budget = puzzle_config.get('creator_budget')
+                    if config_creator_budget is None:
+                        # Auto-set creator_budget from solution cost
+                        puzzle_config['creator_budget'] = int(solution_total_cost)
+                        config_data.setdefault('puzzle', {})['creator_budget'] = int(solution_total_cost)
+                    # Validate budget > creator_budget now that we have the solution cost
+                    effective_creator_budget = puzzle_config.get('creator_budget')
+                    if effective_creator_budget is not None:
+                        puzzle_budget = puzzle_config.get('budget', 0) or 0
+                        if puzzle_budget > 0 and puzzle_budget <= effective_creator_budget:
+                            raise ValidationError(
+                                f"budget ({puzzle_budget}) must be greater than creator_budget "
+                                f"({effective_creator_budget}). Raise the budget or lower the creator's solution cost."
+                            )
                 
                 # Check if solution has circuit structure for actual simulation
                 solution_circuit_data = solution_data.get('circuit')
