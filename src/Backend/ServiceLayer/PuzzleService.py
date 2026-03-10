@@ -457,7 +457,7 @@ class PuzzleService:
             if not is_admin:
                 published_rows = self.repo.conn.execute(
                     """
-                    SELECT rating_count, avg_fun
+                    SELECT is_hall_of_fame, rating_count, avg_fun
                     FROM puzzles
                     WHERE creator_user_id = ? AND status = 'published'
                     """,
@@ -466,13 +466,23 @@ class PuzzleService:
 
                 current_count = 0
                 for row in published_rows:
-                    rating_count = int(row[0] or 0)
-                    avg_fun = float(row[1] or 0.0)
-                    is_popular = rating_count >= 20 and avg_fun > 3.5
+                    is_hall_of_fame = bool(int(row[0] or 0))
+                    rating_count = int(row[1] or 0)
+                    avg_fun = float(row[2] or 0.0)
+                    is_popular = is_hall_of_fame or (rating_count >= 20 and avg_fun > 3.5)
                     if not is_popular:
                         current_count += 1
 
-                if p.status != PuzzleStatus.PUBLISHED and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER:
+                target_is_popular = bool(getattr(p, "is_hall_of_fame", False)) or (
+                    int(getattr(p, "rating_count", 0) or 0) >= 20
+                    and float(getattr(p, "avg_fun", 0.0) or 0.0) > 3.5
+                )
+
+                if (
+                    p.status != PuzzleStatus.PUBLISHED
+                    and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER
+                    and not target_is_popular
+                ):
                     raise ValidationError(
                         f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
                     )

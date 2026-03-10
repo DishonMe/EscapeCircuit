@@ -358,3 +358,7 @@ class RatingService:
             avg_fun=avg_fun,
             avg_clearness=avg_clearness,
         )
+
+        # Hall of Fame rule: once puzzle reaches the threshold, lock exemption permanently.
+        if rating_count >= 20 and avg_fun > 3.5:
+            self.puzzle_repo.mark_hall_of_fame(int(puzzle_id))

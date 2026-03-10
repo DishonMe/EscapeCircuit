@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Trash2, MessageSquare } from 'lucide-react';
+import { Trash2, MessageSquare, Crown } from 'lucide-react';
 
 import { useUser } from '@/lib/auth';
 import { useMyPuzzles } from '@/features/puzzles/api/get-my-puzzles';
@@ -57,6 +57,7 @@ export const MyPuzzles = () => {
 
   const isPopularPublishedPuzzle = (p: Puzzle) => {
     if (!isPublishedPuzzle(p)) return false;
+    if ((p as any).is_hall_of_fame === true) return true;
     const ratingCount = Number((p as any).rating_count ?? 0);
     const avgFun = Number((p as any).avg_fun ?? 0);
     return ratingCount >= 20 && avgFun > 3.5;
@@ -230,6 +231,7 @@ export const MyPuzzles = () => {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredPuzzles.map((puzzle) => {
               const isPublished = (puzzle as any).status === 'published' || (puzzle as any).isPublished === true;
+              const isHallOfFame = (puzzle as any).is_hall_of_fame === true;
               return (
                 <div
                   key={puzzle.id}
@@ -247,6 +249,16 @@ export const MyPuzzles = () => {
                       {isPublished ? 'Published' : 'Unpublished'}
                     </span>
                   </div>
+
+                  {isHallOfFame && (
+                    <div
+                      className="absolute left-2 top-[-10px] z-20 inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shadow-sm"
+                      title="Hall of Fame puzzle"
+                    >
+                      <Crown className="size-3" />
+                      HOF
+                    </div>
+                  )}
 
                   {/* Title */}
                   <div className="mb-3">

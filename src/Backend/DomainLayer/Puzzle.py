@@ -27,6 +27,7 @@ class Puzzle:
     max_cycles: Optional[int] = None
 
     rating_count: int = 0
+    is_hall_of_fame: bool = False
     avg_difficulty: float = 0.0
     avg_fun: float = 0.0
     avg_clearness: float = 0.0
@@ -90,6 +91,8 @@ class Puzzle:
             "max_cycles": self.max_cycles,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
+            "is_hall_of_fame": self.is_hall_of_fame,
+            "isHallOfFame": self.is_hall_of_fame,
             "solvedCount": 0, # Placeholder
             "inputs": [],     # Placeholder
             "outputs": [],    # Placeholder
@@ -119,6 +122,7 @@ class Puzzle:
             min_cycles=d.get("min_cycles"),
             max_cycles=d.get("max_cycles"),
             rating_count=int(d.get("rating_count", 0)),
+            is_hall_of_fame=bool(d.get("is_hall_of_fame", d.get("isHallOfFame", False))),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
             avg_fun=float(d.get("avg_fun", 0.0)),
             avg_clearness=float(d.get("avg_clearness", 0.0)),
