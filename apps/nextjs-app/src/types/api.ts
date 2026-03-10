@@ -56,6 +56,8 @@ export type Puzzle = Entity<{
   timeLimit: number; // in seconds
   budgetLimit: number;
   budget?: number; // Backend compat
+  creatorBudget?: number | null;
+  tightBudgetLimit?: number | null;
   inputs: string[];
   outputs: string[];
   creator: User;

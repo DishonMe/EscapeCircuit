@@ -7,7 +7,7 @@ from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.ServiceLayer.AuthService import AuthService
-from Backend.DomainLayer.Utils import utcnow
+from Backend.DomainLayer.Utils import utcnow, ensure_optional_non_negative_int
 
 
 class PuzzleService:
@@ -101,6 +101,7 @@ class PuzzleService:
             description=payload.get("description", "") or "",
             status=PuzzleStatus.DRAFT,
             budget=int(payload.get("budget", 0)),
+            creator_budget=ensure_optional_non_negative_int("creator_budget", payload.get("creator_budget")),
             time_limit_seconds=payload.get("time_limit_seconds", None),
             default_gate_set=gate_set,
         )

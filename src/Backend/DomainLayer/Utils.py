@@ -41,6 +41,17 @@ def ensure_optional_positive_int(name: str, value: Optional[int]) -> Optional[in
         raise ValidationError(f"{name} must be > 0 when set")
     return value
 
+def ensure_optional_non_negative_int(name: str, value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"{name} must be a non-negative integer or None")
+    if v < 0:
+        raise ValidationError(f"{name} cannot be negative")
+    return v
+
 def ensure_bit_dict(name: str, d: Dict[str, int]) -> Dict[str, int]:
     if not isinstance(d, dict) or len(d) == 0:
         raise ValidationError(f"{name} cannot be empty")

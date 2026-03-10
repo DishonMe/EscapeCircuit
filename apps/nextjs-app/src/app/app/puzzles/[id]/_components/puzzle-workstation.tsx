@@ -76,7 +76,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
 
   const budgetLimit = puzzle?.budgetLimit ?? 0;
-  const tightBudget = Math.ceil((puzzle?.budgetLimit ?? 0) * 1.25);
+  const creatorBudget = puzzle?.creatorBudget ?? puzzle?.tightBudgetLimit ?? null;
 
   const allowedGates = useMemo(() => {
     // Whitelist approach: if defaultGateSet is provided, use it.
@@ -630,7 +630,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <span className="font-medium">Budget:</span> {budgetLimit}
           </div>
           <div>
-            <span className="font-medium">Tight Budget:</span> {tightBudget}
+            <span className="font-medium">Creator&apos;s Cost:</span> {creatorBudget ?? '—'}
           </div>
           <div>
             <span className="font-medium">Current Cost:</span> {currentCost}

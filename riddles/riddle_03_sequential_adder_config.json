@@ -3,6 +3,7 @@
     "name": "Sequential Binary Adder Quiz",
     "description": "Design a sequential circuit that adds binary numbers bit by bit over multiple clock cycles using DFF gates for state. Each cycle receives one input bit X, and produces sum (OUT) and carry (C_out) outputs.",
     "budget": 15,
+    "creator_budget": 4,
     "time_limit_seconds": null,
     "default_gate_set": [
       "AND",

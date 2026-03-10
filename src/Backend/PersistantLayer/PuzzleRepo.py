@@ -23,6 +23,7 @@ class PuzzleRepo:
             description TEXT NOT NULL,
             status TEXT NOT NULL,
             budget INTEGER NOT NULL,
+            creator_budget INTEGER,
             time_limit_seconds INTEGER,
             default_gate_set TEXT NOT NULL,
             rating_count INTEGER NOT NULL,
@@ -32,6 +33,10 @@ class PuzzleRepo:
             created_at TEXT NOT NULL
         );
         """)
+        # Migrate existing databases that don't have creator_budget column yet
+        existing_cols = {row[1] for row in self.conn.execute("PRAGMA table_info(puzzles)").fetchall()}
+        if "creator_budget" not in existing_cols:
+            self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_budget INTEGER;")
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS puzzle_test_cases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,16 +55,17 @@ class PuzzleRepo:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
                 name, creator_user_id, description, status,
-                budget, time_limit_seconds, default_gate_set,
+                budget, creator_budget, time_limit_seconds, default_gate_set,
                 rating_count, avg_difficulty, avg_fun, avg_clearness,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
@@ -83,6 +89,7 @@ class PuzzleRepo:
                 description=?,
                 status=?,
                 budget=?,
+                creator_budget=?,
                 time_limit_seconds=?,
                 default_gate_set=?,
                 rating_count=?,
@@ -96,6 +103,7 @@ class PuzzleRepo:
             puzzle.description,
             puzzle.status.value,
             puzzle.budget,
+            puzzle.creator_budget,
             puzzle.time_limit_seconds,
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
@@ -181,6 +189,7 @@ class PuzzleRepo:
             "description": row["description"],
             "status": row["status"],
             "budget": int(row["budget"]),
+            "creator_budget": row["creator_budget"],
             "time_limit_seconds": row["time_limit_seconds"],
             "default_gate_set": gate_values,
             "rating_count": int(row["rating_count"]),

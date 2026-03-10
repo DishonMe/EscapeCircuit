@@ -4,7 +4,7 @@ from typing import Optional, Set
 
 from .Enums import GateType, PuzzleStatus
 from .Exceptions import ValidationError
-from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_optional_positive_int, ensure_gate_set
+from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_optional_positive_int, ensure_optional_non_negative_int, ensure_gate_set
 
 @dataclass(slots=True)
 class Puzzle:
@@ -15,6 +15,7 @@ class Puzzle:
     status: PuzzleStatus = PuzzleStatus.DRAFT
 
     budget: int = 0
+    creator_budget: Optional[int] = None
     time_limit_seconds: Optional[int] = None
     default_gate_set: Set[GateType] = field(default_factory=set)
 
@@ -44,6 +45,8 @@ class Puzzle:
         self.creator_user_id = ensure_non_negative_int("Puzzle.creator_user_id", self.creator_user_id)
         if self.budget < 0:
             raise ValidationError("Puzzle.budget cannot be negative")
+        if self.creator_budget is not None and self.creator_budget < 0:
+            raise ValidationError("Puzzle.creator_budget cannot be negative")
         if self.time_limit_seconds is not None and self.time_limit_seconds <= 0:
             raise ValidationError("Puzzle.time_limit_seconds must be > 0 when set")
 
@@ -78,6 +81,9 @@ class Puzzle:
             "isPublic": self.status == PuzzleStatus.PUBLISHED,
             "budget": self.budget,
             "budgetLimit": self.budget,
+            "creator_budget": self.creator_budget,       # snake_case for backend/API
+            "creatorBudget": self.creator_budget,         # camelCase for frontend
+            "tightBudgetLimit": self.creator_budget,      # legacy frontend alias
             "time_limit_seconds": self.time_limit_seconds,
             "timeLimit": self.time_limit_seconds, # Alias for frontend
             "difficulty": diff_str, # Mapped for frontend
@@ -105,6 +111,7 @@ class Puzzle:
             description=d.get("description", ""),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
             budget=int(d.get("budget", 0)),
+            creator_budget=ensure_optional_non_negative_int("Puzzle.creator_budget", d.get("creator_budget")),
             time_limit_seconds=d.get("time_limit_seconds", None),
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
             rating_count=int(d.get("rating_count", 0)),
@@ -122,6 +129,7 @@ class Puzzle:
     def get_description(self) -> str: return self.description
     def get_status(self) -> PuzzleStatus: return self.status
     def get_budget(self) -> int: return self.budget
+    def get_creator_budget(self) -> Optional[int]: return self.creator_budget
     def get_time_limit_seconds(self): return self.time_limit_seconds
     def get_default_gate_set(self): return self.default_gate_set
     def get_rating_count(self) -> int: return self.rating_count
@@ -147,6 +155,12 @@ class Puzzle:
 
     def set_budget(self, value: int) -> None:
         self.budget = ensure_non_negative_int("Puzzle.budget", value)
+
+    def set_creator_budget(self, value) -> None:
+        if value is None:
+            self.creator_budget = None
+        else:
+            self.creator_budget = ensure_non_negative_int("Puzzle.creator_budget", value)
 
     def set_time_limit_seconds(self, value) -> None:
         self.time_limit_seconds = ensure_optional_positive_int("Puzzle.time_limit_seconds", value)
