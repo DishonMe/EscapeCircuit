@@ -29,6 +29,7 @@ interface BasicInfo {
   name: string;
   description: string;
   budget: number;
+  creator_budget: number | null;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   timeLimit: number | null;
   minCycles: number | null;
@@ -239,6 +240,7 @@ export default function CreatePuzzleForm() {
       name: "",
       description: "",
       budget: 0,
+      creator_budget: null,
       difficulty: "EASY",
       timeLimit: null,
       minCycles: null,
@@ -509,6 +511,13 @@ export default function CreatePuzzleForm() {
     return catalog;
   }, [data.basic.gateSet]);
 
+  // Compute current circuit cost (sum of placed component costs)
+  const currentCircuitCost = useMemo(() => {
+    return placed.reduce((acc, p) => {
+      return acc + (uiCatalog[p.componentId]?.cost ?? 1);
+    }, 0);
+  }, [placed, uiCatalog]);
+
   // Export solution from workstation
   const exportSolution = useCallback(async () => {
     // Build eval_map by simulating circuit on test cases
@@ -727,10 +736,14 @@ export default function CreatePuzzleForm() {
     setData((prev) => ({
       ...prev,
       solutionJSON: JSON.stringify(solution, null, 2),
+      basic: {
+        ...prev.basic,
+        creator_budget: currentCircuitCost,
+      },
     }));
     
-    alert('✓ Circuit validated! All test cases passed. Solution exported.');
-  }, [placed, wires, data.testCases]);
+    alert(`✓ Circuit validated! All test cases passed. Solution exported.\nCreator's cost captured: ${currentCircuitCost}`);
+  }, [placed, wires, data.testCases, currentCircuitCost]);
 
   const handleAddInputField = () => {
     // Find the first input that hasn't been added to the form yet
@@ -842,6 +855,7 @@ export default function CreatePuzzleForm() {
           name: data.basic.name,
           description: data.basic.description,
           budget: data.basic.budget,
+          creator_budget: data.basic.creator_budget,
           time_limit_seconds: data.basic.timeLimit,
           difficulty: data.basic.difficulty,
           default_gate_set: data.basic.gateSet,
@@ -992,7 +1006,7 @@ export default function CreatePuzzleForm() {
                   <InfoPopup>
                     <p className="font-medium text-foreground mb-1">Budget</p>
                     <p>The max total gate cost solvers can use. Solvers who exceed this cannot submit.</p>
-                    <p className="mt-1"><span className="font-medium text-foreground">Tight Budget</span> (125% of budget) is auto-calculated — solvers within it earn better medals.</p>
+                    <p className="mt-1"><span className="font-medium text-foreground">Creator&apos;s cost</span> is set automatically when you validate your solution — solvers who beat it earn a better medal.</p>
                   </InfoPopup>
                 </label>
                 <input
@@ -1004,6 +1018,11 @@ export default function CreatePuzzleForm() {
                   className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder="e.g., 20"
                 />
+                {data.basic.creator_budget != null && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Creator&apos;s cost: <span className="font-medium text-foreground">{data.basic.creator_budget}</span> (captured from your solution)
+                  </p>
+                )}
               </div>
 
               <div>

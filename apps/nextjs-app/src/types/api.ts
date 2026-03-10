@@ -120,6 +120,7 @@ export type Puzzle = Entity<{
   timeLimit: number; // in seconds
   budgetLimit: number;
   budget?: number; // Backend compat
+  creatorBudget?: number | null; // Creator's own solution cost (threshold for medal bonus)
   inputs: string[];
   outputs: string[];
   creator: User;

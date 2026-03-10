@@ -225,6 +225,12 @@ export const PuzzleViewDialog = ({
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Budget Limit</p>
                 <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.budgetLimit || displayPuzzle.budget}</p>
               </div>
+              {displayPuzzle.creatorBudget != null && displayPuzzle.creatorBudget > 0 && (
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Creator&apos;s Cost</p>
+                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.creatorBudget}</p>
+                </div>
+              )}
               <div>
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Test Cases</p>
                 <div className="border border-border rounded overflow-hidden">
