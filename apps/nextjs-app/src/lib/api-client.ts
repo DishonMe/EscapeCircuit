@@ -115,7 +115,18 @@ async function fetchApi<T>(
         } catch {
           message = response.statusText || 'An error occurred';
         }
-        
+
+        // On 401, if the user has a stale auth cookie (session cleared server-side
+        // e.g. after a server restart), clear it and redirect to login so the
+        // user is not spammed with repeated "unauthorized" notifications.
+        if (response.status === 401 && typeof window !== 'undefined' && authToken) {
+          Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+          window.location.href = '/auth/login';
+          // Suspend execution until the page navigates away so no error
+          // handlers or React Query retries fire after the redirect.
+          await new Promise<never>(() => {});
+        }
+
         if (typeof window !== 'undefined' && !suppressErrorNotification) {
           useNotifications.getState().addNotification({
             type: 'error',

@@ -24,7 +24,7 @@ export const getLeaderboard = ({
   puzzleId: string;
   type?: "time" | "cost";
 }): Promise<LeaderboardResponse> => {
-  return api.get(`/puzzles/${puzzleId}/leaderboard?type=${type}`);
+  return api.get(`/puzzles/${puzzleId}/leaderboard?type=${type}`, { suppressErrorNotification: true });
 };
 
 export const getLeaderboardQueryOptions = ({
