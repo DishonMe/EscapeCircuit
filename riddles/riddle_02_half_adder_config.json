@@ -3,6 +3,7 @@
     "name": "Half Adder Quiz",
     "description": "Design a half adder circuit using AND, NAND, and DFF gates. Implement the sum and carry-out logic for two input bits.",
     "budget": 10,
+    "creator_budget": 2,
     "time_limit_seconds": null,
     "difficulty": "EASY",
     "default_gate_set": ["AND", "NAND", "DFF"],

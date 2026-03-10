@@ -3,6 +3,7 @@
     "name": "123",
     "description": "123",
     "budget": 123,
+    "creator_budget": 2,
     "time_limit_seconds": 122,
     "difficulty": "EASY",
     "default_gate_set": [
