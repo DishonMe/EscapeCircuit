@@ -30,6 +30,7 @@ class PuzzleRepo:
             difficulty TEXT NOT NULL DEFAULT 'EASY',
             default_gate_set TEXT NOT NULL,
             rating_count INTEGER NOT NULL,
+            is_hall_of_fame INTEGER NOT NULL DEFAULT 0,
             avg_difficulty REAL NOT NULL,
             avg_fun REAL NOT NULL,
             avg_clearness REAL NOT NULL,
@@ -54,6 +55,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN max_cycles INTEGER;")
             if "creator_comment" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_comment TEXT;")
+            if "is_hall_of_fame" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN is_hall_of_fame INTEGER NOT NULL DEFAULT 0;")
         except Exception:
             pass
         self.conn.execute("""
@@ -130,11 +133,11 @@ class PuzzleRepo:
             INSERT INTO puzzles(
                 name, creator_user_id, description, status,
                 budget, time_limit_seconds, difficulty, default_gate_set,
-                rating_count, avg_difficulty, avg_fun, avg_clearness,
+                rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
                 creator_comment,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
@@ -145,6 +148,7 @@ class PuzzleRepo:
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
+            1 if puzzle.is_hall_of_fame else 0,
             puzzle.avg_difficulty,
             puzzle.avg_fun,
             puzzle.avg_clearness,
@@ -175,6 +179,7 @@ class PuzzleRepo:
                 difficulty=?,
                 default_gate_set=?,
                 rating_count=?,
+                is_hall_of_fame=?,
                 avg_difficulty=?,
                 avg_fun=?,
                 avg_clearness=?,
@@ -194,6 +199,7 @@ class PuzzleRepo:
             puzzle.difficulty.value if hasattr(puzzle.difficulty, 'value') else str(puzzle.difficulty),
             json.dumps([g.value for g in puzzle.default_gate_set]),
             puzzle.rating_count,
+            1 if puzzle.is_hall_of_fame else 0,
             float(puzzle.avg_difficulty),
             float(puzzle.avg_fun),
             float(puzzle.avg_clearness),
@@ -219,6 +225,14 @@ class PuzzleRepo:
         self.conn.execute(
             f"UPDATE puzzles SET {set_clause} WHERE id=?", vals
         )
+
+    def mark_hall_of_fame(self, puzzle_id: int) -> bool:
+        """Set Hall of Fame flag once. Returns True if this call changed state."""
+        cur = self.conn.execute(
+            "UPDATE puzzles SET is_hall_of_fame = 1 WHERE id = ? AND is_hall_of_fame = 0",
+            (int(puzzle_id),),
+        )
+        return cur.rowcount > 0
 
     def list_published(
         self, 
@@ -866,6 +880,10 @@ class PuzzleRepo:
             max_cycles = row["max_cycles"]
         except (IndexError, KeyError):
             max_cycles = None
+        try:
+            is_hall_of_fame = bool(int(row["is_hall_of_fame"]))
+        except (IndexError, KeyError, TypeError, ValueError):
+            is_hall_of_fame = False
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -882,6 +900,7 @@ class PuzzleRepo:
             "min_cycles": min_cycles,
             "max_cycles": max_cycles,
             "rating_count": int(row["rating_count"]),
+            "is_hall_of_fame": is_hall_of_fame,
             "avg_difficulty": float(row["avg_difficulty"]),
             "avg_fun": float(row["avg_fun"]),
             "avg_clearness": float(row["avg_clearness"]),
