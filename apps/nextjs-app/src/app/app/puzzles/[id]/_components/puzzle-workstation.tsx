@@ -849,7 +849,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Budget:</span> {budgetLimit}
             {creatorBudget != null && creatorBudget > 0 && (
-              <><span className="text-muted-foreground ml-2">Creator&apos;s cost:</span> {creatorBudget}</>
+              <span className="text-muted-foreground ml-2">Creator&apos;s cost: <span className="text-foreground">{creatorBudget}</span></span>
             )}
             <span className="text-muted-foreground ml-2">Cost:</span> {currentCost}
             <InfoPopup>
