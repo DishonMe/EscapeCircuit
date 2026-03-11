@@ -1,12 +1,13 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useRef } from 'react';
 import Cookies from 'js-cookie';
 
 import { Link } from '@/components/ui/link';
 import { paths } from '@/config/paths';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
+import { useNotifications } from '@/components/ui/notifications';
 
 type LayoutProps = {
   children: ReactNode;
@@ -15,6 +16,8 @@ type LayoutProps = {
 export const AuthLayout = ({ children }: LayoutProps) => {
   const router = useRouter();
   const pathname = usePathname();
+  const { addNotification } = useNotifications();
+  const hasShownNotificationRef = useRef(false);
   const isLoginPage = pathname === paths.auth.login.getHref();
   const title = isLoginPage
     ? 'Log in to your account'
@@ -22,6 +25,7 @@ export const AuthLayout = ({ children }: LayoutProps) => {
 
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
+  const reason = searchParams?.get('reason');
 
   const [hasCheckedToken, setHasCheckedToken] = useState(false);
 
@@ -55,6 +59,33 @@ export const AuthLayout = ({ children }: LayoutProps) => {
     };
     checkAuth();
   }, [router, redirectTo]);
+
+  // Show notification based on redirect reason
+  useEffect(() => {
+    if (!hasShownNotificationRef.current && reason && hasCheckedToken) {
+      hasShownNotificationRef.current = true;
+      
+      if (reason === 'unauthorized') {
+        addNotification({
+          type: 'info',
+          title: 'Authentication Required',
+          message: 'Please log in to access this page.',
+        });
+      } else if (reason === 'session-expired') {
+        addNotification({
+          type: 'warning',
+          title: 'Session Expired',
+          message: 'Your session has expired. Please log in again to continue.',
+        });
+      } else if (reason === 'already-logged-in') {
+        addNotification({
+          type: 'info',
+          title: 'Already Logged In',
+          message: 'You are already logged in. Redirecting to dashboard.',
+        });
+      }
+    }
+  }, [reason, hasCheckedToken, addNotification]);
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-background py-12 sm:px-6 lg:px-8">

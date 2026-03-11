@@ -1,0 +1,47 @@
+{
+  "puzzle": {
+    "name": "1231",
+    "description": "123",
+    "budget": 11,
+    "creator_budget": 1,
+    "time_limit_seconds": 11,
+    "difficulty": "EASY",
+    "default_gate_set": [
+      "NOT"
+    ],
+    "inputs": [
+      "input_0"
+    ],
+    "outputs": [
+      "output_0"
+    ],
+    "min_cycles": null,
+    "max_cycles": null,
+    "total_gate_count": null,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 5,
+      "cols": 20
+    }
+  },
+  "test_cases": [
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_0": 1
+      },
+      "expected_outputs": {
+        "output_0": 0
+      }
+    },
+    {
+      "kind": "blackbox",
+      "inputs": {
+        "input_0": 0
+      },
+      "expected_outputs": {
+        "output_0": 1
+      }
+    }
+  ]
+}

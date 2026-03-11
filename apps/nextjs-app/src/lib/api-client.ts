@@ -116,6 +116,20 @@ async function fetchApi<T>(
           message = response.statusText || 'An error occurred';
         }
         
+        // Handle 401 Unauthorized - session expired or token invalidated
+        if (response.status === 401 && typeof window !== 'undefined') {
+          // Clear the invalid token
+          Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+          
+          // Redirect to login with a notification reason
+          const currentPath = window.location.pathname;
+          const redirectUrl = `/auth/login?redirectTo=${encodeURIComponent(currentPath)}&reason=session-expired`;
+          window.location.href = redirectUrl;
+          
+          // Stop further processing
+          throw new Error('Session expired - redirecting to login');
+        }
+        
         if (typeof window !== 'undefined' && !suppressErrorNotification) {
           useNotifications.getState().addNotification({
             type: 'error',

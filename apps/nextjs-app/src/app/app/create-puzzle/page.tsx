@@ -1182,7 +1182,7 @@ export default function CreatePuzzleForm() {
       const navigate = async () => {
         setIsSubmitting(false);
         await queryClient.invalidateQueries({ queryKey: ["puzzles"] });
-        router.push("/app/puzzles");
+        router.push("/app/my-puzzles");
       };
       
       setShowConfirm(null);
@@ -1196,7 +1196,7 @@ export default function CreatePuzzleForm() {
 
   const handleCancel = () => {
     setShowConfirm(null);
-    router.push("/app/puzzles");
+    router.push("/app/my-puzzles");
   };
 
   return (
