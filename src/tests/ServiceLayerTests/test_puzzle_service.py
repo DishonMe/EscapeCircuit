@@ -1,3 +1,5 @@
+import contextlib
+import json
 import pytest
 from unittest.mock import Mock, patch
 from typing import Dict, Any
@@ -12,7 +14,6 @@ from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
-import json
 
 
 class TestPuzzleServiceCreation:
@@ -1111,8 +1112,8 @@ class TestPuzzleServiceCapacityLimits:
             return m
         self.mock_puzzle_repo.conn.execute.side_effect = conn_exec
 
-        import contextlib
-        with patch("Backend.PersistantLayer._db.transaction", lambda conn: contextlib.nullcontext()):
+        import Backend.PersistantLayer._db as db_mod
+        with patch.object(db_mod, "transaction", lambda conn: contextlib.nullcontext()):
             with pytest.raises(ValidationError, match="maximum limit of 2"):
                 self.service.publish("token", 1)
 

@@ -49,11 +49,15 @@ class User:
         PUZZLE_CAPACITY_LEVEL_INCREMENT (2).  Admin overrides take priority.
         """
         from Backend import settings
+        # Clamp level increments to the range [0, total levels in the bonus window].
+        # min(...) caps the bonus at level END; max(..., 0) avoids a negative bonus
+        # when the user is below the START level.
+        total_bonus_levels = settings.PUZZLE_CAPACITY_LEVEL_END - settings.PUZZLE_CAPACITY_LEVEL_START + 1
         level_steps = max(
             0,
             min(
                 self.level - settings.PUZZLE_CAPACITY_LEVEL_START + 1,
-                settings.PUZZLE_CAPACITY_LEVEL_END - settings.PUZZLE_CAPACITY_LEVEL_START + 1,
+                total_bonus_levels,
             ),
         )
         level_bonus = level_steps * settings.PUZZLE_CAPACITY_LEVEL_INCREMENT
