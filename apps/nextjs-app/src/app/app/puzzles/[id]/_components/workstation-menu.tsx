@@ -122,7 +122,7 @@ const Category = ({
   children: React.ReactNode;
 }) => {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+    <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm transition-all duration-300">
       <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
       {children}
     </div>
@@ -145,48 +145,95 @@ const DraggableItem = ({
   onDragEnd?: () => void;
 }) => {
   return (
-    <div
-      className={cn(
-        'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-colors',
-        isSelected
-          ? 'border-foreground/20 bg-foreground/5 shadow-subtle'
-          : 'border-border/60 bg-secondary/30 hover:bg-secondary/60',
-      )}
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onInfoClick?.();
-        }}
-        className={cn(
-          'text-foreground/40 hover:text-foreground/70 transition-opacity',
-          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        )}
-        title="View Truth Table"
-      >
-        <Info size={16} />
-      </button>
-      <div
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData(
-            'application/x-escapecircuit-component',
-            component.id,
+    <>
+      <style jsx>{`
+        .holographic-item {
+          position: relative;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.3) 0%, rgba(30, 41, 59, 0.2) 100%);
+          border-color: rgba(34, 211, 238, 0.4);
+          transition: all 300ms ease;
+        }
+
+        .holographic-item:hover {
+          border-color: rgba(34, 211, 238, 0.8);
+          box-shadow: 
+            inset 0 0 12px rgba(34, 211, 238, 0.15),
+            0 0 12px rgba(34, 211, 238, 0.25),
+            0 0 20px rgba(34, 211, 238, 0.1);
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(30, 41, 59, 0.35) 100%);
+        }
+
+        .holographic-item:hover::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: repeating-linear-gradient(
+            0deg,
+            rgba(34, 211, 238, 0.03) 0px,
+            rgba(34, 211, 238, 0.03) 1px,
+            transparent 1px,
+            transparent 3px
           );
-          e.dataTransfer.effectAllowed = 'copy';
-          onDragStart?.(component.id);
-        }}
-        onDragEnd={() => onDragEnd?.()}
-        onClick={() => onSelect?.(component.id)}
-        className="flex flex-1 cursor-pointer items-center justify-between"
+          pointer-events: none;
+          border-radius: 0.5rem;
+          animation: holographic-scanlines 8s linear infinite;
+        }
+
+        @keyframes holographic-scanlines {
+          0% {
+            transform: translateY(0);
+          }
+          100% {
+            transform: translateY(4px);
+          }
+        }
+      `}</style>
+      <div
+        className={cn(
+          'group holographic-item flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-all duration-200 hover:-translate-y-1 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20',
+          isSelected
+            ? 'border-cyan-400/60 bg-cyan-950/30 shadow-[0_0_12px_rgba(34,211,238,0.3)]'
+            : 'border-border/60 bg-secondary/30',
+        )}
       >
-        <span className="font-medium text-foreground">{component.type}</span>
-        <span className="text-xs text-muted-foreground">
-          cost {component.cost} · pins {component.pins}
-        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfoClick?.();
+          }}
+          className={cn(
+            'text-foreground/40 hover:text-foreground/70 transition-opacity cursor-help',
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+          title="View Truth Table"
+        >
+          <Info size={16} />
+        </button>
+        <div
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(
+              'application/x-escapecircuit-component',
+              component.id,
+            );
+            e.dataTransfer.effectAllowed = 'copy';
+            onDragStart?.(component.id);
+          }}
+          onDragEnd={() => onDragEnd?.()}
+          onClick={() => onSelect?.(component.id)}
+          className="flex flex-1 cursor-grab active:cursor-grabbing items-center justify-between"
+        >
+          <span className="font-medium text-foreground">{component.type}</span>
+          <span className="text-xs text-muted-foreground">
+            cost {component.cost} · pins {component.pins}
+          </span>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

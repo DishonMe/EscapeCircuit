@@ -13,6 +13,7 @@ import {
   AdminPuzzleFilters,
 } from '../api/get-admin-puzzles';
 import { AdminDeletePuzzle } from './admin-delete-puzzle';
+import { AdminUnpublishPuzzle } from './admin-unpublish-puzzle';
 
 // Debounce hook — delays value updates until user stops typing
 function useDebouncedValue<T>(value: T, delay: number = 400): T {
@@ -161,10 +162,19 @@ export const AdminPuzzlesList = () => {
             field: 'id',
             Cell({ entry }: { entry: any }) {
               return (
-                <AdminDeletePuzzle
-                  puzzleId={Number(entry.id)}
-                  puzzleName={entry.name || entry.title || 'Unknown'}
-                />
+                <div className="flex gap-2 items-center">
+                  {entry.status === 'published' ? (
+                    <AdminUnpublishPuzzle
+                      puzzleId={Number(entry.id)}
+                      puzzleName={entry.name || entry.title || 'Unknown'}
+                    />
+                  ) : (
+                    <AdminDeletePuzzle
+                      puzzleId={Number(entry.id)}
+                      puzzleName={entry.name || entry.title || 'Unknown'}
+                    />
+                  )}
+                </div>
               );
             },
           },

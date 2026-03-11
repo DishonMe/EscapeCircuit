@@ -22,6 +22,10 @@ export type User = Entity<{
   bio: string;
   xp: number;
   level: number;
+  max_published_override?: number | null;
+  max_unpublished_override?: number | null;
+  effective_max_published?: number;
+  effective_max_unpublished?: number;
 }>;
 
 export type AuthResponse = {

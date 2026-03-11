@@ -14,8 +14,20 @@ class logicEngineService:
     """
 
     # ---------- existing evaluate ----------
-    def evaluate(self, circuit: Circuit, inputs: Dict[str, int]) -> Dict[str, int]:
-        data = self._load(circuit.structure_json)
+    def evaluate(
+        self,
+        circuit: Circuit,
+        inputs: Dict[str, int],
+        data: Dict[str, Any] | None = None,
+    ) -> Dict[str, int]:
+        loaded = self._load(circuit.structure_json)
+
+        # Allow callers to pass supplemental simulation fields (e.g. custom
+        # arsenal pieces) without having to mutate circuit.structure_json.
+        if isinstance(data, dict):
+            loaded.update(data)
+
+        data = loaded
         
         # Check if this is a simulation-ready circuit (from frontend solution)
         # It will have 'wires' and 'placedComponents' (or 'components')

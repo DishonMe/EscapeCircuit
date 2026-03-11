@@ -296,6 +296,12 @@ class AdminService:
         if not puzzle:
             raise ValidationError("puzzle not found")
 
+        # Admins may not directly delete a published puzzle; they must unpublish first
+        if puzzle.status == PuzzleStatus.PUBLISHED:
+            raise ValidationError(
+                "Cannot delete a published puzzle. Unpublish it first, then delete."
+            )
+
         puzzle_name = puzzle.name
         creator_id = puzzle.creator_user_id
         status = puzzle.status.value
@@ -326,6 +332,97 @@ class AdminService:
         )
 
         return {"ok": True}
+
+    # ------------------------------------------------------------------ #
+    #  Admin Unpublish Puzzle (moderation — bypasses unpublished-limit)
+    # ------------------------------------------------------------------ #
+    def admin_unpublish_puzzle(self, session_token: str, puzzle_id: int) -> dict:
+        """Unpublish a published puzzle as an admin.
+
+        Unlike a creator unpublishing their own puzzle, this bypasses the
+        creator's unpublished-capacity limit — the puzzle is always unpublished,
+        but the creator may become blocked from editing/creating until they
+        remove enough puzzles.
+        """
+        admin_id = self._require_admin(session_token)
+
+        puzzle = self.puzzle_repo.get_by_id(puzzle_id)
+        if not puzzle:
+            raise ValidationError("puzzle not found")
+
+        if puzzle.status != PuzzleStatus.PUBLISHED:
+            raise ValidationError("puzzle is not published")
+
+        puzzle_name = puzzle.name
+        creator_id = puzzle.creator_user_id
+
+        self.puzzle_repo.conn.execute(
+            "UPDATE puzzles SET status = 'unpublished' WHERE id = ? AND status = 'published'",
+            (int(puzzle_id),),
+        )
+        self.puzzle_repo.conn.commit()
+
+        # Notify the creator
+        creator = self.user_repo.get_by_id(creator_id)
+        if creator:
+            self.notification_repo.create(
+                user_id=creator_id,
+                notif_type="puzzle_unpublished",
+                message=f"Your puzzle \"{puzzle_name}\" has been unpublished by an admin.",
+            )
+
+        # Audit log
+        self.audit_log.create(
+            admin_user_id=admin_id,
+            action_type=AuditActionType.UNPUBLISH_PUZZLE.value,
+            target_puzzle_id=puzzle_id,
+            target_user_id=creator_id,
+            details={"puzzle_name": puzzle_name},
+        )
+
+        return {"ok": True}
+
+    # ------------------------------------------------------------------ #
+    #  Admin: edit creator's puzzle capacity overrides
+    # ------------------------------------------------------------------ #
+    def update_creator_puzzle_limits(
+        self,
+        session_token: str,
+        target_user_id: int,
+        max_published: Optional[int],
+        max_unpublished: Optional[int],
+    ) -> dict:
+        """Set per-creator published/unpublished puzzle capacity overrides.
+
+        Pass None for either value to revert to the level-based default.
+        """
+        self._require_admin(session_token)
+
+        target = self.user_repo.get_by_id(target_user_id)
+        if not target:
+            raise ValidationError("target user not found")
+        if target.role not in (UserRole.CREATOR, UserRole.PENDING_CREATOR):
+            raise ValidationError("target user is not a creator")
+
+        if max_published is not None and max_published < 0:
+            raise ValidationError("max_published cannot be negative")
+        if max_unpublished is not None and max_unpublished < 0:
+            raise ValidationError("max_unpublished cannot be negative")
+
+        self.user_repo.update_puzzle_limits(target_user_id, max_published, max_unpublished)
+
+        # Re-fetch to return current effective values
+        updated = self.user_repo.get_by_id(target_user_id)
+        eff_published, eff_unpublished = updated.get_puzzle_capacity()
+
+        return {
+            "ok": True,
+            "user_id": target_user_id,
+            "max_published_override": max_published,
+            "max_unpublished_override": max_unpublished,
+            "effective_max_published": eff_published,
+            "effective_max_unpublished": eff_unpublished,
+        }
 
     # ------------------------------------------------------------------ #
     #  Admin Puzzle Listing (moderation view)

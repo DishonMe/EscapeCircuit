@@ -61,10 +61,16 @@ export const ConfirmationDialog = ({
           <DialogTitle className="flex items-center gap-2">
             {' '}
             {icon === 'danger' && (
-              <CircleAlert className="size-6 text-destructive" aria-hidden="true" />
+              <CircleAlert
+                className="size-6 text-destructive animate-[pulse_1.2s_ease-in-out_2]"
+                aria-hidden="true"
+              />
             )}
             {icon === 'info' && (
-              <Info className="size-6 text-foreground" aria-hidden="true" />
+              <Info
+                className="size-6 text-foreground animate-[bounce_0.9s_ease-in-out_2]"
+                aria-hidden="true"
+              />
             )}
             {title}
           </DialogTitle>

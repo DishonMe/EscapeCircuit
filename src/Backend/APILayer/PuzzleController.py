@@ -492,6 +492,24 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
 
+        # Enforce unpublished puzzle capacity for non-admin creators.
+        # This endpoint bypasses PuzzleService.create_puzzle, so the check must
+        # be applied here as well.
+        user = puzzle_service.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=400, detail="user not found")
+        if not puzzle_service._is_admin(user.role):
+            _, max_unpublished = user.get_puzzle_capacity()
+            current_unpublished = puzzle_service._count_unpublished_puzzles(user_id)
+            if current_unpublished >= max_unpublished:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"You have reached the maximum limit of {max_unpublished} unpublished puzzles. "
+                        "Delete or publish existing puzzles to create room."
+                    ),
+                )
+
         conn = get_db_conn()
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
