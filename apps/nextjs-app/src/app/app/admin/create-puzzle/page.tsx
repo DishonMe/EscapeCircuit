@@ -863,7 +863,7 @@ export default function CreatePuzzleForm() {
       setShowConfirm(null);
       alert("Puzzle created successfully!");
       await queryClient.invalidateQueries({ queryKey: ["puzzles"] });
-      router.push("/app/puzzles");
+      router.push("/app/my-puzzles");
     } catch (err: any) {
       alert("Error: " + (err.message || "Failed to create puzzle"));
     } finally {
