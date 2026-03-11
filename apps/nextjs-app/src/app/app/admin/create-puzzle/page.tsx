@@ -268,6 +268,14 @@ export default function CreatePuzzleForm() {
 
   const handleAddTestCase = () => {
     const initializedForm = { ...testCaseForm };
+
+    if (
+      (initializedForm.kind === 'blackbox' || !initializedForm.kind) &&
+      (data.basic.inputs.length === 0 || data.basic.outputs.length === 0)
+    ) {
+      alert('Please add at least one input and one output before creating a blackbox test case.');
+      return;
+    }
     
     // Only initialize inputs/outputs if this is a blackbox test case
     if (initializedForm.kind === 'blackbox' || !initializedForm.kind) {
@@ -1170,6 +1178,47 @@ export default function CreatePuzzleForm() {
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-secondary/50 p-4">
               <h3 className="font-semibold mb-4">Add Test Case</h3>
+
+              {(data.basic.inputs.length === 0 || data.basic.outputs.length === 0) && (
+                <div className="mb-4 rounded-lg border border-amber-300/50 bg-amber-50/40 p-3">
+                  <p className="text-[13px] text-amber-800 mb-2">
+                    Add at least one input and one output to define test data.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleBasicChange('inputs', [
+                          ...data.basic.inputs,
+                          `input_${data.basic.inputs.length}`,
+                        ])
+                      }
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      + Add Input
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleBasicChange('outputs', [
+                          ...data.basic.outputs,
+                          `output_${data.basic.outputs.length}`,
+                        ])
+                      }
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      + Add Output
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('basic')}
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] text-foreground hover:bg-secondary transition-colors"
+                    >
+                      Open Basic Info
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4">
                 <label className="block text-[13px] font-medium text-foreground mb-2">Test Case Type</label>

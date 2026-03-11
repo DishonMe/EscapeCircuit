@@ -434,6 +434,14 @@ export default function CreatePuzzleForm() {
 
   const handleAddTestCase = () => {
     const initializedForm = { ...testCaseForm };
+
+    if (
+      (initializedForm.kind === 'blackbox' || !initializedForm.kind) &&
+      (data.basic.inputs.length === 0 || data.basic.outputs.length === 0)
+    ) {
+      alert('Please add at least one input and one output before creating a blackbox test case.');
+      return;
+    }
     
     // Only initialize inputs/outputs if this is a blackbox test case
     if (initializedForm.kind === 'blackbox' || !initializedForm.kind) {
@@ -1265,7 +1273,7 @@ export default function CreatePuzzleForm() {
                   <InfoPopup>
                     <p className="font-medium text-foreground mb-1">Budget</p>
                     <p>The max total gate cost solvers can use. Solvers who exceed this cannot submit.</p>
-                    <p className="mt-1"><span className="font-medium text-foreground">Creator Budget</span> is your solution&apos;s gate cost. Set it below — solvers who match or beat it earn a better medal.</p>
+                    <p className="mt-1"><span className="font-medium text-foreground">Creator Budget</span> is your solution&apos;s gate cost and is auto-filled when you export your solution. Solvers who match or beat it earn a better medal.</p>
                   </InfoPopup>
                 </label>
                 <input
@@ -1296,29 +1304,6 @@ export default function CreatePuzzleForm() {
                   <option value="HARD">Hard</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="flex items-center gap-1 text-[13px] font-medium text-foreground mb-2">
-                Creator Budget (optional)
-                <InfoPopup>
-                  <p className="font-medium text-foreground mb-1">Creator Budget</p>
-                  <p>Your solution&apos;s total gate cost. Must be less than the Budget.</p>
-                  <p className="mt-1">Solvers who match or beat this cost earn a better medal. Auto-filled when you export your solution.</p>
-                </InfoPopup>
-              </label>
-              <input
-                type="number"
-                value={data.basic.creator_budget ?? ""}
-                onChange={(e) =>
-                  handleBasicChange(
-                    "creator_budget",
-                    e.target.value ? parseInt(e.target.value) : null
-                  )
-                }
-                className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Auto-filled from your exported solution"
-              />
             </div>
 
             <div>
@@ -1609,6 +1594,47 @@ export default function CreatePuzzleForm() {
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-secondary/50 p-4">
               <h3 className="font-semibold mb-4">Add Test Case</h3>
+
+              {(data.basic.inputs.length === 0 || data.basic.outputs.length === 0) && (
+                <div className="mb-4 rounded-lg border border-amber-300/50 bg-amber-50/40 p-3">
+                  <p className="text-[13px] text-amber-800 mb-2">
+                    Add at least one input and one output to define test data.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleBasicChange('inputs', [
+                          ...data.basic.inputs,
+                          `input_${data.basic.inputs.length}`,
+                        ])
+                      }
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      + Add Input
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleBasicChange('outputs', [
+                          ...data.basic.outputs,
+                          `output_${data.basic.outputs.length}`,
+                        ])
+                      }
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      + Add Output
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('basic')}
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] text-foreground hover:bg-secondary transition-colors"
+                    >
+                      Open Basic Info
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4">
                 <label className="block text-[13px] font-medium text-foreground mb-2">Test Case Type</label>

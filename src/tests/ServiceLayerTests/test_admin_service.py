@@ -328,4 +328,204 @@ class TestAdminServiceModeration:
         assert result is not None
 
 
+class TestAdminServiceDeletePuzzle:
+    """Tests for AdminService.delete_puzzle with the published-puzzle restriction."""
+
+    def _make_service(self):
+        mock_user_repo = Mock()
+        mock_user_repo.conn = Mock()
+        mock_puzzle_repo = Mock()
+        mock_puzzle_repo.conn = Mock()
+        mock_solve_repo = Mock()
+        mock_rating_repo = Mock()
+        mock_audit_log = Mock()
+        mock_notification_repo = Mock()
+        mock_auth = Mock()
+
+        service = AdminService(
+            mock_user_repo,
+            mock_puzzle_repo,
+            mock_solve_repo,
+            mock_rating_repo,
+            mock_audit_log,
+            mock_notification_repo,
+            mock_auth,
+        )
+        return service, mock_user_repo, mock_puzzle_repo, mock_solve_repo, mock_rating_repo, mock_audit_log, mock_auth
+
+    def test_delete_published_puzzle_raises(self):
+        service, mock_user_repo, mock_puzzle_repo, *_ = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        puzzle = Mock(spec=Puzzle); puzzle.status = PuzzleStatus.PUBLISHED
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.return_value = admin
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError, match="Cannot delete a published puzzle"):
+            service.delete_puzzle("token", 1)
+
+    def test_delete_draft_puzzle_succeeds(self):
+        service, mock_user_repo, mock_puzzle_repo, mock_solve_repo, mock_rating_repo, mock_audit_log, _ = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        puzzle = Mock(spec=Puzzle)
+        puzzle.status = PuzzleStatus.DRAFT
+        puzzle.name = "TestPuzzle"
+        puzzle.creator_user_id = 2
+        puzzle.id = 10
+
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.return_value = admin
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+        mock_puzzle_repo.conn = Mock()
+        mock_puzzle_repo.conn.__enter__ = Mock(return_value=None)
+        mock_puzzle_repo.conn.__exit__ = Mock(return_value=False)
+
+        # patch transaction context manager
+        with pytest.MonkeyPatch().context() as mp:
+            import Backend.PersistantLayer._db as db_mod
+            mp.setattr(db_mod, "transaction", lambda conn: __import__("contextlib").nullcontext())
+            result = service.delete_puzzle("token", 10)
+        assert result["ok"] is True
+
+
+class TestAdminServiceAdminUnpublish:
+    """Tests for AdminService.admin_unpublish_puzzle."""
+
+    def _make_service(self):
+        mock_user_repo = Mock()
+        mock_user_repo.conn = Mock()
+        mock_puzzle_repo = Mock()
+        mock_puzzle_repo.conn = Mock()
+        mock_solve_repo = Mock()
+        mock_rating_repo = Mock()
+        mock_audit_log = Mock()
+        mock_notification_repo = Mock()
+        mock_auth = Mock()
+        service = AdminService(
+            mock_user_repo, mock_puzzle_repo, mock_solve_repo,
+            mock_rating_repo, mock_audit_log, mock_notification_repo, mock_auth,
+        )
+        return service, mock_user_repo, mock_puzzle_repo, mock_audit_log
+
+    def test_unpublish_non_published_raises(self):
+        service, mock_user_repo, mock_puzzle_repo, _ = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        puzzle = Mock(spec=Puzzle); puzzle.status = PuzzleStatus.DRAFT
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.return_value = admin
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError, match="puzzle is not published"):
+            service.admin_unpublish_puzzle("token", 1)
+
+    def test_unpublish_not_found_raises(self):
+        service, mock_user_repo, mock_puzzle_repo, _ = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.return_value = admin
+        mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError, match="puzzle not found"):
+            service.admin_unpublish_puzzle("token", 99)
+
+    def test_unpublish_published_succeeds(self):
+        service, mock_user_repo, mock_puzzle_repo, mock_audit_log = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        puzzle = Mock(spec=Puzzle)
+        puzzle.status = PuzzleStatus.PUBLISHED
+        puzzle.name = "MyPuzzle"
+        puzzle.creator_user_id = 5
+
+        service.auth.require_user_id.return_value = 1
+        # get_by_id called twice: once for admin auth, once for creator notification
+        mock_user_repo.get_by_id.side_effect = [admin, Mock(spec=User)]
+        mock_puzzle_repo.get_by_id.return_value = puzzle
+        mock_puzzle_repo.conn.execute = Mock()
+        mock_puzzle_repo.conn.commit = Mock()
+
+        result = service.admin_unpublish_puzzle("token", 42)
+        assert result["ok"] is True
+        mock_audit_log.create.assert_called_once()
+
+
+class TestAdminServiceUpdatePuzzleLimits:
+    """Tests for AdminService.update_creator_puzzle_limits."""
+
+    def _make_service(self):
+        mock_user_repo = Mock()
+        mock_user_repo.conn = Mock()
+        mock_puzzle_repo = Mock()
+        mock_solve_repo = Mock()
+        mock_rating_repo = Mock()
+        mock_audit_log = Mock()
+        mock_notification_repo = Mock()
+        mock_auth = Mock()
+        service = AdminService(
+            mock_user_repo, mock_puzzle_repo, mock_solve_repo,
+            mock_rating_repo, mock_audit_log, mock_notification_repo, mock_auth,
+        )
+        return service, mock_user_repo
+
+    def test_update_limits_target_not_found(self):
+        service, mock_user_repo = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.side_effect = [admin, None]
+
+        with pytest.raises(ValidationError, match="target user not found"):
+            service.update_creator_puzzle_limits("token", 99, 10, 5)
+
+    def test_update_limits_non_creator_raises(self):
+        service, mock_user_repo = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        target = Mock(spec=User); target.role = UserRole.SOLVER
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.side_effect = [admin, target]
+
+        with pytest.raises(ValidationError, match="not a creator"):
+            service.update_creator_puzzle_limits("token", 2, 10, 5)
+
+    def test_update_limits_negative_raises(self):
+        service, mock_user_repo = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        target = Mock(spec=User); target.role = UserRole.CREATOR
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.side_effect = [admin, target]
+
+        with pytest.raises(ValidationError, match="cannot be negative"):
+            service.update_creator_puzzle_limits("token", 2, -1, 5)
+
+    def test_update_limits_success(self):
+        service, mock_user_repo = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        target = Mock(spec=User); target.role = UserRole.CREATOR
+
+        updated_user = Mock(spec=User)
+        updated_user.max_published_puzzles = 10
+        updated_user.max_unpublished_puzzles = 5
+        updated_user.get_puzzle_capacity = Mock(return_value=(10, 5))
+
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.side_effect = [admin, target, updated_user]
+
+        result = service.update_creator_puzzle_limits("token", 2, 10, 5)
+        assert result["ok"] is True
+        assert result["max_published_override"] == 10
+        assert result["max_unpublished_override"] == 5
+        mock_user_repo.update_puzzle_limits.assert_called_once_with(2, 10, 5)
+
+    def test_update_limits_with_none_reverts_to_default(self):
+        service, mock_user_repo = self._make_service()
+        admin = Mock(spec=User); admin.role = UserRole.ADMIN
+        target = Mock(spec=User); target.role = UserRole.CREATOR
+
+        updated_user = Mock(spec=User)
+        updated_user.get_puzzle_capacity = Mock(return_value=(5, 5))
+
+        service.auth.require_user_id.return_value = 1
+        mock_user_repo.get_by_id.side_effect = [admin, target, updated_user]
+
+        result = service.update_creator_puzzle_limits("token", 2, None, None)
+        assert result["ok"] is True
+        mock_user_repo.update_puzzle_limits.assert_called_once_with(2, None, None)
 

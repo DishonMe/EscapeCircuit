@@ -23,8 +23,6 @@ import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 import { PuzzleViewDialog } from './puzzle-view-dialog';
 
-const PUZZLE_MAX_PUBLISHED_PER_USER = 10;
-
 export const MyPuzzles = () => {
   const user = useUser();
   const [page, setPage] = useState(1);
@@ -52,6 +50,8 @@ export const MyPuzzles = () => {
   const meta = puzzlesQuery.data?.meta;
   const isLoading = puzzlesQuery.isLoading;
   const isAdmin = String(user.data?.role || '').toLowerCase() === 'admin';
+  const effectiveMaxPublished = Number(user.data?.effective_max_published ?? 5);
+  const effectiveMaxUnpublished = Number(user.data?.effective_max_unpublished ?? 5);
   const isPublishedPuzzle = (p: Puzzle) =>
     (p as any).status === 'published' || (p as any).isPublished === true;
 
@@ -68,6 +68,18 @@ export const MyPuzzles = () => {
     (p) => isPublishedPuzzle(p) && !isPopularPublishedPuzzle(p),
   ).length;
   const popularPublishedCount = Math.max(0, publishedCount - effectivePublishedCount);
+  const unpublishedCount = allPuzzles.filter((p) => !isPublishedPuzzle(p)).length;
+  const unpublishedLimitReached = !isAdmin && unpublishedCount >= effectiveMaxUnpublished;
+
+  const handleCreatePuzzleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (unpublishedLimitReached) {
+      e.preventDefault();
+      alert(
+        `You have reached the unpublished puzzles limit (${unpublishedCount}/${effectiveMaxUnpublished}). ` +
+          'Delete or publish existing puzzles to create room.'
+      );
+    }
+  };
 
   // Filter by published status
   const filteredPuzzles = allPuzzles.filter((p) => {
@@ -145,9 +157,13 @@ export const MyPuzzles = () => {
             Create, manage, and publish your circuit puzzles
           </p>
           <p className="text-[12px] text-muted-foreground mt-1">
-            {isAdmin
-              ? `Publishing capacity: ${publishedCount}/Unlimited (Admin)`
-              : `Publishing capacity: ${effectivePublishedCount}/${PUZZLE_MAX_PUBLISHED_PER_USER}`}
+            {showPublished
+              ? isAdmin
+                ? `Published capacity: ${publishedCount}/Unlimited (Admin)`
+                : `Published capacity: ${effectivePublishedCount}/${effectiveMaxPublished}`
+              : isAdmin
+                ? `Unpublished capacity: ${unpublishedCount}/Unlimited (Admin)`
+                : `Unpublished capacity: ${unpublishedCount}/${effectiveMaxUnpublished}`}
           </p>
           {!isAdmin && popularPublishedCount > 0 && (
             <p className="text-[11px] text-muted-foreground mt-1">
@@ -160,6 +176,7 @@ export const MyPuzzles = () => {
         <div className="mb-6 flex gap-3">
           <Link
             href={paths.app.createPuzzle.getHref()}
+            onClick={handleCreatePuzzleClick}
             className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
           >
             Create New Puzzle
@@ -219,6 +236,7 @@ export const MyPuzzles = () => {
             </p>
             <Link
               href={paths.app.createPuzzle.getHref()}
+              onClick={handleCreatePuzzleClick}
               className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
             >
               Create Your First Puzzle

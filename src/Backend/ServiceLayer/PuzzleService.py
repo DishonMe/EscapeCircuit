@@ -5,7 +5,6 @@ import os
 import shutil
 
 from Backend import settings
-from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
 
@@ -381,6 +380,21 @@ class PuzzleService:
         if user.role not in (UserRole.CREATOR, UserRole.ADMIN):
             raise ValidationError("Only creators and admins can create puzzles. Contact an admin to upgrade your account to creator.")
 
+        # Non-admin creators: check unpublished capacity and blocked state
+        if not self._is_admin(user.role):
+            _, max_unpublished = user.get_puzzle_capacity()
+            current_unpublished = self._count_unpublished_puzzles(user_id)
+            if current_unpublished >= max_unpublished:
+                raise ValidationError(
+                    f"You have reached the maximum limit of {max_unpublished} unpublished puzzles. "
+                    "Delete or publish existing puzzles to create a new one."
+                )
+            if self._is_creator_blocked(user):
+                raise ValidationError(
+                    "You have exceeded your puzzle limits. Please remove puzzles until "
+                    "you are within your allowed amounts before creating new ones."
+                )
+
         from Backend.DomainLayer.Puzzle import Puzzle
         from Backend.DomainLayer.Enums import GateType, PuzzleDifficulty
 
@@ -477,6 +491,9 @@ class PuzzleService:
         now_iso = utcnow().isoformat()
         with transaction(self.repo.conn):
             if not is_admin:
+                # Use per-user published capacity
+                max_published, _ = user.get_puzzle_capacity()
+
                 published_rows = self.repo.conn.execute(
                     """
                     SELECT is_hall_of_fame, rating_count, avg_fun
@@ -502,11 +519,11 @@ class PuzzleService:
 
                 if (
                     p.status != PuzzleStatus.PUBLISHED
-                    and current_count >= PUZZLE_MAX_PUBLISHED_PER_USER
+                    and current_count >= max_published
                     and not target_is_popular
                 ):
                     raise ValidationError(
-                        f"You have reached the maximum limit of {PUZZLE_MAX_PUBLISHED_PER_USER} published puzzles."
+                        f"You have reached the maximum limit of {max_published} published puzzles."
                     )
 
             cur = self.repo.conn.execute(
@@ -525,6 +542,31 @@ class PuzzleService:
         if isinstance(role, UserRole):
             return role == UserRole.ADMIN
         return str(role).strip().lower() == UserRole.ADMIN.value
+
+    def _count_unpublished_puzzles(self, creator_user_id: int) -> int:
+        """Count DRAFT + UNPUBLISHED puzzles for a creator."""
+        row = self.repo.conn.execute(
+            "SELECT COUNT(*) FROM puzzles WHERE creator_user_id=? AND status IN ('draft','unpublished')",
+            (int(creator_user_id),),
+        ).fetchone()
+        return row[0] if row else 0
+
+    def _count_published_puzzles(self, creator_user_id: int) -> int:
+        """Count PUBLISHED puzzles for a creator."""
+        row = self.repo.conn.execute(
+            "SELECT COUNT(*) FROM puzzles WHERE creator_user_id=? AND status='published'",
+            (int(creator_user_id),),
+        ).fetchone()
+        return row[0] if row else 0
+
+    def _is_creator_blocked(self, user) -> bool:
+        """Return True if a creator is over their published or unpublished limit."""
+        max_published, max_unpublished = user.get_puzzle_capacity()
+        if self._count_published_puzzles(user.id) > max_published:
+            return True
+        if self._count_unpublished_puzzles(user.id) > max_unpublished:
+            return True
+        return False
 
     def unpublish(self, session_token: str, puzzle_id: int) -> dict:
         user_id = self.auth.require_user_id(session_token)
@@ -588,6 +630,13 @@ class PuzzleService:
 
         if user.role != UserRole.ADMIN and p.creator_user_id != user_id:
             raise ValidationError("not allowed")
+
+        # Non-admin creators: block editing when over their limits
+        if not self._is_admin(user.role) and self._is_creator_blocked(user):
+            raise ValidationError(
+                "You have exceeded your puzzle limits. Please remove puzzles until "
+                "you are within your allowed amounts before editing."
+            )
 
         # Build targeted SQL update — only write the fields actually being changed
         # to avoid clobbering concurrent rating recalculations or status changes
