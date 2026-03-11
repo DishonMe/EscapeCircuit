@@ -54,7 +54,7 @@ export type SelectedComponentState =
   | { mode: 'placing'; componentId: string; rotation: 0 | 90 };
 
 const DEFAULT_GRID_ROWS = 15;
-const DEFAULT_GRID_COLS = 20;
+const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 
 // Visual Feature: Dynamic Wire Coloring
