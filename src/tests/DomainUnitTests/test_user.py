@@ -236,3 +236,98 @@ class TestUserGetters:
         now = datetime.now(timezone.utc)
         user = User(id=1, username="test", created_at=now)
         assert user.get_created_at() == now
+
+
+class TestUserPuzzleCapacity:
+    """Tests for per-user puzzle capacity (level-based + admin overrides)."""
+
+    def test_capacity_below_level_10_is_base(self):
+        # Level 1 (xp=0) → base 5/5
+        user = User(id=1, username="test", xp=0)
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 5
+        assert max_unpub == 5
+
+    def test_capacity_at_level_9_is_base(self):
+        # Level 9: xp=800 → level = 1 + 8 = 9 → no bonus yet
+        user = User(id=1, username="test", xp=800)
+        assert user.level == 9
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 5
+        assert max_unpub == 5
+
+    def test_capacity_at_level_10_adds_2(self):
+        # Level 10: xp=900
+        user = User(id=1, username="test", xp=900)
+        assert user.level == 10
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 7
+        assert max_unpub == 7
+
+    def test_capacity_at_level_11_adds_4(self):
+        user = User(id=1, username="test", xp=1000)
+        assert user.level == 11
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 9
+        assert max_unpub == 9
+
+    def test_capacity_at_level_15_is_max(self):
+        # Level 15: xp=1400
+        user = User(id=1, username="test", xp=1400)
+        assert user.level == 15
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 17
+        assert max_unpub == 17
+
+    def test_capacity_above_level_15_stays_at_max(self):
+        # Level 20: xp=1900 — bonus capped at 6 increments
+        user = User(id=1, username="test", xp=1900)
+        assert user.level == 20
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 17
+        assert max_unpub == 17
+
+    def test_admin_override_published(self):
+        user = User(id=1, username="test", xp=0, max_published_puzzles=20)
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 20
+        assert max_unpub == 5  # still default
+
+    def test_admin_override_unpublished(self):
+        user = User(id=1, username="test", xp=0, max_unpublished_puzzles=3)
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 5
+        assert max_unpub == 3
+
+    def test_admin_override_both(self):
+        user = User(id=1, username="test", xp=900, max_published_puzzles=10, max_unpublished_puzzles=2)
+        max_pub, max_unpub = user.get_puzzle_capacity()
+        assert max_pub == 10
+        assert max_unpub == 2
+
+    def test_negative_override_rejected(self):
+        with pytest.raises(ValidationError):
+            User(id=1, username="test", max_published_puzzles=-1)
+
+    def test_to_dict_includes_capacity_fields(self):
+        user = User(id=1, username="test", xp=900, max_published_puzzles=10)
+        d = user.to_dict()
+        assert "effective_max_published" in d
+        assert "effective_max_unpublished" in d
+        assert "max_published_override" in d
+        assert d["max_published_override"] == 10
+        assert d["effective_max_published"] == 10
+
+    def test_from_dict_restores_overrides(self):
+        user = User(id=1, username="test", xp=0, max_published_puzzles=8, max_unpublished_puzzles=3)
+        d = user.to_dict()
+        # from_dict reads the raw override values, not the effective values
+        restored = User.from_dict({
+            "id": 1,
+            "username": "test",
+            "xp": 0,
+            "max_published_puzzles": 8,
+            "max_unpublished_puzzles": 3,
+        })
+        assert restored.max_published_puzzles == 8
+        assert restored.max_unpublished_puzzles == 3

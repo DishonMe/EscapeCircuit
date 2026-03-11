@@ -959,3 +959,167 @@ class TestPuzzleServiceUpdatePuzzle:
         with pytest.raises(ValidationError) as exc_info:
             self.service.update_puzzle("valid_token", 1, {"name": "New"})
         assert "user not found" in str(exc_info.value)
+
+
+class TestPuzzleServiceCapacityLimits:
+    """Tests for per-user puzzle capacity enforcement in PuzzleService."""
+
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def _make_conn_execute(self, unpublished_count=0, published_count=0):
+        """Configure mock conn to return specific counts for capacity queries."""
+        def side_effect(sql, *args, **kwargs):
+            m = Mock()
+            if "status IN ('draft','unpublished')" in sql:
+                m.fetchone.return_value = (unpublished_count,)
+            elif "status='published'" in sql:
+                m.fetchone.return_value = (published_count,)
+            else:
+                m.fetchone.return_value = None
+                m.fetchall.return_value = []
+            return m
+        self.mock_puzzle_repo.conn.execute.side_effect = side_effect
+
+    # ── create_puzzle limits ────────────────────────────────────────────
+
+    def test_create_puzzle_blocked_by_unpublished_limit(self):
+        """Creator at their unpublished limit cannot create a new puzzle."""
+        # Default capacity for level-1 user is 5 unpublished
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+        self._make_conn_execute(unpublished_count=5, published_count=0)
+
+        with pytest.raises(ValidationError, match="maximum limit"):
+            self.service.create_puzzle("token", {"name": "New", "default_gate_set": []})
+
+    def test_create_puzzle_blocked_over_limit(self):
+        """Creator over their limits is blocked from creating."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+        self._make_conn_execute(unpublished_count=6, published_count=6)
+
+        with pytest.raises(ValidationError):
+            self.service.create_puzzle("token", {"name": "New", "default_gate_set": []})
+
+    def test_create_puzzle_admin_bypasses_limit(self):
+        """Admins are never blocked by capacity limits."""
+        admin = User(id=1, username="admin", role=UserRole.ADMIN, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+
+        saved = Puzzle(id=5, name="AdminPuzzle", creator_user_id=1)
+        self.mock_puzzle_repo.create.return_value = saved
+        self.mock_user_repo.get_by_id.return_value = admin
+        # conn.execute for duplicate-name check returns None (no duplicate)
+        def conn_exec(sql, *args, **kwargs):
+            m = Mock()
+            m.fetchone.return_value = None
+            return m
+        self.mock_puzzle_repo.conn.execute.side_effect = conn_exec
+
+        result = self.service.create_puzzle("token", {
+            "name": "AdminPuzzle", "default_gate_set": []
+        })
+        assert result["name"] == "AdminPuzzle"
+
+    def test_create_puzzle_under_limit_succeeds(self):
+        """Creator below their limit can create a puzzle."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+
+        saved = Puzzle(id=2, name="MyPuzzle", creator_user_id=1)
+        self.mock_puzzle_repo.create.return_value = saved
+
+        def conn_exec(sql, *args, **kwargs):
+            m = Mock()
+            if "status IN" in sql:
+                m.fetchone.return_value = (2,)  # 2 unpublished < 5 limit
+            elif "status=" in sql:
+                m.fetchone.return_value = (1,)  # 1 published < 5 limit
+            else:
+                m.fetchone.return_value = None
+            return m
+        self.mock_puzzle_repo.conn.execute.side_effect = conn_exec
+
+        result = self.service.create_puzzle("token", {
+            "name": "MyPuzzle", "default_gate_set": []
+        })
+        assert result["name"] == "MyPuzzle"
+
+    # ── update_puzzle limits ────────────────────────────────────────────
+
+    def test_update_puzzle_blocked_over_limit(self):
+        """Creator over their limit cannot edit a puzzle."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=0)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self._make_conn_execute(unpublished_count=10, published_count=10)
+
+        with pytest.raises(ValidationError, match="exceeded your puzzle limits"):
+            self.service.update_puzzle("token", 1, {"name": "New"})
+
+    def test_update_puzzle_admin_bypasses_limit(self):
+        """Admins can always edit puzzles even when creators are over limit."""
+        admin = User(id=1, username="admin", role=UserRole.ADMIN, xp=0)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2)
+        updated = Puzzle(id=1, name="Updated", creator_user_id=2)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = admin
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, updated]
+
+        def conn_exec(sql, *args, **kwargs):
+            m = Mock()
+            m.fetchone.return_value = None
+            return m
+        self.mock_puzzle_repo.conn.execute.side_effect = conn_exec
+
+        result = self.service.update_puzzle("token", 1, {"name": "Updated"})
+        assert result["name"] == "Updated"
+
+    # ── publish limits ──────────────────────────────────────────────────
+
+    def test_publish_uses_per_user_published_limit(self):
+        """Creator with admin-override limit can't publish past that limit."""
+        # Admin set max_published = 2; user has 2 published already
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=0,
+                       max_published_puzzles=2)
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = creator
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        self.mock_puzzle_repo.list_test_cases.return_value = [Mock()]
+
+        # Simulate 2 published, non-popular puzzles
+        def conn_exec(sql, *args, **kwargs):
+            m = Mock()
+            if "status = 'published'" in sql:
+                m.fetchall.return_value = [(0, 0, 0.0), (0, 0, 0.0)]
+            else:
+                m.fetchone.return_value = (1,)
+                m.fetchall.return_value = []
+            return m
+        self.mock_puzzle_repo.conn.execute.side_effect = conn_exec
+
+        import contextlib
+        with patch("Backend.PersistantLayer._db.transaction", lambda conn: contextlib.nullcontext()):
+            with pytest.raises(ValidationError, match="maximum limit of 2"):
+                self.service.publish("token", 1)
+
+    def test_publish_level_10_gets_higher_limit(self):
+        """Creator at level 10 (xp=900) has a published limit of 7, not 5."""
+        creator = User(id=1, username="creator", role=UserRole.CREATOR, xp=900)
+        assert creator.level == 10
+        max_pub, _ = creator.get_puzzle_capacity()
+        assert max_pub == 7
+

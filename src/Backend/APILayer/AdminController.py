@@ -30,6 +30,11 @@ class ConfirmRemoveCreatorReq(BaseModel):
     action: str  # "unpublish", "delete", or "leave"
 
 
+class UpdatePuzzleLimitsReq(BaseModel):
+    max_published: Optional[int] = None
+    max_unpublished: Optional[int] = None
+
+
 def get_db_conn():
     """Helper to get a fresh connection for the upload-puzzle script."""
     current_file = pathlib.Path(__file__).resolve()
@@ -149,12 +154,44 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
             raise HTTPException(status_code=400, detail=msg)
 
     # ------------------------------------------------------------------ #
-    #  REQ 7.4  —  Delete any puzzle
+    #  REQ 7.4  —  Delete any puzzle (only non-published)
     # ------------------------------------------------------------------ #
     @router.delete("/puzzles/{puzzle_id}")
     def delete_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
         try:
             return admin_service.delete_puzzle(token, puzzle_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    # ------------------------------------------------------------------ #
+    #  Admin unpublish a published puzzle
+    # ------------------------------------------------------------------ #
+    @router.post("/puzzles/{puzzle_id}/unpublish")
+    def unpublish_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            return admin_service.admin_unpublish_puzzle(token, puzzle_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
+    # ------------------------------------------------------------------ #
+    #  Admin: update creator puzzle capacity overrides
+    # ------------------------------------------------------------------ #
+    @router.patch("/users/{user_id}/puzzle-limits")
+    def update_puzzle_limits(
+        user_id: int,
+        req: UpdatePuzzleLimitsReq,
+        token: str = Depends(verify_token),
+    ):
+        try:
+            return admin_service.update_creator_puzzle_limits(
+                token, user_id, req.max_published, req.max_unpublished
+            )
         except ValidationError as e:
             msg = str(e)
             if "admin required" in msg:

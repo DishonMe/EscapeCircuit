@@ -13,6 +13,7 @@ import { useUsers, UserFilters } from '../api/get-users';
 import { DeleteUser } from './delete-user';
 import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
 import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
+import { CreatorPuzzleLimits } from '@/features/admin/components/creator-puzzle-limits';
 
 // Debounce hook — delays value updates until user stops typing
 function useDebouncedValue<T>(value: T, delay: number = 400): T {
@@ -123,11 +124,23 @@ export const UsersList = () => {
                     />
                   )}
                   {(entry.role === 'creator' || entry.role === 'pending_creator') && (
-                    <RemoveCreatorButton
-                      userId={Number(entry.id)}
-                      username={entry.username}
-                      currentRole={entry.role}
-                    />
+                    <>
+                      <RemoveCreatorButton
+                        userId={Number(entry.id)}
+                        username={entry.username}
+                        currentRole={entry.role}
+                      />
+                      {entry.role === 'creator' && (
+                        <CreatorPuzzleLimits
+                          userId={Number(entry.id)}
+                          username={entry.username}
+                          effectiveMaxPublished={entry.effective_max_published ?? 5}
+                          effectiveMaxUnpublished={entry.effective_max_unpublished ?? 5}
+                          maxPublishedOverride={entry.max_published_override ?? null}
+                          maxUnpublishedOverride={entry.max_unpublished_override ?? null}
+                        />
+                      )}
+                    </>
                   )}
                   <DeleteUser id={entry.id} />
                 </div>

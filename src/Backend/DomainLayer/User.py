@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 
 from .Enums import UserRole
 from .Exceptions import ValidationError
@@ -16,6 +17,9 @@ class User:
     xp: int = 0
     is_discussion_banned: bool = False
     created_at: datetime = field(default_factory=utcnow)
+    # Admin-set overrides for puzzle capacity (None = use level-based default)
+    max_published_puzzles: Optional[int] = None
+    max_unpublished_puzzles: Optional[int] = None
 
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("User.id", self.id)
@@ -23,6 +27,10 @@ class User:
             raise ValidationError("User.username is required")
         if self.xp < 0:
             raise ValidationError("User.xp cannot be negative")
+        if self.max_published_puzzles is not None and self.max_published_puzzles < 0:
+            raise ValidationError("User.max_published_puzzles cannot be negative")
+        if self.max_unpublished_puzzles is not None and self.max_unpublished_puzzles < 0:
+            raise ValidationError("User.max_unpublished_puzzles cannot be negative")
 
     @property
     def level(self) -> int:
@@ -33,12 +41,45 @@ class User:
     def is_experienced(self) -> bool:
         return self.level >= 5  
 
+    def get_puzzle_capacity(self) -> tuple:
+        """Returns (max_published, max_unpublished) for this creator.
+
+        Base capacity is 5/5.  For each level from PUZZLE_CAPACITY_LEVEL_START
+        (10) through PUZZLE_CAPACITY_LEVEL_END (15) the capacity increases by
+        PUZZLE_CAPACITY_LEVEL_INCREMENT (2).  Admin overrides take priority.
+        """
+        from Backend import settings
+        level_steps = max(
+            0,
+            min(
+                self.level - settings.PUZZLE_CAPACITY_LEVEL_START + 1,
+                settings.PUZZLE_CAPACITY_LEVEL_END - settings.PUZZLE_CAPACITY_LEVEL_START + 1,
+            ),
+        )
+        level_bonus = level_steps * settings.PUZZLE_CAPACITY_LEVEL_INCREMENT
+
+        default_published = settings.PUZZLE_BASE_PUBLISHED_PER_CREATOR + level_bonus
+        default_unpublished = settings.PUZZLE_BASE_UNPUBLISHED_PER_CREATOR + level_bonus
+
+        eff_published = (
+            self.max_published_puzzles
+            if self.max_published_puzzles is not None
+            else default_published
+        )
+        eff_unpublished = (
+            self.max_unpublished_puzzles
+            if self.max_unpublished_puzzles is not None
+            else default_unpublished
+        )
+        return eff_published, eff_unpublished
+
     def add_xp(self, amount: int) -> None:
         if amount < 0:
             raise ValidationError("XP amount must be non-negative")
         self.xp += amount
 
     def to_dict(self) -> dict:
+        eff_published, eff_unpublished = self.get_puzzle_capacity()
         return {
             "id": str(self.id),
             "username": self.username,
@@ -50,6 +91,10 @@ class User:
             "is_discussion_banned": self.is_discussion_banned,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
+            "max_published_override": self.max_published_puzzles,
+            "max_unpublished_override": self.max_unpublished_puzzles,
+            "effective_max_published": eff_published,
+            "effective_max_unpublished": eff_unpublished,
         }
 
     @staticmethod
@@ -64,6 +109,8 @@ class User:
             xp=int(d.get("xp", 0)),
             is_discussion_banned=bool(d.get("is_discussion_banned", False)),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
+            max_published_puzzles=d.get("max_published_puzzles"),
+            max_unpublished_puzzles=d.get("max_unpublished_puzzles"),
         )
 
     # --- getters ---
