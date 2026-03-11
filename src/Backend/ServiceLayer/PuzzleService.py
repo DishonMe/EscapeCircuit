@@ -359,6 +359,7 @@ class PuzzleService:
             if self.arsenal_service and getattr(p, 'allow_arsenal', True):
                 allowed_gates = {g.value for g in p.default_gate_set}
                 arsenal_components = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates)
+                print(f"DEBUG: Found {len(arsenal_components)} arsenal pieces for puzzle {puzzle_id}")
             
             # For backward compatibility, also include both in specialComponents
             d["specialComponents"] = custom_components + arsenal_components
@@ -367,6 +368,7 @@ class PuzzleService:
             d["arsenalComponents"] = arsenal_components
         except Exception as e:
             # If service fails, try to at least return custom pieces
+            print(f"DEBUG: Error fetching arsenal/custom pieces for puzzle {puzzle_id}: {e}")
             d["specialComponents"] = custom_components if custom_components else []
             d["customComponents"] = custom_components
             d["arsenalComponents"] = arsenal_components

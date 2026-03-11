@@ -799,17 +799,8 @@ class SolvingService:
 
     def _run_simulation(self, puzzle_id: int, expanded_solution: Dict[str, Any], inputs: Dict[str, int]) -> Dict[str, Any]:
         """Run a single simulation step with expanded solution and given inputs."""
-        # Reconstruct Circuit for Logic Engine
-        tcircuit = Circuit(
-            id=0,
-            user_id=0,
-            name="Simulation",
-            cost=expanded_solution.get("totalCost", 0),
-            structure_json=json.dumps(expanded_solution)
-        )
-        
-        # Get the full circuit data with placed components and wires
-        data = json.loads(tcircuit.structure_json)
+        # Get the circuit data
+        data = expanded_solution.copy()
         placed = data.get("placedComponents", [])
         wires = data.get("wires", [])
         arsenal_pieces = data.get("_arsenal_pieces", {})
@@ -837,6 +828,9 @@ class SolvingService:
                 # If we can't fetch custom pieces, just continue with what we have
                 print(f"[WARNING] Failed to fetch custom pieces for puzzle {puzzle_id}: {str(e)}")
         
+        # Store arsenal pieces in data for the circuit
+        data["_arsenal_pieces"] = arsenal_pieces
+        
         # DEBUG: Log what components we received
         print(f"[DEBUGGER] Total placed components: {len(placed)}")
         print(f"[DEBUGGER] Total arsenal pieces detected: {len(arsenal_pieces)}")
@@ -846,9 +840,18 @@ class SolvingService:
             is_arsenal = comp_id in arsenal_pieces
             print(f"[DEBUGGER]   Component: {comp_id} (type: {comp_type}, is_arsenal: {is_arsenal})")
         
+        # Reconstruct Circuit for Logic Engine with arsenal pieces included
+        tcircuit = Circuit(
+            id=0,
+            user_id=0,
+            name="Simulation",
+            cost=data.get("totalCost", 0),
+            structure_json=json.dumps(data)
+        )
+        
         # Evaluate the circuit to get puzzle outputs
         try:
-            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs, data={"_arsenal_pieces": arsenal_pieces})
+            puzzle_outputs = self.logic_engine.evaluate(tcircuit, inputs)
         except Exception as e:
             raise ValidationError(f"Circuit evaluation failed: {str(e)}")
         

@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Set
 
+from Backend import settings
 from .Enums import GateType, PuzzleStatus, PuzzleDifficulty
 from .Exceptions import ValidationError
 from .Utils import utcnow, ensure_non_empty, ensure_non_negative_int, ensure_optional_positive_int, ensure_gate_set
@@ -106,8 +107,8 @@ class Puzzle:
             "total_gate_count": self.total_gate_count,
             "min_cycles": self.min_cycles,
             "max_cycles": self.max_cycles,
-            "board_rows": self.board_rows,
-            "board_cols": self.board_cols,
+            "board_rows": self.board_rows if self.board_rows is not None else settings.PUZZLE_DEFAULT_BOARD_ROWS,
+            "board_cols": self.board_cols if self.board_cols is not None else settings.PUZZLE_DEFAULT_BOARD_COLS,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "is_hall_of_fame": self.is_hall_of_fame,

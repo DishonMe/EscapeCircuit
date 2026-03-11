@@ -308,19 +308,25 @@ export const WorkstationMenu = ({
           <div className="text-[11px] text-muted-foreground mb-2">
             Your personal circuit pieces
           </div>
-          <div className="flex flex-col gap-2">
-            {arsenal.map((c) => (
-              <DraggableItem
-                key={c.id}
-                component={c}
-                isSelected={selectedComponentId === c.id}
-                onSelect={onSelectComponent}
-                onInfoClick={() => handleInfoClick(c.id, c)}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-              />
-            ))}
-          </div>
+          {arsenal.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {arsenal.map((c) => (
+                <DraggableItem
+                  key={c.id}
+                  component={c}
+                  isSelected={selectedComponentId === c.id}
+                  onSelect={onSelectComponent}
+                  onInfoClick={() => handleInfoClick(c.id, c)}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-muted-foreground opacity-60">
+              No arsenal pieces yet. Create one in your arsenal workspace.
+            </div>
+          )}
         </Category>
       ) : null}
 

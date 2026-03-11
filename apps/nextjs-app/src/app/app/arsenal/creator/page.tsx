@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
-import { useSaveArsenalPiece } from '@/features/arsenal/api';
+import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
 import { CircuitComponent, Wire } from '@/types/api';
 import {
   WorkstationGrid,
@@ -61,8 +61,23 @@ export default function ArsenalCreatorPage() {
   >(null);
 
   const saveArsenalMutation = useSaveArsenalPiece();
+  const { data: myArsenalData } = useMyArsenal();
 
-  // Generate inputs and outputs based on selected counts
+  // Convert arsenal pieces to CircuitComponent format
+  const arsenalComponents = useMemo(() => {
+    if (!myArsenalData) return [];
+    return myArsenalData.map((piece) => ({
+      id: String(piece.id),
+      type: piece.name,
+      cost: piece.cost,
+      pins: (piece as any).num_inputs + (piece as any).num_outputs,
+      basic_gates: piece.basic_gates,
+      truth_table: piece.truth_table,
+      is_arsenal: piece.is_arsenal,
+      num_inputs: (piece as any).num_inputs ?? 0,
+      num_outputs: (piece as any).num_outputs ?? 0,
+    } as CircuitComponent));
+  }, [myArsenalData]);
   const inputs = useMemo(() => {
     return Array.from({ length: numInputs }, (_, i) => `in${i}`);
   }, [numInputs]);
@@ -74,11 +89,16 @@ export default function ArsenalCreatorPage() {
   // Build component catalog for UI
   const componentCatalog = useMemo(() => {
     const byId = new Map<string, CircuitComponent>();
+    // Add basic components
     for (const c of BASIC_COMPONENTS) {
       byId.set(c.id, c);
     }
+    // Add arsenal pieces
+    for (const c of arsenalComponents) {
+      byId.set(c.id, c);
+    }
     return byId;
-  }, []);
+  }, [arsenalComponents]);
 
   // Build UI catalog with port definitions
   const uiCatalog = useMemo(() => {
@@ -188,11 +208,44 @@ export default function ArsenalCreatorPage() {
     const ui = new Map<string, ComponentDef>();
     for (const [id, def] of componentCatalog.entries()) {
       const hc = hardcoded[def.type];
-      const size = hc?.size ?? {
-        w: 4,
-        h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
-      };
-      const ports = hc?.ports ?? toDefaultPorts(def.pins, size);
+      const isArsenal = (def as any).is_arsenal === true;
+      
+      let size: { w: number; h: number };
+      let ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }>;
+      
+      if (isArsenal) {
+        // Arsenal piece sizing: width=4, height=max(inputs, outputs)
+        const numInputs = (def as any).num_inputs ?? 0;
+        const numOutputs = (def as any).num_outputs ?? 0;
+        const maxPorts = Math.max(numInputs, numOutputs);
+        size = { w: 4, h: Math.max(1, maxPorts) };
+        
+        // Generate ports for arsenal pieces
+        const ports_list: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        for (let i = 0; i < numInputs; i++) {
+          ports_list.push({
+            id: `in${i}`,
+            kind: 'input',
+            offset: { row: Math.min(i, size.h - 1), col: 0 },
+          });
+        }
+        for (let i = 0; i < numOutputs; i++) {
+          ports_list.push({
+            id: `out${i}`,
+            kind: 'output',
+            offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
+          });
+        }
+        ports = ports_list;
+      } else {
+        // Basic gates use hardcoded or calculated sizing
+        size = hc?.size ?? {
+          w: 4,
+          h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
+        };
+        ports = hc?.ports ?? toDefaultPorts(def.pins, size);
+      }
+      
       ui.set(id, {
         id,
         label: def.type,
@@ -215,16 +268,25 @@ export default function ArsenalCreatorPage() {
     }, 0);
   }, [componentCatalog, placed]);
 
-  // Extract basic gates from placed components
-  const extractBasicGates = useCallback(() => {
+  // Extract direct basic gates and track which arsenal pieces are used
+  const extractGatesAndArsenal = useCallback(() => {
     const gates: string[] = [];
+    const usedArsenalPieceIds: number[] = [];
+    
     for (const p of placed) {
       const def = componentCatalog.get(p.componentId);
       if (def) {
-        gates.push(def.type);
+        const isArsenal = (def as any).is_arsenal === true;
+        if (isArsenal) {
+          // Track which arsenal piece is used (but don't flatten its gates yet)
+          usedArsenalPieceIds.push(parseInt(def.id));
+        } else {
+          // This is a basic gate - include it directly
+          gates.push(def.type);
+        }
       }
     }
-    return gates;
+    return { gates, usedArsenalPieceIds };
   }, [placed, componentCatalog]);
 
   const handleSave = async () => {
@@ -249,7 +311,7 @@ export default function ArsenalCreatorPage() {
     setSaveState({ open: true, saving: true });
 
     try {
-      const basicGates = extractBasicGates();
+      const { gates, usedArsenalPieceIds } = extractGatesAndArsenal();
 
       await saveArsenalMutation.mutateAsync({
         name: pieceName.trim(),
@@ -261,9 +323,10 @@ export default function ArsenalCreatorPage() {
           placed,
           wires,
         }),
-        basic_gates: JSON.stringify(basicGates),
+        basic_gates: JSON.stringify(gates),
         truth_table: {},
-      });
+        used_arsenal_pieces: usedArsenalPieceIds,
+      } as any);
 
       addNotification({
         type: 'success',
@@ -377,8 +440,8 @@ export default function ArsenalCreatorPage() {
         <WorkstationMenu
           basic={BASIC_COMPONENTS}
           custom={[]}
-          arsenal={[]}
-          allowArsenal={false}
+          arsenal={arsenalComponents}
+          allowArsenal={true}
           filteredBasicTypes={[]}
           selectedComponentId={
             selectedComponent.mode === 'placing' ? selectedComponent.componentId : undefined

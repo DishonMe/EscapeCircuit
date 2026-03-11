@@ -38,6 +38,7 @@ import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
+import { ChevronDown } from 'lucide-react';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -80,6 +81,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     useState<SelectedComponentState>({ mode: 'none' });
   // Feature: Drag-and-Drop Ghost/Preview
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
+
+  // Sandbox state
+  const [sandboxPlaced, setSandboxPlaced] = useState<PlacedGridComponent[]>([]);
+  const [sandboxWires, setSandboxWires] = useState<Wire[]>([]);
+  const [sandboxSelectedComponent, setSandboxSelectedComponent] =
+    useState<SelectedComponentState>({ mode: 'none' });
+  const [sandboxDraggedPaletteComponentId, setSandboxDraggedPaletteComponentId] = useState<string | null>(null);
+  const [showSandbox, setShowSandbox] = useState(false);
+  const [sandboxNumInputs, setSandboxNumInputs] = useState(2);
+  const [sandboxNumOutputs, setSandboxNumOutputs] = useState(1);
+  const [showSandboxDebugger, setShowSandboxDebugger] = useState(false);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
@@ -799,6 +811,77 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     setConnectivityIssues(null);
   };
 
+  const applySandboxToWorkstation = () => {
+    // Filter wires: keep only those that don't connect to IO:IN or IO:OUT
+    const filteredWires = sandboxWires.filter(w => {
+      const fromIsIO = w.from.componentId.startsWith('IO:IN:') || w.from.componentId.startsWith('IO:OUT:');
+      const toIsIO = w.to.componentId.startsWith('IO:IN:') || w.to.componentId.startsWith('IO:OUT:');
+      return !fromIsIO && !toIsIO;
+    });
+
+    // Create mapping of old component IDs to new IDs
+    const oldToNewId = new Map<string, string>();
+    sandboxPlaced.forEach(p => {
+      oldToNewId.set(p.id, `${p.id}-applied`);
+    });
+
+    // Clear main workstation and apply sandbox content
+    const newPlaced = sandboxPlaced.map(p => ({...p, id: `${p.id}-applied`}));
+    
+    // Update wire component IDs to match renamed components
+    const newWires = filteredWires.map(w => ({
+      ...w,
+      id: `${w.id}-applied`,
+      from: {
+        ...w.from,
+        componentId: oldToNewId.get(w.from.componentId) || w.from.componentId
+      },
+      to: {
+        ...w.to,
+        componentId: oldToNewId.get(w.to.componentId) || w.to.componentId
+      }
+    }));
+    
+    setPlaced(newPlaced);
+    setWires(newWires);
+    setSelectedComponent({ mode: 'none' });
+    
+    // Clear sandbox after applying
+    setSandboxPlaced([]);
+    setSandboxWires([]);
+    setSandboxSelectedComponent({ mode: 'none' });
+    setShowSandbox(false);
+    
+    const removedWireCount = sandboxWires.length - filteredWires.length;
+    notifications.addNotification({
+      type: 'success',
+      title: 'Sandbox Applied',
+      message: `Sandbox circuit transferred to main workstation${removedWireCount > 0 ? ` (${removedWireCount} I/O wires removed)` : ''}`,
+    });
+  };
+
+  const clearSandbox = () => {
+    setSandboxPlaced([]);
+    setSandboxWires([]);
+    setSandboxSelectedComponent({ mode: 'none' });
+  };
+
+  // Sandbox I/O
+  const sandboxInputs = useMemo(() => {
+    return Array.from({ length: sandboxNumInputs }, (_, i) => `in${i}`);
+  }, [sandboxNumInputs]);
+
+  const sandboxOutputs = useMemo(() => {
+    return Array.from({ length: sandboxNumOutputs }, (_, i) => `out${i}`);
+  }, [sandboxNumOutputs]);
+
+  const sandboxCurrentCost = useMemo(() => {
+    return sandboxPlaced.reduce((acc, p) => {
+      const def = componentCatalog.get(p.componentId);
+      return acc + (def?.cost ?? 0);
+    }, 0);
+  }, [componentCatalog, sandboxPlaced]);
+
   const onBrowsePuzzles = () => {
     router.push(paths.app.puzzles.getHref());
   };
@@ -943,8 +1026,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onPlacedChange={onPlacedChange}
           onWiresChange={setWires}
           draggedPaletteComponentId={draggedPaletteComponentId}
-          boardRows={puzzle.board_rows}
-          boardCols={puzzle.board_cols}
+          boardRows={puzzle.board_rows ?? 15}
+          boardCols={puzzle.board_cols ?? 30}
         />
 
         <div className="flex flex-col gap-3">
@@ -1016,6 +1099,192 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Sandbox Section */}
+      <div className="w-full">
+        <button
+          type="button"
+          onClick={() => setShowSandbox(!showSandbox)}
+          className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm hover:bg-card transition-colors"
+        >
+          <ChevronDown
+            size={16}
+            className={cn(
+              'transition-transform',
+              showSandbox ? 'rotate-180' : ''
+            )}
+          />
+          <span className="text-[13px] font-semibold tracking-tight text-foreground">
+            Sandbox Workstation
+          </span>
+          {sandboxPlaced.length > 0 && (
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              {sandboxPlaced.length} components · {sandboxWires.length} wires
+            </span>
+          )}
+        </button>
+
+        {showSandbox && (
+          <div className="mt-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-subtle backdrop-blur-sm">
+            <div className="mb-4 text-[13px] text-muted-foreground">
+              Design and test circuits here, then transfer to main workstation
+            </div>
+
+            <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+              {/* Configuration & Controls Panel */}
+              <div className="flex flex-col gap-4">
+                {/* I/O Configuration */}
+                <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+                  <div className="mb-3 text-[13px] font-semibold text-foreground">
+                    I/O Configuration
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground block mb-2">
+                        Inputs
+                      </label>
+                      <select
+                        value={sandboxNumInputs}
+                        onChange={(e) => setSandboxNumInputs(parseInt(e.target.value))}
+                        className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <option key={n} value={n}>
+                            {n} input{n !== 1 ? 's' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground block mb-2">
+                        Outputs
+                      </label>
+                      <select
+                        value={sandboxNumOutputs}
+                        onChange={(e) => setSandboxNumOutputs(parseInt(e.target.value))}
+                        className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <option key={n} value={n}>
+                            {n} output{n !== 1 ? 's' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Statistics */}
+                <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+                  <div className="mb-3 text-[13px] font-semibold text-foreground">
+                    Sandbox Info
+                  </div>
+                  
+                  <div className="space-y-2 text-[13px]">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Components:</span>
+                      <span className="font-medium">{sandboxPlaced.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Cost:</span>
+                      <span className="font-medium">{sandboxCurrentCost}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Wires:</span>
+                      <span className="font-medium">{sandboxWires.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">I/O Pins:</span>
+                      <span className="font-medium">{sandboxNumInputs + sandboxNumOutputs}</span>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowSandboxDebugger(true)}
+                    className="w-full mt-3"
+                  >
+                    Debug
+                  </Button>
+                </div>
+
+                {/* Action Buttons */}
+                {sandboxPlaced.length > 0 && (
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={clearSandbox}
+                      className="w-full"
+                    >
+                      Clear Sandbox
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={applySandboxToWorkstation}
+                      className="w-full"
+                    >
+                      Send to Workstation
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Menu & Grid */}
+              <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                <WorkstationMenu
+                  basic={visibleBasics}
+                  custom={customComponents}
+                  arsenal={arsenalComponents}
+                  allowArsenal={allowArsenal}
+                  filteredBasicTypes={filteredBasicTypes}
+                  selectedComponentId={
+                    sandboxSelectedComponent.mode === 'placing'
+                      ? sandboxSelectedComponent.componentId
+                      : undefined
+                  }
+                  onSelectComponent={(componentId) =>
+                    setSandboxSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
+                  }
+                  onDragStart={setSandboxDraggedPaletteComponentId}
+                  onDragEnd={() => setSandboxDraggedPaletteComponentId(null)}
+                />
+
+                <WorkstationGrid
+                  puzzleId={puzzle.id}
+                  inputs={sandboxInputs}
+                  outputs={sandboxOutputs}
+                  catalog={uiCatalog}
+                  placed={sandboxPlaced}
+                  wires={sandboxWires}
+                  selectedComponent={sandboxSelectedComponent}
+                  onSelectedComponentChange={setSandboxSelectedComponent}
+                  onPlacedChange={setSandboxPlaced}
+                  onWiresChange={setSandboxWires}
+                  draggedPaletteComponentId={sandboxDraggedPaletteComponentId}
+                  boardRows={puzzle.board_rows ?? 15}
+                  boardCols={puzzle.board_cols ?? 30}
+                />
+              </div>
+            </div>
+
+            {/* Sandbox Debugger */}
+            <CircuitDebugger
+              isOpen={showSandboxDebugger}
+              onClose={() => setShowSandboxDebugger(false)}
+              inputs={sandboxInputs}
+              outputs={sandboxOutputs}
+              placed={sandboxPlaced}
+              wires={sandboxWires}
+              catalog={uiCatalog}
+              puzzleId={puzzle.id}
+            />
+          </div>
+        )}
       </div>
 
       <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>

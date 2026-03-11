@@ -15,6 +15,7 @@ class SaveArsenalPieceReq(BaseModel):
     structure_json: str
     basic_gates: str = ""  # Optional, calculated by service if not provided
     truth_table: dict = {}
+    used_arsenal_pieces: List[int] = []  # IDs of other arsenal pieces used as components
 
 
 class RenameArsenalPieceReq(BaseModel):
