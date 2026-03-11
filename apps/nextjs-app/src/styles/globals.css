@@ -89,7 +89,7 @@ code {
     Consolas, 'Courier New', monospace;
 }
 
-/* Refined scrollbar */
+/* Tech scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -100,10 +100,10 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(220 10% 82%);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(220 10% 70%);
+  background: rgba(59, 130, 246, 0.5);
 }

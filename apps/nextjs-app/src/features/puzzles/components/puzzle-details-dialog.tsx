@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Puzzle } from '@/types/api';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import 'katex/dist/katex.min.css';
 
 type PuzzleDetailsDialogProps = {
@@ -99,15 +99,6 @@ export const PuzzleDetailsDialog = ({
   // dynamically import them inside useEffect and store the rendered HTML.
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'instructions' | 'custom'>('instructions');
-  const [typedInstructions, setTypedInstructions] = useState('');
-  const [isTypewriting, setIsTypewriting] = useState(false);
-
-  const typewriterSource = useMemo(() => {
-    if (!puzzle?.instructions) return '';
-    return latexToMarkdown(puzzle.instructions)
-      .replace(/\s+/g, ' ')
-      .trim();
-  }, [puzzle?.instructions]);
 
   useEffect(() => {
     if (!puzzle?.instructions) {
@@ -142,31 +133,6 @@ export const PuzzleDetailsDialog = ({
       }));
     });
   }, [puzzle?.instructions]);
-
-  useEffect(() => {
-    if (!open || activeTab !== 'instructions' || !typewriterSource) {
-      setIsTypewriting(false);
-      return;
-    }
-
-    setTypedInstructions('');
-    setIsTypewriting(true);
-
-    let cursor = 0;
-    const total = typewriterSource.length;
-    const step = Math.max(1, Math.ceil(total / 180));
-
-    const timer = window.setInterval(() => {
-      cursor = Math.min(total, cursor + step);
-      setTypedInstructions(typewriterSource.slice(0, cursor));
-      if (cursor >= total) {
-        setIsTypewriting(false);
-        window.clearInterval(timer);
-      }
-    }, 14);
-
-    return () => window.clearInterval(timer);
-  }, [open, activeTab, typewriterSource]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,15 +175,6 @@ export const PuzzleDetailsDialog = ({
             {/* Instructions Tab */}
             {activeTab === 'instructions' && (
               <>
-                <style>{`
-                  .terminal-cursor {
-                    animation: terminal-cursor-blink 0.85s steps(1, end) infinite;
-                  }
-                  @keyframes terminal-cursor-blink {
-                    0%, 45% { opacity: 1; }
-                    50%, 100% { opacity: 0; }
-                  }
-                `}</style>
                 {puzzle.instructions && renderedHtml ? (
                   <style>{`
                     .prose .katex {
@@ -263,14 +220,9 @@ export const PuzzleDetailsDialog = ({
                     }
                   `}</style>
                 ) : null}
-                {isTypewriting ? (
-                  <div className="rounded-md border border-cyan-500/40 bg-black/90 p-3 font-mono text-[12px] leading-relaxed text-cyan-300">
-                    <span>{typedInstructions}</span>
-                    <span className="terminal-cursor text-cyan-200">_</span>
-                  </div>
-                ) : puzzle.instructions && renderedHtml ? (
+                {puzzle.instructions && renderedHtml ? (
                   <div
-                    className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+                    className="prose prose-sm max-w-none rounded-md border border-slate-300 bg-white p-4 text-slate-900 [&_*]:text-slate-900"
                     dangerouslySetInnerHTML={{ __html: renderedHtml }}
                   />
                 ) : (
