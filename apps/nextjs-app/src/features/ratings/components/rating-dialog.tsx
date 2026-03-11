@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star } from 'lucide-react';
+import { Sparkles, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -45,7 +45,7 @@ const StarInput = ({
           <button
             key={star}
             type="button"
-            className="focus:outline-none"
+            className="transition-transform hover:scale-110 active:scale-95 focus:outline-none"
             onMouseEnter={() => setHover(star)}
             onMouseLeave={() => setHover(0)}
             onClick={() => onChange(star)}
@@ -148,7 +148,8 @@ export const RatingDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="size-5 text-amber-500 animate-[bounce_0.9s_ease-in-out_2]" />
             {existingRating ? 'Update Your Rating' : 'Rate This Puzzle'}
           </DialogTitle>
           <DialogDescription>
@@ -175,7 +176,7 @@ export const RatingDialog = ({
           {existingRating && (
             <Button
               variant="outline"
-              className="text-red-600 hover:bg-red-50"
+              className="text-red-600 transition-all hover:scale-105 hover:bg-red-50 active:scale-95"
               onClick={handleDelete}
               isLoading={deleteMutation.isPending}
             >
@@ -184,11 +185,13 @@ export const RatingDialog = ({
           )}
           <Button
             variant="outline"
+            className="transition-all hover:scale-105 active:scale-95"
             onClick={() => onOpenChange(false)}
           >
             Cancel
           </Button>
           <Button
+            className="transition-all hover:scale-105 active:scale-95"
             onClick={handleSubmit}
             disabled={!isValid}
             isLoading={rateMutation.isPending}

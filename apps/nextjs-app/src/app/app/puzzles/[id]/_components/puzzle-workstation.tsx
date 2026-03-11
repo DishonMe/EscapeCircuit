@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import { useAudio } from '@/hooks/useAudio';
 import {
   Dialog,
   DialogContent,
@@ -65,11 +66,22 @@ type PostCheckState =
       xpLeftForMax?: number;
     };
 
+type BoardFeedbackState = 'idle' | 'success' | 'failure';
+
+type VictoryFxState = {
+  key: number;
+  xp?: number;
+  visible: boolean;
+};
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
   const startTime = useRef(Date.now());
   const queryClient = useQueryClient();
+  const { playError, playSuccess } = useAudio();
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
@@ -89,6 +101,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
+  const [boardFeedback, setBoardFeedback] = useState<BoardFeedbackState>('idle');
+  const [isPowerSurge, setIsPowerSurge] = useState(false);
+  const [showSolvedSlam, setShowSolvedSlam] = useState(false);
+  const [victoryFx, setVictoryFx] = useState<VictoryFxState>({
+    key: 0,
+    visible: false,
+  });
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
@@ -133,6 +152,39 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [puzzle?.id]);
 
   const notifications = useNotifications();
+
+  const triggerVictoryFx = useCallback(async (xpEarned?: number) => {
+    setVictoryFx({
+      key: Date.now(),
+      xp: xpEarned,
+      visible: true,
+    });
+
+    window.setTimeout(() => {
+      setVictoryFx((current) => ({ ...current, visible: false }));
+    }, 2200);
+
+    const { default: confetti } = await import('canvas-confetti');
+    const endTime = Date.now() + 3000;
+
+    const fire = () => {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        startVelocity: 32,
+        ticks: 180,
+        origin: { x: 0.25 + Math.random() * 0.5, y: 0.62 - Math.random() * 0.18 },
+        colors: ['#38bdf8', '#facc15', '#34d399', '#a78bfa', '#fb7185'],
+        scalar: 0.95,
+      });
+
+      if (Date.now() < endTime) {
+        window.setTimeout(fire, 220);
+      }
+    };
+
+    fire();
+  }, []);
 
   const inputs = puzzle?.inputs ?? EMPTY_STRINGS;
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
@@ -713,14 +765,33 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       return;
     }
 
+    setIsPowerSurge(true);
     setIsChecking(true);
     try {
       const timeTaken = Math.floor((Date.now() - startTime.current) / 1000);
-      const res = await validateSolution({
-        puzzleId: puzzle.id,
-        solution: buildSolution(),
-        timeTaken,
-      });
+      const [res] = await Promise.all([
+        validateSolution({
+          puzzleId: puzzle.id,
+          solution: buildSolution(),
+          timeTaken,
+        }),
+        wait(600),
+      ]);
+
+      setIsPowerSurge(false);
+
+      setBoardFeedback(res.solved ? 'success' : 'failure');
+      if (res.solved) {
+        playSuccess();
+        setShowSolvedSlam(true);
+        window.setTimeout(() => setShowSolvedSlam(false), 650);
+        void triggerVictoryFx(res.xp_earned);
+      } else {
+        playError();
+      }
+      await wait(res.solved ? 1000 : 700);
+      setBoardFeedback('idle');
+
       setPostCheck({
         open: true,
         solved: res.solved,
@@ -747,6 +818,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
       }
     } catch (e: any) {
+      setIsPowerSurge(false);
       let errorTitle = 'Validation Failed';
       let errorMessage = e?.message ?? 'Something went wrong';
       
@@ -768,6 +840,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         message: errorMessage,
       });
     } finally {
+      setIsPowerSurge(false);
+      setBoardFeedback('idle');
       setIsChecking(false);
     }
   };
@@ -855,9 +929,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
               Instructions
             </Button>
-            <Button size="sm" onClick={checkSolution} isLoading={isChecking}>
-              Check Solution
-            </Button>
+            <div className="relative">
+              <Button
+                size="sm"
+                className="transition-all hover:scale-105 active:scale-95"
+                onClick={checkSolution}
+                isLoading={isChecking}
+              >
+                {isChecking ? 'Checking...' : 'Check Solution'}
+              </Button>
+              {victoryFx.visible && (
+                <div
+                  key={victoryFx.key}
+                  className="pointer-events-none absolute left-1/2 top-0 z-20 flex -translate-x-1/2 -translate-y-2 items-center gap-2 rounded-full border border-sky-200/80 bg-white/90 px-3 py-1 text-xs font-semibold text-sky-600 shadow-xl shadow-sky-500/20 backdrop-blur-sm animate-bounce victory-float-up"
+                >
+                  +{victoryFx.xp ?? 'XP'}!
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -943,8 +1032,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onPlacedChange={onPlacedChange}
           onWiresChange={setWires}
           draggedPaletteComponentId={draggedPaletteComponentId}
-          boardRows={puzzle.board_rows}
-          boardCols={puzzle.board_cols}
+          isChecking={isChecking}
+          isPowerSurge={isPowerSurge}
+          boardFeedback={boardFeedback}
+          showSolvedSlam={showSolvedSlam}
+          boardRows={puzzle.board_rows ?? 15}
+          boardCols={puzzle.board_cols ?? 20}
         />
 
         <div className="flex flex-col gap-3">
@@ -975,7 +1068,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       </span>
                       <button
                         type="button"
-                        className="hidden text-muted-foreground hover:text-destructive group-hover:block"
+                        className="hidden rounded-sm px-1.5 py-0.5 text-muted-foreground transition-all group-hover:block hover:scale-105 hover:bg-red-100 hover:text-red-700"
                         onClick={() =>
                           setWires((prev) => prev.filter((x) => x.id !== w.id))
                         }
@@ -1194,7 +1287,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               <div className="space-y-2">
                 {postCheck.medal && postCheck.medal !== 'NONE' && (
                   <div className="flex items-center gap-2 text-lg font-semibold">
-                    <span>
+                    <span className="animate-[bounce_0.9s_ease-in-out_2]">
                       {postCheck.medal === 'GOLD' ? '🥇' : postCheck.medal === 'SILVER' ? '🥈' : '🥉'}
                     </span>
                     <span className={
@@ -1236,12 +1329,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
           <DialogFooter>
             <Button
+              className="transition-all hover:scale-105 active:scale-95"
               onClick={onSolveAgain}
               disabled={!postCheck.open}
             >
               {postCheck.open && postCheck.solved ? 'Solve again' : 'Try again'}
             </Button>
             <Button
+              className="transition-all hover:scale-105 active:scale-95"
               onClick={onBrowsePuzzles}
               disabled={!postCheck.open}
             >
@@ -1274,7 +1369,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <PuzzleLeaderboard puzzleId={puzzleId} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLeaderboard(false)}>
+            <Button
+              variant="outline"
+              className="transition-all hover:scale-105 active:scale-95"
+              onClick={() => setShowLeaderboard(false)}
+            >
               Close
             </Button>
           </DialogFooter>
@@ -1296,6 +1395,31 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         puzzle={puzzle}
         showLink={false}
       />
+
+      <style jsx>{`
+        .victory-float-up {
+          animation: victory-float-up 2.1s ease-out forwards;
+        }
+
+        @keyframes victory-float-up {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.86);
+          }
+          18% {
+            opacity: 1;
+            transform: translate(-50%, -56%) scale(1.02);
+          }
+          70% {
+            opacity: 1;
+            transform: translate(-50%, -110%) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -148%) scale(0.96);
+          }
+        }
+      `}</style>
 
     </div>
   );
