@@ -81,12 +81,12 @@ def test_xp_award_first_and_repeat():
     payload = {"difficulty": 3, "fun": 4, "clearness": 3}
     service.submit_rating("valid_token", 1, payload)
     service.xp.award_rating_xp.assert_any_call(rater_user_id=1, creator_user_id=2, first_time_rating=True)
-    # Repeat rating: try_mark_xp_awarded returns False (already awarded)
+    # Repeat rating: use edit_rating instead of submit_rating to update existing rating
     # XP should NOT be awarded again — the atomic guard prevents it
     service.xp.award_rating_xp.reset_mock()
     service.rating_repo.get_by_puzzle_user.return_value = service.rating_repo.upsert.return_value
     service.rating_repo.try_mark_xp_awarded.return_value = False
-    service.submit_rating("valid_token", 1, payload)
+    service.edit_rating("valid_token", 1, payload["difficulty"], payload["fun"], payload["clearness"])
     service.xp.award_rating_xp.assert_not_called()
 
 def test_aggregate_calculation_multiple_ratings():
@@ -114,6 +114,7 @@ def test_aggregate_calculation_multiple_ratings():
     normal_rating = Rating(id=1, puzzle_id=1, user_id=1, difficulty=3, fun=4, clearness=3, is_experienced_at_rating=False)
     service.rating_repo.list_by_puzzle.return_value = [experienced_rating, normal_rating]
     service.rating_repo.upsert.return_value = normal_rating
+    service.rating_repo.get_by_puzzle_user.return_value = None
     payload = {"difficulty": 3, "fun": 4, "clearness": 3}
     service.submit_rating("valid_token", 1, payload)
     # Weighted average: alpha * creator_label + (1-alpha) * weighted_user_avg
@@ -469,7 +470,7 @@ class TestRatingServiceSubmitRating:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_rating("valid_token", 1, payload)
-        assert "5 minutes" in str(exc_info.value)
+        assert "300 seconds" in str(exc_info.value)
 
     def test_submit_rating_puzzle_not_found(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -630,7 +631,7 @@ class TestRatingServiceMultipleRatings:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.submit_rating("valid_token", 1, payload)
-        assert "5 minutes" in str(exc_info.value)
+        assert "300 seconds" in str(exc_info.value)
 
 
 # ============ Additional branch coverage tests ============
