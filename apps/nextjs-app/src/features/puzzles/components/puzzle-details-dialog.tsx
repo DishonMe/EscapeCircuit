@@ -222,7 +222,7 @@ export const PuzzleDetailsDialog = ({
                 ) : null}
                 {puzzle.instructions && renderedHtml ? (
                   <div
-                    className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+                    className="prose prose-sm max-w-none rounded-md border border-slate-300 bg-white p-4 text-slate-900 [&_*]:text-slate-900"
                     dangerouslySetInnerHTML={{ __html: renderedHtml }}
                   />
                 ) : (

@@ -9,6 +9,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
+import { Spinner } from '@/components/ui/spinner';
+import { RippleEffect } from '@/components/ripple-effect';
+import { useAudio } from '@/hooks/useAudio';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 
@@ -110,8 +113,14 @@ export const WorkstationGrid = ({
   onPlacedChange,
   onWiresChange,
   draggedPaletteComponentId,
-  boardRows = DEFAULT_GRID_ROWS,
-  boardCols = DEFAULT_GRID_COLS,
+  isChecking = false,
+  isPowerSurge = false,
+  boardFeedback = 'idle',
+  showSolvedSlam = false,
+  activeWireIds = [],
+  activeComponentIds = [],
+  boardRows,
+  boardCols,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -124,11 +133,17 @@ export const WorkstationGrid = ({
   onPlacedChange: (next: PlacedGridComponent[]) => void;
   onWiresChange: (next: Wire[]) => void;
   draggedPaletteComponentId?: string | null;
-  boardRows?: number;
-  boardCols?: number;
+  isChecking?: boolean;
+  isPowerSurge?: boolean;
+  boardFeedback?: 'idle' | 'success' | 'failure';
+  showSolvedSlam?: boolean;
+  activeWireIds?: string[];
+  activeComponentIds?: string[];
+  boardRows?: number | null;
+  boardCols?: number | null;
 }) => {
-  const gridRows = Math.max(1, boardRows);
-  const gridCols = Math.max(1, boardCols);
+  const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
+  const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
   const notifications = useNotifications();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -164,6 +179,53 @@ export const WorkstationGrid = ({
 
   // Ghost/Preview State
   const [dropPreview, setDropPreview] = useState<HoleCoord | null>(null);
+  const [recentlyPlacedId, setRecentlyPlacedId] = useState<string | null>(null);
+  const [recentlyConnectedWireId, setRecentlyConnectedWireId] = useState<string | null>(null);
+  const [hoveredDeleteComponentId, setHoveredDeleteComponentId] = useState<string | null>(null);
+  const [hoveredDeleteWireId, setHoveredDeleteWireId] = useState<string | null>(null);
+  const [deletingComponentIds, setDeletingComponentIds] = useState<string[]>([]);
+  const [activeRipples, setActiveRipples] = useState<Array<{ id: string; x: number; y: number }>>([]);
+  const [cursorSpotlight, setCursorSpotlight] = useState<{ x: number; y: number; visible: boolean }>({
+    x: 0,
+    y: 0,
+    visible: false,
+  });
+  const [hoveredWireSignal, setHoveredWireSignal] = useState<{
+    wireId: string;
+    x: number;
+    y: number;
+    high: boolean;
+  } | null>(null);
+  const [flashingPortKeys, setFlashingPortKeys] = useState<string[]>([]);
+  const [wireSnapBack, setWireSnapBack] = useState<null | {
+    from: { x: number; y: number };
+    current: { x: number; y: number };
+    startedAt: number;
+  }>(null);
+  const [microSparks, setMicroSparks] = useState<
+    Array<{ id: string; x: number; y: number; dx: number; dy: number }>
+  >([]);
+
+  const { playDrop, playWireConnect } = useAudio();
+
+  const activeWireIdsSet = useMemo(() => new Set(activeWireIds), [activeWireIds]);
+  const activeComponentIdsSet = useMemo(
+    () => new Set(activeComponentIds),
+    [activeComponentIds],
+  );
+
+  const highInputOwnerIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of wires) {
+      if (!activeWireIdsSet.has(w.id)) continue;
+      if (w.from.componentId.startsWith('IO:IN:')) set.add(w.from.componentId);
+      if (w.to.componentId.startsWith('IO:IN:')) set.add(w.to.componentId);
+    }
+    return set;
+  }, [wires, activeWireIdsSet]);
+
+  const previousPlacedIdsRef = useRef<string[]>(placed.map((component) => component.id));
+  const previousWireIdsRef = useRef<string[]>(wires.map((wire) => wire.id));
 
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
 
@@ -207,6 +269,46 @@ export const WorkstationGrid = ({
       // ignore
     }
   }, [STORAGE_KEY, zoom]);
+
+  useEffect(() => {
+    const previousPlacedIds = previousPlacedIdsRef.current;
+    const addedComponent = placed.find(
+      (component) => !previousPlacedIds.includes(component.id),
+    );
+
+    if (addedComponent) {
+      setRecentlyPlacedId(addedComponent.id);
+      const timeoutId = window.setTimeout(() => {
+        setRecentlyPlacedId((current) =>
+          current === addedComponent.id ? null : current,
+        );
+      }, 320);
+
+      previousPlacedIdsRef.current = placed.map((component) => component.id);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    previousPlacedIdsRef.current = placed.map((component) => component.id);
+  }, [placed]);
+
+  useEffect(() => {
+    const previousWireIds = previousWireIdsRef.current;
+    const addedWire = wires.find((wire) => !previousWireIds.includes(wire.id));
+
+    if (addedWire) {
+      setRecentlyConnectedWireId(addedWire.id);
+      const timeoutId = window.setTimeout(() => {
+        setRecentlyConnectedWireId((current) =>
+          current === addedWire.id ? null : current,
+        );
+      }, 500);
+
+      previousWireIdsRef.current = wires.map((wire) => wire.id);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    previousWireIdsRef.current = wires.map((wire) => wire.id);
+  }, [wires]);
 
   // Compute minZoom so the entire grid fits; set as default if no saved state.
   useEffect(() => {
@@ -468,14 +570,28 @@ export const WorkstationGrid = ({
       return;
     }
 
+    const newId = `${componentId}:${Date.now()}`;
+    
     onPlacedChange(
       placed.concat({
-        id: `${componentId}:${Date.now()}`,
+        id: newId,
         componentId,
         origin,
         rotation,
       }),
     );
+
+    // Trigger drop sound and ripple effect
+    playDrop();
+    const ripleId = `ripple:${Date.now()}`;
+    const centerX = (origin.col + 1) * CELL_PX * zoom + pan.x;
+    const centerY = (origin.row + 1) * CELL_PX * zoom + pan.y;
+    setActiveRipples((prev) => [...prev, { id: ripleId, x: centerX, y: centerY }]);
+    
+    // Remove ripple after animation completes
+    window.setTimeout(() => {
+      setActiveRipples((prev) => prev.filter((r) => r.id !== ripleId));
+    }, 600);
   };
 
   const placeSelectedComponent = (origin: HoleCoord) => {
@@ -575,6 +691,23 @@ export const WorkstationGrid = ({
         },
       }),
     );
+
+    const keyA = `${a.ownerId}:${a.portId}`;
+    const keyB = `${b.ownerId}:${b.portId}`;
+    setFlashingPortKeys([keyA, keyB]);
+    window.setTimeout(() => {
+      setFlashingPortKeys((current) =>
+        current.filter((k) => k !== keyA && k !== keyB),
+      );
+    }, 220);
+
+    const pointA = getPortScreenPoint(a, ioLayout);
+    const pointB = getPortScreenPoint(b, ioLayout);
+    emitSparks(pointA.x, pointA.y);
+    emitSparks(pointB.x, pointB.y);
+
+    // Trigger wire connection sound
+    playWireConnect();
   };
 
   // IO layout pinned to viewport.
@@ -672,6 +805,16 @@ export const WorkstationGrid = ({
   };
 
   const onPointerMoveBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const spotlightEl = containerRef.current;
+    if (spotlightEl) {
+      const rect = spotlightEl.getBoundingClientRect();
+      setCursorSpotlight({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        visible: true,
+      });
+    }
+
     if (!isPanning) {
       if (wireDraft) {
         const el = containerRef.current;
@@ -739,6 +882,12 @@ export const WorkstationGrid = ({
         setWireDraft(null);
         return;
       }
+      const startPt = getPortScreenPoint(wireDraft.start, ioLayout);
+      setWireSnapBack({
+        from: startPt,
+        current: { x: wireDraft.current.x, y: wireDraft.current.y },
+        startedAt: performance.now(),
+      });
       // releasing on background cancels wiring
       setWireDraft(null);
     }
@@ -811,9 +960,74 @@ export const WorkstationGrid = ({
     setSelectedEntity({ type: 'none' });
   };
 
+  useEffect(() => {
+    if (!wireSnapBack) return;
+
+    const duration = 150;
+    let rafId = 0;
+
+    const tick = () => {
+      const elapsed = performance.now() - wireSnapBack.startedAt;
+      const t = clamp(elapsed / duration, 0, 1);
+      const eased = 1 - (1 - t) * (1 - t);
+
+      setWireSnapBack((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          current: {
+            x: current.current.x + (current.from.x - current.current.x) * eased,
+            y: current.current.y + (current.from.y - current.current.y) * eased,
+          },
+        };
+      });
+
+      if (t < 1) {
+        rafId = window.requestAnimationFrame(tick);
+      } else {
+        setWireSnapBack(null);
+      }
+    };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [wireSnapBack]);
+
+  const emitSparks = (x: number, y: number) => {
+    const created = Array.from({ length: 4 }).map((_, index) => {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 8 + Math.random() * 12;
+      return {
+        id: `spark:${Date.now()}:${index}:${Math.random()}`,
+        x,
+        y,
+        dx: Math.cos(angle) * distance,
+        dy: Math.sin(angle) * distance,
+      };
+    });
+
+    const ids = new Set(created.map((spark) => spark.id));
+    setMicroSparks((current) => [...current, ...created]);
+    window.setTimeout(() => {
+      setMicroSparks((current) => current.filter((spark) => !ids.has(spark.id)));
+    }, 320);
+  };
+
+  const triggerDeleteComponent = (placedId: string) => {
+    if (deletingComponentIds.includes(placedId)) return;
+    setDeletingComponentIds((current) => [...current, placedId]);
+    window.setTimeout(() => {
+      removeComponent(placedId);
+      setDeletingComponentIds((current) =>
+        current.filter((id) => id !== placedId),
+      );
+    }, 150);
+  };
+
   const removeWire = (wireId: string) => {
     onWiresChange(wires.filter((w) => w.id !== wireId));
     setSelectedEntity({ type: 'none' });
+    setHoveredWireSignal((current) => (current?.wireId === wireId ? null : current));
   };
 
   const trashRef = useRef<HTMLButtonElement | null>(null);
@@ -872,7 +1086,11 @@ export const WorkstationGrid = ({
         <Button
           size="sm"
           variant="outline"
-          className="h-7 px-2"
+          className="h-7 px-2 transition-all hover:scale-105 hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-95"
+          onMouseEnter={() => setHoveredDeleteWireId(w.id)}
+          onMouseLeave={() =>
+            setHoveredDeleteWireId((current) => (current === w.id ? null : current))
+          }
           onClick={(e) => {
             e.stopPropagation();
             removeWire(w.id);
@@ -884,6 +1102,21 @@ export const WorkstationGrid = ({
       </div>
     );
   })();
+
+  const getCurvedWirePath = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const controlX = Math.max(28, Math.abs(dx) * 0.38);
+    const droopY = Math.max(8, Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04));
+    const c1x = from.x + controlX;
+    const c1y = from.y + droopY;
+    const c2x = to.x - controlX;
+    const c2y = to.y + droopY;
+    return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -899,11 +1132,28 @@ export const WorkstationGrid = ({
 
       <div
         ref={containerRef}
-        className="relative h-[calc(100vh-18rem)] overflow-hidden rounded-md border border-gray-300 bg-white"
+        className={cn(
+          'relative h-[calc(100vh-18rem)] overflow-hidden rounded-md border border-gray-300 bg-white transition-[box-shadow,transform,border-color] duration-300 cursor-crosshair',
+          isPowerSurge && 'workstation-board-surge',
+          boardFeedback === 'success' && 'workstation-board-success border-emerald-400',
+          boardFeedback === 'failure' && 'workstation-board-failure border-red-400',
+        )}
         onWheel={onWheel}
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMoveBackground}
         onPointerUp={onPointerUpBackground}
+        onPointerEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setCursorSpotlight({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            visible: true,
+          });
+        }}
+        onPointerLeave={() => {
+          setCursorSpotlight((prev) => ({ ...prev, visible: false }));
+          setHoveredWireSignal(null);
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           if (!draggedPaletteComponentId) return;
@@ -945,6 +1195,43 @@ export const WorkstationGrid = ({
           onSelectedComponentChange({ mode: 'none' });
         }}
       >
+        {isChecking && (
+          <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-white/45 backdrop-blur-[2px]">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-xl shadow-blue-500/10">
+              <Spinner size="md" className="text-blue-500" />
+              <span>Running the circuit...</span>
+            </div>
+          </div>
+        )}
+
+        {showSolvedSlam && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
+            <div className="rounded-xl border border-emerald-300/70 bg-white/90 px-6 py-3 text-4xl font-extrabold tracking-[0.12em] text-emerald-600 shadow-2xl shadow-emerald-500/30 animate-in fade-in zoom-in-50 duration-300 workstation-solved-slam">
+              SOLVED!
+            </div>
+          </div>
+        )}
+
+        {/* Ripple Effects */}
+        {activeRipples.map((ripple) => (
+          <RippleEffect key={ripple.id} x={ripple.x} y={ripple.y} />
+        ))}
+
+        {/* Interactive Spotlight */}
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0 z-[5] transition-opacity duration-150',
+            cursorSpotlight.visible ? 'opacity-100' : 'opacity-0',
+          )}
+          style={{
+            background: `radial-gradient(600px circle at ${cursorSpotlight.x}px ${cursorSpotlight.y}px, rgba(255,255,255,0.05), transparent 40%)`,
+          }}
+        />
+
+        {isPowerSurge ? (
+          <div className="pointer-events-none absolute inset-0 z-[6] bg-slate-950/25" />
+        ) : null}
+
         {/* Trash */}
         <button
           type="button"
@@ -1037,27 +1324,94 @@ export const WorkstationGrid = ({
             const b = getPortScreenPoint(toPort, ioLayout);
             const isSelected =
               selectedEntity.type === 'wire' && selectedEntity.wireId === w.id;
+            const isRecentlyConnected = recentlyConnectedWireId === w.id;
+            const isHighSignal = activeWireIdsSet.has(w.id);
+            const isDeleteWarn = hoveredDeleteWireId === w.id;
+            const wirePath = getCurvedWirePath(a, b);
+            const isSurgePowered = isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
 
             // Visual Feature: Dynamic Wire Coloring
-            const strokeColor = isSelected ? '#2563eb' : getWireColor(w.id);
+            const strokeColor = isSelected
+              ? '#2563eb'
+              : isDeleteWarn
+                ? '#ef4444'
+              : isHighSignal
+                ? '#fde047'
+              : isRecentlyConnected
+                ? '#60a5fa'
+                : getWireColor(w.id);
+
+            const flowColor = isHighSignal
+              ? '#fef08a'
+              : isRecentlyConnected
+                ? '#bfdbfe'
+                : '#93c5fd';
 
             return (
               <g key={w.id}>
-                <line
-                  className="pointer-events-auto cursor-pointer"
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
+                <path
+                  className={cn(
+                    'pointer-events-auto cursor-pointer transition-all duration-300',
+                    isRecentlyConnected && 'animate-pulse',
+                    isRecentlyConnected && 'workstation-wire-snap',
+                  )}
+                  d={wirePath}
+                  fill="none"
                   stroke={strokeColor}
-                  strokeWidth={isSelected ? 3 : 2}
+                  strokeWidth={isPowerSurge ? 4.2 : isSelected ? 3 : isRecentlyConnected ? 4 : 2}
+                  style={{
+                    filter: isDeleteWarn
+                      ? 'drop-shadow(0 0 8px rgba(239,68,68,0.85))'
+                      : isSurgePowered
+                      ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
+                      : isHighSignal
+                      ? 'drop-shadow(0 0 8px rgba(250,204,21,0.9))'
+                      : isRecentlyConnected
+                        ? 'drop-shadow(0 0 6px rgba(96,165,250,0.95))'
+                        : 'drop-shadow(0 0 3px rgba(59,130,246,0.2))',
+                  }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
                     setSelectedEntity({ type: 'wire', wireId: w.id });
                   }}
+                  onPointerMove={(e) => {
+                    const el = containerRef.current;
+                    if (!el) return;
+                    const rect = el.getBoundingClientRect();
+                    setHoveredWireSignal({
+                      wireId: w.id,
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                      high: isHighSignal,
+                    });
+                  }}
+                  onPointerLeave={() => {
+                    setHoveredWireSignal((current) =>
+                      current?.wireId === w.id ? null : current,
+                    );
+                  }}
                   onPointerUp={(e) => {
                     e.stopPropagation();
                     if (isOverTrash(e.clientX, e.clientY)) removeWire(w.id);
+                  }}
+                />
+                <path
+                  d={wirePath}
+                  fill="none"
+                  stroke={flowColor}
+                  strokeWidth={isPowerSurge ? 3.2 : isHighSignal ? 2.4 : 1.4}
+                  strokeDasharray={isHighSignal ? '9 7' : '7 9'}
+                  className={cn(
+                    'pointer-events-none workstation-wire-flow',
+                    (isHighSignal || isPowerSurge) && 'workstation-wire-flow-fast',
+                  )}
+                  style={{
+                    opacity: isPowerSurge ? 1 : isHighSignal ? 0.95 : 0.45,
+                    filter: isPowerSurge
+                      ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
+                      : isHighSignal
+                      ? 'drop-shadow(0 0 8px rgba(250,204,21,0.8))'
+                      : 'drop-shadow(0 0 4px rgba(96,165,250,0.45))',
                   }}
                 />
               </g>
@@ -1065,17 +1419,63 @@ export const WorkstationGrid = ({
           })}
 
           {wireDraft ? (
-            <line
-              x1={getPortScreenPoint(wireDraft.start, ioLayout).x}
-              y1={getPortScreenPoint(wireDraft.start, ioLayout).y}
-              x2={wireDraft.current.x}
-              y2={wireDraft.current.y}
-              stroke="#2563eb"
-              strokeWidth={2}
-              strokeDasharray="4 3"
-            />
+            <>
+              <path
+                d={getCurvedWirePath(getPortScreenPoint(wireDraft.start, ioLayout), wireDraft.current)}
+                fill="none"
+                stroke="#2563eb"
+                strokeWidth={2}
+                strokeDasharray="4 3"
+              />
+              <path
+                d={getCurvedWirePath(getPortScreenPoint(wireDraft.start, ioLayout), wireDraft.current)}
+                fill="none"
+                stroke="#bfdbfe"
+                strokeWidth={1.4}
+                strokeDasharray="8 6"
+                className="workstation-wire-flow-fast"
+                style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
+              />
+            </>
+          ) : null}
+
+          {wireSnapBack ? (
+            <>
+              <path
+                d={getCurvedWirePath(wireSnapBack.from, wireSnapBack.current)}
+                fill="none"
+                stroke="#2563eb"
+                strokeWidth={2}
+                strokeDasharray="4 3"
+                className="workstation-wire-snapback"
+              />
+              <path
+                d={getCurvedWirePath(wireSnapBack.from, wireSnapBack.current)}
+                fill="none"
+                stroke="#bfdbfe"
+                strokeWidth={1.4}
+                strokeDasharray="8 6"
+                className="workstation-wire-flow-fast workstation-wire-snapback"
+                style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
+              />
+            </>
           ) : null}
         </svg>
+
+        {microSparks.map((spark) => (
+          <div
+            key={spark.id}
+            className="pointer-events-none absolute z-30 size-1 rounded-full bg-yellow-400 workstation-micro-spark"
+            style={{
+              left: spark.x,
+              top: spark.y,
+              ...({
+                '--spark-dx': `${spark.dx}px`,
+                '--spark-dy': `${spark.dy}px`,
+              } as any),
+            }}
+          />
+        ))}
 
         {/* Grid content (transformed) */}
         <div
@@ -1175,7 +1575,7 @@ export const WorkstationGrid = ({
           })()}
 
           {/* Components */}
-          {placed.map((p) => {
+          {placed.map((p, placedIndex) => {
             const def = catalog[p.componentId];
             const size = rotatedSize(def.size, p.rotation);
 
@@ -1188,15 +1588,24 @@ export const WorkstationGrid = ({
             const isSelected =
               selectedEntity.type === 'component' &&
               selectedEntity.placedId === p.id;
+            const isActive = activeComponentIdsSet.has(p.id);
+            const isDeleteWarn = hoveredDeleteComponentId === p.id;
+            const isDeleting = deletingComponentIds.includes(p.id);
 
             return (
               <div
                 key={p.id}
                 className={cn(
-                  'group absolute rounded border bg-gray-50 text-[10px] text-gray-800',
+                  'group absolute rounded border bg-gray-50 text-[10px] text-gray-800 transition-[box-shadow,transform,border-color] duration-300 animate-in fade-in zoom-in-90',
+                  isDeleting && 'workstation-component-delete-out',
+                  !isDragging && !isDeleting && 'workstation-component-breathe',
+                  isDeleteWarn && 'border-red-400 bg-red-50/60 shadow-[0_0_0_1px_rgba(248,113,113,0.45),0_0_18px_rgba(239,68,68,0.25)]',
+                  isActive && 'border-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_0_12px_rgba(59,130,246,0.4),0_0_24px_rgba(34,211,238,0.32)]',
+                  isPowerSurge && 'workstation-component-surge',
                   isSelected
-                    ? 'border-blue-400 ring-2 ring-blue-200'
+                    ? 'border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.55),0_0_18px_rgba(59,130,246,0.28)]'
                     : 'border-gray-300',
+                  recentlyPlacedId === p.id && 'workstation-component-pop',
                   isDragging ? 'z-50 opacity-80 shadow-xl' : 'z-10',
                 )}
                 style={{
@@ -1205,6 +1614,8 @@ export const WorkstationGrid = ({
                   width: size.w * CELL_PX - 2,
                   height: size.h * CELL_PX - 2,
                   cursor: isDragging ? 'grabbing' : 'grab',
+                  animationDelay: `${Math.min(placedIndex, 12) * 100}ms`,
+                  animationFillMode: 'both',
                 }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
@@ -1302,11 +1713,17 @@ export const WorkstationGrid = ({
                 {isSelected && !isDragging && (
                   <button
                     type="button"
-                    className="absolute -top-2 left-1/2 z-50 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 hover:bg-red-50"
+                    className="absolute -top-2 left-1/2 z-50 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                    onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
+                    onMouseLeave={() =>
+                      setHoveredDeleteComponentId((current) =>
+                        current === p.id ? null : current,
+                      )
+                    }
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeComponent(p.id);
+                      triggerDeleteComponent(p.id);
                     }}
                     title="Delete component"
                   >
@@ -1339,13 +1756,17 @@ export const WorkstationGrid = ({
                       col: origin.col + rot.col,
                     },
                   };
+                  const effectiveKey = `${effective.ownerId}:${effective.portId}`;
+                  const isPortFlashing = flashingPortKeys.includes(effectiveKey);
 
                   return (
                     <button
                       type="button"
                       key={port.id}
                       className={cn(
-                        'absolute flex items-center justify-center rounded-full border transition-transform hover:scale-150',
+                        'absolute flex items-center justify-center rounded-full border transition-transform duration-200 hover:scale-150 hover:bg-blue-400 cursor-pointer',
+                        wireDraft && 'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
+                        isPortFlashing && 'workstation-port-lock-flash',
                         port.kind === 'input'
                           ? 'border-green-300 bg-green-50'
                           : 'border-purple-300 bg-purple-50',
@@ -1372,11 +1793,6 @@ export const WorkstationGrid = ({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // We handle wiring in onPointerUp.
-                        // If we let this propagate, the grid hole click handler might run?
-                        // No, we stop propagation.
-                        // We do NOT want to run onClickHole here because it might restart the wire draft
-                        // immediately after onPointerUp finished it.
                       }}
                       title={`${port.kind} ${port.id}`}
                       aria-label={`${port.kind} ${port.id}`}
@@ -1390,7 +1806,7 @@ export const WorkstationGrid = ({
 
         {/* Floating IO */}
         <div className="pointer-events-none absolute inset-0 z-20">
-          {inputs.map((label) => {
+          {inputs.map((label, inputIndex) => {
             const id = `IO:IN:${label}`;
             const pt = ioLayout.inputs[id];
             if (!pt) return null;
@@ -1398,11 +1814,17 @@ export const WorkstationGrid = ({
               <button
                 type="button"
                 key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125"
+                className={cn(
+                  'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125 animate-in fade-in zoom-in-90',
+                  highInputOwnerIds.has(id) && 'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
+                  isPowerSurge && 'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
+                )}
                 style={{
                   left: pt.x,
                   top: pt.y,
                   transform: 'translate(-100%, -50%)',
+                  animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
+                  animationFillMode: 'both',
                 }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
@@ -1614,7 +2036,196 @@ export const WorkstationGrid = ({
             </div>
           ));
         })()}
+
+        {hoveredWireSignal ? (
+          <div
+            className="pointer-events-none absolute z-40 rounded border border-cyan-500/50 bg-black/90 px-2 py-1 text-xs font-mono text-green-400 backdrop-blur-md"
+            style={{
+              left: hoveredWireSignal.x + 12,
+              top: hoveredWireSignal.y + 12,
+            }}
+          >
+            SIGNAL: {hoveredWireSignal.high ? 'HIGH' : 'LOW'}
+          </div>
+        ) : null}
       </div>
+
+      <style jsx>{`
+        .workstation-solved-slam {
+          transform-origin: center;
+        }
+
+        .workstation-wire-flow {
+          animation: workstation-wire-flow 1.9s linear infinite;
+        }
+
+        .workstation-wire-flow-fast {
+          animation: workstation-wire-flow 0.9s linear infinite;
+        }
+
+        .workstation-component-pop {
+          animation: workstation-pop 280ms ease-out;
+        }
+
+        .workstation-board-success {
+          animation: workstation-board-success 1s ease-out;
+          box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.55), 0 0 28px rgba(34, 197, 94, 0.3);
+        }
+
+        .workstation-board-surge {
+          animation: workstation-board-surge 600ms cubic-bezier(0.22, 0.7, 0.2, 1);
+          box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.7), 0 0 40px rgba(34, 211, 238, 0.45);
+        }
+
+        .workstation-board-failure {
+          animation: workstation-shake 420ms ease-in-out, workstation-board-failure 700ms ease-out;
+          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55), 0 0 28px rgba(239, 68, 68, 0.28);
+        }
+
+        .workstation-port-lock-flash {
+          animation: workstation-port-lock 220ms ease-out;
+        }
+
+        .workstation-wire-snap {
+          animation: workstation-wire-snap 360ms cubic-bezier(0.16, 0.84, 0.24, 1);
+          transform-origin: center;
+        }
+
+        .workstation-wire-snapback {
+          transition: all 150ms ease-out;
+        }
+
+        .workstation-component-surge {
+          animation: workstation-component-surge 360ms ease-in-out infinite;
+        }
+
+        .workstation-component-breathe {
+          animation: workstation-component-breathe 4s ease-in-out infinite;
+        }
+
+        .workstation-component-delete-out {
+          animation: workstation-component-delete-out 150ms ease-in forwards;
+          transform-origin: center;
+        }
+
+        @keyframes workstation-pop {
+          0% { transform: scale(0.88); }
+          65% { transform: scale(1.08); }
+          100% { transform: scale(1); }
+        }
+
+        @keyframes workstation-board-surge {
+          0% {
+            box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+            transform: scale(1);
+          }
+          38% {
+            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.75), 0 0 46px rgba(34, 211, 238, 0.55);
+            transform: scale(1.006);
+          }
+          100% {
+            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.45), 0 0 24px rgba(34, 211, 238, 0.24);
+            transform: scale(1);
+          }
+        }
+
+        @keyframes workstation-wire-flow {
+          0% { stroke-dashoffset: 0; }
+          100% { stroke-dashoffset: -64; }
+        }
+
+        @keyframes workstation-board-success {
+          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+          35% { box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.55), 0 0 36px rgba(34, 197, 94, 0.35); }
+          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        @keyframes workstation-board-failure {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+          30% { box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.55), 0 0 34px rgba(239, 68, 68, 0.35); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        @keyframes workstation-shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-5px); }
+          40% { transform: translateX(4px); }
+          60% { transform: translateX(-3px); }
+          80% { transform: translateX(2px); }
+        }
+
+        @keyframes workstation-wire-snap {
+          0% { transform: scaleY(0.88) scaleX(0.98) translateY(0.5px); }
+          42% { transform: scaleY(1.18) scaleX(1.03) translateY(-0.6px); }
+          68% { transform: scaleY(0.95) scaleX(0.995) translateY(0.3px); }
+          100% { transform: scaleY(1) scaleX(1) translateY(0); }
+        }
+
+        @keyframes workstation-component-surge {
+          0%, 100% {
+            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 10px rgba(34, 211, 238, 0.22);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.9), 0 0 28px rgba(34, 211, 238, 0.5);
+            transform: scale(1.016);
+          }
+        }
+
+        @keyframes workstation-component-delete-out {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(0);
+            opacity: 0;
+          }
+        }
+
+        @keyframes workstation-component-breathe {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.02);
+          }
+        }
+
+        @keyframes workstation-micro-spark {
+          0% {
+            opacity: 0.95;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(calc(-50% + var(--spark-dx)), calc(-50% + var(--spark-dy))) scale(0.2);
+          }
+        }
+
+        .workstation-micro-spark {
+          animation: workstation-micro-spark 300ms ease-out forwards;
+          box-shadow: 0 0 8px rgba(250, 204, 21, 0.85);
+        }
+
+        @keyframes workstation-port-lock {
+          0% {
+            transform: scale(1);
+            background-color: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+          }
+          50% {
+            transform: scale(1.35);
+            background-color: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 14px rgba(34, 211, 238, 0.75);
+          }
+          100% {
+            transform: scale(1);
+            background-color: initial;
+            box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+          }
+        }
+      `}</style>
     </div>
   );
 };
