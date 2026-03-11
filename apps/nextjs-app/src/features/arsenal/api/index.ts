@@ -20,6 +20,7 @@ export interface SaveArsenalPiecePayload {
   structure_json: string;
   basic_gates?: string; // JSON string of array
   truth_table?: Record<string, any>;
+  used_arsenal_pieces?: number[]; // IDs of other arsenal pieces used as components
 }
 
 export const saveArsenalPiece = (

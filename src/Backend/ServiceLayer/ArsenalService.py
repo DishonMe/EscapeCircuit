@@ -100,6 +100,8 @@ class ArsenalService:
         # Extract and validate gates - no DFF allowed in arsenal pieces
         # Use provided basic_gates if available, otherwise extract from structure
         basic_gates_str = payload.get("basic_gates", "")
+        used_arsenal_piece_ids = payload.get("used_arsenal_pieces", [])
+        
         if basic_gates_str and isinstance(basic_gates_str, str):
             try:
                 basic_gates = json.loads(basic_gates_str)
@@ -107,8 +109,15 @@ class ArsenalService:
                     basic_gates = []
             except (json.JSONDecodeError, ValueError):
                 basic_gates = []
+            # Frontend sends direct basic gates (not including arsenal piece gates yet)
         else:
             basic_gates = self._extract_basic_gates(structure_json)
+
+        # Calculate cost BEFORE flattening (direct gates + piece costs)
+        cost = self._calculate_arsenal_cost(basic_gates, used_arsenal_piece_ids, user_id)
+        
+        # Now flatten basic gates with arsenal pieces for final storage
+        basic_gates = self._flatten_used_arsenal_pieces(basic_gates, used_arsenal_piece_ids, user_id)
 
         if GateType.DFF.value in basic_gates:
             raise ValidationError("DFF (Dynamic Flip-Flop) gates are not allowed in custom arsenal pieces. Design your circuit using other available gates.")
@@ -120,9 +129,6 @@ class ArsenalService:
 
         if not isinstance(truth_table, dict):
             raise ValidationError("truth_table must be a dictionary")
-
-        # Calculate cost (sum of costs of basic gates used)
-        cost = self._calculate_arsenal_cost(basic_gates)
 
         # Create and save circuit
         arsenal_piece = Circuit(
@@ -325,9 +331,71 @@ class ArsenalService:
 
 
 
-    def _calculate_arsenal_cost(self, gates: List[str]) -> int:
-        """Calculate cost as sum of gate counts.
+    def _flatten_used_arsenal_pieces(
+        self, basic_gates: List[str], used_arsenal_ids: List[int], user_id: int
+    ) -> List[str]:
+        """Flatten gates from used arsenal pieces into the basic gates list.
+        
+        When an arsenal piece uses another arsenal piece, we add all of the used piece's
+        basic gates to the final basic_gates list (flattened, not nested).
+        
+        Args:
+            basic_gates: Current list of basic gates
+            used_arsenal_ids: List of arsenal piece IDs to use as components
+            user_id: Current user ID (to validate ownership)
+            
+        Returns:
+            Flattened list of basic gates including gates from used pieces
+        """
+        if not used_arsenal_ids:
+            return basic_gates
+        
+        flattened = basic_gates.copy() if basic_gates else []
+        
+        for piece_id in used_arsenal_ids:
+            # Retrieve the used arsenal piece
+            piece = self.repo.get_by_id(piece_id)
+            if not piece:
+                raise ValidationError(f"Arsenal piece with ID {piece_id} not found")
+            if piece.user_id != user_id:
+                raise ValidationError(f"Arsenal piece with ID {piece_id} is not owned by you")
+            if not piece.is_arsenal:
+                raise ValidationError(f"Piece with ID {piece_id} is not an arsenal piece")
+            
+            # Extract and add its basic gates (flattened)
+            try:
+                piece_gates = json.loads(piece.basic_gates) if piece.basic_gates else []
+                if isinstance(piece_gates, list):
+                    flattened.extend(piece_gates)
+            except (json.JSONDecodeError, ValueError):
+                raise ValidationError(f"Invalid basic_gates format in arsenal piece {piece_id}")
+        
+        return flattened
+
+    def _calculate_arsenal_cost(
+        self, gates: List[str], used_arsenal_ids: List[int] = None, user_id: int = None
+    ) -> int:
+        """Calculate cost as sum of gate counts and used piece costs.
         
         Basic gates cost 1 each.
+        Used arsenal pieces cost their computed cost (not 1).
         """
-        return len(gates)
+        # Count basic gates
+        cost = len(gates)
+        
+        # Add cost of used arsenal pieces
+        if used_arsenal_ids and user_id is not None:
+            for piece_id in used_arsenal_ids:
+                piece = self.repo.get_by_id(piece_id)
+                if not piece:
+                    raise ValidationError(f"Arsenal piece with ID {piece_id} not found")
+                if piece.user_id != user_id:
+                    raise ValidationError(f"Arsenal piece with ID {piece_id} is not owned by you")
+                if not piece.is_arsenal:
+                    raise ValidationError(f"Piece with ID {piece_id} is not an arsenal piece")
+                
+                # Add the cost of the used piece instead of 1
+                cost += piece.cost
+        
+        return cost
+
