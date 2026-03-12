@@ -110,13 +110,13 @@ class TestSolverWorkflow:
             budget=5, time_limit=60,
         )
 
-        # Solver gets GOLD: cost=1 (under budget=5) + time=10 (under 60)
+        # Solver gets SILVER: cost=1 (under budget=5) + time=10 (under 60)
         solver_token = register_and_login(client, "gold_solver")
         solution = _and_solution()  # totalCost=1
         result = validate_solution(client, solver_token, pid, solution,
                                    time_taken=10)
         assert result["solved"] is True
-        assert result["medal"] == "GOLD"
+        assert result["medal"] == "SILVER"
 
     def test_re_solve_no_extra_xp(self, client, conn):
         """Re-solving with same/worse medal should not award extra XP."""

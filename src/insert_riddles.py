@@ -193,7 +193,7 @@ def get_or_create_admin(conn):
     
     print("Creating admin user...")
     c.execute("INSERT INTO users (username, role, xp, created_at) VALUES (?, ?, ?, ?)",
-              ('admin', 'admin', 0, utcnow()))
+              ('admin', 'admin', 0, utcnow().isoformat()))
     conn.commit()
     return c.lastrowid
 
@@ -291,7 +291,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             1 if puzzle_data.get('allow_arsenal', True) else 0,
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
-            utcnow()
+            utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid
     
@@ -377,7 +377,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             expected_output_stream_json,
             gate_name,
             gate_limit,
-            utcnow()
+            utcnow().isoformat()
         ))
 
     if basic_circuits:

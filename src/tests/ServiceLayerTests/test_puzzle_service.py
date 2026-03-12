@@ -641,16 +641,15 @@ class TestPuzzleServicePublish:
     def test_publish_success_creator(self):
         creator_user = User(id=1, username="creator", role=UserRole.CREATOR)
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.DRAFT)
+        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
         test_case = Mock()
         
         self.mock_auth.require_user_id.return_value = 1
         self.mock_user_repo.get_by_id.return_value = creator_user
-        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle]
+        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle, published_puzzle]
         self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
         self.mock_puzzle_repo.conn.execute.return_value.rowcount = 1
-        
-        published_puzzle = Puzzle(id=1, name="Test", creator_user_id=1, status=PuzzleStatus.PUBLISHED)
-        self.mock_puzzle_repo.get_by_id.side_effect = [puzzle, puzzle, published_puzzle]
+        self.mock_puzzle_repo.conn.execute.return_value.fetchall.return_value = []
 
         result = self.service.publish("valid_token", 1)
 
@@ -1124,3 +1123,193 @@ class TestPuzzleServiceCapacityLimits:
         max_pub, _ = creator.get_puzzle_capacity()
         assert max_pub == 7
 
+
+class TestPuzzleServicePrivateMethods:
+    """Test private helper methods of PuzzleService"""
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_count_published_puzzles(self):
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = (3,)
+        result = self.service._count_published_puzzles(1)
+        assert result == 3
+
+    def test_is_admin_with_admin_role(self):
+        assert self.service._is_admin(UserRole.ADMIN) is True
+
+    def test_is_admin_with_creator_role(self):
+        assert self.service._is_admin(UserRole.CREATOR) is False
+
+
+class TestPuzzleServiceBrowseFilters:
+    """Test browse method with different filter combinations"""
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_browse_with_creator_id_filter(self):
+        user_id = 1
+        token = "valid_token"
+        creator_id = 5
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=creator_id, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 1
+        
+        result = self.service.browse(token, creator_id=creator_id)
+        
+        assert result["meta"]["total"] == 1
+        assert len(result["data"]) == 1
+
+    def test_browse_with_creator_username_filter(self):
+        user_id = 1
+        token = "valid_token"
+        creator_username = "testuser"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=5, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 1
+        
+        result = self.service.browse(token, creator_username=creator_username)
+        
+        assert result["meta"]["total"] == 1
+
+    def test_browse_with_difficulty_filter(self):
+        user_id = 1
+        token = "valid_token"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 1
+        
+        result = self.service.browse(token, min_difficulty=2.0, max_difficulty=3.0)
+        
+        assert len(result["data"]) == 1
+
+    def test_browse_with_clearness_filter(self):
+        user_id = 1
+        token = "valid_token"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 1
+        
+        result = self.service.browse(token, min_clearness=1.0, max_clearness=2.0)
+        
+        assert len(result["data"]) == 1
+
+    def test_browse_with_fun_filter(self):
+        user_id = 1
+        token = "valid_token"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 1
+        
+        result = self.service.browse(token, min_fun=1.5, max_fun=3.5)
+        
+        assert len(result["data"]) == 1
+
+    def test_browse_with_pagination(self):
+        user_id = 1
+        token = "valid_token"
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2, description="Test")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = [puzzle]
+        self.mock_puzzle_repo.count_published.return_value = 10
+        
+        result = self.service.browse(token, limit=5, offset=5)
+        
+        assert result["meta"]["total"] == 10
+        assert result["meta"]["page"] == 2
+
+    def test_browse_empty_results(self):
+        user_id = 1
+        token = "valid_token"
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_puzzle_repo.list_published.return_value = []
+        self.mock_puzzle_repo.count_published.return_value = 0
+        
+        result = self.service.browse(token)
+        
+        assert len(result["data"]) == 0
+        assert result["meta"]["total"] == 0
+
+
+class TestPuzzleServiceCreatePuzzleErrors:
+    """Test create_puzzle method with error scenarios"""
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_create_puzzle_requires_user(self):
+        user_id = 1
+        token = "valid_token"
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_user_repo.get_by_id.return_value = None
+        
+        payload = {"name": "Test", "description": "Test puzzle"}
+        with pytest.raises(ValidationError):
+            self.service.create_puzzle(token, payload)
+
+    def test_create_puzzle_non_creator_not_allowed(self):
+        user_id = 1
+        token = "valid_token"
+        user = User(id=user_id, username="test", role=UserRole.SOLVER)
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_user_repo.get_by_id.return_value = user
+        
+        payload = {"name": "Test", "description": "Test puzzle"}
+        with pytest.raises(ValidationError):
+            self.service.create_puzzle(token, payload)
+
+    def test_create_puzzle_with_creator_role(self):
+        user_id = 1
+        token = "valid_token"
+        user = User(id=user_id, username="test", role=UserRole.CREATOR)
+        puzzle = Puzzle(id=100, name="Test", creator_user_id=user_id, description="Test puzzle")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_user_repo.get_by_id.return_value = user
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.create.return_value = puzzle
+        
+        payload = {"name": "Test", "description": "Test puzzle", "default_gate_set": []}
+        result = self.service.create_puzzle(token, payload)
+        
+        assert result is not None
+
+    def test_create_puzzle_with_admin_role(self):
+        user_id = 1
+        token = "valid_token"
+        user = User(id=user_id, username="admin", role=UserRole.ADMIN)
+        puzzle = Puzzle(id=100, name="AdminTest", creator_user_id=user_id, description="Admin puzzle")
+        
+        self.mock_auth.require_user_id.return_value = user_id
+        self.mock_user_repo.get_by_id.return_value = user
+        self.mock_puzzle_repo.conn.execute.return_value.fetchone.return_value = None
+        self.mock_puzzle_repo.create.return_value = puzzle
+        
+        payload = {"name": "AdminTest", "description": "Admin puzzle", "default_gate_set": []}
+        result = self.service.create_puzzle(token, payload)
+        
+        assert result is not None

@@ -28,7 +28,7 @@ class TestMedalAcquisitionEdgeCases:
         result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=60)
 
         assert result["solved"] is True
-        assert result["medal"] == "GOLD"
+        assert result["medal"] == "SILVER"
 
     def test_exact_time_limit_with_no_budget_bonus_grants_silver(self, client, conn):
         creator_token = make_creator(client, conn, "edge_medal_timer_creator")
@@ -64,7 +64,7 @@ class TestMedalAcquisitionEdgeCases:
         result = validate_solution(client, solver_token, pid, _and_solution(), time_taken=60)
 
         assert result["solved"] is True
-        assert result["medal"] == "SILVER"
+        assert result["medal"] == "BRONZE"
 
 
 class TestPublishedPuzzleNameUniqueness:

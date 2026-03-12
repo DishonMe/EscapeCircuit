@@ -172,6 +172,9 @@ class TestUserServiceLogout:
 class TestUserServiceMe:
     def setup_method(self):
         self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_user_repo.conn = Mock()  # me() uses conn for medal/arsenal queries
+        self.mock_user_repo.conn.execute.return_value.fetchall.return_value = []
+        self.mock_user_repo.conn.execute.return_value.fetchone.return_value = None
         self.mock_auth = Mock(spec=AuthService)
         self.mock_xp = Mock(spec=XPService)
         self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)
