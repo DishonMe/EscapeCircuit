@@ -1115,8 +1115,27 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [isInlineDebugger, runInlineDebugger]);
 
   const onInlineSequenceChange = (inputName: string, rawValue: string) => {
-    const next = sanitizeBitSequence(rawValue);
-    setDebugSequences((prev) => ({ ...prev, [inputName]: next }));
+    const edited = sanitizeBitSequence(rawValue);
+    const targetLength = Math.max(1, edited.length || defaultDebugSequence.length || 1);
+
+    const normalizeToTargetLength = (value: string) => {
+      const sanitized = sanitizeBitSequence(value);
+      if (sanitized.length === targetLength) return sanitized;
+      if (sanitized.length > targetLength) return sanitized.slice(0, targetLength);
+      return sanitized.padEnd(targetLength, '0');
+    };
+
+    setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const name of inputs) {
+        if (name === inputName) {
+          next[name] = normalizeToTargetLength(edited || '0');
+        } else {
+          next[name] = normalizeToTargetLength(prev[name] ?? defaultDebugSequence);
+        }
+      }
+      return next;
+    });
   };
 
   const stepCount = debugSnapshot?.stepCount ?? 0;
