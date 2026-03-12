@@ -122,6 +122,14 @@ export const WorkstationGrid = ({
   activeComponentIds = [],
   boardRows,
   boardCols,
+  debuggerActive = false,
+  debuggerStepIndex = 0,
+  debuggerStepCount = 0,
+  debuggerInputBits = {},
+  debuggerOutputBits = {},
+  debuggerGateBits = {},
+  debuggerSequences = {},
+  onDebuggerSequenceChange,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -142,6 +150,14 @@ export const WorkstationGrid = ({
   activeComponentIds?: string[];
   boardRows?: number | null;
   boardCols?: number | null;
+  debuggerActive?: boolean;
+  debuggerStepIndex?: number;
+  debuggerStepCount?: number;
+  debuggerInputBits?: Record<string, string>;
+  debuggerOutputBits?: Record<string, string>;
+  debuggerGateBits?: Record<string, string>;
+  debuggerSequences?: Record<string, string>;
+  onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -1130,6 +1146,38 @@ export const WorkstationGrid = ({
     return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
   };
 
+  const getOutputBitForPlaced = (placedId: string, pinIndex: number) => {
+    const values = String(debuggerGateBits[placedId] ?? '0');
+    if (!values.length) return '0';
+    if (values.length === 1) return values;
+    return values[Math.min(pinIndex, values.length - 1)] ?? values[0] ?? '0';
+  };
+
+  const getPortBitForDisplay = (
+    placedId: string,
+    portKind: PortKind,
+    portIndex: number,
+  ) => {
+    if (portKind === 'output') {
+      return getOutputBitForPlaced(placedId, portIndex);
+    }
+
+    const incomingWire = wires.find(
+      (w) => w.to.componentId === placedId && w.to.pinIndex === portIndex,
+    );
+    if (!incomingWire) return '0';
+
+    if (incomingWire.from.componentId.startsWith('IO:IN:')) {
+      const inputName = incomingWire.from.componentId.replace('IO:IN:', '');
+      return debuggerInputBits[inputName] ?? '0';
+    }
+
+    return getOutputBitForPlaced(
+      incomingWire.from.componentId,
+      incomingWire.from.pinIndex,
+    );
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <div className="rounded-md border border-gray-300 bg-white p-3">
@@ -1712,7 +1760,7 @@ export const WorkstationGrid = ({
                 )}
 
                 {/* Port markers */}
-                {def.ports.map((port) => {
+                {def.ports.map((port, portIndex) => {
                   const rot = rotateOffset(port.offset, def.size, p.rotation);
                   const pl = rot.col * CELL_PX;
                   const pt = rot.row * CELL_PX;
@@ -1728,43 +1776,60 @@ export const WorkstationGrid = ({
                   };
                   const effectiveKey = `${effective.ownerId}:${effective.portId}`;
                   const isPortFlashing = flashingPortKeys.includes(effectiveKey);
+                  const portBit = debuggerActive
+                    ? getPortBitForDisplay(p.id, port.kind, portIndex)
+                    : '0';
 
                   return (
-                    <button
-                      type="button"
-                      key={port.id}
-                      className={cn(
-                        'absolute rounded-full transition-transform duration-200 hover:scale-150 hover:ring-2 hover:ring-blue-400/65 cursor-pointer',
-                        wireDraft && 'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
-                        isPortFlashing && 'workstation-port-lock-flash',
-                        'border-transparent bg-transparent',
-                      )}
-                      style={{
-                        left: pl + (CELL_PX - 14) / 2,
-                        top: pt + (CELL_PX - 14) / 2,
-                        width: 14,
-                        height: 14,
-                      }}
-                      onPointerDown={(e) => onStartWireDrag(effective, e)}
-                      onPointerUp={(e) => {
-                        e.stopPropagation();
-                        if (wireDraft) {
-                          if (
-                            wireDraft.start.ownerId === effective.ownerId &&
-                            wireDraft.start.portId === effective.portId
-                          ) {
-                            return;
+                    <div key={port.id}>
+                      {debuggerActive ? (
+                        <div
+                          className="pointer-events-none absolute z-30 flex size-3 items-center justify-center rounded border border-slate-400 bg-white text-[8px] font-bold leading-none text-slate-700"
+                          style={{
+                            left: pl + (CELL_PX - 8) / 2 - 6,
+                            top: pt + (CELL_PX - 8) / 2 - 9,
+                          }}
+                        >
+                          {portBit}
+                        </div>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={cn(
+                          'absolute flex items-center justify-center rounded-full border transition-transform duration-200 hover:scale-150 hover:bg-blue-400 cursor-pointer',
+                          wireDraft && 'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
+                          isPortFlashing && 'workstation-port-lock-flash',
+                          port.kind === 'input'
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-purple-300 bg-purple-50',
+                        )}
+                        style={{
+                          left: pl + (CELL_PX - 8) / 2,
+                          top: pt + (CELL_PX - 8) / 2,
+                          width: 8,
+                          height: 8,
+                        }}
+                        onPointerDown={(e) => onStartWireDrag(effective, e)}
+                        onPointerUp={(e) => {
+                          e.stopPropagation();
+                          if (wireDraft) {
+                            if (
+                              wireDraft.start.ownerId === effective.ownerId &&
+                              wireDraft.start.portId === effective.portId
+                            ) {
+                              return;
+                            }
+                            finalizeWire(wireDraft.start, effective);
+                            setWireDraft(null);
                           }
-                          finalizeWire(wireDraft.start, effective);
-                          setWireDraft(null);
-                        }
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      title={`${port.kind} ${port.id}`}
-                      aria-label={`${port.kind} ${port.id}`}
-                    />
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        title={`${port.kind} ${port.id}`}
+                        aria-label={`${port.kind} ${port.id}`}
+                      />
+                    </div>
                   );
                 })}
               </LogicNode>
@@ -1803,54 +1868,86 @@ export const WorkstationGrid = ({
             const id = `IO:IN:${label}`;
             const pt = ioLayout.inputs[id];
             if (!pt) return null;
+            const inputBit = debuggerInputBits[label] ?? '0';
+            const sequenceValue = debuggerSequences[label] ?? '';
             return (
-              <button
-                type="button"
-                key={id}
-                className={cn(
-                  'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125 animate-in fade-in zoom-in-90',
-                  highInputOwnerIds.has(id) && 'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
-                  isPowerSurge && 'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
-                )}
-                style={{
-                  left: pt.x,
-                  top: pt.y,
-                  transform: 'translate(-100%, -50%)',
-                  animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
-                  animationFillMode: 'both',
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  onStartWireDrag(
-                    { ownerId: id, portId: 'P0', kind: 'output' },
-                    e,
-                  );
-                }}
-                onPointerUp={(e) => {
-                  e.stopPropagation();
-                  if (wireDraft) {
-                    if (
-                      wireDraft.start.ownerId === id &&
-                      wireDraft.start.portId === 'P0'
-                    ) {
-                      return;
+              <div key={id}>
+                {debuggerActive ? (
+                  <div
+                    className="pointer-events-auto absolute z-30 flex items-center gap-1"
+                    style={{
+                      left: pt.x,
+                      top: pt.y,
+                      transform: 'translate(-102%, -165%)',
+                    }}
+                  >
+                    <div
+                      className="flex size-4 items-center justify-center rounded border border-green-400 bg-white text-[9px] font-bold text-green-700"
+                      title={`Current bit at step ${debuggerStepIndex + 1}`}
+                    >
+                      {inputBit}
+                    </div>
+                    <input
+                      type="text"
+                      value={sequenceValue}
+                      onChange={(e) =>
+                        onDebuggerSequenceChange?.(
+                          label,
+                          e.target.value.replace(/[^01]/g, ''),
+                        )
+                      }
+                      className="h-5 w-20 rounded border border-green-300 bg-white px-1 text-[10px] text-green-700"
+                      title="Input bit sequence"
+                    />
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className={cn(
+                    'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125 animate-in fade-in zoom-in-90',
+                    highInputOwnerIds.has(id) && 'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
+                    isPowerSurge && 'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
+                  )}
+                  style={{
+                    left: pt.x,
+                    top: pt.y,
+                    transform: 'translate(-100%, -50%)',
+                    animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
+                    animationFillMode: 'both',
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onStartWireDrag(
+                      { ownerId: id, portId: 'P0', kind: 'output' },
+                      e,
+                    );
+                  }}
+                  onPointerUp={(e) => {
+                    e.stopPropagation();
+                    if (wireDraft) {
+                      if (
+                        wireDraft.start.ownerId === id &&
+                        wireDraft.start.portId === 'P0'
+                      ) {
+                        return;
+                      }
+                      finalizeWire(wireDraft.start, {
+                        ownerId: id,
+                        portId: 'P0',
+                        kind: 'output',
+                      });
+                      setWireDraft(null);
                     }
-                    finalizeWire(wireDraft.start, {
-                      ownerId: id,
-                      portId: 'P0',
-                      kind: 'output',
-                    });
-                    setWireDraft(null);
-                  }
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Handled by onPointerUp
-                }}
-                aria-label={`Puzzle input ${label}`}
-              >
-                {label}
-              </button>
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Handled by onPointerUp
+                  }}
+                  aria-label={`Puzzle input ${label}`}
+                >
+                  {label}
+                </button>
+              </div>
             );
           })}
 
@@ -1858,51 +1955,76 @@ export const WorkstationGrid = ({
             const id = `IO:OUT:${label}`;
             const pt = ioLayout.outputs[id];
             if (!pt) return null;
+            const outputBit = debuggerOutputBits[label] ?? '0';
             return (
-              <button
-                type="button"
-                key={id}
-                className="pointer-events-auto absolute flex items-center gap-2 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs text-orange-700 transition-transform hover:scale-125"
-                style={{
-                  left: pt.x,
-                  top: pt.y,
-                  transform: 'translate(-50%, 0%)',
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  onStartWireDrag(
-                    { ownerId: id, portId: 'P0', kind: 'input' },
-                    e,
-                  );
-                }}
-                onPointerUp={(e) => {
-                  e.stopPropagation();
-                  if (wireDraft) {
-                    if (
-                      wireDraft.start.ownerId === id &&
-                      wireDraft.start.portId === 'P0'
-                    ) {
-                      return;
+              <div key={id}>
+                {debuggerActive ? (
+                  <div
+                    className="pointer-events-none absolute z-30"
+                    style={{
+                      left: pt.x,
+                      top: pt.y,
+                      transform: 'translate(-50%, -140%)',
+                    }}
+                  >
+                    <div
+                      className="flex size-4 items-center justify-center rounded border border-orange-400 bg-white text-[9px] font-bold text-orange-700"
+                      title={`Output bit at step ${debuggerStepIndex + 1}`}
+                    >
+                      {outputBit}
+                    </div>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="pointer-events-auto absolute flex items-center gap-2 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs text-orange-700 transition-transform hover:scale-125"
+                  style={{
+                    left: pt.x,
+                    top: pt.y,
+                    transform: 'translate(-50%, 0%)',
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onStartWireDrag(
+                      { ownerId: id, portId: 'P0', kind: 'input' },
+                      e,
+                    );
+                  }}
+                  onPointerUp={(e) => {
+                    e.stopPropagation();
+                    if (wireDraft) {
+                      if (
+                        wireDraft.start.ownerId === id &&
+                        wireDraft.start.portId === 'P0'
+                      ) {
+                        return;
+                      }
+                      finalizeWire(wireDraft.start, {
+                        ownerId: id,
+                        portId: 'P0',
+                        kind: 'input',
+                      });
+                      setWireDraft(null);
                     }
-                    finalizeWire(wireDraft.start, {
-                      ownerId: id,
-                      portId: 'P0',
-                      kind: 'input',
-                    });
-                    setWireDraft(null);
-                  }
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Handled by onPointerUp
-                }}
-                aria-label={`Puzzle output ${label}`}
-              >
-                {label}
-              </button>
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Handled by onPointerUp
+                  }}
+                  aria-label={`Puzzle output ${label}`}
+                >
+                  {label}
+                </button>
+              </div>
             );
           })}
         </div>
+
+        {debuggerActive ? (
+          <div className="pointer-events-none absolute right-3 top-14 z-30 rounded border border-slate-300 bg-white/90 px-2 py-1 text-[11px] text-slate-700 shadow-sm backdrop-blur-sm">
+            Step {debuggerStepCount ? debuggerStepIndex + 1 : 0}/{debuggerStepCount || 0}
+          </div>
+        ) : null}
 
         {/* Persistent Direction Indicators */}
         {(() => {

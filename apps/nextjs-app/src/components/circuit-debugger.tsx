@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,6 +23,9 @@ export type DebuggerProps = {
   catalog: Record<string, ComponentDef>;
   puzzleId?: string;
   onDebug?: (gateOutputs: any[], puzzleOutputs: Record<string, number>) => void;
+  modeOverride?: 'single' | 'sequence';
+  sequenceInputsOverride?: Record<string, string>;
+  autoRunToken?: number;
 };
 
 type GateOutput = {
@@ -42,6 +45,9 @@ export function CircuitDebugger({
   catalog,
   puzzleId,
   onDebug,
+  modeOverride,
+  sequenceInputsOverride,
+  autoRunToken,
 }: DebuggerProps) {
   const [mode, setMode] = useState<'single' | 'sequence'>('single');
   const [inputValues, setInputValues] = useState<Record<string, string>>(
@@ -56,6 +62,24 @@ export function CircuitDebugger({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepCount, setStepCount] = useState(0);
+
+  useEffect(() => {
+    if (!modeOverride) return;
+    setMode(modeOverride);
+  }, [modeOverride]);
+
+  useEffect(() => {
+    if (!sequenceInputsOverride) return;
+    setSequenceInputs((prev) => ({ ...prev, ...sequenceInputsOverride }));
+  }, [sequenceInputsOverride]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (autoRunToken == null) return;
+    if (mode !== 'sequence') return;
+    void handleRunSequence();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunToken, isOpen]);
 
   // Helper: count same component types for numbering
   const getComponentDisplayLabel = (
