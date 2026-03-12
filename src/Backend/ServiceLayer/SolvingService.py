@@ -778,6 +778,14 @@ class SolvingService:
             raise ValidationError("All input sequences must have the same length")
         
         seq_length = lengths[0]
+
+        # Preserve DFF state between cycles for sequential behavior.
+        dff_ids = [
+            pc.get("id")
+            for pc in expanded_solution.get("placedComponents", [])
+            if pc.get("componentId") == "DFF" and pc.get("id")
+        ]
+        dff_state = {str(dff_id): 0 for dff_id in dff_ids}
         
         # Simulate each step
         all_steps = []
@@ -786,9 +794,26 @@ class SolvingService:
             step_inputs = {}
             for input_name, sequence in input_sequences.items():
                 step_inputs[input_name] = sequence[step_idx]
+
+            # Merge external step inputs with current DFF state.
+            full_inputs = step_inputs.copy()
+            full_inputs.update(dff_state)
             
             # Run simulation for this step
-            result = self._run_simulation(puzzle_id, expanded_solution, step_inputs)
+            result = self._run_simulation(puzzle_id, expanded_solution, full_inputs)
+
+            raw_outputs = result.get("puzzleOutputs", {}) or {}
+
+            # Advance DFF state from this cycle's computed next-state outputs.
+            for dff_id in dff_ids:
+                next_key = f"{dff_id}_next"
+                next_val = raw_outputs.get(next_key)
+                dff_state[str(dff_id)] = int(next_val) if next_val is not None else 0
+
+            # Hide internal next-state wires from puzzle output display.
+            result["puzzleOutputs"] = {
+                k: v for k, v in raw_outputs.items() if not str(k).endswith("_next")
+            }
             all_steps.append(result)
         
         # Combine results
@@ -913,6 +938,13 @@ class SolvingService:
         def evaluate_gate(comp_id, comp_type):
             """Evaluate a single gate and return its outputs."""
             if comp_id in gate_result_cache:
+                return gate_result_cache[comp_id]
+
+            # DFF is stateful. Its Q output for this cycle is the injected
+            # state value carried in inputs[cid].
+            if comp_type == "DFF":
+                q_val = inputs.get(comp_id, 0)
+                gate_result_cache[comp_id] = [str(int(q_val))]
                 return gate_result_cache[comp_id]
             
             # Check if this is an arsenal piece
