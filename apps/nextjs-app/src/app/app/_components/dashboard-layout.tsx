@@ -35,6 +35,7 @@ const Logo = () => {
       className="flex items-center gap-1.5"
       href={paths.home.getHref()}
     >
+      <img src="/logo.svg" alt="EscapeCircuit" className="h-7 w-7 shrink-0" />
       <span className="text-[15px] font-semibold tracking-tight text-foreground">
         EscapeCircuit
       </span>

@@ -58,7 +58,7 @@ export const config = {
     // - _next/static/* (static files)
     // - _next/image/* (image optimization files)
     // - favicon.ico (favicon file)
-    // - public/* (public files)
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    // - Static file extensions (svg, png, jpg, ico, mp3, wav, etc.)
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
   ],
 };

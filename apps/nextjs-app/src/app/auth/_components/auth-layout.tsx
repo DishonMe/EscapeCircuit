@@ -95,7 +95,7 @@ export const AuthLayout = ({ children }: LayoutProps) => {
             className="flex items-center"
             href={paths.home.getHref()}
           >
-            <img className="h-20 w-auto" src="/logo.svg" alt="Workflow" />
+            <img className="h-20 w-20" src="/logo.svg" alt="Workflow" />
           </Link>
         </div>
 
