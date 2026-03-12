@@ -91,7 +91,7 @@ export const DiscussionsList = () => {
               offset: 0,
             }))
           }
-          className="ml-auto rounded-lg border border-border px-2 py-1 text-[11px]"
+          className="ml-auto rounded-lg border border-border bg-card text-foreground px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
         >
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>

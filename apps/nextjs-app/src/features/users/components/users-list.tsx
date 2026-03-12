@@ -68,7 +68,7 @@ export const UsersList = () => {
     if (!users || users.length === 0) {
       return (
         <div className="rounded-xl border border-border bg-secondary/50 p-4">
-          <p className="text-[13px] text-muted-foreground">No users found.</p>
+          <p className="text-[13px] text-foreground/80">No users found.</p>
         </div>
       );
     }
@@ -92,10 +92,10 @@ export const UsersList = () => {
               const roleColors: Record<string, string> = {
                 admin: 'bg-violet-50/50 text-violet-700',
                 creator: 'bg-emerald-50/50 text-emerald-700',
-                solver: 'bg-secondary text-muted-foreground',
+                solver: 'bg-secondary text-foreground/80',
                 pending_creator: 'bg-amber-50/50 text-amber-700',
               };
-              const color = roleColors[role] || 'bg-secondary text-muted-foreground';
+              const color = roleColors[role] || 'bg-secondary text-foreground/80';
               const label = role === 'pending_creator' ? 'Pending Creator' : role;
               return (
                 <span className={`capitalize rounded-md px-2 py-0.5 text-[11px] font-medium ${color}`}>
@@ -170,7 +170,7 @@ export const UsersList = () => {
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-muted-foreground"
+            className="text-foreground/75"
           >
             <X className="size-4" />
             Clear
@@ -188,7 +188,7 @@ export const UsersList = () => {
               <input
                 type="text"
                 placeholder="Search username..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.usernameSearch || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, usernameSearch: e.target.value || undefined })}
               />
@@ -198,7 +198,7 @@ export const UsersList = () => {
             <div>
               <label className="text-[13px] font-medium text-foreground">Role</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.role || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, role: (e.target.value || undefined) as any })}
               >
@@ -214,7 +214,7 @@ export const UsersList = () => {
             <div>
               <label className="text-[13px] font-medium text-foreground">Experience</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.experienceLevel || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any })}
               >
@@ -228,7 +228,7 @@ export const UsersList = () => {
             <div>
               <label className="text-[13px] font-medium text-foreground">Order By</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
               >
@@ -243,7 +243,7 @@ export const UsersList = () => {
             <div>
               <label className="text-[13px] font-medium text-foreground">Direction</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderDirection || 'ASC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
               >

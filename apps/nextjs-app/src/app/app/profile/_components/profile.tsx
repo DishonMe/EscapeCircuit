@@ -1,27 +1,115 @@
 'use client';
 
-import { useUser } from '@/lib/auth';
+import { Boxes, CircuitBoard, Medal, PackageOpen, Trophy, UserRound } from 'lucide-react';
 import Link from 'next/link';
+
 import { paths } from '@/config/paths';
+import { useMyArsenal } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
+import { useUser } from '@/lib/auth';
 
 type EntryProps = {
   label: string;
   value: string;
 };
+
+type ArsenalStructure = {
+  placed?: Array<{ id: string; componentId: string; origin?: { row: number; col: number }; x?: number; y?: number }>;
+  placedComponents?: Array<{ id: string; componentId: string; x: number; y: number }>;
+  wires?: Array<{
+    id: string;
+    from: { componentId: string; pinIndex?: number };
+    to: { componentId: string; pinIndex?: number };
+  }>;
+};
+
 const Entry = ({ label, value }: EntryProps) => (
-  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
-    <dt className="text-sm font-medium text-slate-500">{label}</dt>
-    <dd className="mt-1 text-sm text-slate-700 sm:col-span-2 sm:mt-0">
-      {value}
-    </dd>
+  <div className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70 sm:grid-cols-[140px_1fr]">
+    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+    <dd className="text-sm text-slate-900 dark:text-slate-100">{value}</dd>
   </div>
 );
 
+const parseStructure = (raw: string): ArsenalStructure | null => {
+  try {
+    const parsed = JSON.parse(raw) as ArsenalStructure;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const getPlaced = (structure: ArsenalStructure) => {
+  if (Array.isArray(structure.placed) && structure.placed.length > 0) {
+    return structure.placed.map((node) => ({
+      id: node.id,
+      componentId: node.componentId,
+      x: node.origin?.col ?? node.x ?? 0,
+      y: node.origin?.row ?? node.y ?? 0,
+    }));
+  }
+
+  if (Array.isArray(structure.placedComponents) && structure.placedComponents.length > 0) {
+    return structure.placedComponents;
+  }
+
+  return [];
+};
+
+const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
+  const parsed = parseStructure(structureRaw);
+  if (!parsed) {
+    return (
+      <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900" />
+    );
+  }
+
+  const placed = getPlaced(parsed);
+  const wires = Array.isArray(parsed.wires) ? parsed.wires : [];
+  const nodeById = new Map(placed.map((node) => [node.id, node]));
+
+  return (
+    <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/70">
+      <div className="absolute inset-0 origin-top-left scale-[0.5]" style={{ width: '200%', height: '200%' }}>
+        {wires.map((wire) => {
+          const fromNode = nodeById.get(wire.from.componentId);
+          const toNode = nodeById.get(wire.to.componentId);
+          if (!fromNode || !toNode) return null;
+
+          const x1 = fromNode.x * 44 + 34;
+          const y1 = fromNode.y * 44 + 26;
+          const x2 = toNode.x * 44 + 34;
+          const y2 = toNode.y * 44 + 26;
+          const control = Math.max(20, Math.abs(x2 - x1) * 0.35);
+          const d = `M ${x1} ${y1} C ${x1 + control} ${y1}, ${x2 - control} ${y2}, ${x2} ${y2}`;
+
+          return (
+            <svg key={wire.id} className="absolute inset-0 h-full w-full">
+              <path d={d} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          );
+        })}
+
+        {placed.map((node) => (
+          <div
+            key={node.id}
+            className="absolute flex h-9 w-14 items-center justify-center rounded-md border border-slate-300 bg-white text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            style={{ left: node.x * 44 + 6, top: node.y * 44 + 6 }}
+          >
+            {node.componentId}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const Profile = () => {
   const user = useUser();
+  const { data: arsenal = [] } = useMyArsenal();
 
-  if (!user || !user.data) return null;
+  if (!user?.data) return null;
+  const userData = user.data as any;
 
   const formatDateOnly = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -31,189 +119,121 @@ export const Profile = () => {
     });
   };
 
-  const displayName = user.data.username ?? 'Operator';
+  const displayName = userData.username ?? 'Operator';
   const initials = displayName.slice(0, 2).toUpperCase();
-  const arsenalCount = user.data.arsenal_count ?? 0;
-  const medalsTotal = user.data.medals?.total ?? 0;
-  const savedPuzzleCount = user.data.saved_puzzles?.length ?? 0;
-  const loadoutSlots = Math.min(12, arsenalCount);
+  const medals = userData.medals ?? {};
+  const goldMedals = Number(medals.gold ?? 0);
+  const silverMedals = Number(medals.silver ?? 0);
+  const bronzeMedals = Number(medals.bronze ?? 0);
+  const medalsTotal = userData.medals?.total ?? 0;
+  const savedPuzzleCount = userData.saved_puzzles?.length ?? 0;
 
   return (
-    <div className="space-y-6 rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:p-6">
-      <div className="rounded-3xl border border-slate-200/60 bg-slate-50/80 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="relative floating-avatar flex size-16 items-center justify-center rounded-full border-4 border-white/70 bg-slate-200 text-xl font-semibold text-slate-700 shadow-sm">
+    <div className="space-y-5">
+      <section className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                 {initials}
               </div>
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{displayName}</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Circuit Operator Profile</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-800">
-                {displayName}
-              </h1>
-              <p className="text-sm font-medium text-slate-500">
-                Player profile
-              </p>
-            </div>
+            <EditBio />
           </div>
-          <EditBio />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-100/60 p-4">
-          <div className="text-sm font-medium text-slate-500">Level</div>
-          <div className="text-3xl font-semibold text-slate-700">{user.data.level ?? 0}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-100/60 p-4">
-          <div className="text-sm font-medium text-slate-500">XP</div>
-          <div className="text-3xl font-semibold text-slate-700">{user.data.xp ?? 0}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-100/60 p-4">
-          <div className="text-sm font-medium text-slate-500">Medals</div>
-          <div className="text-3xl font-semibold text-slate-700">{medalsTotal}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-100/60 p-4">
-          <div className="text-sm font-medium text-slate-500">Saved Puzzles</div>
-          <div className="text-3xl font-semibold text-slate-700">{savedPuzzleCount}</div>
-        </div>
-      </div>
-
-      {/* User Information */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="px-4 py-5 sm:px-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-lg font-semibold leading-6 text-slate-800">
-                User Information
-              </h3>
-              <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                Personal details of the user.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="border-t border-slate-200/70 px-4 py-5 sm:p-0">
-          <dl className="sm:divide-y sm:divide-slate-200/70">
-            <Entry label="Username" value={user.data.username ?? ''} />
-            <Entry label="Email Address" value={user.data.email ?? ''} />
-            <Entry label="Role" value={user.data.role ?? ''} />
-            <Entry label="User Since" value={formatDateOnly(user.data.created_at ?? '')} />
-            {user.data.is_experienced && <Entry label="Status" value="Experienced" />}
-            {user.data.is_discussion_banned && (
-              <Entry label="Discussion Status" value="Banned" />
-            )}
-            {user.data.bio && <Entry label="Bio" value={user.data.bio} />}
+          <dl className="mt-4 grid gap-3">
+            <Entry label="Email" value={userData.email ?? ''} />
+            <Entry label="Role" value={userData.role ?? ''} />
+            <Entry label="Joined" value={formatDateOnly(userData.created_at ?? userData.createdAt ?? '')} />
+            {userData.bio ? <Entry label="Bio" value={userData.bio} /> : null}
           </dl>
         </div>
-      </div>
 
-      {/* Medals */}
-      {user.data.medals && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg font-semibold leading-6 text-slate-800">
-              Medals
-            </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><UserRound size={16} /> Level</div>
+            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{userData.level ?? 0}</p>
           </div>
-          <div className="border-t border-slate-200/70 px-4 py-5 sm:p-0">
-            <dl className="sm:divide-y sm:divide-slate-200/70">
-              <Entry label="Gold" value={String(user.data.medals.gold ?? 0)} />
-              <Entry label="Silver" value={String(user.data.medals.silver ?? 0)} />
-              <Entry label="Bronze" value={String(user.data.medals.bronze ?? 0)} />
-              <Entry label="Total" value={String(user.data.medals.total ?? 0)} />
-            </dl>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><CircuitBoard size={16} /> XP</div>
+            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{userData.xp ?? 0}</p>
           </div>
-        </div>
-      )}
-
-      {/* Arsenal */}
-      {user.data.arsenal_count !== undefined && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg font-semibold leading-6 text-slate-800">
-              Arsenal
-            </h3>
-          </div>
-          <div className="border-t border-slate-200/70 px-4 py-5">
-            <div className="mb-3 text-sm font-medium text-slate-500">
-              Saved Circuits: {user.data.arsenal_count}
-            </div>
-            {arsenalCount > 0 ? (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {Array.from({ length: loadoutSlots }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="aspect-square rounded-xl border border-slate-200/60 bg-white/60 p-2 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-105 hover:shadow-lg"
-                  >
-                    <div className="flex h-full items-end justify-between text-[10px] text-slate-500">
-                      <span>#{index + 1}</span>
-                      <span className="size-1.5 rounded-full bg-slate-300" />
-                    </div>
-                  </div>
-                ))}
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><Trophy size={16} /> Medals</div>
+            <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{medalsTotal}</p>
+            <div className="mt-2 space-y-1 text-xs">
+              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
+                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-500" /> Gold</span>
+                <span className="font-semibold">{goldMedals}</span>
               </div>
-            ) : null}
+              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
+                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-slate-400" /> Silver</span>
+                <span className="font-semibold">{silverMedals}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
+                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-700" /> Bronze</span>
+                <span className="font-semibold">{bronzeMedals}</span>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><Boxes size={16} /> Saved Puzzles</div>
+            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{savedPuzzleCount}</p>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Saved Puzzles */}
-      {user.data.saved_puzzles !== undefined && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg font-semibold leading-6 text-slate-800">
-              Saved Puzzles
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Puzzles you have saved.
-            </p>
-          </div>
-          <div className="border-t border-slate-200/70 px-4 py-5 sm:p-0">
-            {user.data.saved_puzzles.length > 0 ? (
-              <ul className="grid gap-2 px-4 sm:grid-cols-2">
-                {user.data.saved_puzzles.map((puzzle: any) => (
-                  <li
-                    key={puzzle.id}
-                    className="rounded-xl border border-slate-200/60 bg-white/60 p-3 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-105 hover:shadow-lg"
-                  >
-                    <Link
-                      href={`${paths.app.puzzles.getHref()}/${puzzle.id}`}
-                      className="text-sm font-medium text-slate-700 hover:text-slate-900 underline"
-                    >
-                      {puzzle.name}
-                    </Link>
-                    <span className="ml-2 text-xs text-slate-500">
-                      ({puzzle.status})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-4 py-5 text-sm text-slate-500">
-                No saved puzzles
-              </p>
-            )}
-          </div>
+      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Arsenal</h2>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{arsenal.length} saved</span>
         </div>
-      )}
 
-      <style jsx>{`
-        .floating-avatar {
-          animation: profile-float 4s ease-in-out infinite;
-        }
+        {arsenal.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center dark:border-slate-700 dark:bg-slate-950/70">
+            <PackageOpen className="mx-auto mb-3 size-10 text-slate-400" />
+            <p className="text-base font-medium text-slate-700 dark:text-slate-200">Your Arsenal is empty</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Build a custom circuit piece to see it here.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {arsenal.map((piece) => (
+              <div
+                key={String(piece.id)}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+              >
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{piece.name}</h3>
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">cost {piece.cost}</span>
+                </div>
+                <MiniCircuitPreview structureRaw={piece.structure_json} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-        @keyframes profile-float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-4px);
-          }
-        }
-      `}</style>
+      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">Saved Puzzles</h2>
+        {userData.saved_puzzles?.length ? (
+          <ul className="grid gap-2 md:grid-cols-2">
+            {userData.saved_puzzles.map((puzzle: any) => (
+              <li key={puzzle.id} className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/70">
+                <Link href={`${paths.app.puzzles.getHref()}/${puzzle.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline dark:text-slate-100">
+                  {puzzle.name}
+                </Link>
+                <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({puzzle.status})</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No saved puzzles yet.</p>
+        )}
+      </section>
     </div>
   );
 };

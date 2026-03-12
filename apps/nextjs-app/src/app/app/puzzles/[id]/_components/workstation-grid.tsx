@@ -205,8 +205,17 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
+  const [bootSequenceActive, setBootSequenceActive] = useState(true);
 
   const { playDrop, playWireConnect } = useAudio();
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setBootSequenceActive(false);
+    }, 1200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   const activeWireIdsSet = useMemo(() => new Set(activeWireIds), [activeWireIds]);
   const activeComponentIdsSet = useMemo(
@@ -438,32 +447,6 @@ export const WorkstationGrid = ({
     }
     return occ;
   }, [allPorts]);
-
-  // Helper function to get display label with numbering
-  const getComponentDisplayLabel = (
-    componentId: string,
-    placedId: string,
-  ): string => {
-    const def = catalog[componentId];
-    if (!def) return componentId;
-
-    // Count how many components have the same componentId
-    const sameTypeComponents = placed.filter((p) => p.componentId === componentId);
-
-    // If only one of this type, don't show the number
-    if (sameTypeComponents.length <= 1) {
-      return def.label;
-    }
-
-    // If multiple, find the index of the current component
-    const index = sameTypeComponents.findIndex((p) => p.id === placedId);
-    if (index === -1) {
-      return def.label;
-    }
-
-    // Return numbered label like "1-and", "2-and"
-    return `${index + 1}-${def.label.toLowerCase()}`;
-  };
 
   const worldToScreen = (hole: HoleCoord) => {
     const x = pan.x + hole.col * CELL_PX * zoom;
@@ -1537,43 +1520,6 @@ export const WorkstationGrid = ({
             },
           )}
 
-          {/* Feature: Drag-and-Drop Ghost/Preview */}
-          {draggedPaletteComponentId && dropPreview && (() => {
-             const def = catalog[draggedPaletteComponentId];
-             if (!def) return null;
-             const rotation = 0; // Default zero for new drops
-             const size = rotatedSize(def.size, rotation);
-             const isValid = canPlaceComponentAt(draggedPaletteComponentId, dropPreview, rotation);
-             
-             // Count how many components of this type will exist after placing this one
-             const sameTypeCount = placed.filter((p) => p.componentId === draggedPaletteComponentId).length + 1;
-             const displayLabel = sameTypeCount > 1 
-               ? `${sameTypeCount}-${def.label.toLowerCase()}` 
-               : def.label;
-             
-             const left = dropPreview.col * CELL_PX;
-             const top = dropPreview.row * CELL_PX;
-
-              return (
-                <div
-                  className={cn(
-                    'absolute rounded border text-[10px] flex items-center justify-center font-medium opacity-60 z-50 pointer-events-none',
-                    isValid
-                      ? 'bg-blue-100 border-blue-400 text-blue-900'
-                      : 'bg-red-100 border-red-400 text-red-900',
-                  )}
-                  style={{
-                    left,
-                    top,
-                    width: size.w * CELL_PX - 2,
-                    height: size.h * CELL_PX - 2,
-                  }}
-                >
-                  {displayLabel}
-                </div>
-              );
-          })()}
-
           {/* Components */}
           {placed.map((p, placedIndex) => {
             const def = catalog[p.componentId];
@@ -1596,15 +1542,16 @@ export const WorkstationGrid = ({
               <div
                 key={p.id}
                 className={cn(
-                  'group absolute rounded border bg-gray-50 text-[10px] text-gray-800 transition-[box-shadow,transform,border-color] duration-300 animate-in fade-in zoom-in-90',
+                  'group absolute rounded border bg-white text-[10px] text-slate-800 dark:bg-slate-800 dark:text-slate-100 transition-[box-shadow,transform,border-color] duration-300',
+                  bootSequenceActive && 'animate-in fade-in zoom-in-75',
                   isDeleting && 'workstation-component-delete-out',
                   !isDragging && !isDeleting && 'workstation-component-breathe',
                   isDeleteWarn && 'border-red-400 bg-red-50/60 shadow-[0_0_0_1px_rgba(248,113,113,0.45),0_0_18px_rgba(239,68,68,0.25)]',
-                  isActive && 'border-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_0_12px_rgba(59,130,246,0.4),0_0_24px_rgba(34,211,238,0.32)]',
+                  isActive && 'border-cyan-300 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)] shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_0_12px_rgba(59,130,246,0.4),0_0_24px_rgba(34,211,238,0.32)]',
                   isPowerSurge && 'workstation-component-surge',
                   isSelected
                     ? 'border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.55),0_0_18px_rgba(59,130,246,0.28)]'
-                    : 'border-gray-300',
+                    : 'border-slate-300 dark:border-slate-600',
                   recentlyPlacedId === p.id && 'workstation-component-pop',
                   isDragging ? 'z-50 opacity-80 shadow-xl' : 'z-10',
                 )}
@@ -1700,14 +1647,13 @@ export const WorkstationGrid = ({
                   }
                 }}
               >
-                 {/* Canvas Rendering: Grid & Labels (Label Visibility) */}
-                 {/* Render label with z-20 and pointer-events-none so it stays on top but doesn't block clicks */}
-                 {/* Name in the middle-bottom with improved style */}
-                <div className="flex size-full items-end justify-center pb-1 z-20 relative pointer-events-none">
-                  <div className="max-w-[90%] truncate rounded-sm bg-white/85 px-1 py-px text-[9px] font-bold uppercase tracking-tight text-slate-800 shadow-sm ring-1 ring-black/5 backdrop-blur-[1px] select-none">
-                    {getComponentDisplayLabel(p.componentId, p.id)}
+                {!isDragging ? (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="select-none text-[9px] font-semibold tracking-wide text-slate-800 dark:text-slate-100">
+                      {def.label}
+                    </span>
                   </div>
-                </div>
+                ) : null}
 
                 {/* Selected Delete Button (Outside) */}
                 {isSelected && !isDragging && (
@@ -2037,17 +1983,6 @@ export const WorkstationGrid = ({
           ));
         })()}
 
-        {hoveredWireSignal ? (
-          <div
-            className="pointer-events-none absolute z-40 rounded border border-cyan-500/50 bg-black/90 px-2 py-1 text-xs font-mono text-green-400 backdrop-blur-md"
-            style={{
-              left: hoveredWireSignal.x + 12,
-              top: hoveredWireSignal.y + 12,
-            }}
-          >
-            SIGNAL: {hoveredWireSignal.high ? 'HIGH' : 'LOW'}
-          </div>
-        ) : null}
       </div>
 
       <style jsx>{`

@@ -120,12 +120,16 @@ async function fetchApi<T>(
         if (response.status === 401 && typeof window !== 'undefined') {
           // Clear the invalid token
           Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
-          
-          // Redirect to login with a notification reason
+
+          // Avoid redirect loops on auth routes and preserve full current location.
           const currentPath = window.location.pathname;
-          const redirectUrl = `/auth/login?redirectTo=${encodeURIComponent(currentPath)}&reason=session-expired`;
-          window.location.href = redirectUrl;
-          
+          const onAuthRoute = currentPath.startsWith('/auth/');
+          if (!onAuthRoute) {
+            const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            const redirectUrl = `/auth/login?redirectTo=${encodeURIComponent(currentLocation)}&reason=session-expired`;
+            window.location.replace(redirectUrl);
+          }
+
           // Stop further processing
           throw new Error('Session expired - redirecting to login');
         }

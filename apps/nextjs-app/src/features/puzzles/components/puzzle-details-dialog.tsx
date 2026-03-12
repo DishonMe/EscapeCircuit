@@ -254,7 +254,7 @@ export const PuzzleDetailsDialog = ({
                       
                       {Object.keys(truthTable).length > 0 ? (
                         <div className="overflow-x-auto">
-                          <table className="w-full text-xs border-collapse">
+                          <table className="w-full border-collapse text-xs text-slate-900 dark:text-slate-100">
                             <thead>
                               <tr>
                                 {Object.keys(truthTable[Object.keys(truthTable)[0]] || {}).map((key) => (

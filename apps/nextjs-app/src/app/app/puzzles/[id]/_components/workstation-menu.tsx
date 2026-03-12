@@ -122,8 +122,8 @@ const Category = ({
   children: React.ReactNode;
 }) => {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm transition-all duration-300">
-      <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-subtle transition-all duration-300 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100">
+      <div className="mb-2 text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</div>
       {children}
     </div>
   );
@@ -145,58 +145,12 @@ const DraggableItem = ({
   onDragEnd?: () => void;
 }) => {
   return (
-    <>
-      <style jsx>{`
-        .holographic-item {
-          position: relative;
-          background: linear-gradient(135deg, rgba(15, 23, 42, 0.3) 0%, rgba(30, 41, 59, 0.2) 100%);
-          border-color: rgba(34, 211, 238, 0.4);
-          transition: all 300ms ease;
-        }
-
-        .holographic-item:hover {
-          border-color: rgba(34, 211, 238, 0.8);
-          box-shadow: 
-            inset 0 0 12px rgba(34, 211, 238, 0.15),
-            0 0 12px rgba(34, 211, 238, 0.25),
-            0 0 20px rgba(34, 211, 238, 0.1);
-          background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(30, 41, 59, 0.35) 100%);
-        }
-
-        .holographic-item:hover::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: repeating-linear-gradient(
-            0deg,
-            rgba(34, 211, 238, 0.03) 0px,
-            rgba(34, 211, 238, 0.03) 1px,
-            transparent 1px,
-            transparent 3px
-          );
-          pointer-events: none;
-          border-radius: 0.5rem;
-          animation: holographic-scanlines 8s linear infinite;
-        }
-
-        @keyframes holographic-scanlines {
-          0% {
-            transform: translateY(0);
-          }
-          100% {
-            transform: translateY(4px);
-          }
-        }
-      `}</style>
       <div
         className={cn(
-          'group holographic-item flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-all duration-200 hover:-translate-y-1 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20',
+          'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:text-foreground',
           isSelected
-            ? 'border-cyan-400/60 bg-cyan-950/30 shadow-[0_0_12px_rgba(34,211,238,0.3)]'
-            : 'border-border/60 bg-secondary/30',
+            ? 'border-sky-500 bg-sky-100 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-slate-800'
+            : 'border-slate-200 bg-slate-50 dark:border-border/60 dark:bg-slate-900',
         )}
       >
         <button
@@ -206,7 +160,7 @@ const DraggableItem = ({
             onInfoClick?.();
           }}
           className={cn(
-            'text-foreground/40 hover:text-foreground/70 transition-opacity cursor-help',
+            'text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-help opacity-100',
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
           )}
           title="View Truth Table"
@@ -227,13 +181,12 @@ const DraggableItem = ({
           onClick={() => onSelect?.(component.id)}
           className="flex flex-1 cursor-grab active:cursor-grabbing items-center justify-between"
         >
-          <span className="font-medium text-foreground">{component.type}</span>
-          <span className="text-xs text-muted-foreground">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">{component.type}</span>
+          <span className="text-xs text-foreground/75 dark:text-slate-300">
             cost {component.cost} · pins {component.pins}
           </span>
         </div>
       </div>
-    </>
   );
 };
 
@@ -330,7 +283,7 @@ export const WorkstationMenu = ({
       {/* Custom Pieces Category (puzzle-specific) */}
       {custom.length ? (
         <Category title="Special Pieces">
-          <div className="text-[11px] text-muted-foreground mb-2">
+          <div className="text-[11px] text-foreground/80 mb-2">
             Custom logic gates created for this puzzle
           </div>
           <div className="flex flex-col gap-2">
@@ -352,7 +305,7 @@ export const WorkstationMenu = ({
       {/* Arsenal Category (user's saved pieces) */}
       {allowArsenal && arsenal.length ? (
         <Category title="Arsenal">
-          <div className="text-[11px] text-muted-foreground mb-2">
+          <div className="text-[11px] text-foreground/80 mb-2">
             Your personal circuit pieces
           </div>
           {arsenal.length > 0 ? (
@@ -370,7 +323,7 @@ export const WorkstationMenu = ({
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-muted-foreground opacity-60">
+            <div className="text-[11px] text-foreground/70 opacity-80">
               No arsenal pieces yet. Create one in your arsenal workspace.
             </div>
           )}
@@ -379,7 +332,7 @@ export const WorkstationMenu = ({
 
       {allowArsenal && visibleArsenal.length ? (
         <Category title="Saved">
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-foreground/80">
             Saved circuits are shown only if they don’t use filtered-out basic
             gates.
           </div>
@@ -390,10 +343,10 @@ export const WorkstationMenu = ({
                 className="rounded border border-border bg-secondary/50 p-2 text-[13px] text-foreground"
               >
                 <div className="font-medium text-foreground">{c.name}</div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-[11px] text-foreground/75">
                   Uses: {c.usedBasicTypes.join(', ') || 'none'}
                 </div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
+                <div className="mt-1 text-[11px] text-foreground/70">
                   (Loading saved circuits into the board will be added next.)
                 </div>
               </div>
@@ -412,8 +365,8 @@ export const WorkstationMenu = ({
           </DialogHeader>
           {viewingTruthTableData ? (
             <div className="overflow-hidden rounded-lg border border-border/60">
-              <table className="w-full text-[13px] text-foreground">
-                <thead className="bg-secondary/50 text-[11px] font-medium uppercase text-muted-foreground">
+              <table className="w-full text-[13px] text-slate-900 dark:text-slate-100">
+                <thead className="bg-slate-100 text-[11px] font-medium uppercase text-slate-900 dark:bg-slate-800 dark:text-slate-100">
                   <tr>
                     {viewingTruthTableData.inputs.map((i: string) => (
                       <th key={i} className="px-3 py-2 text-center">
@@ -432,9 +385,9 @@ export const WorkstationMenu = ({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {viewingTruthTableData.rows.map((row: string[], idx: number) => (
-                    <tr key={idx} className="divide-x divide-border">
+                    <tr key={idx} className="divide-x divide-border bg-white dark:bg-slate-900">
                       {row.map((cell: string, cIdx: number) => (
-                        <td key={cIdx} className="px-3 py-2 text-center">
+                        <td key={cIdx} className="px-3 py-2 text-center text-slate-900 dark:text-slate-100">
                           {cell}
                         </td>
                       ))}

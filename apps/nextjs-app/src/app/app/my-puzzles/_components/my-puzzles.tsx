@@ -261,7 +261,7 @@ export const MyPuzzles = () => {
                 >
                   {/* Status Badge */}
                   <div className={`absolute -right-2 -top-2 z-10 flex items-center justify-center rounded-md px-2.5 py-0.5 ${
-                    isPublished ? 'bg-foreground text-background' : 'bg-amber-500 text-white'
+                    isPublished ? 'bg-foreground text-background' : 'bg-amber-500 text-background'
                   }`}>
                     <span className="text-[11px] font-semibold">
                       {isPublished ? 'Published' : 'Unpublished'}
@@ -388,11 +388,11 @@ export const MyPuzzles = () => {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[13px] font-medium text-foreground">Your Comment</label>
+                  <label className="text-[13px] font-medium text-slate-900 dark:text-slate-100">Your Comment</label>
                   <textarea
                     value={creatorComment}
                     onChange={(e) => setCreatorComment(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     placeholder="Enter a message for people solving this puzzle..."
                     rows={4}
                   />
@@ -405,14 +405,14 @@ export const MyPuzzles = () => {
               <DialogFooter>
                 <button
                   onClick={() => setCommentingPuzzle(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-black dark:text-background bg-transparent hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
                 {commentingPuzzle?.creatorComment && (
                   <button
                     onClick={handleDeleteComment}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                    className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background hover:bg-red-700 transition-colors disabled:opacity-50"
                     disabled={updateMutation.isPending}
                   >
                     {updateMutation.isPending ? 'Deleting...' : 'Delete'}
@@ -452,7 +452,7 @@ export const MyPuzzles = () => {
                 <button
                   onClick={() => handleDelete(deleteConfirmId)}
                   disabled={deleteMutation.isPending}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   {deleteMutation.isPending ? 'Deleting...' : 'Delete Puzzle'}
                 </button>

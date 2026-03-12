@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { ThemeProvider } from 'next-themes';
 import * as React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -27,11 +28,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     <ErrorBoundary FallbackComponent={MainErrorFallback}>
       <QueryClientProvider client={queryClient}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
-          <NavigationLoadingProvider>
-            {process.env.DEV && <ReactQueryDevtools />}
-            <Notifications />
-            {children}
-          </NavigationLoadingProvider>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+            <NavigationLoadingProvider>
+              {process.env.DEV && <ReactQueryDevtools />}
+              <Notifications />
+              {children}
+            </NavigationLoadingProvider>
+          </ThemeProvider>
         </GoogleOAuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -154,7 +154,7 @@ export default function ArsenalPage() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
-          <div className="flex items-center gap-1 text-muted-foreground">
+          <div className="flex items-center gap-1 text-foreground/85">
             <span>
               {isAdmin
                 ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
@@ -182,8 +182,8 @@ export default function ArsenalPage() {
 
       {/* Arsenal Grid */}
       {pieces.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-lg border">
-          <p className="text-muted-foreground mb-4">No arsenal pieces yet</p>
+        <div className="text-center py-12 bg-card rounded-lg border border-border/70">
+          <p className="text-foreground/80 mb-4">No arsenal pieces yet</p>
           <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
             Create Your First Piece
           </Button>
@@ -192,10 +192,10 @@ export default function ArsenalPage() {
         <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-muted">
+              <thead className="bg-muted/70">
                 <tr>
-                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Name</th>
-                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">
+                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">Name</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">
                     <span className="inline-flex items-center gap-1">
                       Cost
                       <InfoPopup>
@@ -204,20 +204,20 @@ export default function ArsenalPage() {
                       </InfoPopup>
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-[13px] font-medium text-muted-foreground">Basic Gates</th>
-                  <th className="px-6 py-3 text-right text-[13px] font-medium text-muted-foreground">Actions</th>
+                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">Basic Gates</th>
+                  <th className="px-6 py-3 text-right text-[13px] font-semibold text-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {pieces.map((piece) => (
                   <tr key={piece.id} className="hover:bg-muted/50">
-                    <td className="px-6 py-4 font-medium">{piece.name}</td>
+                    <td className="px-6 py-4 font-medium text-foreground">{piece.name}</td>
                     <td className="px-6 py-4">
                       <span className="bg-secondary text-foreground px-2 py-1 rounded-md text-[13px] font-medium">
                         {piece.cost}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-[13px] text-muted-foreground">
+                    <td className="px-6 py-4 text-[13px] text-foreground/80">
                       {parseBasicGates(piece.basic_gates).join(', ') || 'None'}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
@@ -300,7 +300,7 @@ export default function ArsenalPage() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold mb-2">Basic Gates Used</h3>
-                <div className="bg-secondary/50 p-3 rounded-lg text-[13px]">
+                <div className="bg-secondary/60 p-3 rounded-lg text-[13px] text-foreground border border-border/60">
                   {parseBasicGates(selectedPiece.basic_gates).join(', ') || 'None'} (Cost: {selectedPiece.cost})
                 </div>
               </div>
@@ -311,16 +311,16 @@ export default function ArsenalPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-secondary sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left text-[13px] font-medium text-muted-foreground">Inputs</th>
-                        <th className="px-3 py-2 text-left text-[13px] font-medium text-muted-foreground">Outputs</th>
+                        <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">Inputs</th>
+                        <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">Outputs</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(parseTruthTable(selectedPiece.truth_table)).map(
                         ([inputKey, output], idx) => (
                           <tr key={idx} className="border-t hover:bg-muted/50">
-                            <td className="px-3 py-2 font-mono text-xs">{inputKey}</td>
-                            <td className="px-3 py-2 font-mono text-xs">
+                            <td className="px-3 py-2 font-mono text-xs text-foreground">{inputKey}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-foreground">
                               {JSON.stringify(output)}
                             </td>
                           </tr>
@@ -329,7 +329,7 @@ export default function ArsenalPage() {
                     </tbody>
                   </table>
                   {Object.keys(parseTruthTable(selectedPiece.truth_table)).length === 0 && (
-                    <div className="p-4 text-center text-muted-foreground">
+                    <div className="p-4 text-center text-foreground/75">
                       No truth table data available
                     </div>
                   )}

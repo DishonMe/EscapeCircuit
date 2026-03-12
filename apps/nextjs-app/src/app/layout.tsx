@@ -12,7 +12,7 @@ export const metadata = {
 const RootLayout = async ({ children }: { children: ReactNode }) => {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-white text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-50">
         <AppProvider>
           {children}
         </AppProvider>

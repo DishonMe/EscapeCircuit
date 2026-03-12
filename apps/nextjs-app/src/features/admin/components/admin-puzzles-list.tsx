@@ -65,7 +65,7 @@ export const AdminPuzzlesList = () => {
     if (puzzles.length === 0) {
       return (
         <div className="rounded-xl border border-border bg-secondary p-4">
-          <p className="text-muted-foreground">No puzzles found.</p>
+          <p className="text-foreground/80">No puzzles found.</p>
         </div>
       );
     }
@@ -94,7 +94,7 @@ export const AdminPuzzlesList = () => {
                   ? 'text-emerald-700 bg-emerald-50/50'
                   : entry.status === 'draft'
                     ? 'text-amber-700 bg-amber-50/50'
-                    : 'text-muted-foreground bg-secondary';
+                    : 'text-foreground/80 bg-secondary';
               return (
                 <span
                   className={`capitalize rounded-lg px-2 py-0.5 text-[11px] font-medium ${color}`}
@@ -123,7 +123,7 @@ export const AdminPuzzlesList = () => {
             Cell({ entry }: { entry: any }) {
               const flags: string[] = entry.flags || [];
               if (flags.length === 0)
-                return <span className="text-muted-foreground">-</span>;
+                return <span className="text-foreground/70">-</span>;
               return (
                 <div className="flex flex-wrap gap-1">
                   {flags.map((f: string) => (
@@ -203,7 +203,7 @@ export const AdminPuzzlesList = () => {
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-muted-foreground"
+            className="text-foreground/75"
           >
             <X className="size-4" />
             Clear
@@ -223,7 +223,7 @@ export const AdminPuzzlesList = () => {
               <input
                 type="text"
                 placeholder="Search puzzle name..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -242,7 +242,7 @@ export const AdminPuzzlesList = () => {
               <input
                 type="text"
                 placeholder="Search by creator username..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.creatorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -259,7 +259,7 @@ export const AdminPuzzlesList = () => {
                 Status
               </label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.status || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -281,7 +281,7 @@ export const AdminPuzzlesList = () => {
                 Order By
               </label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -304,7 +304,7 @@ export const AdminPuzzlesList = () => {
                 Direction
               </label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                 value={filters.orderDirection || 'DESC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({

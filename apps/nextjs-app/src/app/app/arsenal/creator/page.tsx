@@ -375,7 +375,7 @@ export default function ArsenalCreatorPage() {
             <select
               value={numInputs}
               onChange={(e: any) => setNumInputs(parseInt(e.target.value))}
-              className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {[1, 2, 3, 4, 5].map((n) => (
                 <option key={n} value={n}>
@@ -390,7 +390,7 @@ export default function ArsenalCreatorPage() {
             <select
               value={numOutputs}
               onChange={(e: any) => setNumOutputs(parseInt(e.target.value))}
-              className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {[1, 2, 3].map((n) => (
                 <option key={n} value={n}>

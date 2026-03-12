@@ -301,21 +301,21 @@ export function CircuitDebugger({
 
           {/* Input Section */}
           <div>
-            <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-3">
+            <h3 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-3">
               {mode === 'single' ? 'Puzzle Inputs' : 'Input Sequences'}
             </h3>
             {mode === 'single' ? (
               <div className="grid grid-cols-2 gap-3">
                 {inputs.map((inputName) => (
                   <div key={inputName} className="flex items-center gap-2">
-                    <label className="text-[13px] font-medium text-foreground w-20">{inputName}:</label>
+                    <label className="text-[13px] font-medium text-slate-900 dark:text-slate-100 w-20">{inputName}:</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={inputValues[inputName] || ''}
                       onChange={(e) => handleInputChange(inputName, e.target.value)}
                       placeholder="0 or 1"
-                      className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-16 text-center text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-16 text-center text-[13px] text-slate-900 dark:text-slate-700 focus:outline-none focus:ring-1 focus:ring-ring"
                       maxLength={1}
                     />
                   </div>
@@ -325,16 +325,16 @@ export function CircuitDebugger({
               <div className="grid grid-cols-1 gap-3">
                 {inputs.map((inputName) => (
                   <div key={inputName} className="flex items-start gap-2">
-                    <label className="text-[13px] font-medium text-foreground w-20 pt-2">{inputName}:</label>
+                    <label className="text-[13px] font-medium text-slate-900 dark:text-slate-100 w-20 pt-2">{inputName}:</label>
                     <div className="flex-1">
                       <input
                         type="text"
                         value={sequenceInputs[inputName] || ''}
                         onChange={(e) => handleSequenceChange(inputName, e.target.value)}
                         placeholder="e.g., 01010 or 0,1,0,1,0"
-                        className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-full text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-full text-[13px] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-ring"
                       />
-                      <p className="text-[11px] text-muted-foreground mt-1">
+                      <p className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
                         Enter binary digits (0,1) or comma-separated values
                       </p>
                     </div>
@@ -366,15 +366,15 @@ export function CircuitDebugger({
                   {/* Gate Outputs */}
                   {gateOutputs[0].length > 0 && (
                     <div>
-                      <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h3>
-                      <div className="space-y-1.5 bg-secondary/30 p-3 rounded-lg border border-border/60">
+                      <h3 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Gate Outputs</h3>
+                      <div className="space-y-1.5 bg-slate-100 p-3 rounded-lg border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700">
                         {gateOutputs[0].map((gate) => (
                           <div
                             key={gate.placedId}
                             className="flex justify-between text-[13px]"
                           >
-                            <span className="font-medium text-foreground">{gate.displayLabel}:</span>
-                            <span className="font-mono text-muted-foreground">{gate.values}</span>
+                            <span className="font-medium text-slate-900 dark:text-slate-100">{gate.displayLabel}:</span>
+                            <span className="font-mono text-slate-900 dark:text-slate-100">{gate.values}</span>
                           </div>
                         ))}
                       </div>
@@ -383,15 +383,15 @@ export function CircuitDebugger({
 
                   {/* Puzzle Outputs */}
                   <div>
-                    <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h3>
-                    <div className="space-y-1.5 bg-secondary/30 p-3 rounded-lg border border-border/60">
+                    <h3 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Puzzle Outputs</h3>
+                    <div className="space-y-1.5 bg-slate-100 p-3 rounded-lg border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700">
                       {outputs.map((outputName) => (
                         <div
                           key={outputName}
                           className="flex justify-between text-[13px]"
                         >
-                          <span className="font-medium text-foreground">{outputName}:</span>
-                          <span className="font-mono font-semibold text-foreground">
+                          <span className="font-medium text-slate-900 dark:text-slate-100">{outputName}:</span>
+                          <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
                             {puzzleOutputs[0]?.[outputName] || '0'}
                           </span>
                         </div>
@@ -403,17 +403,17 @@ export function CircuitDebugger({
 
               {mode === 'sequence' && gateOutputs.length > 0 && (
                 <div className="overflow-x-auto">
-                  <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Simulation Results ({stepCount} steps)</h3>
+                  <h3 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Simulation Results ({stepCount} steps)</h3>
 
                   {/* Puzzle Outputs Table */}
                   <div className="mb-4">
-                    <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h4>
+                    <h4 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Puzzle Outputs</h4>
                     <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
                       <thead>
                         <tr className="bg-secondary">
-                          <th className="border border-border px-3 py-2 text-left text-muted-foreground">Step</th>
+                          <th className="border border-border px-3 py-2 text-left text-slate-900 dark:text-slate-100">Step</th>
                           {outputs.map((out) => (
-                            <th key={out} className="border border-border px-3 py-2 text-center text-muted-foreground">
+                            <th key={out} className="border border-border px-3 py-2 text-center text-slate-900 dark:text-slate-100">
                               {out}
                             </th>
                           ))}
@@ -422,9 +422,9 @@ export function CircuitDebugger({
                       <tbody>
                         {puzzleOutputs.map((outputs_map, step) => (
                           <tr key={step} className={step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'}>
-                            <td className="border border-border px-3 py-2 font-mono text-muted-foreground">{step + 1}</td>
+                            <td className="border border-border px-3 py-2 font-mono text-slate-700 dark:text-slate-300">{step + 1}</td>
                             {outputs.map((out) => (
-                              <td key={out} className="border border-border px-3 py-2 text-center font-mono font-semibold text-foreground">
+                              <td key={out} className="border border-border px-3 py-2 text-center font-mono font-semibold text-slate-700 dark:text-slate-300">
                                 {outputs_map[out] || '0'}
                               </td>
                             ))}
@@ -437,13 +437,13 @@ export function CircuitDebugger({
                   {/* Gate Outputs Table */}
                   {gateOutputs.some((step) => step.length > 0) && (
                     <div>
-                      <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h4>
+                      <h4 className="text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Gate Outputs</h4>
                       <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
                         <thead>
                           <tr className="bg-secondary">
-                            <th className="border border-border px-3 py-2 text-left text-muted-foreground">Step</th>
+                            <th className="border border-border px-3 py-2 text-left text-slate-900 dark:text-slate-100">Step</th>
                             {gateOutputs[0]?.map((gate) => (
-                              <th key={gate.placedId} className="border border-border px-3 py-2 text-center text-muted-foreground">
+                              <th key={gate.placedId} className="border border-border px-3 py-2 text-center text-slate-900 dark:text-slate-100">
                                 {gate.displayLabel}
                               </th>
                             ))}
@@ -452,9 +452,9 @@ export function CircuitDebugger({
                         <tbody>
                           {gateOutputs.map((step_gates, step) => (
                             <tr key={step} className={step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'}>
-                              <td className="border border-border px-3 py-2 font-mono text-muted-foreground">{step + 1}</td>
+                              <td className="border border-border px-3 py-2 font-mono text-slate-700 dark:text-slate-300">{step + 1}</td>
                               {step_gates.map((gate) => (
-                                <td key={gate.placedId} className="border border-border px-3 py-2 text-center font-mono text-foreground">
+                                <td key={gate.placedId} className="border border-border px-3 py-2 text-center font-mono text-slate-700 dark:text-slate-300">
                                   {gate.values}
                                 </td>
                               ))}

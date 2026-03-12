@@ -34,8 +34,8 @@ export const AdminPanel = () => {
               className={cn(
                 'flex items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
                 isActive
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+                  ? 'border-foreground text-slate-900 dark:text-slate-300'
+                  : 'border-transparent text-slate-700 dark:text-slate-600 hover:text-slate-900 dark:hover:text-slate-100 hover:border-border',
               )}
             >
               <tab.icon className="size-4" />
