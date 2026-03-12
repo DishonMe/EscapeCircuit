@@ -2,6 +2,8 @@
 
 import { Info } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import {
   Dialog,
@@ -11,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { CircuitComponent, CircuitSolution } from '@/types/api';
 import { cn } from '@/utils/cn';
+import { LogicNode, type LogicNodeDefinition } from './node';
 
 type ArsenalCircuit = {
   id: string;
@@ -129,8 +132,119 @@ const Category = ({
   );
 };
 
+const getFallbackNodeDefinition = (
+  component: CircuitComponent,
+): LogicNodeDefinition => {
+  const hardcoded: Record<string, LogicNodeDefinition> = {
+    AND: {
+      label: 'AND',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    OR: {
+      label: 'OR',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    XOR: {
+      label: 'XOR',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    NAND: {
+      label: 'NAND',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    NOR: {
+      label: 'NOR',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    XNOR: {
+      label: 'XNOR',
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'IN1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    NOT: {
+      label: 'NOT',
+      size: { w: 3, h: 1 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    DFF: {
+      label: 'DFF',
+      size: { w: 3, h: 1 },
+      ports: [
+        { id: 'IN0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'OUT0', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+  };
+
+  if (hardcoded[component.type]) {
+    return hardcoded[component.type];
+  }
+
+  const size = {
+    w: 3,
+    h: Math.max(1, Math.min(4, Math.ceil(component.pins / 2))),
+  };
+  const ports: LogicNodeDefinition['ports'] = [];
+  const outputsCount = 1;
+  const inputsCount = Math.max(1, component.pins - outputsCount);
+
+  for (let index = 0; index < inputsCount; index++) {
+    ports.push({
+      id: `IN${index}`,
+      kind: 'input',
+      offset: { row: Math.min(index, size.h - 1), col: 0 },
+    });
+  }
+
+  ports.push({
+    id: 'OUT0',
+    kind: 'output',
+    offset: { row: 0, col: size.w - 1 },
+  });
+
+  return {
+    label: component.type,
+    size,
+    ports,
+  };
+};
+
 const DraggableItem = ({
   component,
+  node,
+  inPalette = false,
   isSelected,
   onSelect,
   onInfoClick,
@@ -138,6 +252,8 @@ const DraggableItem = ({
   onDragEnd,
 }: {
   component: CircuitComponent;
+  node: LogicNodeDefinition;
+  inPalette?: boolean;
   isSelected?: boolean;
   onSelect?: (componentId: string) => void;
   onInfoClick?: () => void;
@@ -170,6 +286,33 @@ const DraggableItem = ({
         <div
           draggable
           onDragStart={(e) => {
+            const dragPreview = document.createElement('div');
+            dragPreview.style.position = 'fixed';
+            dragPreview.style.left = '-10000px';
+            dragPreview.style.top = '-10000px';
+            dragPreview.style.pointerEvents = 'none';
+            dragPreview.style.zIndex = '-1';
+            document.body.appendChild(dragPreview);
+
+            const root = createRoot(dragPreview);
+            flushSync(() => {
+              root.render(
+                <LogicNode
+                  node={node}
+                  className="border-slate-300 dark:border-slate-600 opacity-80 shadow-xl"
+                />,
+              );
+            });
+
+            e.dataTransfer.setDragImage(
+              dragPreview,
+              (node.size.w * 18) / 2,
+              (node.size.h * 18) / 2,
+            );
+            window.requestAnimationFrame(() => {
+              root.unmount();
+              dragPreview.remove();
+            });
             e.dataTransfer.setData(
               'application/x-escapecircuit-component',
               component.id,
@@ -182,9 +325,11 @@ const DraggableItem = ({
           className="flex flex-1 cursor-grab active:cursor-grabbing items-center justify-between"
         >
           <span className="font-semibold text-slate-900 dark:text-slate-100">{component.type}</span>
-          <span className="text-xs text-foreground/75 dark:text-slate-300">
-            cost {component.cost} · pins {component.pins}
-          </span>
+          {inPalette ? (
+            <span className="text-xs text-foreground/75 dark:text-slate-300">
+              cost {component.cost} · pins {component.pins}
+            </span>
+          ) : null}
         </div>
       </div>
   );
@@ -194,6 +339,7 @@ export const WorkstationMenu = ({
   basic,
   custom,
   arsenal,
+  componentDefs,
   allowArsenal,
   filteredBasicTypes,
   selectedComponentId,
@@ -204,6 +350,7 @@ export const WorkstationMenu = ({
   basic: CircuitComponent[];
   custom: CircuitComponent[];
   arsenal: CircuitComponent[];
+  componentDefs?: Record<string, LogicNodeDefinition>;
   allowArsenal: boolean;
   filteredBasicTypes: string[];
   selectedComponentId?: string;
@@ -269,6 +416,8 @@ export const WorkstationMenu = ({
               <DraggableItem
                 key={c.id}
                 component={c}
+                node={componentDefs?.[c.id] ?? getFallbackNodeDefinition(c)}
+                inPalette
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
                 onInfoClick={() => handleInfoClick(c.id, c)}
@@ -291,6 +440,8 @@ export const WorkstationMenu = ({
               <DraggableItem
                 key={c.id}
                 component={c}
+                node={componentDefs?.[c.id] ?? getFallbackNodeDefinition(c)}
+                inPalette
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
                 onInfoClick={() => handleInfoClick(c.id, c)}
@@ -314,6 +465,8 @@ export const WorkstationMenu = ({
                 <DraggableItem
                   key={c.id}
                   component={c}
+                  node={componentDefs?.[c.id] ?? getFallbackNodeDefinition(c)}
+                  inPalette
                   isSelected={selectedComponentId === c.id}
                   onSelect={onSelectComponent}
                   onInfoClick={() => handleInfoClick(c.id, c)}

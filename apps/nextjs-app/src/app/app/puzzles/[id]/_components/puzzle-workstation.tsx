@@ -1141,6 +1141,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           basic={visibleBasics}
           custom={customComponents}
           arsenal={arsenalComponents}
+          componentDefs={uiCatalog}
           allowArsenal={allowArsenal}
           filteredBasicTypes={filteredBasicTypes}
           selectedComponentId={
@@ -1385,6 +1386,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   basic={visibleBasics}
                   custom={customComponents}
                   arsenal={arsenalComponents}
+                  componentDefs={uiCatalog}
                   allowArsenal={allowArsenal}
                   filteredBasicTypes={filteredBasicTypes}
                   selectedComponentId={

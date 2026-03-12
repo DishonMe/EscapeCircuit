@@ -14,6 +14,7 @@ import { RippleEffect } from '@/components/ripple-effect';
 import { useAudio } from '@/hooks/useAudio';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
+import { LogicNode } from './node';
 
 export type HoleCoord = { row: number; col: number };
 
@@ -1015,6 +1016,34 @@ export const WorkstationGrid = ({
 
   const trashRef = useRef<HTMLButtonElement | null>(null);
 
+  const getDropOriginFromPointer = (
+    pointerLocal: { x: number; y: number },
+    componentId: string,
+    rotation: 0 | 90,
+  ) => {
+    const def = catalog[componentId];
+    if (!def) {
+      const world = screenToWorld(pointerLocal);
+      return {
+        row: clamp(Math.floor(world.row), 0, gridRows - 1),
+        col: clamp(Math.floor(world.col), 0, gridCols - 1),
+      };
+    }
+
+    const size = rotatedSize(def.size, rotation);
+    const world = screenToWorld(pointerLocal);
+
+    // Palette drag preview is anchored at its visual center, so we convert
+    // pointer position to top-left origin before snapping to grid holes.
+    const originRow = Math.round(world.row - size.h / 2);
+    const originCol = Math.round(world.col - size.w / 2);
+
+    return {
+      row: clamp(originRow, 0, gridRows - size.h),
+      col: clamp(originCol, 0, gridCols - size.w),
+    };
+  };
+
   const isOverTrash = (clientX: number, clientY: number) => {
     const el = trashRef.current;
     if (!el) return false;
@@ -1145,11 +1174,16 @@ export const WorkstationGrid = ({
           if (!el) return;
           const rect = el.getBoundingClientRect();
           const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-          const world = screenToWorld(local);
-          const origin = {
-            row: clamp(Math.floor(world.row), 0, gridRows - 1),
-            col: clamp(Math.floor(world.col), 0, gridCols - 1),
-          };
+          const rotation =
+            selectedComponent.mode === 'placing' &&
+            selectedComponent.componentId === draggedPaletteComponentId
+              ? selectedComponent.rotation
+              : 0;
+          const origin = getDropOriginFromPointer(
+            local,
+            draggedPaletteComponentId,
+            rotation,
+          );
           setDropPreview(origin);
         }}
         onDragLeave={() => setDropPreview(null)}
@@ -1162,17 +1196,14 @@ export const WorkstationGrid = ({
           if (!el) return;
           const rect = el.getBoundingClientRect();
           const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-          const world = screenToWorld(local);
-          const origin = {
-            row: clamp(Math.floor(world.row), 0, gridRows - 1),
-            col: clamp(Math.floor(world.col), 0, gridCols - 1),
-          };
 
           const rotation =
             selectedComponent.mode === 'placing' &&
             selectedComponent.componentId === componentId
               ? selectedComponent.rotation
               : 0;
+
+          const origin = getDropOriginFromPointer(local, componentId, rotation);
 
           placeComponent(componentId, origin, rotation);
           onSelectedComponentChange({ mode: 'none' });
@@ -1539,10 +1570,11 @@ export const WorkstationGrid = ({
             const isDeleting = deletingComponentIds.includes(p.id);
 
             return (
-              <div
+              <LogicNode
                 key={p.id}
+                node={def}
                 className={cn(
-                  'group absolute rounded border bg-white text-[10px] text-slate-800 dark:bg-slate-800 dark:text-slate-100 transition-[box-shadow,transform,border-color] duration-300',
+                  'absolute transition-[box-shadow,transform,border-color] duration-300',
                   bootSequenceActive && 'animate-in fade-in zoom-in-75',
                   isDeleting && 'workstation-component-delete-out',
                   !isDragging && !isDeleting && 'workstation-component-breathe',
@@ -1647,14 +1679,6 @@ export const WorkstationGrid = ({
                   }
                 }}
               >
-                {!isDragging ? (
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <span className="select-none text-[9px] font-semibold tracking-wide text-slate-800 dark:text-slate-100">
-                      {def.label}
-                    </span>
-                  </div>
-                ) : null}
-
                 {/* Selected Delete Button (Outside) */}
                 {isSelected && !isDragging && (
                   <button
@@ -1710,18 +1734,16 @@ export const WorkstationGrid = ({
                       type="button"
                       key={port.id}
                       className={cn(
-                        'absolute flex items-center justify-center rounded-full border transition-transform duration-200 hover:scale-150 hover:bg-blue-400 cursor-pointer',
+                        'absolute rounded-full transition-transform duration-200 hover:scale-150 hover:ring-2 hover:ring-blue-400/65 cursor-pointer',
                         wireDraft && 'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
                         isPortFlashing && 'workstation-port-lock-flash',
-                        port.kind === 'input'
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-purple-300 bg-purple-50',
+                        'border-transparent bg-transparent',
                       )}
                       style={{
-                        left: pl + (CELL_PX - 8) / 2,
-                        top: pt + (CELL_PX - 8) / 2,
-                        width: 8,
-                        height: 8,
+                        left: pl + (CELL_PX - 14) / 2,
+                        top: pt + (CELL_PX - 14) / 2,
+                        width: 14,
+                        height: 14,
                       }}
                       onPointerDown={(e) => onStartWireDrag(effective, e)}
                       onPointerUp={(e) => {
@@ -1745,9 +1767,34 @@ export const WorkstationGrid = ({
                     />
                   );
                 })}
-              </div>
+              </LogicNode>
             );
           })}
+
+          {/* Drop Preview / Ghost Node */}
+          {dropPreview && draggedPaletteComponentId &&
+            (() => {
+              const def = catalog[draggedPaletteComponentId];
+              if (!def) return null;
+              const rotation =
+                selectedComponent.mode === 'placing' &&
+                selectedComponent.componentId === draggedPaletteComponentId
+                  ? selectedComponent.rotation
+                  : 0;
+              const size = rotatedSize(def.size, rotation);
+              return (
+                <LogicNode
+                  node={def}
+                  className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
+                  style={{
+                    left: dropPreview.col * 18,
+                    top: dropPreview.row * 18,
+                    width: size.w * 18 - 2,
+                    height: size.h * 18 - 2,
+                  }}
+                />
+              );
+            })()}
         </div>
 
         {/* Floating IO */}
