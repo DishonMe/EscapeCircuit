@@ -55,10 +55,10 @@ const ThemeToggle = () => {
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full"
+        className="size-8 rounded-full text-yellow-500 dark:text-slate-300"
         aria-label="Toggle dark mode"
       >
-        <Sun className="size-4 text-yellow-500" />
+        <Sun className="size-4" />
       </Button>
     );
   }
@@ -71,16 +71,18 @@ const ThemeToggle = () => {
       size="icon"
       className={cn(
         'size-8 rounded-full transition-colors',
-        isDark && 'bg-slate-800 text-slate-100',
+        isDark
+          ? 'bg-slate-800 text-slate-100 hover:bg-slate-700'
+          : 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50/50',
       )}
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       aria-label="Toggle dark mode"
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDark ? (
-        <Moon className="size-4 text-foreground" />
+        <Moon className="size-4" />
       ) : (
-        <Sun className="size-4 text-yellow-500" />
+        <Sun className="size-4" />
       )}
     </Button>
   );
