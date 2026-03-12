@@ -1165,6 +1165,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const currentGateBits = useMemo(() => {
     const localComputed: Record<string, string> = {};
+    const backendStep = debugSnapshot?.gateOutputSteps?.[debugStepIndex] ?? {};
+
+    const normalizeBits = (raw: string | null | undefined) => {
+      const normalized = String(raw ?? '0').replace(/[^01]/g, '');
+      return normalized || '0';
+    };
 
     const getInputValue = (wireFrom: Wire['from']) => {
       if (wireFrom.componentId.startsWith('IO:IN:')) {
@@ -1206,12 +1212,18 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           return [gateInputs[0] | gateInputs[1] ? 0 : 1];
         case 'XNOR':
           return [gateInputs[0] ^ gateInputs[1] ? 0 : 1];
-        case 'DFF':
-          return [gateInputs[0]];
         default:
           return null;
       }
     };
+
+    // Seed stateful/unknown gates from backend step simulation output.
+    // DFF must come from backend trace so delay behavior is correct per step.
+    for (const p of placed) {
+      if (p.componentId === 'DFF') {
+        localComputed[p.id] = normalizeBits(backendStep[p.id]);
+      }
+    }
 
     const unresolved = new Set(placed.map((p) => p.id));
     let iterationGuard = 0;
@@ -1258,20 +1270,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           continue;
         }
 
-        const fallback = debugSnapshot?.gateOutputSteps?.[debugStepIndex]?.[p.id];
-        if (fallback != null) {
-          localComputed[p.id] = String(fallback).replace(/;/g, '');
-        } else {
-          localComputed[p.id] = '0';
-        }
+        const fallback = backendStep[p.id];
+        localComputed[p.id] = normalizeBits(fallback);
         unresolved.delete(p.id);
         progressed = true;
       }
 
       if (!progressed) {
         for (const unresolvedId of Array.from(unresolved)) {
-          const fallback = debugSnapshot?.gateOutputSteps?.[debugStepIndex]?.[unresolvedId];
-          localComputed[unresolvedId] = fallback != null ? String(fallback).replace(/;/g, '') : '0';
+          localComputed[unresolvedId] = normalizeBits(backendStep[unresolvedId]);
           unresolved.delete(unresolvedId);
         }
         break;
