@@ -39,7 +39,7 @@ import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
-import { ChevronDown } from 'lucide-react';
+import { Bug, ChevronDown, StepBack, StepForward } from 'lucide-react';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -76,6 +76,14 @@ type VictoryFxState = {
 };
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const sanitizeBitSequence = (value: string) => value.replace(/[^01]/g, '');
+
+const parseBitSequence = (value: string) => {
+  const normalized = sanitizeBitSequence(value);
+  if (!normalized) return [] as string[];
+  return normalized.split('');
+};
 
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
@@ -124,6 +132,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
   );
+  const [isInlineDebugger, setIsInlineDebugger] = useState(false);
+  const [debugSequences, setDebugSequences] = useState<Record<string, string>>({});
+  const [debugStepIndex, setDebugStepIndex] = useState(0);
+  const [debugIsRunning, setDebugIsRunning] = useState(false);
+  const [debugRunKey, setDebugRunKey] = useState(0);
+  const [debugSnapshot, setDebugSnapshot] = useState<{
+    stepCount: number;
+    inputSteps: Record<string, string[]>;
+    outputSteps: Record<string, string>[];
+    gateOutputSteps: Record<string, string>[];
+  } | null>(null);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -200,6 +219,28 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const inputs = puzzle?.inputs ?? EMPTY_STRINGS;
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
+
+  const dffCount = useMemo(
+    () => placed.filter((p) => p.componentId === 'DFF').length,
+    [placed],
+  );
+
+  const defaultDebugSequence = useMemo(() => {
+    if (dffCount > 0) return '0'.repeat(dffCount);
+    return '0';
+  }, [dffCount]);
+
+  useEffect(() => {
+    if (!inputs.length) return;
+    setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const inputName of inputs) {
+        const current = sanitizeBitSequence(prev[inputName] ?? '');
+        next[inputName] = current || defaultDebugSequence;
+      }
+      return next;
+    });
+  }, [inputs, defaultDebugSequence]);
 
   const budgetLimit = puzzle?.budgetLimit ?? 0;
   const creatorBudget = puzzle?.creatorBudget ?? null;
@@ -960,6 +1001,286 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     router.push(paths.app.puzzles.getHref());
   };
 
+  const runInlineDebugger = useCallback(async () => {
+    if (!puzzle?.id) return;
+    if (!inputs.length) return;
+
+    const parsed: Record<string, string[]> = {};
+    let stepCount = 0;
+    for (const inputName of inputs) {
+      const bits = parseBitSequence(debugSequences[inputName] ?? '');
+      if (!bits.length) {
+        notifications.addNotification({
+          type: 'warning',
+          title: 'Invalid debugger sequence',
+          message: `Input ${inputName} must contain at least one bit.`,
+        });
+        return;
+      }
+      parsed[inputName] = bits;
+      stepCount = Math.max(stepCount, bits.length);
+    }
+
+    for (const inputName of inputs) {
+      if (parsed[inputName].length !== stepCount) {
+        notifications.addNotification({
+          type: 'warning',
+          title: 'Sequence length mismatch',
+          message: 'All input sequences must have the same length.',
+        });
+        return;
+      }
+    }
+
+    const sequencePayload: Record<string, number[]> = {};
+    for (const inputName of inputs) {
+      sequencePayload[inputName] = parsed[inputName].map((bit) => Number(bit));
+    }
+
+    setDebugIsRunning(true);
+    try {
+      const solution = {
+        placedComponents: placed.map((p) => ({
+          id: p.id,
+          componentId: p.componentId,
+          x: p.origin.col,
+          y: p.origin.row,
+        })),
+        wires,
+        totalCost: currentCost,
+      };
+
+      const result = await api.post<any>(`/puzzles/${puzzle.id}/simulate`, {
+        solution,
+        inputs: sequencePayload,
+        isSequence: true,
+      });
+
+      const outputSteps: Record<string, string>[] = (result.steps ?? []).map(
+        (step: any) => {
+          const mapped: Record<string, string> = {};
+          for (const outputName of outputs) {
+            mapped[outputName] = String(step?.puzzleOutputs?.[outputName] ?? '0');
+          }
+          return mapped;
+        },
+      );
+
+      const gateOutputSteps: Record<string, string>[] = (result.steps ?? []).map(
+        (step: any) => {
+          const mapped: Record<string, string> = {};
+          for (const gate of step?.gateOutputs ?? []) {
+            if (!gate?.placedId) continue;
+            mapped[String(gate.placedId)] = String(gate?.values ?? '0');
+          }
+          return mapped;
+        },
+      );
+
+      const effectiveStepCount = outputSteps.length || stepCount;
+      setDebugSnapshot({
+        stepCount: effectiveStepCount,
+        inputSteps: parsed,
+        outputSteps,
+        gateOutputSteps,
+      });
+      setDebugStepIndex((prev) => Math.min(prev, Math.max(effectiveStepCount - 1, 0)));
+      setDebugRunKey((prev) => prev + 1);
+    } catch (err: any) {
+      notifications.addNotification({
+        type: 'error',
+        title: 'Debugger simulation failed',
+        message: err?.message ?? 'Failed to simulate sequence.',
+      });
+    } finally {
+      setDebugIsRunning(false);
+    }
+  }, [puzzle?.id, inputs, debugSequences, placed, wires, currentCost, outputs, notifications]);
+
+  const enterInlineDebugger = useCallback(() => {
+    setIsInlineDebugger(true);
+    setDebugStepIndex(0);
+  }, []);
+
+  const exitInlineDebugger = useCallback(() => {
+    setIsInlineDebugger(false);
+    setShowDebugger(false);
+    setDebugStepIndex(0);
+    setDebugSnapshot(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isInlineDebugger) return;
+    void runInlineDebugger();
+  }, [isInlineDebugger, runInlineDebugger]);
+
+  const onInlineSequenceChange = (inputName: string, rawValue: string) => {
+    const next = sanitizeBitSequence(rawValue);
+    setDebugSequences((prev) => ({ ...prev, [inputName]: next }));
+  };
+
+  const stepCount = debugSnapshot?.stepCount ?? 0;
+
+  const onDebuggerStepNext = () => {
+    if (!stepCount) return;
+    if (debugStepIndex >= stepCount - 1) {
+      notifications.addNotification({
+        type: 'info',
+        title: 'End of sequence reached',
+        message: 'You are already at the last step.',
+      });
+      return;
+    }
+    setDebugStepIndex((prev) => prev + 1);
+  };
+
+  const onDebuggerStepPrev = () => {
+    if (!stepCount) return;
+    if (debugStepIndex <= 0) {
+      notifications.addNotification({
+        type: 'info',
+        title: 'Start of sequence reached',
+        message: 'You are already at the first step.',
+      });
+      return;
+    }
+    setDebugStepIndex((prev) => prev - 1);
+  };
+
+  const currentInputBits = useMemo(() => {
+    const bits: Record<string, string> = {};
+    for (const inputName of inputs) {
+      bits[inputName] = debugSnapshot?.inputSteps?.[inputName]?.[debugStepIndex] ?? '0';
+    }
+    return bits;
+  }, [inputs, debugSnapshot, debugStepIndex]);
+
+  const currentOutputBits = useMemo(() => {
+    const bits: Record<string, string> = {};
+    for (const outputName of outputs) {
+      bits[outputName] = debugSnapshot?.outputSteps?.[debugStepIndex]?.[outputName] ?? '0';
+    }
+    return bits;
+  }, [outputs, debugSnapshot, debugStepIndex]);
+
+  const currentGateBits = useMemo(() => {
+    const localComputed: Record<string, string> = {};
+
+    const getInputValue = (wireFrom: Wire['from']) => {
+      if (wireFrom.componentId.startsWith('IO:IN:')) {
+        const inputName = wireFrom.componentId.replace('IO:IN:', '');
+        return Number(currentInputBits[inputName] ?? '0');
+      }
+
+      const sourcePlaced = placed.find((p) => p.id === wireFrom.componentId);
+      if (!sourcePlaced) return 0;
+      const sourceDef = uiCatalog[sourcePlaced.componentId];
+      if (!sourceDef) return 0;
+
+      if (localComputed[wireFrom.componentId] == null) {
+        return null;
+      }
+
+      const sourceOutputs = (localComputed[wireFrom.componentId] ?? '0').split('');
+      const sourceOutputPortIndices = sourceDef.ports
+        .map((port, idx) => ({ port, idx }))
+        .filter((x) => x.port.kind === 'output')
+        .map((x) => x.idx);
+      const outputPosition = Math.max(0, sourceOutputPortIndices.indexOf(wireFrom.pinIndex));
+      return Number(sourceOutputs[Math.min(outputPosition, sourceOutputs.length - 1)] ?? '0');
+    };
+
+    const evalGate = (componentId: string, gateInputs: number[]) => {
+      switch (componentId) {
+        case 'AND':
+          return [gateInputs[0] & gateInputs[1]];
+        case 'OR':
+          return [gateInputs[0] | gateInputs[1]];
+        case 'NOT':
+          return [gateInputs[0] ? 0 : 1];
+        case 'XOR':
+          return [gateInputs[0] ^ gateInputs[1]];
+        case 'NAND':
+          return [gateInputs[0] & gateInputs[1] ? 0 : 1];
+        case 'NOR':
+          return [gateInputs[0] | gateInputs[1] ? 0 : 1];
+        case 'XNOR':
+          return [gateInputs[0] ^ gateInputs[1] ? 0 : 1];
+        case 'DFF':
+          return [gateInputs[0]];
+        default:
+          return null;
+      }
+    };
+
+    const unresolved = new Set(placed.map((p) => p.id));
+    let iterationGuard = 0;
+    while (unresolved.size > 0 && iterationGuard < placed.length * 4) {
+      iterationGuard += 1;
+      let progressed = false;
+      for (const p of placed) {
+        if (!unresolved.has(p.id)) continue;
+        const def = uiCatalog[p.componentId];
+        if (!def) {
+          unresolved.delete(p.id);
+          progressed = true;
+          continue;
+        }
+
+        const inputPortIndices = def.ports
+          .map((port, idx) => ({ port, idx }))
+          .filter((x) => x.port.kind === 'input')
+          .map((x) => x.idx);
+
+        let hasPendingDependency = false;
+        const gateInputs = inputPortIndices.map((pinIndex) => {
+          const incoming = wires.find(
+            (w) => w.to.componentId === p.id && w.to.pinIndex === pinIndex,
+          );
+          if (!incoming) return 0;
+          const value = getInputValue(incoming.from);
+          if (value == null) {
+            hasPendingDependency = true;
+            return 0;
+          }
+          return value;
+        });
+
+        if (hasPendingDependency) {
+          continue;
+        }
+
+        const evaluated = evalGate(p.componentId, gateInputs);
+        if (evaluated) {
+          localComputed[p.id] = evaluated.map((bit) => String(bit)).join('');
+          unresolved.delete(p.id);
+          progressed = true;
+          continue;
+        }
+
+        const fallback = debugSnapshot?.gateOutputSteps?.[debugStepIndex]?.[p.id];
+        if (fallback != null) {
+          localComputed[p.id] = String(fallback).replace(/;/g, '');
+        } else {
+          localComputed[p.id] = '0';
+        }
+        unresolved.delete(p.id);
+        progressed = true;
+      }
+
+      if (!progressed) {
+        for (const unresolvedId of Array.from(unresolved)) {
+          const fallback = debugSnapshot?.gateOutputSteps?.[debugStepIndex]?.[unresolvedId];
+          localComputed[unresolvedId] = fallback != null ? String(fallback).replace(/;/g, '') : '0';
+          unresolved.delete(unresolvedId);
+        }
+        break;
+      }
+    }
+
+    return localComputed;
+  }, [debugSnapshot, debugStepIndex, currentInputBits, placed, wires, uiCatalog]);
+
   const visibleBasics = basicComponents;
 
   return (
@@ -991,9 +1312,29 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <WorkstationTimer
               timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds}
             />
-            <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
-              Debug
-            </Button>
+            {!isInlineDebugger ? (
+              <Button variant="outline" size="sm" onClick={enterInlineDebugger}>
+                <Bug className="mr-1 size-4" />
+                Debugger
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={onDebuggerStepPrev}>
+                  <StepBack className="mr-1 size-4" />
+                  Previous Step
+                </Button>
+                <Button variant="outline" size="sm" onClick={onDebuggerStepNext}>
+                  <StepForward className="mr-1 size-4" />
+                  Next Step
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
+                  View Full Debugger Report
+                </Button>
+                <Button variant="outline" size="sm" onClick={exitInlineDebugger}>
+                  Exit Debugger
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="sm" onClick={() => setShowLeaderboard(true)}>
               Leaderboard
             </Button>
@@ -1121,6 +1462,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           showSolvedSlam={showSolvedSlam}
           boardRows={puzzle.board_rows ?? 15}
           boardCols={puzzle.board_cols ?? 30}
+          debuggerActive={isInlineDebugger}
+          debuggerStepIndex={debugStepIndex}
+          debuggerStepCount={stepCount}
+          debuggerInputBits={currentInputBits}
+          debuggerOutputBits={currentOutputBits}
+          debuggerGateBits={currentGateBits}
+          debuggerSequences={debugSequences}
+          onDebuggerSequenceChange={onInlineSequenceChange}
         />
 
         <div className="flex flex-col gap-3">
@@ -1128,10 +1477,29 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
               Debugger
             </div>
-            <div className="text-[11px] text-muted-foreground">
-              This debugger shows wiring and IO usage. Backend validation runs
-              creator test-cases.
-            </div>
+            {isInlineDebugger ? (
+              <div className="space-y-1 text-[11px] text-muted-foreground">
+                <div>
+                  Step {stepCount ? debugStepIndex + 1 : 0}/{stepCount || 0}
+                </div>
+                <div>
+                  Edit bit sequences near each input pin, then refresh.
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => void runInlineDebugger()}
+                  isLoading={debugIsRunning}
+                >
+                  {debugIsRunning ? 'Refreshing...' : 'Refresh Debug'}
+                </Button>
+              </div>
+            ) : (
+              <div className="text-[11px] text-muted-foreground">
+                Press Debugger to enter inline step-by-step mode.
+              </div>
+            )}
             <div className="mt-3">
               <div className="mb-2 text-[11px] font-medium text-muted-foreground">
                 Wires
@@ -1493,6 +1861,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         wires={wires}
         catalog={uiCatalog}
         puzzleId={puzzleId}
+        modeOverride="sequence"
+        sequenceInputsOverride={debugSequences}
+        autoRunToken={debugRunKey}
       />
 
       <Dialog
