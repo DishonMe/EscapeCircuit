@@ -47,11 +47,11 @@ def get_db_conn():
 
 
 def get_next_puzzle_number(riddles_dir: pathlib.Path) -> int:
-    """Get the next puzzle number based on existing riddle_XX files."""
+    """Get the next puzzle number based on existing riddle_XX items."""
     max_num = 0
     if riddles_dir.exists():
-        for file in riddles_dir.iterdir():
-            match = re.match(r'riddle_(\d+)_', file.name)
+        for item in riddles_dir.iterdir():
+            match = re.match(r'riddle_(\d+)_', item.name)
             if match:
                 num = int(match.group(1))
                 max_num = max(max_num, num)
@@ -64,6 +64,16 @@ def sanitize_puzzle_name(name: str) -> str:
     sanitized = re.sub(r'[^\w\s-]', '', name)
     sanitized = re.sub(r'[\s-]+', '_', sanitized)
     return sanitized.lower()
+
+
+def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/."""
+    riddle_dir = riddles_dir / riddle_base_name
+    return (
+        riddle_dir / f"{riddle_base_name}_config.json",
+        riddle_dir / f"{riddle_base_name}_instructions{instructions_ext}",
+        riddle_dir / f"{riddle_base_name}_sample_solution.json",
+    )
 
 
 def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
@@ -284,6 +294,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
                 puzzle_num = get_next_puzzle_number(riddles_dir)
                 sanitized_name = sanitize_puzzle_name(puzzle_name)
+                riddle_base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}'
 
                 temp_path = pathlib.Path(temp_dir)
 
@@ -391,10 +402,13 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                         json.dump(config_data, cf, indent=2)
 
                 # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
-                # Copy validated temp files to final riddles directory
-                final_config_path = riddles_dir / pathlib.Path(config_path).name
-                final_instructions_path = riddles_dir / pathlib.Path(instructions_path).name
-                final_solution_path = riddles_dir / pathlib.Path(solution_path).name
+                instructions_ext = pathlib.Path(instructions_path).suffix or '.tex'
+                final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
+                    riddles_dir,
+                    riddle_base_name,
+                    instructions_ext,
+                )
+                final_config_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)
@@ -450,11 +464,12 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
                 puzzle_num = get_next_puzzle_number(riddles_dir)
                 sanitized_name = sanitize_puzzle_name(puzzle_name)
+                riddle_base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}'
                 solution_content = await sample_solution_file.read()
 
-                config_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_config.json'
-                instructions_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
-                solution_path = temp_path / f'riddle_{puzzle_num:02d}_{sanitized_name}_sample_solution.json'
+                config_path = temp_path / f'{riddle_base_name}_config.json'
+                instructions_path = temp_path / f'{riddle_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
+                solution_path = temp_path / f'{riddle_base_name}_sample_solution.json'
 
                 config_path.write_bytes(config_content)
                 instructions_path.write_bytes(instructions_content)
@@ -523,10 +538,13 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                         json.dump(config_data, cf, indent=2)
 
                 # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
-                # Copy validated temp files to final riddles directory
-                final_config_path = riddles_dir / pathlib.Path(config_path).name
-                final_instructions_path = riddles_dir / pathlib.Path(instructions_path).name
-                final_solution_path = riddles_dir / pathlib.Path(solution_path).name
+                instructions_ext = instructions_path.suffix or '.tex'
+                final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
+                    riddles_dir,
+                    riddle_base_name,
+                    instructions_ext,
+                )
+                final_config_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)

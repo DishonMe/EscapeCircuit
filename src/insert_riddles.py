@@ -126,6 +126,20 @@ def normalize_truth_table(truth_table):
     
     return normalized
 
+def iter_riddle_config_paths(riddles_dir):
+    """Yield all riddle config file paths from nested or legacy layouts."""
+    if not os.path.exists(riddles_dir):
+        return []
+
+    config_paths = []
+    for root, _, files in os.walk(riddles_dir):
+        for filename in files:
+            if filename.endswith('_config.json'):
+                config_paths.append(os.path.join(root, filename))
+
+    config_paths.sort()
+    return config_paths
+
 def get_seed_puzzle_names(riddles_dir):
     """
     Get the set of puzzle names that are defined in the riddles/ directory.
@@ -135,10 +149,7 @@ def get_seed_puzzle_names(riddles_dir):
     if not os.path.exists(riddles_dir):
         return seed_names
     
-    for filename in os.listdir(riddles_dir):
-        if not filename.endswith('_config.json'):
-            continue
-        config_path = os.path.join(riddles_dir, filename)
+    for config_path in iter_riddle_config_paths(riddles_dir):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 cfg = json.load(f)
@@ -514,10 +525,7 @@ def main():
         #    but skip any whose name was deleted (user or admin).
         print("Importing riddles...")
         count = 0
-        for filename in os.listdir(RIDDLES_DIR):
-            if not filename.endswith('_config.json'):
-                continue
-            config_path = os.path.join(RIDDLES_DIR, filename)
+        for config_path in iter_riddle_config_paths(RIDDLES_DIR):
 
             # Read the puzzle name from the config to check against deleted list
             try:
@@ -531,18 +539,20 @@ def main():
                 print(f"  Skipped (admin-deleted): {puzzle_name}")
                 continue
 
-            base_name = filename.replace('_config.json', '')
-            instr_path = os.path.join(RIDDLES_DIR, f"{base_name}_instructions.tex")
+            config_filename = os.path.basename(config_path)
+            base_name = config_filename.replace('_config.json', '')
+            config_dir = os.path.dirname(config_path)
+            instr_path = os.path.join(config_dir, f"{base_name}_instructions.tex")
             
             # Fallback to .md if .tex not found
             if not os.path.exists(instr_path):
-                instr_path = os.path.join(RIDDLES_DIR, f"{base_name}_instructions.md")
+                instr_path = os.path.join(config_dir, f"{base_name}_instructions.md")
 
             try:
                 insert_riddle(conn, config_path, instr_path, admin_id)
                 count += 1
             except Exception as e:
-                print(f"Error inserting {filename}: {e}")
+                print(f"Error inserting {config_filename}: {e}")
                     
         print(f"Done. Imported {count} riddles.")
         

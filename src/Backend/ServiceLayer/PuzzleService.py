@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 import pathlib
 import os
 import shutil
+import re
 
 from Backend import settings
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -27,6 +28,12 @@ class PuzzleService:
         self.solve_repo = solve_repo
         self.arsenal_service = arsenal_service
 
+    @staticmethod
+    def _slugify_puzzle_name(name: str) -> str:
+        sanitized = re.sub(r'[^\w\s-]', '', name or '')
+        sanitized = re.sub(r'[\s-]+', '_', sanitized)
+        return sanitized.lower().strip('_')
+
     def _delete_riddle_files(self, puzzle_name: str) -> None:
         """Delete riddle files/folders from the riddles directory matching the puzzle name.
         Handles both: riddle_XX_puzzle_name_*.ext (files) and riddle_XX_puzzle_name/ (folders)
@@ -40,11 +47,21 @@ class PuzzleService:
             if not riddles_dir.exists():
                 return
             
-            # Search for all files/folders containing the puzzle name (case-insensitive match)
-            # Pattern: riddle_XX_puzzle_name_*.ext or riddle_XX_puzzle_name/
+            puzzle_slug = self._slugify_puzzle_name(puzzle_name)
+
+            def matches_riddle_item(item_name: str, is_dir: bool) -> bool:
+                item_lower = item_name.lower()
+                if puzzle_slug:
+                    if is_dir and re.fullmatch(rf'riddle_\d+_{re.escape(puzzle_slug)}', item_lower):
+                        return True
+                    if (not is_dir) and re.match(rf'riddle_\d+_{re.escape(puzzle_slug)}_', item_lower):
+                        return True
+                # Legacy fallback for older naming variants
+                return ("_" + puzzle_name.lower() + "_") in item_lower
+
             deleted_count = 0
             for item in riddles_dir.iterdir():
-                if ("_" + puzzle_name.lower() + "_") in item.name.lower():
+                if matches_riddle_item(item.name, item.is_dir()):
                     try:
                         if item.is_file():
                             item.unlink()
