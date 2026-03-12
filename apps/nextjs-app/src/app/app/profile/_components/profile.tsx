@@ -1,8 +1,13 @@
 'use client';
 
-import { Boxes, CircuitBoard, Medal, PackageOpen, Trophy, UserRound } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { Boxes, CircuitBoard, Gift, Medal, PackageOpen, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getLevelInfo } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useMyArsenal } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
@@ -22,6 +27,64 @@ type ArsenalStructure = {
     to: { componentId: string; pinIndex?: number };
   }>;
 };
+
+type LevelBenefit = {
+  level: number;
+  arsenalSlots: number;
+  publishedCap: number;
+  unpublishedCap: number;
+};
+
+type LevelBenefitChange = {
+  level: number;
+  changes: string[];
+};
+
+const getArsenalSlots = (level: number) => {
+  if (level <= 2) return 5;
+  if (level <= 4) return 10;
+  if (level <= 6) return 20;
+  if (level <= 8) return 35;
+  return 50;
+};
+
+const getCreatorPuzzleCap = (level: number) => {
+  if (level < 10) return 5;
+  const steps = Math.min(level - 10 + 1, 6);
+  return 5 + steps * 2;
+};
+
+const LEVEL_BENEFITS: LevelBenefit[] = Array.from({ length: 15 }, (_, i) => {
+  const level = i + 1;
+  const creatorCap = getCreatorPuzzleCap(level);
+  return {
+    level,
+    arsenalSlots: getArsenalSlots(level),
+    publishedCap: creatorCap,
+    unpublishedCap: creatorCap,
+  };
+});
+
+const LEVEL_BENEFIT_CHANGES: LevelBenefitChange[] = LEVEL_BENEFITS
+  .map((benefit, index) => {
+    if (index === 0) return null;
+    const previous = LEVEL_BENEFITS[index - 1];
+    const changes: string[] = [];
+
+    if (benefit.arsenalSlots !== previous.arsenalSlots) {
+      changes.push(`Arsenal slots ${previous.arsenalSlots}->${benefit.arsenalSlots}`);
+    }
+    if (benefit.publishedCap !== previous.publishedCap) {
+      changes.push(`Published puzzles ${previous.publishedCap}->${benefit.publishedCap}`);
+    }
+    if (benefit.unpublishedCap !== previous.unpublishedCap) {
+      changes.push(`Unpublished puzzles ${previous.unpublishedCap}->${benefit.unpublishedCap}`);
+    }
+
+    if (changes.length === 0) return null;
+    return { level: benefit.level, changes };
+  })
+  .filter((entry): entry is LevelBenefitChange => entry !== null);
 
 const Entry = ({ label, value }: EntryProps) => (
   <div className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70 sm:grid-cols-[140px_1fr]">
@@ -107,6 +170,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
 export const Profile = () => {
   const user = useUser();
   const { data: arsenal = [] } = useMyArsenal();
+  const [rewardsOpen, setRewardsOpen] = useState(false);
 
   if (!user?.data) return null;
   const userData = user.data as any;
@@ -127,6 +191,8 @@ export const Profile = () => {
   const bronzeMedals = Number(medals.bronze ?? 0);
   const medalsTotal = userData.medals?.total ?? 0;
   const savedPuzzleCount = userData.saved_puzzles?.length ?? 0;
+  const currentXp = Number(userData.xp ?? 0);
+  const levelInfo = useMemo(() => getLevelInfo(currentXp), [currentXp]);
 
   return (
     <div className="space-y-5">
@@ -154,13 +220,35 @@ export const Profile = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><UserRound size={16} /> Level</div>
-            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{userData.level ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><CircuitBoard size={16} /> XP</div>
-            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{userData.xp ?? 0}</p>
+          <div className="col-span-2 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <CircuitBoard size={16} />
+                Progress
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setRewardsOpen(true)}>
+                  Rewards
+                </Button>
+                <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  Level {levelInfo.level}
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              XP to next level: <span className="font-semibold text-slate-900 dark:text-slate-100">{levelInfo.xpIntoLevel}/{levelInfo.xpForLevel}</span>
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{levelInfo.level}</span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
+                  style={{ width: `${levelInfo.pct}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{levelInfo.level + 1}</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{currentXp}/{levelInfo.nextThreshold} total XP</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><Trophy size={16} /> Medals</div>
@@ -234,6 +322,56 @@ export const Profile = () => {
           <p className="text-sm text-slate-500 dark:text-slate-400">No saved puzzles yet.</p>
         )}
       </section>
+
+      <Dialog open={rewardsOpen} onOpenChange={setRewardsOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift size={18} /> Level Rewards (1-15)
+            </DialogTitle>
+            <DialogDescription>
+              Milestone levels only. Each row shows exactly what changes at that level.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="max-h-[430px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Level</th>
+                    <th className="px-3 py-2 text-left">Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {LEVEL_BENEFIT_CHANGES.map((benefit) => (
+                    <tr
+                      key={benefit.level}
+                      className={benefit.level === levelInfo.level ? 'bg-cyan-50/70 dark:bg-cyan-950/30' : 'bg-white dark:bg-slate-900'}
+                    >
+                      <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2 font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                        Level {benefit.level}
+                      </td>
+                      <td className="border-t border-slate-200 px-3 py-2 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                        {benefit.changes.join(' | ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                You are level {levelInfo.level}. Next level in {Math.max(0, levelInfo.nextThreshold - currentXp)} XP.
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Starting values at level 1 are: Arsenal slots 5, Published puzzles 5, Unpublished puzzles 5.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
