@@ -370,8 +370,10 @@ class TestSolveRepoTimeTracking:
 
     def test_get_total_time_single_attempt_with_time(self, repo):
         """Single attempt time is returned"""
+        from datetime import datetime, timezone
         a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
         a.time_used_seconds = 60
+        a.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a)
         
         total = repo.get_total_time_on_puzzle(user_id=1, puzzle_id=1)
@@ -558,9 +560,11 @@ class TestGetTotalTimeOnPuzzle:
         assert result == 0
     def test_get_total_time_multiple_attempts_sum(self, repo):
         """Multiple attempts are summed"""
+        from datetime import datetime, timezone
         for seconds in [30, 45, 25]:
             a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
             a.time_used_seconds = seconds
+            a.submitted_at = datetime.now(timezone.utc)
             repo.update_attempt(a)
         
         total = repo.get_total_time_on_puzzle(user_id=1, puzzle_id=1)
@@ -568,12 +572,15 @@ class TestGetTotalTimeOnPuzzle:
 
     def test_get_total_time_user_isolated(self, repo):
         """Time from one user doesn't affect another"""
+        from datetime import datetime, timezone
         a1 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
         a1.time_used_seconds = 100
+        a1.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a1)
         
         a2 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=2))
         a2.time_used_seconds = 50
+        a2.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a2)
         
         assert repo.get_total_time_on_puzzle(user_id=1, puzzle_id=1) == 100
@@ -581,12 +588,15 @@ class TestGetTotalTimeOnPuzzle:
 
     def test_get_total_time_puzzle_isolated(self, repo):
         """Time on one puzzle doesn't affect another"""
+        from datetime import datetime, timezone
         a1 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
         a1.time_used_seconds = 100
+        a1.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a1)
         
         a2 = repo.create_attempt(make_attempt(puzzle_id=2, user_id=1))
         a2.time_used_seconds = 50
+        a2.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a2)
         
         assert repo.get_total_time_on_puzzle(user_id=1, puzzle_id=1) == 100
@@ -603,8 +613,10 @@ class TestGetTotalTimeOnPuzzle:
 
     def test_get_total_time_large_values(self, repo):
         """Large time values are handled correctly"""
+        from datetime import datetime, timezone
         a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
         a.time_used_seconds = 86400  # 24 hours in seconds
+        a.submitted_at = datetime.now(timezone.utc)
         repo.update_attempt(a)
         
         total = repo.get_total_time_on_puzzle(user_id=1, puzzle_id=1)

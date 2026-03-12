@@ -20,7 +20,7 @@
     --secondary-foreground: 220 14% 10%;
 
     --muted: 220 10% 96%;
-    --muted-foreground: 220 10% 46%;
+    --muted-foreground: 220 10% 35%;
 
     --accent: 220 10% 96%;
     --accent-foreground: 220 14% 10%;
@@ -52,7 +52,7 @@
     --secondary-foreground: 220 10% 96%;
 
     --muted: 220 14% 14%;
-    --muted-foreground: 220 10% 54%;
+    --muted-foreground: 220 10% 70%;
 
     --accent: 220 14% 14%;
     --accent-foreground: 220 10% 96%;
@@ -89,6 +89,10 @@ code {
     Consolas, 'Courier New', monospace;
 }
 
+svg {
+  color: inherit;
+}
+
 /* Tech scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -100,10 +104,10 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: hsl(var(--muted-foreground) / 0.35);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.5);
+  background: hsl(var(--foreground) / 0.45);
 }

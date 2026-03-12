@@ -451,12 +451,13 @@ def test_search_by_name_order_by_created_at(repo):
 def test_list_published_with_filters_difficulty(repo):
     """Test list_published with difficulty filters"""
     p1 = repo.create(make_puzzle("Easy", avg_difficulty=1.0, status=PuzzleStatus.PUBLISHED))
-    p2 = repo.create(make_puzzle("Hard", avg_difficulty=5.0, status=PuzzleStatus.PUBLISHED))
+    p2 = repo.create(make_puzzle("Hard", avg_difficulty=8.0, status=PuzzleStatus.PUBLISHED))  # Sets difficulty=HARD (3)
     
+    # min_difficulty=2.5 means difficulty >= 2.5, so only HARD (3) matches, not EASY (1) or MEDIUM (2)
     result = repo.list_published(
         limit=10, offset=0,
-        min_difficulty=4.0, max_difficulty=5.5,
-        only_experienced_difficulty=True
+        min_difficulty=2.5,
+        only_experienced_difficulty=False
     )
     assert p2.id in [p.id for p in result]
     assert p1.id not in [p.id for p in result]
@@ -841,7 +842,7 @@ class TestPuzzleRepoComplexFiltering:
         repo.create(make_puzzle("Easy", status=PuzzleStatus.PUBLISHED, avg_difficulty=2.0))
         repo.create(make_puzzle("Hard", status=PuzzleStatus.PUBLISHED, avg_difficulty=7.5))
         
-        result = repo.list_published(min_difficulty=5.0, limit=50, only_experienced_difficulty=True)
+        result = repo.list_published(min_difficulty=2.5, limit=50, only_experienced_difficulty=False)
         names = {p.name for p in result}
         assert "Hard" in names
         assert "Easy" not in names
@@ -851,7 +852,7 @@ class TestPuzzleRepoComplexFiltering:
         repo.create(make_puzzle("Easy", status=PuzzleStatus.PUBLISHED, avg_difficulty=2.0))
         repo.create(make_puzzle("Hard", status=PuzzleStatus.PUBLISHED, avg_difficulty=8.0))
         
-        result = repo.list_published(max_difficulty=3.0, limit=50, only_experienced_difficulty=True)
+        result = repo.list_published(max_difficulty=1.5, limit=50, only_experienced_difficulty=False)
         names = {p.name for p in result}
         assert "Easy" in names
         assert "Hard" not in names
@@ -862,7 +863,7 @@ class TestPuzzleRepoComplexFiltering:
         repo.create(make_puzzle("Medium", status=PuzzleStatus.PUBLISHED, avg_difficulty=5.0))
         repo.create(make_puzzle("VeryHard", status=PuzzleStatus.PUBLISHED, avg_difficulty=9.0))
         
-        result = repo.list_published(min_difficulty=4.0, max_difficulty=6.0, limit=50, only_experienced_difficulty=True)
+        result = repo.list_published(min_difficulty=1.5, max_difficulty=2.5, limit=50, only_experienced_difficulty=False)
         names = {p.name for p in result}
         assert "Medium" in names
         assert "VeryEasy" not in names
@@ -1446,20 +1447,26 @@ class TestListPublishedFiltering:
         assert result[0].name == "med"
     
     def test_list_published_min_difficulty_experienced(self, repo):
-        """Test min_difficulty with only_experienced_difficulty=True"""
+        """Test min_difficulty with only_experienced_difficulty=False uses difficulty enum"""
+        # Add puzzles with correct difficulty enums
+        # min_difficulty=2.0 will match difficulty >= 2 (MEDIUM or HARD)
         repo.create(make_puzzle("easy", avg_difficulty=1.0, status=PuzzleStatus.PUBLISHED))
-        repo.create(make_puzzle("hard", avg_difficulty=2.8, status=PuzzleStatus.PUBLISHED))
+        repo.create(make_puzzle("hard", avg_difficulty=8.0, status=PuzzleStatus.PUBLISHED))  # This sets difficulty=HARD
         
-        result = repo.list_published(min_difficulty=2.0, only_experienced_difficulty=True)
+        # min_difficulty=2.0 means difficulty >= 2, so should get HARD (3) but not EASY (1)
+        result = repo.list_published(min_difficulty=2.0, only_experienced_difficulty=False)
         assert len(result) == 1
         assert result[0].name == "hard"
     
     def test_list_published_max_difficulty_experienced(self, repo):
-        """Test max_difficulty with only_experienced_difficulty=True"""
+        """Test max_difficulty with only_experienced_difficulty=False uses difficulty enum"""
+        # Add puzzles with correct difficulty enums
+        # max_difficulty=1.5 will match difficulty <= 1 (EASY only)
         repo.create(make_puzzle("easy", avg_difficulty=1.0, status=PuzzleStatus.PUBLISHED))
-        repo.create(make_puzzle("hard", avg_difficulty=2.8, status=PuzzleStatus.PUBLISHED))
+        repo.create(make_puzzle("hard", avg_difficulty=8.0, status=PuzzleStatus.PUBLISHED))  # This sets difficulty=HARD
         
-        result = repo.list_published(max_difficulty=1.5, only_experienced_difficulty=True)
+        # max_difficulty=1.5 means difficulty <= 1, so should get EASY (1) but not HARD (3)
+        result = repo.list_published(max_difficulty=1.5, only_experienced_difficulty=False)
         assert len(result) == 1
         assert result[0].name == "easy"
     

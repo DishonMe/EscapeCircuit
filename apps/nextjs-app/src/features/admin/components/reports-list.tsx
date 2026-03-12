@@ -51,7 +51,7 @@ const reasonColors: Record<string, string> = {
 const statusColors: Record<string, string> = {
   pending: 'bg-amber-50/50 text-amber-700',
   reviewed: 'bg-emerald-50/50 text-emerald-700',
-  dismissed: 'bg-secondary text-muted-foreground',
+  dismissed: 'bg-secondary text-foreground/80',
 };
 
 const STATUS_FILTERS = [
@@ -132,7 +132,7 @@ export const ReportsList = () => {
               'rounded-full px-3 py-1 text-[11px] font-medium transition-colors',
               statusFilter === f.value
                 ? 'bg-blue-50/50 text-blue-700'
-                : 'bg-secondary text-muted-foreground hover:bg-secondary',
+                : 'bg-secondary text-foreground/75 hover:bg-secondary',
             )}
           >
             {f.label}
@@ -142,7 +142,7 @@ export const ReportsList = () => {
 
       {reports.length === 0 ? (
         <div className="rounded-xl border border-border bg-secondary p-4">
-          <p className="text-muted-foreground">
+          <p className="text-foreground/80">
             {statusFilter
               ? `No ${statusFilter} reports.`
               : 'No reports yet.'}
@@ -174,13 +174,13 @@ export const ReportsList = () => {
                     {report.status}
                   </span>
                 </div>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[11px] text-foreground/70">
                   {formatDate(report.created_at)}
                 </span>
               </div>
 
               {/* Content info: target link, reporter, author */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-foreground/80">
                 <span className="font-medium capitalize">
                   {report.target_type}
                 </span>
@@ -211,7 +211,7 @@ export const ReportsList = () => {
               </div>
 
               {report.details && (
-                <div className="mt-1 text-[11px] text-muted-foreground">
+                <div className="mt-1 text-[11px] text-foreground/70">
                   {report.details}
                 </div>
               )}
@@ -240,7 +240,7 @@ export const ReportsList = () => {
                       })
                     }
                     disabled={updateMutation.isPending}
-                    className="rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                    className="rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-foreground/80 hover:bg-secondary disabled:opacity-50"
                   >
                     Dismiss
                   </button>

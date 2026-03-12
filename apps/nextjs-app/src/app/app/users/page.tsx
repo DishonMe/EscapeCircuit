@@ -12,7 +12,9 @@ const UsersPage = () => {
   return (
     <ContentLayout title="Admin Panel">
       <AdminGuard>
-        <Users />
+        <div className="space-y-4 text-slate-900 dark:text-slate-100">
+          <Users />
+        </div>
       </AdminGuard>
     </ContentLayout>
   );

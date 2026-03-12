@@ -56,9 +56,16 @@ class TestAdminCreatorManagement:
         creator_info = get_user_info(client, creator_token)
         creator_id = creator_info["id"]
 
-        # Admin removes creator role
+        # Admin initiates creator removal
         resp = client.post("/admin/remove-creator", json={
             "target_user_id": creator_id,
+        }, headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        
+        # Admin confirms removal with action "leave" (leave puzzles as-is)
+        resp = client.post("/admin/confirm-remove-creator", json={
+            "target_user_id": creator_id,
+            "action": "leave",
         }, headers=auth_header(admin_token))
         assert resp.status_code == 200
 

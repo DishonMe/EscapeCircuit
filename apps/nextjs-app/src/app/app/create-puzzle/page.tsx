@@ -1097,7 +1097,17 @@ export default function CreatePuzzleForm() {
         });
       }
       
-      const configData = {
+      const configData: {
+        puzzle: Record<string, unknown>;
+        test_cases: unknown[];
+        custom_pieces?: Array<{
+          name: string;
+          cost: number;
+          num_inputs: number;
+          num_outputs: number;
+          truth_table: Record<string, number>;
+        }>;
+      } = {
         puzzle: {
           name: data.basic.name,
           description: data.basic.description,

@@ -55,7 +55,7 @@ const NotificationsPage = () => {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">Type</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.notifType || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, notifType: (e.target.value || undefined) as any })}
               >
@@ -95,7 +95,7 @@ const NotificationsPage = () => {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">Order By</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
               >
@@ -108,7 +108,7 @@ const NotificationsPage = () => {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">Direction</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderDirection || 'ASC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
               >

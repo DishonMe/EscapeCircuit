@@ -117,9 +117,9 @@ export const PuzzleViewDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-h-[80vh] max-w-2xl bg-white dark:bg-slate-900 flex flex-col">
         <DialogHeader>
-          <DialogTitle>{displayPuzzle.title}</DialogTitle>
+          <DialogTitle className="text-slate-900 dark:text-slate-400">{displayPuzzle.title}</DialogTitle>
         </DialogHeader>
 
         {/* Tabs */}
@@ -128,8 +128,8 @@ export const PuzzleViewDialog = ({
             onClick={() => setTab('base')}
             className={`px-4 py-2 text-[13px] font-medium transition-colors ${
               tab === 'base'
-                ? 'border-b-2 border-foreground text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-b-2 border-foreground text-slate-900 dark:text-slate-400'
+                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             Base Data
@@ -138,8 +138,8 @@ export const PuzzleViewDialog = ({
             onClick={() => setTab('test')}
             className={`px-4 py-2 text-[13px] font-medium transition-colors ${
               tab === 'test'
-                ? 'border-b-2 border-foreground text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-b-2 border-foreground text-slate-900 dark:text-slate-400'
+                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             Test Cases
@@ -148,8 +148,8 @@ export const PuzzleViewDialog = ({
             onClick={() => setTab('ratings')}
             className={`px-4 py-2 text-[13px] font-medium transition-colors ${
               tab === 'ratings'
-                ? 'border-b-2 border-foreground text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-b-2 border-foreground text-slate-900 dark:text-slate-400'
+                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             Solving and Rating
@@ -158,8 +158,8 @@ export const PuzzleViewDialog = ({
             onClick={() => setTab('instructions')}
             className={`px-4 py-2 text-[13px] font-medium transition-colors ${
               tab === 'instructions'
-                ? 'border-b-2 border-foreground text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-b-2 border-foreground text-slate-900 dark:text-slate-400'
+                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             Instructions
@@ -171,46 +171,46 @@ export const PuzzleViewDialog = ({
           {tab === 'base' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Title</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.title}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Title</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.title}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Description</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.description || 'No description'}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Description</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.description || 'No description'}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Creator</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.creator?.username || 'Unknown'}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Creator</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.creator?.username || 'Unknown'}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Difficulty</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.difficulty}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Difficulty</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.difficulty}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Status</p>
-                <p className="text-[13px] text-foreground capitalize">
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Status</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400 capitalize">
                   {(displayPuzzle as any).status || ((displayPuzzle as any).isPublished ? 'Published' : 'Unpublished')}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Visibility</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.isPublic ? 'Public' : 'Private'}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Visibility</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.isPublic ? 'Public' : 'Private'}</p>
               </div>
               {displayPuzzle.creatorComment && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Creator Comment</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.creatorComment}</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Creator Comment</p>
+                  <p className="text-[13px] text-slate-900 dark:text-slate-400 bg-secondary p-2 rounded">{displayPuzzle.creatorComment}</p>
                 </div>
               )}
               {displayPuzzle.defaultGateSet && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Default Gate Set</p>
-                  <p className="text-[13px] text-foreground">{(displayPuzzle.defaultGateSet as any).join?.(',') || displayPuzzle.defaultGateSet}</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Default Gate Set</p>
+                  <p className="text-[13px] text-slate-900 dark:text-slate-400">{(displayPuzzle.defaultGateSet as any).join?.(',') || displayPuzzle.defaultGateSet}</p>
                 </div>
               )}
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Arsenal Allowed</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.allowArsenal ? 'Yes' : 'No'}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Arsenal Allowed</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.allowArsenal ? 'Yes' : 'No'}</p>
               </div>
             </div>
           )}
@@ -218,21 +218,21 @@ export const PuzzleViewDialog = ({
           {tab === 'test' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Time Limit</p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.timeLimit} seconds</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Time Limit</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400 bg-secondary p-2 rounded">{displayPuzzle.timeLimit} seconds</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Budget Limit</p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.budgetLimit || displayPuzzle.budget}</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Budget Limit</p>
+                <p className="text-[13px] text-slate-900 dark:text-slate-400 bg-secondary p-2 rounded">{displayPuzzle.budgetLimit || displayPuzzle.budget}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Test Cases</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Test Cases</p>
                 <div className="border border-border rounded overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary">
-                        <th className="px-3 py-2 text-left text-foreground">Inputs</th>
-                        <th className="px-3 py-2 text-left text-foreground">Expected Outputs</th>
+                        <th className="px-3 py-2 text-left text-slate-900 dark:text-slate-400">Inputs</th>
+                        <th className="px-3 py-2 text-left text-slate-900 dark:text-slate-400">Expected Outputs</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -247,13 +247,13 @@ export const PuzzleViewDialog = ({
                           })
                           .map((tc: any, idx: number) => (
                             <tr key={idx} className="border-b border-border hover:bg-secondary/50">
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.inputs || tc.input_stream || {})}</pre></td>
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.outputs || tc.expected_output_stream || {})}</pre></td>
+                              <td className="px-3 py-2 text-slate-700 dark:text-slate-400 text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.inputs || tc.input_stream || {})}</pre></td>
+                              <td className="px-3 py-2 text-slate-700 dark:text-slate-400 text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.outputs || tc.expected_output_stream || {})}</pre></td>
                             </tr>
                           ))
                       ) : (
                         <tr>
-                          <td colSpan={2} className="px-3 py-2 text-center text-muted-foreground">No test cases specified</td>
+                          <td colSpan={2} className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">No test cases specified</td>
                         </tr>
                       )}
                     </tbody>
@@ -261,8 +261,8 @@ export const PuzzleViewDialog = ({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Gate Limits (Allowed Gates)</p>
-                <div className="bg-secondary p-3 rounded text-[13px] text-foreground">
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Gate Limits (Allowed Gates)</p>
+                <div className="bg-secondary p-3 rounded text-[13px] text-slate-900 dark:text-slate-400">
                   {(displayPuzzle as any).gateLimits && Object.keys((displayPuzzle as any).gateLimits).length > 0 ? (
                     Object.entries((displayPuzzle as any).gateLimits)
                       .map(([gate, limit]: [string, any]) => `${gate}-${limit === null ? 'unlimited' : limit}`)
@@ -273,18 +273,18 @@ export const PuzzleViewDialog = ({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Arsenal Pieces</p>
-                <p className="text-[12px] text-foreground">
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Arsenal Pieces</p>
+                <p className="text-[12px] text-slate-900 dark:text-slate-400">
                   {displayPuzzle.allowArsenal !== false ? "✓ Allowed" : "✗ Not allowed - Only basic gates permitted"}
                 </p>
               </div>
               {displayPuzzle.allowArsenal !== false && displayPuzzle.specialComponents && displayPuzzle.specialComponents.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Available Arsenal</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Available Arsenal</p>
                   <div className="space-y-2">
                     {displayPuzzle.specialComponents.map((comp: any, idx: number) => (
                       <div key={idx} className="bg-secondary p-3 rounded text-[12px]">
-                        <p className="text-foreground"><strong>{comp.type}</strong> - Cost: {comp.cost}, Pins: {comp.pins}</p>
+                        <p className="text-slate-900 dark:text-slate-400"><strong>{comp.type}</strong> - Cost: {comp.cost}, Pins: {comp.pins}</p>
                       </div>
                     ))}
                   </div>
@@ -297,43 +297,43 @@ export const PuzzleViewDialog = ({
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Total Solves</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.solvedCount || 0}</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Total Solves</p>
+                  <p className="text-[13px] text-slate-900 dark:text-slate-500 bg-secondary p-2 rounded">{displayPuzzle.solvedCount || 0}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Times Saved</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{(displayPuzzle as any).timesSaved || 0}</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Times Saved</p>
+                  <p className="text-[13px] text-slate-900 dark:text-slate-500 bg-secondary p-2 rounded">{(displayPuzzle as any).timesSaved || 0}</p>
                 </div>
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Average Ratings</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide mb-2">Average Ratings</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Difficulty</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_difficulty || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-slate-700 dark:text-slate-400 mb-1">Difficulty</p>
+                    <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-400">{Math.round((displayPuzzle.rating_metrics?.avg_difficulty || 0) * 10) / 10}/5</p>
                   </div>
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Fun</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_fun || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-slate-700 dark:text-slate-400 mb-1">Fun</p>
+                    <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-400">{Math.round((displayPuzzle.rating_metrics?.avg_fun || 0) * 10) / 10}/5</p>
                   </div>
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Clearness</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_clearness || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-slate-700 dark:text-slate-400 mb-1">Clearness</p>
+                    <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-400">{Math.round((displayPuzzle.rating_metrics?.avg_clearness || 0) * 10) / 10}/5</p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Rating Distribution</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide mb-2">Rating Distribution</p>
                 <div className="border border-border rounded overflow-hidden">
                   <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border bg-secondary">
-                          <th className="px-3 py-2 text-left text-foreground">Stars</th>
-                          <th className="px-3 py-2 text-center text-foreground">Difficulty</th>
-                          <th className="px-3 py-2 text-center text-foreground">Fun</th>
-                          <th className="px-3 py-2 text-center text-foreground">Clearness</th>
+                          <th className="px-3 py-2 text-left text-slate-900 dark:text-slate-400">Stars</th>
+                          <th className="px-3 py-2 text-center text-slate-900 dark:text-slate-400">Difficulty</th>
+                          <th className="px-3 py-2 text-center text-slate-900 dark:text-slate-400">Fun</th>
+                          <th className="px-3 py-2 text-center text-slate-900 dark:text-slate-400">Clearness</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -344,10 +344,10 @@ export const PuzzleViewDialog = ({
                           const clearCount = distribution?.clearness?.[stars - 1] || 0;
                           return (
                             <tr key={stars} className="border-b border-border hover:bg-secondary/50">
-                              <td className="px-3 py-2 text-foreground">{stars} ⭐</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{diffCount}</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{funCount}</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{clearCount}</td>
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-400">{stars} ⭐</td>
+                              <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{diffCount}</td>
+                              <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{funCount}</td>
+                              <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{clearCount}</td>
                             </tr>
                           );
                         })}
@@ -357,31 +357,31 @@ export const PuzzleViewDialog = ({
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Medal Distribution</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide mb-2">Medal Distribution</p>
                   <div className="border border-border rounded overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border bg-secondary">
-                          <th className="px-3 py-2 text-left text-foreground">Medal</th>
-                          <th className="px-3 py-2 text-center text-foreground">Count</th>
+                          <th className="px-3 py-2 text-left text-slate-900 dark:text-slate-400">Medal</th>
+                          <th className="px-3 py-2 text-center text-slate-900 dark:text-slate-400">Count</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥇 Gold</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.gold || 0}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-400">🥇 Gold</td>
+                          <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{(displayPuzzle as any).medalDistribution?.gold || 0}</td>
                         </tr>
                         <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥈 Silver</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.silver || 0}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-400">🥈 Silver</td>
+                          <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{(displayPuzzle as any).medalDistribution?.silver || 0}</td>
                         </tr>
                         <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥉 Bronze</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.bronze || 0}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-400">🥉 Bronze</td>
+                          <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{(displayPuzzle as any).medalDistribution?.bronze || 0}</td>
                         </tr>
                         <tr className="hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">- Unsolved</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.none || 0}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-400">- Unsolved</td>
+                          <td className="px-3 py-2 text-center text-slate-700 dark:text-slate-400">{(displayPuzzle as any).medalDistribution?.none || 0}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -438,12 +438,12 @@ export const PuzzleViewDialog = ({
                     }
                   `}</style>
                   <div
-                    className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+                    className="prose prose-sm max-w-none dark:prose-invert text-slate-900 dark:text-slate-400 [&_*]:text-slate-900 dark:[&_*]:text-slate-100"
                     dangerouslySetInnerHTML={{ __html: renderedHtml }}
                   />
                 </>
               ) : (
-                <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
+                <div className="text-slate-700 dark:text-slate-400 text-[13px]">No instructions provided.</div>
               )}
             </div>
           )}

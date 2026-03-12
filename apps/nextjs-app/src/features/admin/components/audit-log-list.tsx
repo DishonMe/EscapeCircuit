@@ -50,7 +50,7 @@ export const AuditLogList = () => {
   if (entries.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-secondary p-4">
-        <p className="text-muted-foreground">No audit log entries yet.</p>
+        <p className="text-foreground/80">No audit log entries yet.</p>
       </div>
     );
   }
@@ -72,11 +72,11 @@ export const AuditLogList = () => {
               {actionTypeLabels[entry.action_type] ||
                 entry.action_type.replace(/_/g, ' ')}
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[11px] text-foreground/70">
               {formatAuditDate(entry.created_at)}
             </span>
           </div>
-          <div className="mt-1.5 text-muted-foreground">
+          <div className="mt-1.5 text-foreground/80">
             <span>Admin #{entry.admin_user_id}</span>
             {entry.target_user_id && (
               <span> &rarr; User #{entry.target_user_id}</span>
@@ -86,7 +86,7 @@ export const AuditLogList = () => {
             )}
           </div>
           {entry.details && Object.keys(entry.details).length > 0 && (
-            <div className="mt-1 text-[11px] text-muted-foreground">
+            <div className="mt-1 text-[11px] text-foreground/70">
               {Object.entries(entry.details).map(([key, value]) => (
                 <span key={key} className="mr-3">
                   {key.replace(/_/g, ' ')}: {String(value)}

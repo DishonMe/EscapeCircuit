@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import Confetti from 'react-confetti';
 
 import { Button } from '@/components/ui/button';
 import { useAudio } from '@/hooks/useAudio';
@@ -18,7 +19,6 @@ import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
-import { PuzzleDetailsDialog } from '@/features/puzzles/components/puzzle-details-dialog';
 import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { useUser } from '@/lib/auth';
@@ -128,6 +128,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     key: 0,
     visible: false,
   });
+  const [showFirstSolveCelebration, setShowFirstSolveCelebration] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [typedInstructionText, setTypedInstructionText] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
@@ -184,7 +187,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const notifications = useNotifications();
 
-  const triggerVictoryFx = useCallback(async (xpEarned?: number) => {
+  const triggerVictoryFx = useCallback((xpEarned?: number) => {
     setVictoryFx({
       key: Date.now(),
       xp: xpEarned,
@@ -193,29 +196,48 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     window.setTimeout(() => {
       setVictoryFx((current) => ({ ...current, visible: false }));
-    }, 2200);
+    }, 1900);
+  }, []);
 
-    const { default: confetti } = await import('canvas-confetti');
-    const endTime = Date.now() + 3000;
-
-    const fire = () => {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        startVelocity: 32,
-        ticks: 180,
-        origin: { x: 0.25 + Math.random() * 0.5, y: 0.62 - Math.random() * 0.18 },
-        colors: ['#38bdf8', '#facc15', '#34d399', '#a78bfa', '#fb7185'],
-        scalar: 0.95,
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
       });
-
-      if (Date.now() < endTime) {
-        window.setTimeout(fire, 220);
-      }
     };
 
-    fire();
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
   }, []);
+
+  const terminalInstructionText = useMemo(() => {
+    const segments = [
+      puzzle?.description?.trim(),
+      puzzle?.creatorComment?.trim() ? `Creator comment: ${puzzle.creatorComment.trim()}` : '',
+    ].filter(Boolean);
+
+    return segments.join('\n\n');
+  }, [puzzle?.description, puzzle?.creatorComment]);
+
+  useEffect(() => {
+    if (!showPuzzleInfo) return;
+
+    setTypedInstructionText('');
+    if (!terminalInstructionText) return;
+
+    let index = 0;
+    const tick = window.setInterval(() => {
+      index += 1;
+      setTypedInstructionText(terminalInstructionText.slice(0, index));
+      if (index >= terminalInstructionText.length) {
+        window.clearInterval(tick);
+      }
+    }, 14);
+
+    return () => window.clearInterval(tick);
+  }, [showPuzzleInfo, terminalInstructionText]);
 
   const inputs = puzzle?.inputs ?? EMPTY_STRINGS;
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
@@ -822,23 +844,31 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     setIsChecking(true);
     try {
       const timeTaken = Math.floor((Date.now() - startTime.current) / 1000);
-      const [res] = await Promise.all([
-        validateSolution({
-          puzzleId: puzzle.id,
-          solution: buildSolution(),
-          timeTaken,
-        }),
-        wait(600),
-      ]);
+      await wait(600);
+      const res = await validateSolution({
+        puzzleId: puzzle.id,
+        solution: buildSolution(),
+        timeTaken,
+      });
 
       setIsPowerSurge(false);
 
       setBoardFeedback(res.solved ? 'success' : 'failure');
       if (res.solved) {
+        const isFirstSolve = Boolean(
+          (res as any).is_first_solve ??
+            (res as any).first_solve ??
+            ((res.xp_earned ?? 0) > 0),
+        );
+
         playSuccess();
         setShowSolvedSlam(true);
         window.setTimeout(() => setShowSolvedSlam(false), 650);
-        void triggerVictoryFx(res.xp_earned);
+        if (isFirstSolve) {
+          setShowFirstSolveCelebration(true);
+          window.setTimeout(() => setShowFirstSolveCelebration(false), 3200);
+          triggerVictoryFx(res.xp_earned);
+        }
       } else {
         playError();
       }
@@ -848,7 +878,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       setPostCheck({
         open: true,
         solved: res.solved,
-        message: res.message,
+        message: res.solved
+          ? Boolean(
+              (res as any).is_first_solve ??
+                (res as any).first_solve ??
+                ((res.xp_earned ?? 0) > 0),
+            )
+            ? (res.message || 'You earned XP!')
+            : 'Correct! You rebuilt it.'
+          : res.message,
         medal: res.medal,
         xpEarned: res.xp_earned,
         puzzleTotalXP: res.puzzle_total_xp,
@@ -857,16 +895,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       if (res.solved) {
         setIsSolved(true);
-        // Update user XP immediately
+        const isFirstSolve = Boolean(
+          (res as any).is_first_solve ??
+            (res as any).first_solve ??
+            ((res.xp_earned ?? 0) > 0),
+        );
+
+        // Update user XP immediately for first solves.
         const currentUser = queryClient.getQueryData(['user']) as
           | { xp?: number; [key: string]: unknown }
           | undefined;
-        if (currentUser && res.xp_earned) {
+        if (isFirstSolve && currentUser && res.xp_earned) {
           queryClient.setQueryData(['user'], {
             ...currentUser,
             xp: (currentUser.xp || 0) + res.xp_earned,
           });
         }
+        // Refresh user profile stats (including medal counters) from backend source of truth.
+        await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
         // Invalidate caches so the puzzles list shows "Solved"
         await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
       }
@@ -981,21 +1027,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     setSandboxSelectedComponent({ mode: 'none' });
   };
 
-  // Sandbox I/O
-  const sandboxInputs = useMemo(() => {
-    return Array.from({ length: sandboxNumInputs }, (_, i) => `in${i}`);
-  }, [sandboxNumInputs]);
+  // Sandbox I/O and cost (non-hook values to avoid conditional hook order issues)
+  const sandboxInputs = Array.from({ length: sandboxNumInputs }, (_, i) => `in${i}`);
 
-  const sandboxOutputs = useMemo(() => {
-    return Array.from({ length: sandboxNumOutputs }, (_, i) => `out${i}`);
-  }, [sandboxNumOutputs]);
+  const sandboxOutputs = Array.from({ length: sandboxNumOutputs }, (_, i) => `out${i}`);
 
-  const sandboxCurrentCost = useMemo(() => {
-    return sandboxPlaced.reduce((acc, p) => {
-      const def = componentCatalog.get(p.componentId);
-      return acc + (def?.cost ?? 0);
-    }, 0);
-  }, [componentCatalog, sandboxPlaced]);
+  const sandboxCurrentCost = sandboxPlaced.reduce((acc, p) => {
+    const def = componentCatalog.get(p.componentId);
+    return acc + (def?.cost ?? 0);
+  }, 0);
 
   const onBrowsePuzzles = () => {
     router.push(paths.app.puzzles.getHref());
@@ -1311,6 +1351,26 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   return (
     <div className="flex w-full flex-col gap-3">
+      {showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
+        <Confetti
+          width={viewportSize.width}
+          height={viewportSize.height}
+          numberOfPieces={220}
+          recycle={false}
+          gravity={0.18}
+          tweenDuration={4500}
+        />
+      ) : null}
+
+      {victoryFx.visible ? (
+        <div
+          key={victoryFx.key}
+          className="pointer-events-none fixed left-1/2 top-1/2 z-[120] -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200 bg-white px-5 py-2 font-semibold text-sky-700 shadow-xl"
+        >
+          +{victoryFx.xp ?? 'XP'} • You earned XP!
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm">
           <div className="min-w-0">
@@ -1388,14 +1448,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               >
                 {isChecking ? 'Checking...' : 'Check Solution'}
               </Button>
-              {victoryFx.visible && (
-                <div
-                  key={victoryFx.key}
-                  className="pointer-events-none absolute left-1/2 top-0 z-20 flex -translate-x-1/2 -translate-y-2 items-center gap-2 rounded-full border border-sky-200/80 bg-white/90 px-3 py-1 text-xs font-semibold text-sky-600 shadow-xl shadow-sky-500/20 backdrop-blur-sm animate-bounce victory-float-up"
-                >
-                  +{victoryFx.xp ?? 'XP'}!
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1456,6 +1508,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           basic={visibleBasics}
           custom={customComponents}
           arsenal={arsenalComponents}
+          componentDefs={uiCatalog}
           allowArsenal={allowArsenal}
           filteredBasicTypes={filteredBasicTypes}
           selectedComponentId={
@@ -1635,7 +1688,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       <select
                         value={sandboxNumInputs}
                         onChange={(e) => setSandboxNumInputs(parseInt(e.target.value))}
-                        className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                           <option key={n} value={n}>
@@ -1652,8 +1705,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       <select
                         value={sandboxNumOutputs}
                         onChange={(e) => setSandboxNumOutputs(parseInt(e.target.value))}
-                        className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
+                          className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                           <option key={n} value={n}>
                             {n} output{n !== 1 ? 's' : ''}
@@ -1727,6 +1780,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   basic={visibleBasics}
                   custom={customComponents}
                   arsenal={arsenalComponents}
+                  componentDefs={uiCatalog}
                   allowArsenal={allowArsenal}
                   filteredBasicTypes={filteredBasicTypes}
                   selectedComponentId={
@@ -1779,24 +1833,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           <DialogHeader>
             <DialogTitle>{puzzle.title}</DialogTitle>
             <DialogDescription>
-              Puzzle description and creator comment.
+              Puzzle instructions terminal.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-[13px] text-foreground">
-            <div>
-              <div className="font-medium text-foreground">Description</div>
-              <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                {puzzle.description}
+            <div className="rounded-lg border border-slate-300 bg-white p-3 font-mono text-[12px] leading-6 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                terminal://puzzle-instructions
               </div>
+              <pre className="whitespace-pre-wrap break-words">{typedInstructionText}{showPuzzleInfo && typedInstructionText.length < terminalInstructionText.length ? '_' : ''}</pre>
             </div>
-            {puzzle.creatorComment ? (
-              <div>
-                <div className="font-medium text-foreground">Creator comment</div>
-                <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                  {puzzle.creatorComment}
-                </div>
-              </div>
-            ) : null}
 
             {/* Special instructions for Binary Adder puzzle */}
             {puzzle?.title?.toLowerCase().includes('binary adder') && (
@@ -1811,25 +1857,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   <div>
                     <div className="font-medium mb-1">Truth Table:</div>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs border border-border">
+                      <table className="min-w-full border border-slate-300 text-xs text-slate-900 dark:border-slate-700 dark:text-slate-100">
                         <thead>
-                          <tr className="bg-secondary">
-                            <th className="border border-border px-2 py-1">A</th>
-                            <th className="border border-border px-2 py-1">B</th>
-                            <th className="border border-border px-2 py-1">C_in</th>
-                            <th className="border border-border px-2 py-1">S</th>
-                            <th className="border border-border px-2 py-1">C_out</th>
+                          <tr className="bg-slate-100 dark:bg-slate-800">
+                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">A</th>
+                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">B</th>
+                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">C_in</th>
+                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">S</th>
+                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">C_out</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">0</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
-                          <tr><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td><td className="border border-border px-2 py-1 text-center">1</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
+                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -1871,12 +1917,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           startTime={startTime.current}
         />
       )}
-      <PuzzleDetailsDialog
-        puzzle={puzzle}
-        open={showPuzzleInfo}
-        onOpenChange={setShowPuzzleInfo}
-        showLink={false}
-      />
 
       <CircuitDebugger
         isOpen={showDebugger}
@@ -2046,14 +2086,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Puzzle Details Dialog */}
-      <PuzzleDetailsDialog
-        puzzle={puzzle}
-        open={showPuzzleInfo}
-        onOpenChange={setShowPuzzleInfo}
-        showLink={false}
-      />
-
       {/* Creator Comment Dialog */}
       <CreatorCommentDialog
         open={showCreatorComment}
@@ -2061,31 +2093,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         puzzle={puzzle}
         showLink={false}
       />
-
-      <style jsx>{`
-        .victory-float-up {
-          animation: victory-float-up 2.1s ease-out forwards;
-        }
-
-        @keyframes victory-float-up {
-          0% {
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0.86);
-          }
-          18% {
-            opacity: 1;
-            transform: translate(-50%, -56%) scale(1.02);
-          }
-          70% {
-            opacity: 1;
-            transform: translate(-50%, -110%) scale(1);
-          }
-          100% {
-            opacity: 0;
-            transform: translate(-50%, -148%) scale(0.96);
-          }
-        }
-      `}</style>
 
     </div>
   );

@@ -4892,7 +4892,7 @@ class TestSimulationGateEvaluation:
             xp_service=Mock(),
         )
         
-        result = service._run_simulation(expanded_solution, {"A": 1, "B": 1})
+        result = service._run_simulation(0, expanded_solution, {"A": 1, "B": 1})
         
         assert result["success"] == True
         assert "puzzleOutputs" in result or "puzzle_outputs" in result
@@ -5824,7 +5824,7 @@ class TestSimulationErrorPaths:
         )
         
         with pytest.raises(ValidationError, match="evaluation failed"):
-            service._run_simulation({
+            service._run_simulation(0, {
                 "placedComponents": [],
                 "totalCost": 0,
                 "_arsenal_pieces": {}
