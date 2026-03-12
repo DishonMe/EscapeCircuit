@@ -43,7 +43,7 @@ export const Link = ({ className, children, href, ...props }: LinkProps) => {
   return (
     <NextLink
       href={href}
-      className={cn('text-slate-600 hover:text-slate-900', className)}
+      className={cn('text-foreground/80 hover:text-foreground', className)}
       onClick={handleClick}
       {...props}
     >

@@ -131,7 +131,7 @@ export default function UploadPuzzlePage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-4xl mx-auto text-foreground">
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Upload New Puzzle</h1>
         <div className="flex gap-2">
@@ -152,7 +152,7 @@ export default function UploadPuzzlePage() {
             <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               📋 Configuration JSON (puzzle_config.json)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`{
   "puzzle": {
     "name": "Binary Adder Quiz",
@@ -178,7 +178,7 @@ export default function UploadPuzzlePage() {
             <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               💡 Instructions LaTeX (puzzle_instructions.tex)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`\section*{Binary Adder Quiz Instructions}
 
 \\subsection*{Objective}
@@ -216,7 +216,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
             <summary className="font-medium cursor-pointer text-foreground text-[13px]">
               ✓ Sample Solution JSON (puzzle_solution.json)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] overflow-x-auto font-mono">
+            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0, \\"C_in\\": 0}": {"S": 0, "C_out": 0},
@@ -229,7 +229,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
   "outputs": ["S", "C_out"]
 }`}
             </pre>
-            <p className="mt-3 text-[13px] text-muted-foreground">
+            <p className="mt-3 text-[13px] text-foreground/80">
               The eval_map must contain entries for all possible input combinations.
               Keys are JSON strings of the input dict, values are the expected outputs.
             </p>
@@ -254,7 +254,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as "EASY" | "MEDIUM" | "HARD")}
-            className="border border-border p-2 rounded-lg bg-transparent w-48 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+            className="border border-border p-2 rounded-lg bg-transparent w-48 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="EASY">Easy</option>
             <option value="MEDIUM">Medium</option>
@@ -280,7 +280,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
                 {req.key === "config" && (
                   <div>
                     <p className="font-medium text-[13px] text-foreground mb-2">Configuration JSON Format:</p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`{
   "puzzle": {
     "name": "...",
@@ -304,7 +304,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
                 {req.key === "solution" && (
                   <div>
                     <p className="font-medium text-[13px] text-foreground mb-2">Solution JSON Format:</p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},
@@ -320,7 +320,7 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
                 {req.key === "instructions" && (
                   <div>
                     <p className="font-medium text-[13px] text-foreground mb-2">Instructions LaTeX Format:</p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] overflow-x-auto font-mono">
+                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
 {`\\section*{Puzzle Name}
 \\subsection*{Objective}
 Design a circuit that...
@@ -351,7 +351,7 @@ Use $...$ for math: $C_{out}$`}
               type="file"
               accept={req.ext}
               onChange={(e) => handleFileChange(req.key, e)}
-              className="border border-border p-2 rounded-lg text-[13px]"
+              className="border border-border p-2 rounded-lg text-[13px] text-foreground"
             />
             {files[req.key] && !files[req.key]!.name.endsWith(req.ext) && (
               <span className="text-destructive text-[13px]">Invalid extension. Must be {req.ext}</span>

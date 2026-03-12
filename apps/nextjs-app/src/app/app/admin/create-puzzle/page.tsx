@@ -202,7 +202,7 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
       ) : (
-        <p className="text-muted-foreground">No instructions yet</p>
+        <p className="text-foreground/75">No instructions yet</p>
       )}
     </div>
   );
@@ -877,7 +877,7 @@ export default function CreatePuzzleForm() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto text-foreground">
       <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
 
       {/* Tabs */}
@@ -1239,7 +1239,7 @@ export default function CreatePuzzleForm() {
                   <option value="blackbox">Blackbox (Combinatorial)</option>
                   <option value="stream">Stream (Sequential)</option>
                 </select>
-                <p className="text-[11px] text-muted-foreground mt-1">
+                <p className="text-[11px] text-foreground/75 mt-1">
                   {testCaseForm.kind === 'stream'
                     ? 'Sequential test with input/output values at each time step'
                     : 'Single combinatorial test case with fixed inputs and outputs'}
@@ -1319,7 +1319,7 @@ export default function CreatePuzzleForm() {
 
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3">Input Streams</h4>
-                    <p className="text-[11px] text-muted-foreground mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <p className="text-[11px] text-foreground/75 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
                     <div className="space-y-3">
                       {data.basic.inputs.map((inputName) => (
                         <div key={inputName}>
@@ -1347,7 +1347,7 @@ export default function CreatePuzzleForm() {
 
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3">Expected Output Streams</h4>
-                    <p className="text-[11px] text-muted-foreground mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
+                    <p className="text-[11px] text-foreground/75 mb-3">Enter binary sequences: "01010" or "0,1,0,1,0" format</p>
                     <div className="space-y-3">
                       {data.basic.outputs.map((outputName) => (
                         <div key={outputName}>
@@ -1449,7 +1449,7 @@ export default function CreatePuzzleForm() {
                 rows={15}
                 placeholder="\\section*{Puzzle Instructions}\n\nExplain the puzzle to users in LaTeX format with math expressions like $C_{out}$ for subscripts..."
               />
-              <div className="text-[13px] text-muted-foreground">
+              <div className="text-[13px] text-foreground/80">
                 Use LaTeX syntax: {'\\section*'}, {'\\subsection*'}, {'\\textbf{}'}, {'\\textit{}'}, $...$ for math, {'\\begin{itemize}'} for lists, {'\\begin{tabular}'} for tables
               </div>
             </div>
@@ -1502,7 +1502,7 @@ export default function CreatePuzzleForm() {
               <div className="border-r p-3 overflow-y-auto bg-secondary/50">
                 <div className="text-[13px] font-semibold text-foreground mb-3">Available Gates</div>
                 {data.basic.gateSet.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab</p>
+                  <p className="text-[11px] text-foreground/75">Select gates in "Basic Info" tab</p>
                 ) : (
                   <div className="space-y-2">
                     {data.basic.gateSet.map((gateName) => (

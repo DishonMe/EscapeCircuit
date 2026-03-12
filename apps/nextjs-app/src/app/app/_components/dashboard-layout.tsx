@@ -1,8 +1,10 @@
 'use client';
 
-import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield } from 'lucide-react';
+import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield, Moon, Sun } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { Button } from '@/components/ui/button';
@@ -37,6 +39,52 @@ const Logo = () => {
         EscapeCircuit
       </span>
     </Link>
+  );
+};
+
+const ThemeToggle = () => {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 rounded-full text-yellow-500 dark:text-slate-300"
+        aria-label="Toggle dark mode"
+      >
+        <Sun className="size-4" />
+      </Button>
+    );
+  }
+
+  const isDark = resolvedTheme === 'dark';
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(
+        'size-8 rounded-full transition-colors',
+        isDark
+          ? 'bg-slate-800 text-slate-100 hover:bg-slate-700'
+          : 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50/50',
+      )}
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label="Toggle dark mode"
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? (
+        <Moon className="size-4" />
+      ) : (
+        <Sun className="size-4" />
+      )}
+    </Button>
   );
 };
 
@@ -107,6 +155,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
         <div className="flex items-center gap-3">
           <XPBar currentXP={user.data?.xp ?? 0} />
+          <ThemeToggle />
           <div className="hidden md:flex items-center gap-2 text-[13px]">
             <span className="font-medium text-foreground">{user.data?.username}</span>
             <span className="text-border">|</span>
@@ -169,7 +218,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 className="size-8 rounded-full"
               >
                 <span className="sr-only">Open user menu</span>
-                <User2 className="size-4 text-muted-foreground" />
+                <User2 className="size-4 text-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
