@@ -8,7 +8,7 @@ import { useMemo } from 'react';
  *
  * Threshold for level L = (L-1)^2 * 100
  */
-function getLevelInfo(xp: number) {
+export function getLevelInfo(xp: number) {
   const safeXp = Math.max(0, xp);
   const level = Math.floor(Math.sqrt(safeXp / 100)) + 1;
 
@@ -19,7 +19,7 @@ function getLevelInfo(xp: number) {
   const xpForLevel = nextThreshold - currentThreshold;
   const pct = xpForLevel > 0 ? Math.min(100, (xpIntoLevel / xpForLevel) * 100) : 100;
 
-  return { level, currentThreshold, nextThreshold, pct };
+  return { level, currentThreshold, nextThreshold, xpIntoLevel, xpForLevel, pct };
 }
 
 export const XPBar = ({ currentXP }: { currentXP: number }) => {
