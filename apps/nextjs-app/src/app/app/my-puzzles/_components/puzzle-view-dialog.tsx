@@ -171,45 +171,45 @@ export const PuzzleViewDialog = ({
           {tab === 'base' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Title</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Title</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.title}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Description</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Description</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.description || 'No description'}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Creator</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Creator</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.creator?.username || 'Unknown'}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Difficulty</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Difficulty</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.difficulty}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Status</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Status</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400 capitalize">
                   {(displayPuzzle as any).status || ((displayPuzzle as any).isPublished ? 'Published' : 'Unpublished')}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Visibility</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Visibility</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.isPublic ? 'Public' : 'Private'}</p>
               </div>
               {displayPuzzle.creatorComment && (
                 <div>
-                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Creator Comment</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Creator Comment</p>
                   <p className="text-[13px] text-slate-900 dark:text-slate-400 bg-secondary p-2 rounded">{displayPuzzle.creatorComment}</p>
                 </div>
               )}
               {displayPuzzle.defaultGateSet && (
                 <div>
-                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Default Gate Set</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Default Gate Set</p>
                   <p className="text-[13px] text-slate-900 dark:text-slate-400">{(displayPuzzle.defaultGateSet as any).join?.(',') || displayPuzzle.defaultGateSet}</p>
                 </div>
               )}
               <div>
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">Arsenal Allowed</p>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-100 uppercase tracking-wide">Arsenal Allowed</p>
                 <p className="text-[13px] text-slate-900 dark:text-slate-400">{displayPuzzle.allowArsenal ? 'Yes' : 'No'}</p>
               </div>
             </div>

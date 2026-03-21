@@ -396,7 +396,7 @@ export const MyPuzzles = () => {
                     placeholder="Enter a message for people solving this puzzle..."
                     rows={4}
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">
+                  <p className="text-[11px] text-white mt-1">
                     • Only one comment allowed per puzzle
                     • Use this to note corrections or provide important clarifications
                   </p>

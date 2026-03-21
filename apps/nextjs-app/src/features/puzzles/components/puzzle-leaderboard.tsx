@@ -60,7 +60,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
         <div className="text-3xl">{'\u{1F3C6}'}</div>
-        <p className="text-sm font-medium text-foreground">No solvers yet!</p>
+        <p className="text-sm font-medium text-white">No solvers yet!</p>
         <p className="text-xs text-muted-foreground">
           Be the first to solve this puzzle and claim the top spot.
         </p>
@@ -78,8 +78,8 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
           onClick={() => setLeaderboardType("time")}
           className={`px-3 py-2 text-[13px] font-medium transition-colors ${
             leaderboardType === "time"
-              ? 'text-foreground border-b-2 border-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white'
+              : 'text-muted-foreground hover:text-gray-900 dark:hover:text-white'
           }`}
         >
           ⏱️ Fastest Time
@@ -88,8 +88,8 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
           onClick={() => setLeaderboardType("cost")}
           className={`px-3 py-2 text-[13px] font-medium transition-colors ${
             leaderboardType === "cost"
-              ? 'text-foreground border-b-2 border-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white'
+              : 'text-muted-foreground hover:text-gray-900 dark:hover:text-white'
           }`}
         >
           💰 Lowest Cost

@@ -26,6 +26,12 @@ export type User = Entity<{
   max_unpublished_override?: number | null;
   effective_max_published?: number;
   effective_max_unpublished?: number;
+  medals?: {
+    bronze: number;
+    silver: number;
+    gold: number;
+    total: number;
+  };
 }>;
 
 export type AuthResponse = {
