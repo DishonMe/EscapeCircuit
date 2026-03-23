@@ -2024,7 +2024,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     You have reached the maximum XP for this puzzle.
                   </p>
                 )}
-                <p>Congrats! Your solution passed all test cases.</p>
+                <p className="font-medium text-gray-900 dark:text-white mt-4">Congrats! Your solution passed all test cases.</p>
               </div>
             ) : (
               <div className="text-muted-foreground">

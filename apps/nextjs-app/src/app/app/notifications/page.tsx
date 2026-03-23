@@ -73,7 +73,7 @@ const NotificationsPage = () => {
               <input
                 type="text"
                 placeholder="Search puzzle..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-gray-300 text-gray-500 px-3 py-2 text-sm"
                 value={filters.puzzleName || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, puzzleName: e.target.value || undefined })}
               />
@@ -85,7 +85,7 @@ const NotificationsPage = () => {
               <input
                 type="text"
                 placeholder="Search user..."
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-gray-300 text-gray-500 px-3 py-2 text-sm"
                 value={filters.actorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, actorUsername: e.target.value || undefined })}
               />

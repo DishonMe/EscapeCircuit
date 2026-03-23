@@ -22,7 +22,6 @@ type RatingDialogProps = {
   puzzleId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Timestamp (Date.now()) when the user started working on the puzzle */
   startTime?: number;
 };
 
@@ -37,9 +36,15 @@ const StarInput = ({
 }) => {
   const [hover, setHover] = useState(0);
 
+  // This will show the hover number if you are hovering, 
+  // or the saved/existing value if you are not.
+  const displayValue = hover || value;
+
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[13px] font-medium text-foreground">{label}</span>
+      <span className="text-[13px] font-medium text-white">
+        {label}
+      </span>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
@@ -52,7 +57,7 @@ const StarInput = ({
           >
             <Star
               className={`size-7 transition-colors ${
-                star <= (hover || value)
+                star <= displayValue
                   ? 'fill-amber-400 text-amber-400'
                   : 'text-muted-foreground/40'
               }`}
@@ -60,7 +65,7 @@ const StarInput = ({
           </button>
         ))}
         <span className="ml-2 text-[13px] text-muted-foreground">
-          {value > 0 ? `${value}/5` : '—'}
+          {displayValue > 0 ? `${displayValue}/5` : '—'}
         </span>
       </div>
     </div>
@@ -89,8 +94,10 @@ export const RatingDialog = ({
   const [fun, setFun] = useState(0);
   const [clearness, setClearness] = useState(0);
 
-  // Populate from existing rating
+  // Populate from existing rating whenever dialog opens.
   useEffect(() => {
+    if (!open) return;
+
     if (existingRating) {
       setDifficulty(existingRating.difficulty);
       setFun(existingRating.fun);
@@ -100,7 +107,7 @@ export const RatingDialog = ({
       setFun(0);
       setClearness(0);
     }
-  }, [existingRating]);
+  }, [open, existingRating]);
 
   const isValid = difficulty > 0 && fun > 0 && clearness > 0;
 

@@ -339,7 +339,7 @@ export function CircuitDebugger({
                       value={inputValues[inputName] || ''}
                       onChange={(e) => handleInputChange(inputName, e.target.value)}
                       placeholder="0 or 1"
-                      className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-16 text-center text-[13px] text-slate-900 dark:text-slate-700 focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="border border-border rounded-lg bg-white dark:bg-slate-800 px-2.5 py-1.5 w-16 text-center text-[13px] text-black dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-ring"
                       maxLength={1}
                     />
                   </div>
@@ -356,7 +356,7 @@ export function CircuitDebugger({
                         value={sequenceInputs[inputName] || ''}
                         onChange={(e) => handleSequenceChange(inputName, e.target.value)}
                         placeholder="e.g., 01010 or 0,1,0,1,0"
-                        className="border border-border rounded-lg bg-background px-2.5 py-1.5 w-full text-[13px] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="border border-border rounded-lg bg-white dark:bg-slate-800 px-2.5 py-1.5 w-full text-[13px] text-black dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                       <p className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
                         Enter binary digits (0,1) or comma-separated values
