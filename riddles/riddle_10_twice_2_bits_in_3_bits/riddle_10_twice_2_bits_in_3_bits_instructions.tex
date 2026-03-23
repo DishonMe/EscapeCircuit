@@ -8,30 +8,30 @@ This puzzle models a memory mechanism with \textbf{write-once bits}. A bit may c
 
 The broader challenge is to represent one 2-bit value, and later represent another 2-bit value, while reusing as few physical bits as possible. During the process, a reader may inspect memory at any moment and must still recover the value currently intended by the writer.
 
-In this specific puzzle, the encoding side is fixed to a 3-bit memory state \((x_1, x_2, x_3)\). Your task is to build only the \textbf{reader}: given those three bits, output the correct decoded 2-bit value.
+In this specific puzzle, the encoding side is fixed to a 3-bit memory state (x1, x2, x3). Your task is to build only the \textbf{reader}: given those three bits, output the correct decoded 2-bit value.
 
 \subsection*{What You Must Build}
 Create a logic circuit that maps each possible 3-bit memory state to the correct 2-bit decoded value.
 
 The circuit must be purely combinational with respect to the three inputs:
 \begin{itemize}
-  \item Inputs: \(x_1, x_2, x_3\)
-  \item Outputs: \(out_1, out_0\)
+  \item Inputs: x1, x2, x3
+  \item Outputs: out1, out0
 \end{itemize}
 
 \subsection*{Output Format}
 The decoded value is represented in binary using two output wires:
 \begin{itemize}
-  \item \(out_1\): most-significant bit (MSB)
-  \item \(out_0\): least-significant bit (LSB)
+  \item out1: most-significant bit (MSB)
+  \item out0: least-significant bit (LSB)
 \end{itemize}
 
-So a decoded value \(v \in \{0,1,2,3\}\) must be emitted as:
+So a decoded value v in {0,1,2,3} must be emitted as:
 \begin{itemize}
-  \item \(0 \rightarrow 00\)
-  \item \(1 \rightarrow 01\)
-  \item \(2 \rightarrow 10\)
-  \item \(3 \rightarrow 11\)
+  \item 0 -> 00
+  \item 1 -> 01
+  \item 2 -> 10
+  \item 3 -> 11
 \end{itemize}
 
 \subsection*{Design Intent}
@@ -39,14 +39,14 @@ This is a reasoning puzzle about information reuse under one-way memory updates.
 
 To make the target mapping unique, use the following two anchor constraints:
 \begin{itemize}
-  \item \textbf{Canonical one-hot anchors:} \(000\) decodes to value \(0\), \(100\) decodes to \(1\), \(010\) decodes to \(2\), and \(001\) decodes to \(3\).
+  \item \textbf{Canonical one-hot anchors:} 000 decodes to value 0, 100 decodes to 1, 010 decodes to 2, and 001 decodes to 3.
   \item \textbf{Complement invariance:} complementing all three memory bits does not change the decoded value.
 \end{itemize}
 
 \subsection*{Requirements}
 \begin{itemize}
-  \item Implement a decoder for inputs \(x_1, x_2, x_3\).
-  \item Produce outputs \(out_1, out_0\) as a valid 2-bit value encoding.
+  \item Implement a decoder for inputs x1, x2, x3.
+  \item Produce outputs out1, out0 as a valid 2-bit value encoding.
   \item The circuit must handle all 8 input combinations correctly.
 \end{itemize}
 
