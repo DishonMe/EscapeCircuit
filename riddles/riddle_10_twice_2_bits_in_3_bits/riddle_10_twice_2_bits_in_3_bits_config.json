@@ -1,0 +1,31 @@
+{
+  "puzzle": {
+    "name": "Twice 2 Bits in 3 Bits",
+    "description": "Build a decoder that reads a 3-bit write-once memory state and returns the currently represented 2-bit value according to the puzzle rules.",
+    "budget": 180,
+    "creator_budget": 12,
+    "time_limit_seconds": 90,
+    "difficulty": "HARD",
+    "default_gate_set": ["AND", "OR", "NOT", "XOR", "NAND", "NOR"],
+    "inputs": ["x1", "x2", "x3"],
+    "outputs": ["out1", "out0"],
+    "total_gate_count": null,
+    "min_cycles": null,
+    "max_cycles": null,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 6,
+      "cols": 22
+    }
+  },
+  "test_cases": [
+    { "kind": "blackbox", "inputs": {"x1": 0, "x2": 0, "x3": 0}, "expected_outputs": {"out1": 0, "out0": 0} },
+    { "kind": "blackbox", "inputs": {"x1": 0, "x2": 0, "x3": 1}, "expected_outputs": {"out1": 1, "out0": 1} },
+    { "kind": "blackbox", "inputs": {"x1": 0, "x2": 1, "x3": 0}, "expected_outputs": {"out1": 1, "out0": 0} },
+    { "kind": "blackbox", "inputs": {"x1": 0, "x2": 1, "x3": 1}, "expected_outputs": {"out1": 0, "out0": 1} },
+    { "kind": "blackbox", "inputs": {"x1": 1, "x2": 0, "x3": 0}, "expected_outputs": {"out1": 0, "out0": 1} },
+    { "kind": "blackbox", "inputs": {"x1": 1, "x2": 0, "x3": 1}, "expected_outputs": {"out1": 1, "out0": 0} },
+    { "kind": "blackbox", "inputs": {"x1": 1, "x2": 1, "x3": 0}, "expected_outputs": {"out1": 1, "out0": 1} },
+    { "kind": "blackbox", "inputs": {"x1": 1, "x2": 1, "x3": 1}, "expected_outputs": {"out1": 0, "out0": 0} }
+  ]
+}
