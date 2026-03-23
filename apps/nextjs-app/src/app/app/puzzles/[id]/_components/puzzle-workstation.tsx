@@ -212,14 +212,37 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  const terminalInstructionText = useMemo(() => {
-    const segments = [
-      puzzle?.description?.trim(),
-      puzzle?.creatorComment?.trim() ? `Creator comment: ${puzzle.creatorComment.trim()}` : '',
-    ].filter(Boolean);
+  const normalizedInstructionText = useMemo(() => {
+    const normalizeInstructions = (raw: string) =>
+      raw
+        .replace(/\\section\*\s*\{([^}]+)\}/g, '$1')
+        .replace(/\\subsection\*\s*\{([^}]+)\}/g, '$1')
+        .replace(/\\textbf\s*\{([^}]+)\}/g, '$1')
+        .replace(/\\textit\s*\{([^}]+)\}/g, '$1')
+        .replace(/\\begin\{itemize\}|\\end\{itemize\}/g, '')
+        .replace(/\\item\s+/g, '- ')
+        .replace(/\\\\/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
 
-    return segments.join('\n\n');
-  }, [puzzle?.description, puzzle?.creatorComment]);
+    const instructionsRaw = puzzle?.instructions?.trim();
+    if (!instructionsRaw) return '';
+
+    const normalizedInstructions = normalizeInstructions(instructionsRaw);
+    const description = puzzle?.description?.trim() ?? '';
+
+    if (!normalizedInstructions || normalizedInstructions === description) {
+      return '';
+    }
+
+    return normalizedInstructions;
+  }, [puzzle?.instructions, puzzle?.description]);
+
+  const terminalInstructionText = useMemo(
+    () => puzzle?.description?.trim() ?? '',
+    [puzzle?.description],
+  );
 
   useEffect(() => {
     if (!showPuzzleInfo) return;
@@ -1829,23 +1852,43 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       </div>
 
       <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>
-        <DialogContent>
+        <DialogContent className="flex h-[75vh] max-h-[75vh] flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>{puzzle.title}</DialogTitle>
             <DialogDescription>
               Puzzle instructions terminal.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 text-[13px] text-foreground">
-            <div className="rounded-lg border border-slate-300 bg-white p-3 font-mono text-[12px] leading-6 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 text-[13px] text-foreground">
+            <div className="flex-none rounded-lg border border-slate-300 bg-white p-3 font-mono text-[12px] leading-6 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
               <div className="mb-2 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 terminal://puzzle-instructions
               </div>
               <pre className="whitespace-pre-wrap break-words">{typedInstructionText}{showPuzzleInfo && typedInstructionText.length < terminalInstructionText.length ? '_' : ''}</pre>
             </div>
 
+            {normalizedInstructionText ? (
+              <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-cyan-300/60 bg-cyan-50/60 p-3 text-[12px] text-slate-900 dark:border-cyan-700/60 dark:bg-cyan-950/20 dark:text-cyan-50">
+                <div className="mb-2 text-[11px] uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                  instructions
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-cyan-200/70 bg-white/80 p-2.5 dark:border-cyan-800/60 dark:bg-slate-950/40">
+                  <pre className="whitespace-pre-wrap break-words text-[12px] leading-6">{normalizedInstructionText}</pre>
+                </div>
+              </div>
+            ) : null}
+
+            {puzzle?.creatorComment?.trim() ? (
+              <div className="rounded-lg border border-border bg-amber-50/60 p-3 text-[12px] leading-6 text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+                <div className="mb-2 text-[11px] uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  creator comment
+                </div>
+                <pre className="whitespace-pre-wrap break-words">{puzzle.creatorComment.trim()}</pre>
+              </div>
+            ) : null}
+
             {/* Special instructions for Binary Adder puzzle */}
-            {puzzle?.title?.toLowerCase().includes('binary adder') && (
+            {puzzle?.title?.toLowerCase().includes('binary adder') && !normalizedInstructionText && (
               <div className="mt-4 rounded-lg border border-border bg-secondary/50 p-4">
                 <div className="font-medium text-foreground mb-2">Binary Adder Instructions</div>
                 <div className="text-foreground text-[13px] space-y-2">
