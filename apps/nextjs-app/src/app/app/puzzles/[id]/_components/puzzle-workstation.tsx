@@ -85,6 +85,74 @@ const parseBitSequence = (value: string) => {
   return normalized.split('');
 };
 
+// Convert LaTeX document structure to Markdown
+const latexToMarkdown = (latex: string): string => {
+  let markdown = latex;
+  
+  // Convert tabular environments to markdown tables
+  const tabularyRegex = /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
+  markdown = markdown.replace(tabularyRegex, (_match: string, content: string) => {
+    // Split by \\ to get rows
+    const rows = content
+      .split('\\\\')
+      .map((row: string) => row.replace(/\\hline/g, '').trim())
+      .filter((row: string) => row.length > 0);
+    
+    if (rows.length === 0) return '';
+    
+    // Split each row by & to get cells
+    const mdRows = rows.map((row: string) => {
+      const cells = row.split('&').map((cell: string) => cell.trim());
+      return '| ' + cells.join(' | ') + ' |';
+    });
+    
+    // Add header separator after first row
+    if (mdRows.length > 0) {
+      const firstRowCells = rows[0].split('&').length;
+      const separator = '|' + Array(firstRowCells).fill('---|').join('');
+      mdRows.splice(1, 0, separator);
+    }
+    
+    return '\n' + mdRows.join('\n') + '\n';
+  });
+  
+  // Convert \section*{...} to # ...
+  markdown = markdown.replace(/\\section\*\s*\{([^}]+)\}/g, '# $1');
+  
+  // Convert \subsection*{...} to ## ...
+  markdown = markdown.replace(/\\subsection\*\s*\{([^}]+)\}/g, '## $1');
+  
+  // Convert \subsubsection*{...} to ### ...
+  markdown = markdown.replace(/\\subsubsection\*\s*\{([^}]+)\}/g, '### $1');
+  
+  // Convert \textbf{...} to **...**
+  markdown = markdown.replace(/\\textbf\s*\{([^}]+)\}/g, '**$1**');
+  
+  // Convert \textit{...} to *...*
+  markdown = markdown.replace(/\\textit\s*\{([^}]+)\}/g, '*$1*');
+  
+  // Convert \texttt{...} to `...`
+  markdown = markdown.replace(/\\texttt\s*\{([^}]+)\}/g, '`$1`');
+  
+  // Handle \begin{center}...\end{center}  
+  markdown = markdown.replace(/\\begin\{center\}(.*?)\\end\{center\}/gs, '$1');
+  
+  // Handle \begin{itemize}...\end{itemize} - markdown-it handles bullet lists
+  markdown = markdown.replace(/\\begin\{itemize\}/g, '');
+  markdown = markdown.replace(/\\end\{itemize\}/g, '');
+  markdown = markdown.replace(/\\item\s+/g, '- ');
+  
+  // Handle \begin{enumerate}...\end{enumerate}
+  markdown = markdown.replace(/\\begin\{enumerate\}/g, '');
+  markdown = markdown.replace(/\\end\{enumerate\}/g, '');
+  
+  // Remove remaining LaTeX commands that don't need conversion
+  markdown = markdown.replace(/\\\\/g, '\n'); // \\ to newline
+  
+  return markdown;
+};
+
+
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
@@ -119,6 +187,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [showSandboxDebugger, setShowSandboxDebugger] = useState(false);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
+  const [renderedInstructionsHtml, setRenderedInstructionsHtml] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatorComment, setShowCreatorComment] = useState(false);
@@ -266,6 +335,41 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     return () => window.clearInterval(tick);
   }, [showPuzzleInfo, terminalInstructionText]);
+
+  // Render instructions HTML with markdown and KaTeX support
+  useEffect(() => {
+    if (!showPuzzleInfo || !puzzle?.instructions) {
+      setRenderedInstructionsHtml(null);
+      return;
+    }
+
+    Promise.all([
+      import('markdown-it'),
+      import('markdown-it-katex'),
+      import('dompurify'),
+    ]).then(([MarkdownItMod, katexMod, DOMPurifyMod]) => {
+      const MarkdownIt = MarkdownItMod.default;
+      const markdownItKatex = katexMod.default;
+      const DOMPurify = DOMPurifyMod.default || DOMPurifyMod;
+
+      const md = new MarkdownIt({ html: true }).use(markdownItKatex);
+      const markdown = latexToMarkdown(puzzle.instructions!);
+      const html = md.render(markdown);
+
+      setRenderedInstructionsHtml(DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: [
+          'p', 'strong', 'em', 'u', 'code', 'pre', 'blockquote',
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'ul', 'ol', 'li',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td',
+          'a', 'span', 'div', 'i', 'br', 'sup', 'sub',
+          'annotation', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mtext',
+          'mfrac', 'msup', 'msub', 'mroot', 'msqrt'
+        ],
+        ALLOWED_ATTR: ['class', 'style', 'href', 'data-*']
+      }));
+    });
+  }, [showPuzzleInfo, puzzle?.instructions]);
 
   const inputs = puzzle?.inputs ?? EMPTY_STRINGS;
   const outputs = puzzle?.outputs ?? EMPTY_STRINGS;
@@ -1529,7 +1633,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             <Button variant="outline" size="sm" onClick={() => setShowLeaderboard(true)}>
               Leaderboard
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowCreatorComment(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!puzzle?.creatorComment?.trim()}
+              title={puzzle?.creatorComment?.trim() ? 'View creator comment' : 'No creator comment available'}
+              onClick={() => setShowCreatorComment(true)}
+            >
               Creator Comment
             </Button>
             <Button
@@ -1941,99 +2051,53 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           <DialogHeader>
             <DialogTitle>{puzzle.title}</DialogTitle>
             <DialogDescription>
-              Puzzle instructions terminal.
+              Puzzle instructions.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 text-[13px] text-foreground">
-            <div className="flex-none rounded-lg border border-slate-300 bg-white p-3 font-mono text-[12px] leading-6 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-              <div className="mb-2 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                terminal://puzzle-instructions
-              </div>
-              <pre className="whitespace-pre-wrap break-words">{typedInstructionText}{showPuzzleInfo && typedInstructionText.length < terminalInstructionText.length ? '_' : ''}</pre>
-            </div>
-
-            {normalizedInstructionText ? (
-              <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-cyan-300/60 bg-cyan-50/60 p-3 text-[12px] text-slate-900 dark:border-cyan-700/60 dark:bg-cyan-950/20 dark:text-cyan-50">
-                <div className="mb-2 text-[11px] uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                  instructions
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-cyan-200/70 bg-white/80 p-2.5 dark:border-cyan-800/60 dark:bg-slate-950/40">
-                  <pre className="whitespace-pre-wrap break-words text-[12px] leading-6">{normalizedInstructionText}</pre>
-                </div>
-              </div>
-            ) : null}
-
-            {puzzle?.creatorComment?.trim() ? (
-              <div className="rounded-lg border border-border bg-amber-50/60 p-3 text-[12px] leading-6 text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
-                <div className="mb-2 text-[11px] uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                  creator comment
-                </div>
-                <pre className="whitespace-pre-wrap break-words">{puzzle.creatorComment.trim()}</pre>
-              </div>
-            ) : null}
-
-            {/* Special instructions for Binary Adder puzzle */}
-            {puzzle?.title?.toLowerCase().includes('binary adder') && !normalizedInstructionText && (
-              <div className="mt-4 rounded-lg border border-border bg-secondary/50 p-4">
-                <div className="font-medium text-foreground mb-2">Binary Adder Instructions</div>
-                <div className="text-foreground text-[13px] space-y-2">
-                  <p>
-                    Design a <strong>full adder</strong> circuit that adds three binary digits:
-                    two input bits (A and B) and a carry-in bit (C_in).
-                  </p>
-
-                  <div>
-                    <div className="font-medium mb-1">Truth Table:</div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border border-slate-300 text-xs text-slate-900 dark:border-slate-700 dark:text-slate-100">
-                        <thead>
-                          <tr className="bg-slate-100 dark:bg-slate-800">
-                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">A</th>
-                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">B</th>
-                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">C_in</th>
-                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">S</th>
-                            <th className="border border-slate-300 px-2 py-1 text-slate-900 dark:border-slate-700 dark:text-slate-100">C_out</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">0</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
-                          <tr><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td><td className="border border-slate-300 px-2 py-1 text-center text-slate-900 dark:border-slate-700 dark:text-slate-100">1</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="font-medium mb-1">Available Gates:</div>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li><strong>AND</strong>: Outputs 1 only if both inputs are 1</li>
-                      <li><strong>NAND</strong>: Outputs 0 only if both inputs are 1 (NOT of AND)</li>
-                      <li><strong>DFF</strong>: Passes input signal unchanged with one-time-unit DFF</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-amber-50/50 border border-amber-200/60 rounded-lg p-2.5 mt-2">
-                    <div className="font-medium text-amber-800 mb-1">Hint:</div>
-                    <p className="text-amber-700 text-xs">
-                      NAND gates are universal - you can build any logic function with NAND gates.
-                      Think about how to combine these gates to create XOR operations.
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {puzzle?.instructions ? (
+              <>
+                <style>{`
+                  .prose .katex {
+                    vertical-align: baseline !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: 1 !important;
+                    font-size: inherit;
+                    display: inline-block !important;
+                    white-space: nowrap;
+                    position: relative;
+                    top: -0.35em;
+                  }
+                  .prose .katex-html {
+                    vertical-align: baseline !important;
+                  }
+                  .prose table td, .prose table th {
+                    vertical-align: middle;
+                    line-height: 1.4;
+                  }
+                  .prose table th {
+                    font-weight: bold;
+                    background-color: rgba(0, 0, 0, 0.05);
+                  }
+                  .prose u {
+                    text-decoration: underline;
+                    text-underline-offset: 4px;
+                  }
+                `}</style>
+                {renderedInstructionsHtml ? (
+                  <div
+                    className="prose prose-sm max-w-none rounded-md border border-slate-300 bg-white p-4 text-slate-900 [&_*]:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[&_*]:text-slate-100"
+                    dangerouslySetInnerHTML={{ __html: renderedInstructionsHtml }}
+                  />
+                ) : (
+                  <div className="text-muted-foreground text-[13px]">Loading instructions...</div>
+                )}
+              </>
+            ) : (
+              <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPuzzleInfo(false)}>
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

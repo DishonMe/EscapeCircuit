@@ -1751,10 +1751,20 @@ export const WorkstationGrid = ({
             const isDeleteWarn = hoveredDeleteComponentId === p.id;
             const isDeleting = deletingComponentIds.includes(p.id);
 
+            // Calculate the count of this component type that appear before this one
+            const countBefore = placed.slice(0, placedIndex).filter(comp => comp.componentId === p.componentId).length;
+            const componentNumber = countBefore + 1;
+            const totalCount = placed.filter(comp => comp.componentId === p.componentId).length;
+            // Only add number if there are multiple gates of this type
+            const defWithNumber = {
+              ...def,
+              label: totalCount > 1 ? `${def.label} ${componentNumber}` : def.label,
+            };
+
             return (
               <LogicNode
                 key={p.id}
-                node={def}
+                node={defWithNumber}
                 className={cn(
                   'absolute transition-[box-shadow,transform,border-color] duration-300',
                   bootSequenceActive && 'animate-in fade-in zoom-in-75',
