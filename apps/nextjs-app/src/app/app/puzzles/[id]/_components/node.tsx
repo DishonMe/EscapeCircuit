@@ -164,7 +164,9 @@ export const LogicNode = ({
   children,
   ...props
 }: LogicNodeProps) => {
-  const isBasicGate = BASIC_GATES.includes(node.label);
+  // Extract gate type (e.g., "AND" from "AND 1" or just "AND")
+  const gateType = node.label.split(' ')[0];
+  const isBasicGate = BASIC_GATES.includes(gateType);
 
   return (
     <div
@@ -183,15 +185,15 @@ export const LogicNode = ({
       {isBasicGate ? (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="absolute inset-0">
-            {getGateSVG(node.label)}
+            {getGateSVG(gateType)}
           </div>
           <span className={cn(
-            "select-none text-[9px] font-bold text-black relative z-10",
-            node.label === 'XNOR' ? 'text-[7.5px]' : 'text-[9px]',
-            node.label === 'XNOR' && 'translate-x-[2px]', 
-            node.label === 'NOT' && 'absolute -bottom-1.5 left-1/2 -translate-x-1/6'
+            "select-none text-[7px] font-bold text-black relative z-10",
+            gateType === 'XNOR' ? 'text-[6px]' : 'text-[7px]',
+            gateType === 'XNOR' && 'translate-x-[2px]', 
+            gateType === 'NOT' && 'absolute left-1/4 top-1/2 -translate-y-1/2'
           )}>
-            {node.label}
+            {node.label.includes(' ') ? node.label.split(' ')[1] : ''}
           </span>
         </div>
       ) : (
