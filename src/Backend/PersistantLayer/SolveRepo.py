@@ -332,20 +332,26 @@ class SolveRepo:
         """Return the leaderboard for a puzzle: best (fastest) passed solve per user, ranked by time."""
         rows = self.conn.execute(
             """
-            SELECT sa.user_id,
+            WITH best_times AS (
+              SELECT user_id, MIN(time_taken_seconds) as best_time
+              FROM solve_attempts
+              WHERE puzzle_id = ? AND passed = 1 AND time_taken_seconds IS NOT NULL
+              GROUP BY user_id
+            )
+            SELECT DISTINCT sa.user_id,
                    u.username,
-                   MIN(sa.time_taken_seconds) AS best_time,
-                   MAX(sa.highest_medal)       AS best_medal,
-                   MIN(sa.submitted_at)        AS first_solved_at
+                   bt.best_time,
+                   sa.highest_medal AS best_medal,
+                   sa.submitted_at AS first_solved_at
             FROM solve_attempts sa
             JOIN users u ON u.id = sa.user_id
+            JOIN best_times bt ON sa.user_id = bt.user_id
             WHERE sa.puzzle_id = ? AND sa.passed = 1
-              AND sa.time_taken_seconds IS NOT NULL
-            GROUP BY sa.user_id
-            ORDER BY best_time ASC
+              AND sa.time_taken_seconds = bt.best_time
+            ORDER BY bt.best_time ASC
             LIMIT ?
             """,
-            (int(puzzle_id), int(limit)),
+            (int(puzzle_id), int(puzzle_id), int(limit)),
         ).fetchall()
         result = []
         for rank, r in enumerate(rows, start=1):
@@ -363,20 +369,26 @@ class SolveRepo:
         """Return the leaderboard for a puzzle: best (lowest cost) passed solve per user, ranked by cost."""
         rows = self.conn.execute(
             """
-            SELECT sa.user_id,
+            WITH best_costs AS (
+              SELECT user_id, MIN(cost_used) as best_cost
+              FROM solve_attempts
+              WHERE puzzle_id = ? AND passed = 1 AND cost_used IS NOT NULL
+              GROUP BY user_id
+            )
+            SELECT DISTINCT sa.user_id,
                    u.username,
-                   MIN(sa.cost_used) AS best_cost,
-                   MAX(sa.highest_medal) AS best_medal,
-                   MIN(sa.submitted_at) AS first_solved_at
+                   bc.best_cost,
+                   sa.highest_medal AS best_medal,
+                   sa.submitted_at AS first_solved_at
             FROM solve_attempts sa
             JOIN users u ON u.id = sa.user_id
+            JOIN best_costs bc ON sa.user_id = bc.user_id
             WHERE sa.puzzle_id = ? AND sa.passed = 1
-              AND sa.cost_used IS NOT NULL
-            GROUP BY sa.user_id
-            ORDER BY best_cost ASC
+              AND sa.cost_used = bc.best_cost
+            ORDER BY bc.best_cost ASC
             LIMIT ?
             """,
-            (int(puzzle_id), int(limit)),
+            (int(puzzle_id), int(puzzle_id), int(limit)),
         ).fetchall()
         result = []
         for rank, r in enumerate(rows, start=1):
