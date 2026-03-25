@@ -99,6 +99,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedComponent, setSelectedComponent] =
     useState<SelectedComponentState>({ mode: 'none' });
+  // Undo/Redo history: tracks snapshots of {placed, wires} state
+  const [history, setHistory] = useState<{
+    past: { placed: PlacedGridComponent[]; wires: Wire[] }[];
+    future: { placed: PlacedGridComponent[]; wires: Wire[] }[];
+  }>({ past: [], future: [] });
   // Feature: Drag-and-Drop Ghost/Preview
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
 
@@ -286,6 +291,61 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       return next;
     });
   }, [inputs, defaultDebugSequence]);
+
+  // Undo/Redo keyboard shortcuts (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
+  const stateToRestoreRef = useRef<{ placed: PlacedGridComponent[]; wires: Wire[] } | null>(null);
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isUndo = (e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
+      const isRedo = ((e.key === 'y' || e.key === 'Y') || ((e.key === 'z' || e.key === 'Z') && e.shiftKey)) && (e.ctrlKey || e.metaKey);
+
+      if (isUndo) {
+        e.preventDefault();
+        setHistory((current) => {
+          if (current.past.length === 0) return current;
+          const newPast = [...current.past];
+          const popped = newPast.pop();
+          if (!popped) return current;
+          // Store state to restore in ref, will be handled by effect below
+          stateToRestoreRef.current = popped;
+          return {
+            past: newPast,
+            future: [...current.future, { placed, wires }],
+          };
+        });
+      }
+
+      if (isRedo) {
+        e.preventDefault();
+        setHistory((current) => {
+          if (current.future.length === 0) return current;
+          const newFuture = [...current.future];
+          const popped = newFuture.pop();
+          if (!popped) return current;
+          // Store state to restore in ref, will be handled by effect below
+          stateToRestoreRef.current = popped;
+          return {
+            past: [...current.past, { placed, wires }],
+            future: newFuture,
+          };
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [placed, wires]);
+
+  // Effect to restore state from undo/redo
+  useEffect(() => {
+    if (stateToRestoreRef.current) {
+      const stateToRestore = stateToRestoreRef.current;
+      stateToRestoreRef.current = null;
+      setPlaced(stateToRestore.placed);
+      setWires(stateToRestore.wires);
+    }
+  }, [history]);
 
   const budgetLimit = puzzle?.budgetLimit ?? 0;
   const creatorBudget = puzzle?.creatorBudget ?? null;
@@ -986,20 +1046,41 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }
 
   const onPlacedChange = (next: PlacedGridComponent[]) => {
-    // Budget guard: detect a new placement.
+    // Record history: save current state to past before changing
+    commitHistory();
+    
+    // Budget guard: detect new placements and check total cost of ALL new items.
     if (next.length > placed.length) {
-      const added = next[next.length - 1];
-      const def = componentCatalog.get(added.componentId);
-      if (def && !canAddCost(def.cost)) {
+      // Find all new components by diffing the arrays
+      const placedIds = new Set(placed.map((p) => p.id));
+      const newComponents = next.filter((p) => !placedIds.has(p.id));
+      
+      // Calculate total cost of all new components
+      let totalNewCost = 0;
+      for (const comp of newComponents) {
+        const def = componentCatalog.get(comp.componentId);
+        totalNewCost += def?.cost ?? 0;
+      }
+      
+      // Check if total cost exceeds budget
+      if (currentCost + totalNewCost > budgetLimit) {
         notifications.addNotification({
           type: 'warning',
           title: 'Budget Limit Exceeded',
-          message: `This component costs ${def.cost} but only ${budgetLimit - currentCost} budget remaining. Remove or replace existing components to stay within the limit.`,
+          message: `Adding these components costs ${totalNewCost} total, but only ${budgetLimit - currentCost} budget remaining. Remove or replace existing components to stay within the limit.`,
         });
         return;
       }
     }
     setPlaced(next);
+  };
+
+  const commitHistory = () => {
+    // Push current state to past and clear future when any change is made
+    setHistory((current) => ({
+      past: [...current.past, { placed, wires }],
+      future: [],
+    }));
   };
 
   const buildSolution = (): CircuitSolution => {
@@ -1557,7 +1638,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           selectedComponent={selectedComponent}
           onSelectedComponentChange={setSelectedComponent}
           onPlacedChange={onPlacedChange}
-          onWiresChange={setWires}
+          onWiresChange={(next: Wire[]) => {
+            commitHistory();
+            setWires(next);
+          }}
           draggedPaletteComponentId={draggedPaletteComponentId}
           isChecking={isChecking}
           isPowerSurge={isPowerSurge}
