@@ -914,6 +914,12 @@ class TestSolvingServiceSimulate:
         circuit = Circuit(id=1, user_id=1, name="Test", cost=0, structure_json=structure_json)
         self.mock_circuit_repo.get_by_id.return_value = circuit
         
+        # Mock engine to return empty puzzle outputs for sequence simulation
+        self.mock_engine.evaluate.return_value = {}
+        
+        # Mock circuit_repo to return empty custom pieces
+        self.mock_circuit_repo.list_custom_pieces_by_puzzle.return_value = []
+        
         payload = {"circuit_id": 1, "components": [], "wires": []}
         result = self.service.simulate_solution(
             "token", 1, payload, 

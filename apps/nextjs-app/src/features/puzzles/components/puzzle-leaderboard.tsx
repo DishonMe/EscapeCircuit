@@ -56,18 +56,6 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
     );
   }
 
-  if (entries.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-        <div className="text-3xl">{'\u{1F3C6}'}</div>
-        <p className="text-sm font-medium text-white">No solvers yet!</p>
-        <p className="text-xs text-muted-foreground">
-          Be the first to solve this puzzle and claim the top spot.
-        </p>
-      </div>
-    );
-  }
-
   const currentUserId = (user.data as any)?.id;
 
   return (
@@ -97,8 +85,18 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
       </div>
 
       {/* Leaderboard Content */}
-      {/* Top 3 podium */}
-      {entries.length >= 3 && (
+      {entries.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+          <div className="text-3xl">{'\u{1F3C6}'}</div>
+          <p className="text-sm font-medium text-white">No solvers yet!</p>
+          <p className="text-xs text-muted-foreground">
+            Be the first to solve this puzzle and claim the top spot.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Top 3 podium */}
+          {entries.length >= 3 && (
         <div className="mb-4 flex items-end justify-center gap-2 px-2 pt-2">
           {/* 2nd place */}
           <div className="flex w-20 flex-col items-center">
@@ -225,6 +223,8 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
           </>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };
