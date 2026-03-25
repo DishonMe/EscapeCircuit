@@ -162,6 +162,7 @@ export const WorkstationGrid = ({
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
   const notifications = useNotifications();
+  const { playDrop, playWireConnect } = useAudio();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -178,7 +179,7 @@ export const WorkstationGrid = ({
 
   const [selectedEntity, setSelectedEntity] = useState<
     | { type: 'none' }
-    | { type: 'component'; placedId: string }
+    | { type: 'component'; placedIds: string[] }
     | { type: 'wire'; wireId: string }
   >({ type: 'none' });
 
@@ -188,10 +189,11 @@ export const WorkstationGrid = ({
   }>(null);
 
   const [draggedComponent, setDraggedComponent] = useState<{
-    placedId: string;
-    startHole: HoleCoord;
-    currentHole: HoleCoord;
-    offset: { x: number; y: number };
+    placedIds: string[];
+    startMouseHole: HoleCoord;
+    currentMouseHole: HoleCoord;
+    deltaRow: number;
+    deltaCol: number;
   } | null>(null);
 
   // Ghost/Preview State
@@ -222,9 +224,8 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
+  const [clipboard, setClipboard] = useState<{ components: PlacedGridComponent[], wires: Wire[] } | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
-
-  const { playDrop, playWireConnect } = useAudio();
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -233,6 +234,124 @@ export const WorkstationGrid = ({
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  // Copy/Paste keyboard shortcuts (Ctrl+C / Ctrl+V)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCopyKey = (e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
+      const isPasteKey = (e.key === 'v' || e.key === 'V') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
+
+      if (isCopyKey) {
+        e.preventDefault();
+        console.log('[Copy] selectedEntity:', selectedEntity);
+        // Copy: collect selected components and their internal wires
+        if (selectedEntity.type === 'component' && selectedEntity.placedIds && selectedEntity.placedIds.length > 0) {
+          const selectedIds = new Set(selectedEntity.placedIds);
+          const selectedComps = placed.filter((p) => selectedIds.has(p.id));
+          console.log('[Copy] Selected components:', selectedComps);
+          // Only copy internal wires (both endpoints in selection)
+          const internalWires = wires.filter(
+            (w) => selectedIds.has(w.from.componentId) && selectedIds.has(w.to.componentId)
+          );
+          console.log('[Copy] Internal wires:', internalWires);
+          setClipboard({ components: selectedComps, wires: internalWires });
+          console.log('[Copy] Clipboard set:', { components: selectedComps, wires: internalWires });
+        } else {
+          console.log('[Copy] No components selected or wrong type');
+        }
+      }
+
+      if (isPasteKey) {
+        e.preventDefault();
+        console.log('[Paste] clipboard:', clipboard);
+        // Paste: clone components and wires with new IDs and offset
+        if (clipboard && clipboard.components.length > 0) {
+          console.log('[Paste] Starting paste with', clipboard.components.length, 'components');
+          const idMap = new Map<string, string>();
+          const newComponents: PlacedGridComponent[] = [];
+          const newWires: Wire[] = [];
+
+          // Create new components with offset
+          clipboard.components.forEach((comp, idx) => {
+            const newId = `${comp.componentId}:${Date.now()}-${idx}`;
+            idMap.set(comp.id, newId);
+            newComponents.push({
+              id: newId,
+              componentId: comp.componentId,
+              origin: {
+                row: clamp(comp.origin.row + 2, 0, gridRows - 1),
+                col: clamp(comp.origin.col + 2, 0, gridCols - 1),
+              },
+              rotation: comp.rotation,
+            });
+          });
+          console.log('[Paste] New components created:', newComponents);
+
+          // Create new wires using ID map
+          clipboard.wires.forEach((wire, idx) => {
+            const newFromId = idMap.get(wire.from.componentId);
+            const newToId = idMap.get(wire.to.componentId);
+            if (newFromId && newToId) {
+              newWires.push({
+                id: `${wire.id}:${Date.now()}-${idx}`,
+                from: { ...wire.from, componentId: newFromId },
+                to: { ...wire.to, componentId: newToId },
+              });
+            }
+          });
+          console.log('[Paste] New wires created:', newWires);
+
+          // Add to placed/wires (budget guard runs in onPlacedChange)
+          console.log('[Paste] Calling onPlacedChange with', newComponents.length, 'new components');
+          onPlacedChange([...placed, ...newComponents]);
+          onWiresChange([...wires, ...newWires]);
+
+          // Auto-select newly pasted components
+          setSelectedEntity({
+            type: 'component',
+            placedIds: Array.from(idMap.values()),
+          });
+          console.log('[Paste] Auto-selected new components:', Array.from(idMap.values()));
+        } else {
+          console.log('[Paste] Clipboard is empty or null');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedEntity, placed, wires, clipboard, gridRows, gridCols, onPlacedChange, onWiresChange]);
+
+  // Keyboard deletion (Delete / Backspace)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+      // Don't delete if user is typing in an input field
+      const activeEl = document.activeElement as HTMLElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      e.preventDefault();
+      console.log('[Delete Key] selectedEntity:', selectedEntity);
+
+      if (selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0) {
+        console.log('[Delete Key] Deleting components:', selectedEntity.placedIds);
+        // Delete all selected components
+        for (const placedId of selectedEntity.placedIds) {
+          console.log('[Delete] Removing component:', placedId);
+          removeComponent(placedId);
+        }
+      } else if (selectedEntity.type === 'wire') {
+        console.log('[Delete Key] Deleting wire:', selectedEntity.wireId);
+        removeWire(selectedEntity.wireId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedEntity]);
 
   const activeWireIdsSet = useMemo(() => new Set(activeWireIds), [activeWireIds]);
   const activeComponentIdsSet = useMemo(
@@ -520,6 +639,7 @@ export const WorkstationGrid = ({
     origin: HoleCoord,
     rotation: 0 | 90,
     excludePlacedId?: string,
+    excludePlacedIds?: string[],
   ) => {
     const def = catalog[componentId];
     if (!def) return false;
@@ -529,9 +649,14 @@ export const WorkstationGrid = ({
     if (origin.row + size.h > gridRows) return false;
     if (origin.col + size.w > gridCols) return false;
 
+    // Build exclusion set from both parameters
+    const excludeSet = new Set<string>();
+    if (excludePlacedId) excludeSet.add(excludePlacedId);
+    if (excludePlacedIds) excludePlacedIds.forEach((id) => excludeSet.add(id));
+
     // no component overlap
     for (const rect of componentRects) {
-      if (rect.placedId === excludePlacedId) continue;
+      if (excludeSet.has(rect.placedId)) continue;
       for (let r = 0; r < size.h; r++) {
         for (let c = 0; c < size.w; c++) {
           const hole = { row: origin.row + r, col: origin.col + c };
@@ -549,7 +674,7 @@ export const WorkstationGrid = ({
       };
       const key = `r${hole.row}c${hole.col}`;
       const occ = occupiedPortHoles.get(key);
-      if (occ && occ.ownerId !== excludePlacedId) return false;
+      if (occ && !excludeSet.has(occ.ownerId)) return false;
     }
 
     return true;
@@ -1314,7 +1439,11 @@ export const WorkstationGrid = ({
               return;
             }
             if (selectedEntity.type === 'component') {
-              removeComponent(selectedEntity.placedId);
+              // Delete all selected components
+              for (const placedId of selectedEntity.placedIds) {
+                removeComponent(placedId);
+              }
+              setSelectedEntity({ type: 'none' });
               return;
             }
             if (selectedEntity.type === 'wire') {
@@ -1604,15 +1733,20 @@ export const WorkstationGrid = ({
             const def = catalog[p.componentId];
             const size = rotatedSize(def.size, p.rotation);
 
-            const isDragging = draggedComponent?.placedId === p.id;
-            const origin = isDragging ? draggedComponent.currentHole : p.origin;
+            const isDragging = draggedComponent && draggedComponent.placedIds.includes(p.id);
+            const origin = isDragging 
+              ? { 
+                  row: p.origin.row + draggedComponent.deltaRow, 
+                  col: p.origin.col + draggedComponent.deltaCol 
+                }
+              : p.origin;
 
             const left = origin.col * CELL_PX;
             const top = origin.row * CELL_PX;
 
             const isSelected =
               selectedEntity.type === 'component' &&
-              selectedEntity.placedId === p.id;
+              selectedEntity.placedIds.includes(p.id);
             const isActive = activeComponentIdsSet.has(p.id);
             const isDeleteWarn = hoveredDeleteComponentId === p.id;
             const isDeleting = deletingComponentIds.includes(p.id);
@@ -1647,7 +1781,25 @@ export const WorkstationGrid = ({
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   e.currentTarget.setPointerCapture(e.pointerId);
-                  setSelectedEntity({ type: 'component', placedId: p.id });
+                  
+                  // Multi-select: Shift+Click toggles component in selection, otherwise single select
+                  if (e.shiftKey) {
+                    setSelectedEntity((current) => {
+                      if (current.type !== 'component') {
+                        return { type: 'component', placedIds: [p.id] };
+                      }
+                      const ids = [...current.placedIds];
+                      const idx = ids.indexOf(p.id);
+                      if (idx >= 0) {
+                        ids.splice(idx, 1); // Remove if present
+                      } else {
+                        ids.push(p.id); // Add if missing
+                      }
+                      return { type: 'component', placedIds: ids.length > 0 ? ids : [p.id] };
+                    });
+                  } else {
+                    setSelectedEntity({ type: 'component', placedIds: [p.id] });
+                  }
 
                   const el = containerRef.current;
                   if (!el) return;
@@ -1658,73 +1810,96 @@ export const WorkstationGrid = ({
                   };
                   const worldPos = screenToWorld(cursor);
 
+                  // Group dragging: if clicked component is in selection, drag all selected
+                  const placedIdsToMove = selectedEntity.type === 'component' && selectedEntity.placedIds.includes(p.id)
+                    ? selectedEntity.placedIds
+                    : [p.id];
+
                   setDraggedComponent({
-                    placedId: p.id,
-                    startHole: p.origin,
-                    currentHole: p.origin,
-                    offset: {
-                      x: worldPos.col - p.origin.col,
-                      y: worldPos.row - p.origin.row,
-                    },
+                    placedIds: placedIdsToMove,
+                    startMouseHole: p.origin,
+                    currentMouseHole: p.origin,
+                    deltaRow: 0,
+                    deltaCol: 0,
                   });
                 }}
                 onPointerMove={(e) => {
-                  if (draggedComponent?.placedId === p.id) {
-                    e.stopPropagation();
-                    const el = containerRef.current;
-                    if (!el) return;
-                    const rect = el.getBoundingClientRect();
-                    const cursor = {
-                      x: e.clientX - rect.left,
-                      y: e.clientY - rect.top,
-                    };
-                    const worldPos = screenToWorld(cursor);
+                  if (!draggedComponent || !draggedComponent.placedIds.includes(p.id)) return;
+                  
+                  e.stopPropagation();
+                  const el = containerRef.current;
+                  if (!el) return;
+                  const rect = el.getBoundingClientRect();
+                  const cursor = {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                  };
+                  const worldPos = screenToWorld(cursor);
 
-                    const newCol = Math.round(
-                      worldPos.col - draggedComponent.offset.x,
-                    );
-                    const newRow = Math.round(
-                      worldPos.row - draggedComponent.offset.y,
-                    );
+                  const newDeltaCol = Math.round(
+                    worldPos.col - draggedComponent.startMouseHole.col,
+                  );
+                  const newDeltaRow = Math.round(
+                    worldPos.row - draggedComponent.startMouseHole.row,
+                  );
 
-                    if (
-                      newCol !== draggedComponent.currentHole.col ||
-                      newRow !== draggedComponent.currentHole.row
-                    ) {
-                      setDraggedComponent({
-                        ...draggedComponent,
-                        currentHole: { row: newRow, col: newCol },
-                      });
-                    }
+                  if (
+                    newDeltaCol !== draggedComponent.deltaCol ||
+                    newDeltaRow !== draggedComponent.deltaRow
+                  ) {
+                    setDraggedComponent({
+                      ...draggedComponent,
+                      deltaRow: newDeltaRow,
+                      deltaCol: newDeltaCol,
+                    });
                   }
                 }}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   e.currentTarget.releasePointerCapture(e.pointerId);
 
-                  if (draggedComponent?.placedId === p.id) {
-                    if (isOverTrash(e.clientX, e.clientY)) {
-                      removeComponent(p.id);
-                    } else {
-                      // Commit move
-                      if (
-                        canPlaceComponentAt(
-                          p.componentId,
-                          draggedComponent.currentHole,
-                          p.rotation,
-                          p.id,
-                        )
-                      ) {
-                        const next = placed.map((x) =>
-                          x.id === p.id
-                            ? { ...x, origin: draggedComponent.currentHole }
-                            : x,
-                        );
-                        onPlacedChange(next);
-                      }
+                  if (!draggedComponent || !draggedComponent.placedIds.includes(p.id)) return;
+
+                  if (isOverTrash(e.clientX, e.clientY)) {
+                    // Delete all dragged components
+                    for (const placedId of draggedComponent.placedIds) {
+                      removeComponent(placedId);
                     }
-                    setDraggedComponent(null);
+                  } else {
+                    // Commit all moves: validate each component, then update all
+                    const allValid = draggedComponent.placedIds.every((placedId) => {
+                      const comp = placed.find((c) => c.id === placedId);
+                      if (!comp) return false;
+                      const newOrigin = {
+                        row: clamp(comp.origin.row + draggedComponent.deltaRow, 0, gridRows - 1),
+                        col: clamp(comp.origin.col + draggedComponent.deltaCol, 0, gridCols - 1),
+                      };
+                      return canPlaceComponentAt(
+                        comp.componentId,
+                        newOrigin,
+                        comp.rotation,
+                        undefined,
+                        draggedComponent.placedIds, // exclude all dragged components from collision
+                      );
+                    });
+
+                    if (allValid) {
+                      const next = placed.map((comp) => {
+                        if (draggedComponent.placedIds.includes(comp.id)) {
+                          return {
+                            ...comp,
+                            origin: {
+                              row: clamp(comp.origin.row + draggedComponent.deltaRow, 0, gridRows - 1),
+                              col: clamp(comp.origin.col + draggedComponent.deltaCol, 0, gridCols - 1),
+                            },
+                          };
+                        }
+                        return comp;
+                      });
+                      onPlacedChange(next);
+                    }
                   }
+                  setDraggedComponent(null);
                 }}
               >
                 {/* Selected Delete Button (Outside) */}
