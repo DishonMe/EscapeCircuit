@@ -32,7 +32,7 @@ import {
 import type { Wire } from "@/types/api";
 import { cn } from "@/utils/cn";
 
-type TabName = "basic" | "test-cases" | "instructions" | "solution" | "custom-pieces";
+type TabName = "basic" | "test-cases" | "python-tests" | "instructions" | "solution" | "custom-pieces";
 
 interface BasicInfo {
   name: string;
@@ -43,8 +43,10 @@ interface BasicInfo {
   timeLimit: number | null;
   minCycles: number | null;
   maxCycles: number | null;
+  minGateCount: number | null;
   totalGateCount: number | null;
   gateQuotas: Record<string, number>;
+  minGateQuotas: Record<string, number>;
   gateSet: string[];
   inputs: string[];
   outputs: string[];
@@ -86,6 +88,7 @@ const arrayToBinaryString = (arr: number[]): string => {
 interface CreatePuzzleData {
   basic: BasicInfo;
   testCases: TestCase[];
+  pythonTests: File | null;
   instructions: string;
   solutionJSON: string;
 }
@@ -350,8 +353,10 @@ export default function CreatePuzzleForm() {
       timeLimit: null,
       minCycles: null,
       maxCycles: null,
+      minGateCount: null,
       totalGateCount: null,
       gateQuotas: {},
+      minGateQuotas: {},
       gateSet: [],
       inputs: [],
       outputs: [],
@@ -360,6 +365,7 @@ export default function CreatePuzzleForm() {
       allowArsenal: true,
     },
     testCases: [],
+    pythonTests: null,
     instructions: "",
     solutionJSON: "",
   });
@@ -1079,6 +1085,9 @@ export default function CreatePuzzleForm() {
       
       // ADD: Convert gate quotas to gate_limit test cases
       const gateQuotasEntries = Object.entries(data.basic.gateQuotas);
+      const minGateQuotasEntries = Object.entries(data.basic.minGateQuotas);
+      
+      // Create test cases for maximum gate limits
       if (gateQuotasEntries.length > 0) {
         gateQuotasEntries.forEach(([gateName, gateLimit]) => {
           convertedTestCases.push({
@@ -1089,11 +1098,23 @@ export default function CreatePuzzleForm() {
         });
       }
       
+      // Create test cases for minimum gate limits
+      if (minGateQuotasEntries.length > 0) {
+        minGateQuotasEntries.forEach(([gateName, minGateLimit]) => {
+          convertedTestCases.push({
+            kind: 'gate_limit',
+            gate_name: gateName,
+            min_gate_limit: minGateLimit,
+          });
+        });
+      }
+      
       // ADD: Add total gate count limit test case if specified
-      if ((data.basic.totalGateCount ?? 0) > 0) {
+      if ((data.basic.minGateCount ?? 0) > 0 || (data.basic.totalGateCount ?? 0) > 0) {
         convertedTestCases.push({
           kind: 'gate_count_limit',
-          max_gate_count: data.basic.totalGateCount,
+          min_gate_count: (data.basic.minGateCount ?? 0) > 0 ? data.basic.minGateCount : undefined,
+          max_gate_count: (data.basic.totalGateCount ?? 0) > 0 ? data.basic.totalGateCount : undefined,
         });
       }
       
@@ -1120,6 +1141,7 @@ export default function CreatePuzzleForm() {
           outputs: data.basic.outputs,
           min_cycles: data.basic.minCycles,
           max_cycles: data.basic.maxCycles,
+          min_gate_count: data.basic.minGateCount,
           total_gate_count: data.basic.totalGateCount,
           gate_quotas: Object.keys(data.basic.gateQuotas).length > 0 ? data.basic.gateQuotas : undefined,
           allow_arsenal: data.basic.allowArsenal,
@@ -1163,6 +1185,16 @@ export default function CreatePuzzleForm() {
         new Blob([data.solutionJSON], { type: "application/json" }),
         "puzzle_solution.json"
       );
+      
+      // Add Python tests file if provided
+      if (data.pythonTests) {
+        formData.append(
+          "python_tests_file",
+          data.pythonTests,
+          data.pythonTests.name
+        );
+      }
+      
       formData.append("difficulty", data.basic.difficulty);
 
       const res = await fetch(`${baseUrl}/puzzles/create-puzzle-form`, {
@@ -1215,7 +1247,7 @@ export default function CreatePuzzleForm() {
 
       {/* Tabs */}
       <div className="flex border-b mb-6">
-        {(["basic", "test-cases", "custom-pieces", "instructions", "solution"] as TabName[]).map(
+        {(["basic", "test-cases", "python-tests", "custom-pieces", "instructions", "solution"] as TabName[]).map(
           (tab) => (
             <button
               key={tab}
@@ -1230,11 +1262,13 @@ export default function CreatePuzzleForm() {
                 ? "Basic Info"
                 : tab === "test-cases"
                   ? "Test Cases"
-                  : tab === "custom-pieces"
-                    ? "Custom Pieces"
-                    : tab === "instructions"
-                      ? "Instructions"
-                      : "Solution"}
+                  : tab === "python-tests"
+                    ? "Python Tests"
+                    : tab === "custom-pieces"
+                      ? "Custom Pieces"
+                      : tab === "instructions"
+                        ? "Instructions"
+                        : "Solution"}
             </button>
           )
         )}
@@ -1406,6 +1440,23 @@ export default function CreatePuzzleForm() {
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-2">
+                  Minimum Gate Count (optional)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={data.basic.minGateCount ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value) : null;
+                    // Only accept values > 0, treat 0 or negative as null
+                    handleBasicChange("minGateCount", val && val > 0 ? val : null);
+                  }}
+                  className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="Min gates required"
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-foreground mb-2">
                   Gate Limit (optional)
                 </label>
                 <input
@@ -1488,22 +1539,40 @@ export default function CreatePuzzleForm() {
                           <Info size={14} />
                         </button>
                       </div>
-                      <input
-                        type="number"
-                        min="1"
-                        value={data.basic.gateQuotas[gate] ?? ""}
-                        onChange={(e) => {
-                          const newQuotas = { ...data.basic.gateQuotas };
-                          if (e.target.value) {
-                            newQuotas[gate] = parseInt(e.target.value);
-                          } else {
-                            delete newQuotas[gate];
-                          }
-                          handleBasicChange("gateQuotas", newQuotas);
-                        }}
-                        className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                        placeholder="Max count"
-                      />
+                      <div className="space-y-1">
+                        <input
+                          type="number"
+                          min="1"
+                          value={data.basic.gateQuotas[gate] ?? ""}
+                          onChange={(e) => {
+                            const newQuotas = { ...data.basic.gateQuotas };
+                            if (e.target.value) {
+                              newQuotas[gate] = parseInt(e.target.value);
+                            } else {
+                              delete newQuotas[gate];
+                            }
+                            handleBasicChange("gateQuotas", newQuotas);
+                          }}
+                          className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          placeholder="Max count"
+                        />
+                        <input
+                          type="number"
+                          min="1"
+                          value={data.basic.minGateQuotas[gate] ?? ""}
+                          onChange={(e) => {
+                            const newMinQuotas = { ...data.basic.minGateQuotas };
+                            if (e.target.value) {
+                              newMinQuotas[gate] = parseInt(e.target.value);
+                            } else {
+                              delete newMinQuotas[gate];
+                            }
+                            handleBasicChange("minGateQuotas", newMinQuotas);
+                          }}
+                          className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          placeholder="Min count"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2034,6 +2103,80 @@ export default function CreatePuzzleForm() {
                 />
               </div>
             </details>
+          </div>
+        )}
+
+        {activeTab === "python-tests" && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-secondary/50 p-4">
+              <h3 className="font-semibold mb-2">Python Tests (Optional)</h3>
+              <p className="text-[13px] text-muted-foreground mb-4">
+                Upload a Python file with custom test cases for puzzle validation. Tests will run when users submit solutions.
+              </p>
+              
+              <div className="space-y-3 mb-4">
+                <h4 className="text-[13px] font-semibold">How Tests Work:</h4>
+                <ul className="text-[13px] text-muted-foreground space-y-2 list-disc list-inside">
+                  <li><strong>REQUIRED:</strong> Define <code className="bg-black/20 px-1 rounded">def run_tests(solution):</code> function</li>
+                  <li><strong>Purpose:</strong> Call your individual test functions from <code className="bg-black/20 px-1 rounded">run_tests()</code></li>
+                  <li><strong>No return statements:</strong> Tests don't return values</li>
+                  <li><strong>Raise on failure:</strong> Use <code className="bg-black/20 px-1 rounded">raise Exception("error message")</code> to fail</li>
+                  <li><strong>Silent pass:</strong> If no error is raised, the test passes</li>
+                  <li><strong>Available context:</strong> <code className="bg-black/20 px-1 rounded">solution</code> dict contains the circuit structure</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[13px] font-medium text-foreground">Python Tests File (optional)</label>
+                <input
+                  type="file"
+                  accept=".py"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setData((prev) => ({ ...prev, pythonTests: file }));
+                  }}
+                  className="w-full"
+                />
+                {data.pythonTests && (
+                  <p className="text-[12px] text-green-600">✓ {data.pythonTests.name} selected</p>
+                )}
+              </div>
+
+              <details className="mt-4 p-3 bg-black/20 rounded-lg">
+                <summary className="cursor-pointer font-semibold text-[13px]">Example Test File</summary>
+                <pre className="mt-3 p-3 bg-black/30 rounded text-[11px] overflow-x-auto">
+{`# Example: validate_solution.py
+# Define individual test functions that validate the solution
+# The 'solution' dict contains: placedComponents, wires, totalCost, etc.
+
+def test_has_enough_components():
+    """Check that solution has minimum components"""
+    components = solution.get('placedComponents', [])
+    if len(components) < 2:
+        raise Exception("Solution must have at least 2 components")
+
+def test_uses_xor_gate():
+    """Check specific gate usage"""
+    components = solution.get('placedComponents', [])
+    has_xor = any(c.get('componentId') == 'XOR' for c in components)
+    if not has_xor:
+        raise Exception("Solution must use at least one XOR gate")
+
+def test_circuit_structure():
+    """Validate circuit connectivity"""
+    wires = solution.get('wires', [])
+    if len(wires) < 1:
+        raise Exception("Solution must have at least one wire connection")
+
+# REQUIRED: Define run_tests() function that calls all test functions
+def run_tests(solution):
+    """Main test runner - this function is called automatically"""
+    test_has_enough_components()
+    test_uses_xor_gate()
+    test_circuit_structure()`}
+                </pre>
+              </details>
+            </div>
           </div>
         )}
 

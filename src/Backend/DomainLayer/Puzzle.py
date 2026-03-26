@@ -16,6 +16,7 @@ class Puzzle:
     instructions: Optional[str] = None
     creator_comment: Optional[str] = None
     status: PuzzleStatus = PuzzleStatus.DRAFT
+    riddle_base_name: Optional[str] = None  # e.g., "riddle_01_puzzle_name" - used to locate puzzle files
 
     budget: int = 0
     creator_budget: Optional[int] = None  # Creator's solution cost (must be < budget when set)
@@ -26,6 +27,7 @@ class Puzzle:
 
     # Constraint fields
     total_gate_count: Optional[int] = None
+    min_gate_count: Optional[int] = None
     min_cycles: Optional[int] = None
     max_cycles: Optional[int] = None
     
@@ -104,6 +106,7 @@ class Puzzle:
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "allow_arsenal": self.allow_arsenal,
             "allowArsenal": self.allow_arsenal,
+            "min_gate_count": self.min_gate_count,
             "total_gate_count": self.total_gate_count,
             "min_cycles": self.min_cycles,
             "max_cycles": self.max_cycles,
@@ -134,6 +137,7 @@ class Puzzle:
             instructions=d.get("instructions"),
             creator_comment=d.get("creator_comment"),
             status=PuzzleStatus(d.get("status", PuzzleStatus.DRAFT.value)),
+            riddle_base_name=d.get("riddle_base_name"),
             budget=int(d.get("budget", 0)),
             creator_budget=int(d["creator_budget"]) if d.get("creator_budget") is not None else (
                 int(d["creatorBudget"]) if d.get("creatorBudget") is not None else None
@@ -142,6 +146,7 @@ class Puzzle:
             difficulty=PuzzleDifficulty(d["difficulty"]) if "difficulty" in d else PuzzleDifficulty.EASY,
             default_gate_set={GateType(x) for x in d.get("default_gate_set", [])},
             total_gate_count=d.get("total_gate_count"),
+            min_gate_count=d.get("min_gate_count"),
             min_cycles=d.get("min_cycles"),
             max_cycles=d.get("max_cycles"),
             board_rows=d.get("board_rows"),
