@@ -254,7 +254,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 description=?, instructions=?, budget=?, creator_budget=?, time_limit_seconds=?,
                 default_gate_set=?, difficulty=?,
                 total_gate_count=?, min_cycles=?, max_cycles=?,
-                board_rows=?, board_cols=?
+                board_rows=?, board_cols=?,
+                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?
             WHERE id=?
         """, (
             description,
@@ -269,6 +270,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('max_cycles'),
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
+            1 if puzzle_data.get('allow_arsenal', True) else 0,
+            json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
+            json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_id
         ))
         # Clear old test cases for this puzzle (they get re-imported below)
@@ -281,9 +285,10 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 time_limit_seconds, difficulty, default_gate_set, rating_count, 
                 avg_difficulty, avg_fun, avg_clearness,
                 total_gate_count, min_cycles, max_cycles,
-                allow_arsenal, board_rows, board_cols,
+                allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
+                board_rows, board_cols,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -300,6 +305,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
             1 if puzzle_data.get('allow_arsenal', True) else 0,
+            json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
+            json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
             utcnow().isoformat()

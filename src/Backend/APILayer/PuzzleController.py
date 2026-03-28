@@ -30,6 +30,9 @@ class CreatePuzzleReq(BaseModel):
     timeLimit: Optional[int] = None # alias
     default_gate_set: list[str] = []
     difficulty: str = "EASY"
+    allow_arsenal: Optional[bool] = None
+    allowed_arsenal_component_ids: Optional[list[str]] = None
+    arsenal_component_display_modes: Optional[dict] = None
 
     def to_backend_dict(self):
         return {
@@ -39,7 +42,10 @@ class CreatePuzzleReq(BaseModel):
             "creator_budget": self.creator_budget,
             "time_limit_seconds": self.timeLimit if self.timeLimit is not None else self.time_limit_seconds,
             "default_gate_set": self.default_gate_set,
-            "difficulty": self.difficulty
+            "difficulty": self.difficulty,
+            "allow_arsenal": self.allow_arsenal,
+            "allowed_arsenal_component_ids": self.allowed_arsenal_component_ids,
+            "arsenal_component_display_modes": self.arsenal_component_display_modes
         }
 
 
@@ -340,6 +346,19 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         try:
             result = puzzle_service.get(token, puzzle_id)
             _inject_rating_metrics(result)
+            
+            # Log what we're about to return to the client
+            print(f"\n🌐 API ENDPOINT: GET /puzzles/{puzzle_id}")
+            print(f"   - arsenalComponents in result: {len(result.get('arsenalComponents', []))}")
+            if result.get('arsenalComponents'):
+                first = result['arsenalComponents'][0]
+                print(f"   - First arsenal component:")
+                print(f"     * id: {first.get('id')}")
+                print(f"     * type: {first.get('type')}")
+                print(f"     * description key present: {'description' in first}")
+                print(f"     * description value: '{first.get('description', 'MISSING')}'")
+                print(f"     * all keys: {list(first.keys())}")
+            print(f"   ✅ RETURNING TO CLIENT: {list(result.keys())}\n")
 
             # Inject per-user solve status (same as browse does)
             try:

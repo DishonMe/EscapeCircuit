@@ -25,6 +25,7 @@ class CircuitRepo:
             num_inputs INTEGER NOT NULL DEFAULT 0,
             num_outputs INTEGER NOT NULL DEFAULT 0,
             puzzle_id INTEGER,
+            description TEXT NOT NULL DEFAULT '',
             UNIQUE(user_id, name)
         );
         """)
@@ -44,15 +45,17 @@ class CircuitRepo:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN num_outputs INTEGER NOT NULL DEFAULT 0;")
             if "puzzle_id" not in cols:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN puzzle_id INTEGER;")
+            if "description" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN description TEXT NOT NULL DEFAULT '';")
             self.conn.commit()
         except Exception:
             pass
 
     def create(self, circuit: Circuit, commit: bool = True) -> Circuit:
         cur = self.conn.execute("""
-            INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs, puzzle_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?)
-        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id))
+            INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
+        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.description))
         circuit.id = int(cur.lastrowid)
         if commit:
             self.conn.commit()
@@ -62,6 +65,7 @@ class CircuitRepo:
         row = self.conn.execute("SELECT * FROM circuits WHERE id=?", (circuit_id,)).fetchone()
         if not row:
             return None
+        
         return Circuit(
             id=int(row["id"]),
             user_id=int(row["user_id"]),
@@ -74,6 +78,7 @@ class CircuitRepo:
             num_inputs=int(row["num_inputs"] or 0),
             num_outputs=int(row["num_outputs"] or 0),
             puzzle_id=int(row["puzzle_id"]) if row["puzzle_id"] else None,
+            description=row["description"] or "",
         )
 
     def list_by_user(self, user_id: int) -> List[Circuit]:
@@ -93,6 +98,7 @@ class CircuitRepo:
                 num_inputs=int(r["num_inputs"] or 0),
                 num_outputs=int(r["num_outputs"] or 0),
                 puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
             )
             for r in rows
         ]
@@ -120,6 +126,7 @@ class CircuitRepo:
                 num_inputs=int(r["num_inputs"] or 0),
                 num_outputs=int(r["num_outputs"] or 0),
                 puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
             )
             for r in rows
         ]
@@ -128,10 +135,10 @@ class CircuitRepo:
         """Update an existing circuit"""
         cur = self.conn.execute("""
             UPDATE circuits 
-            SET name=?, cost=?, structure_json=?, is_arsenal=?, basic_gates=?, truth_table=?, num_inputs=?, num_outputs=?, puzzle_id=?
+            SET name=?, cost=?, structure_json=?, is_arsenal=?, basic_gates=?, truth_table=?, num_inputs=?, num_outputs=?, puzzle_id=?, description=?
             WHERE id=? AND user_id=?
         """, (circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), 
-              circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.id, circuit.user_id))
+              circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.description, circuit.id, circuit.user_id))
         self.conn.commit()
         return cur.rowcount > 0
 
@@ -153,6 +160,7 @@ class CircuitRepo:
                 num_inputs=int(r["num_inputs"] or 0),
                 num_outputs=int(r["num_outputs"] or 0),
                 puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
             )
             for r in rows
         ]

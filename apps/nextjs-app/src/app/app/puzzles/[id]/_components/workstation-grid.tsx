@@ -130,6 +130,7 @@ export const WorkstationGrid = ({
   debuggerGateBits = {},
   debuggerSequences = {},
   onDebuggerSequenceChange,
+  onInspectComponent,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -158,6 +159,8 @@ export const WorkstationGrid = ({
   debuggerGateBits?: Record<string, string>;
   debuggerSequences?: Record<string, string>;
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
+  onInspectComponent?: (placedId: string) => void;
+  arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -1912,36 +1915,68 @@ export const WorkstationGrid = ({
                   setDraggedComponent(null);
                 }}
               >
-                {/* Selected Delete Button (Outside) */}
+                {/* Selected Action Buttons: Inspect & Delete (Outside) */}
                 {isSelected && !isDragging && (
-                  <button
-                    type="button"
-                    className="absolute -top-2 left-1/2 z-50 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
-                    onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
-                    onMouseLeave={() =>
-                      setHoveredDeleteComponentId((current) =>
-                        current === p.id ? null : current,
-                      )
-                    }
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      triggerDeleteComponent(p.id);
-                    }}
-                    title="Delete component"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="size-3"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
+                    {/* Inspect Button - Only for custom/Arsenal components */}
+                    {!(() => {
+                      const gateType = def.label.split(' ')[0];
+                      return ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'DFF'].includes(gateType);
+                    })() && (
+                      <button
+                        type="button"
+                        className="flex size-5 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-blue-100 hover:text-blue-700 hover:ring-blue-300"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInspectComponent?.(p.id);
+                        }}
+                        title="Inspect component"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="size-3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="8" />
+                          <path d="M12 8v4" />
+                          <path d="M9 12h6" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      className="flex size-5 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                      onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
+                      onMouseLeave={() =>
+                        setHoveredDeleteComponentId((current) =>
+                          current === p.id ? null : current,
+                        )
+                      }
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerDeleteComponent(p.id);
+                      }}
+                      title="Delete component"
                     >
-                      <path d="M3 6h18" />
-                      <path d="M8 6V4h8v2" />
-                      <path d="M6 6l1 16h10l1-16" />
-                    </svg>
-                  </button>
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M6 6l1 16h10l1-16" />
+                      </svg>
+                    </button>
+                  </div>
                 )}
 
                 {/* Port markers */}

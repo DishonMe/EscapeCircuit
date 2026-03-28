@@ -48,6 +48,9 @@ class CircuitService:
         if not isinstance(structure_json, str) or not structure_json.strip():
             raise ValidationError("Circuit structure (JSON) is required. Please provide a valid circuit structure.")
 
+        # Accept description from request (for Arsenal pieces)
+        description = (payload.get("description") or "").strip()
+
         # Enforce arsenal limit based on XP/level using SQL COUNT to prevent TOCTOU bypass.
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -67,6 +70,7 @@ class CircuitService:
             name=name,
             cost=int(cost),
             structure_json=structure_json,
+            description=description,  # Include description in Circuit creation
         )
 
         # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU

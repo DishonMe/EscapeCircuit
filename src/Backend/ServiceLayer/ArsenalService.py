@@ -130,6 +130,9 @@ class ArsenalService:
         if not isinstance(truth_table, dict):
             raise ValidationError("truth_table must be a dictionary")
 
+        # Extract description from payload before creating Circuit
+        description = (payload.get("description") or "").strip()
+
         # Create and save circuit
         arsenal_piece = Circuit(
             id=0,
@@ -142,6 +145,7 @@ class ArsenalService:
             truth_table=json.dumps(truth_table),
             num_inputs=num_inputs,
             num_outputs=num_outputs,
+            description=description,
         )
 
         # Wrap capacity check + insert in IMMEDIATE transaction to prevent TOCTOU
@@ -248,7 +252,37 @@ class ArsenalService:
             pieces = self.repo.list_custom_pieces_by_puzzle(puzzle_id)
             return [piece.to_circuit_component() for piece in pieces]
         except Exception as e:
-            print(f"DEBUG: Error fetching custom pieces for puzzle {puzzle_id}: {e}")
+            return []
+
+    def get_arsenal_pieces_by_ids(self, piece_ids: List[int]) -> List[dict]:
+        """Fetch specific Arsenal pieces by their IDs.
+        
+        This is used when a puzzle specifies which arsenal pieces are allowed.
+        Returns the full component definitions for those pieces.
+        
+        Args:
+            piece_ids: List of Arsenal piece IDs to fetch
+            
+        Returns:
+            List of CircuitComponent dicts for the requested pieces
+        """
+        try:
+            if not piece_ids:
+                return []
+            
+            components = []
+            for piece_id in piece_ids:
+                try:
+                    # Fetch the circuit piece by ID
+                    piece = self.repo.get_by_id(piece_id)
+                    if piece and piece.is_arsenal:
+                        component = piece.to_circuit_component()
+                        components.append(component)
+                except Exception as e:
+                    continue
+            
+            return components
+        except Exception as e:
             return []
 
     def _resolve_max_slots_for_level(self, user_level: int) -> int:

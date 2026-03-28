@@ -139,6 +139,8 @@ export type Puzzle = Entity<{
   filteredBasicComponents?: string[];
   defaultGateSet?: string[];
   allowArsenal?: boolean;
+  allowedArsenalComponentIds?: string[];  // Specific Arsenal components allowed in this puzzle
+  arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;  // Display mode for each Arsenal component
   board_rows?: number | null;  // Board height (null = use default)
   board_cols?: number | null;  // Board width (null = use default)
   specialComponents?: CircuitComponent[];  // Backward compatibility (all special components)
@@ -174,12 +176,16 @@ export type CircuitComponent = {
   type: string;
   cost: number;
   pins: number;
-  num_inputs?: number;  // For arena/custom pieces
+  num_inputs?: number;  // For arsenal/custom pieces
   num_outputs?: number;  // For arsenal/custom pieces
   puzzle_id?: number | null;  // Non-null indicates custom piece, null indicates arsenal piece
   basic_gates?: string;  // For arsenal/custom pieces
   truth_table?: string;  // For arsenal/custom pieces
   is_arsenal?: boolean;
+  used_basic_types?: string[];  // Array of basic gate types used in the component
+  solution?: Record<string, any>;  // Component's internal structure/implementation
+  hide_internal_structure?: boolean;  // Whether internal structure should be hidden from player
+  description?: string;  // Component description shown in inspection dialog
 };
 
 export type PlacedComponent = {

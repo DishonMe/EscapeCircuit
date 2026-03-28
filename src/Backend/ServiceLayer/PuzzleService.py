@@ -4,6 +4,7 @@ import pathlib
 import os
 import shutil
 import re
+import json
 
 from Backend import settings
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -373,18 +374,43 @@ class PuzzleService:
             
             # Arsenal pieces only available if arsenal is enabled for this puzzle
             if self.arsenal_service and getattr(p, 'allow_arsenal', True):
-                allowed_gates = {g.value for g in p.default_gate_set}
-                arsenal_components = self.arsenal_service.get_available_pieces_for_puzzle(session_token, allowed_gates)
-                print(f"DEBUG: Found {len(arsenal_components)} arsenal pieces for puzzle {puzzle_id}")
+                # Get list of allowed Arsenal component IDs from puzzle config
+                allowed_ids = getattr(p, 'allowed_arsenal_component_ids', None) or []
+                print(f"🎯 DEBUG [PuzzleService.get] Puzzle {puzzle_id}:")
+                print(f"   - allowed_arsenal_component_ids = {allowed_ids}")
+                
+                if allowed_ids:
+                    # CRITICAL FIX: Fetch SPECIFIC Arsenal pieces by ID, not just the current user's arsenal
+                    # The creator selected specific pieces - we need to fetch those exact pieces by their IDs
+                    arsenal_components = self.arsenal_service.get_arsenal_pieces_by_ids(allowed_ids)
+                    print(f"✅ Fetched {len(arsenal_components)} arsenal pieces by IDs for puzzle {puzzle_id}")
+                    
+                    # Log the returned arsenal_components to verify they have description
+                    print(f"\n📊 ARSENAL COMPONENTS RETURNED FROM SERVICE:")
+                    for i, component in enumerate(arsenal_components):
+                        print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
+                        print(f"       - description present: {('description' in component)}")
+                        print(f"       - description value: '{component.get('description', 'MISSING')}'")
+                        print(f"       - keys: {list(component.keys())}")
+                else:
+                    print(f"   - No allowed_arsenal_component_ids specified for puzzle {puzzle_id}")
             
             # For backward compatibility, also include both in specialComponents
             d["specialComponents"] = custom_components + arsenal_components
             # New separate fields for categorization
             d["customComponents"] = custom_components
             d["arsenalComponents"] = arsenal_components
+            
+            print(f"\n✅ FINAL DICT RETURNED TO API:")
+            print(f"   - arsenalComponents count: {len(d['arsenalComponents'])}")
+            if d['arsenalComponents']:
+                print(f"   - First component description: '{d['arsenalComponents'][0].get('description', 'MISSING')}'")
+            
         except Exception as e:
             # If service fails, try to at least return custom pieces
-            print(f"DEBUG: Error fetching arsenal/custom pieces for puzzle {puzzle_id}: {e}")
+            print(f"❌ DEBUG: Error fetching arsenal/custom pieces for puzzle {puzzle_id}: {e}")
+            import traceback
+            traceback.print_exc()
             d["specialComponents"] = custom_components if custom_components else []
             d["customComponents"] = custom_components
             d["arsenalComponents"] = arsenal_components
@@ -455,6 +481,8 @@ class PuzzleService:
 
         raw_creator_budget = payload.get("creator_budget")
         creator_budget = int(raw_creator_budget) if raw_creator_budget is not None else None
+        allowed_arsenal_ids = payload.get("allowed_arsenal_component_ids")
+        display_modes = payload.get("arsenal_component_display_modes")
         p = Puzzle(
             id=0,
             name=name,
@@ -467,6 +495,8 @@ class PuzzleService:
             default_gate_set=gate_set,
             difficulty=difficulty,
             allow_arsenal=payload.get("allow_arsenal", True),
+            allowed_arsenal_component_ids=allowed_arsenal_ids,
+            arsenal_component_display_modes=display_modes,
         )
         p.instructions = instructions or None
         try:
@@ -715,6 +745,11 @@ class PuzzleService:
                 raise ValidationError("allow_arsenal must be a boolean")
             set_clauses.append("allow_arsenal = ?")
             params.append(1 if allow_arsenal else 0)
+        
+        if "arsenal_component_display_modes" in payload:
+            display_modes = payload.get("arsenal_component_display_modes")
+            set_clauses.append("arsenal_component_display_modes = ?")
+            params.append(json.dumps(display_modes) if display_modes else None)
 
         if set_clauses:
             params.append(int(puzzle_id))

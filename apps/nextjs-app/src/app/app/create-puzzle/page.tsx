@@ -11,6 +11,7 @@ import { Info } from "lucide-react";
 import Cookies from "js-cookie";
 import { AUTH_TOKEN_COOKIE_NAME } from "@/utils/auth-constants";
 import { api } from "@/lib/api-client";
+import { useMyArsenal } from "@/features/arsenal/api";
 import MarkdownIt from "markdown-it";
 // @ts-ignore - markdown-it-katex doesn't have types
 import markdownItKatex from "markdown-it-katex";
@@ -51,6 +52,8 @@ interface BasicInfo {
   boardRows: number;
   boardCols: number;
   allowArsenal: boolean;
+  allowedArsenalComponentIds: string[];
+  arsenalComponentDisplayModes: Record<string, 'circuit' | 'description'>;
 }
 
 interface TestCase {
@@ -328,6 +331,7 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
 export default function CreatePuzzleForm() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { data: myArsenalData } = useMyArsenal();
   const [activeTab, setActiveTab] = useState<TabName>("basic");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState<"submit" | "cancel" | null>(
@@ -358,6 +362,8 @@ export default function CreatePuzzleForm() {
       boardRows: DEFAULT_BOARD_ROWS,
       boardCols: DEFAULT_BOARD_COLS,
       allowArsenal: true,
+      allowedArsenalComponentIds: [],
+      arsenalComponentDisplayModes: {},
     },
     testCases: [],
     instructions: "",
@@ -378,18 +384,92 @@ export default function CreatePuzzleForm() {
 
   // State for truth table dialog
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<string | null>(null);
+  const [viewingCustomPieceTruthTable, setViewingCustomPieceTruthTable] = useState<number | null>(null);
 
   // State for custom pieces form
   const [customPieceForm, setCustomPieceForm] = useState({
     name: "",
+    description: "",
     cost: 0,
     numInputs: 1,
     numOutputs: 1,
     truthTable: {} as Record<string, number | Record<string, number>>,
+    hideInternalStructure: true,
   });
   const [customPieces, setCustomPieces] = useState<any[]>([]);
   const [prevNumInputs, setPrevNumInputs] = useState(1);
   const [prevNumOutputs, setPrevNumOutputs] = useState(1);
+
+  // Compute filtered arsenal pieces that are selected for this puzzle
+  const selectedArsenalPieces = useMemo(() => {
+    console.group("🔧 selectedArsenalPieces COMPUTATION");
+    console.log("  myArsenalData available?", !!myArsenalData, "length:", myArsenalData?.length);
+    console.log("  myArsenalData:", myArsenalData);
+    console.log("  allowedArsenalComponentIds:", data.basic.allowedArsenalComponentIds);
+    
+    if (!myArsenalData || !data.basic.allowedArsenalComponentIds) {
+      console.log("  ❌ EARLY EXIT: Missing myArsenalData or allowedArsenalComponentIds");
+      console.groupEnd();
+      return [];
+    }
+    
+    const filtered = myArsenalData.filter(piece => {
+      const pieceIdStr = String(piece.id);
+      const isIncluded = data.basic.allowedArsenalComponentIds.includes(pieceIdStr);
+      console.log(`  Piece ID ${pieceIdStr} ("${piece.name}"):`, isIncluded ? "✓ INCLUDED" : "✗ filtered out");
+      return isIncluded;
+    });
+    
+    console.log(`  → Found ${filtered.length} matching pieces after filter`);
+    
+    const result = filtered.map(piece => {
+      // Parse structure to extract num_inputs and num_outputs
+      let num_inputs = 1;
+      let num_outputs = 1;
+      
+      try {
+        const structure = JSON.parse(piece.structure_json || '{}');
+        // Count the inputs and outputs from the structure
+        if (structure.inputs) {
+          num_inputs = Array.isArray(structure.inputs) ? structure.inputs.length : 1;
+        }
+        if (structure.outputs) {
+          num_outputs = Array.isArray(structure.outputs) ? structure.outputs.length : 1;
+        }
+      } catch (e) {
+        // If parsing fails, use defaults
+        console.warn('Failed to parse arsenal piece structure:', piece.id, e);
+      }
+      
+      return {
+        id: piece.id,
+        name: piece.name,
+        cost: piece.cost,
+        num_inputs,
+        num_outputs,
+        truth_table: piece.truth_table ? JSON.parse(piece.truth_table) : {},
+        isArsenal: true,
+        basic_gates: piece.basic_gates,
+      };
+    });
+    
+    console.log(`  ✓ Returning ${result.length} populated pieces`);
+    console.groupEnd();
+    return result;
+  }, [myArsenalData, data.basic.allowedArsenalComponentIds]);
+
+  // Combine custom and arsenal pieces for simulation
+  const allPiecesForSimulation = useMemo(() => {
+    const allPieces = [...customPieces, ...selectedArsenalPieces];
+    return allPieces.map(piece => ({
+      name: piece.name,
+      cost: piece.cost,
+      num_inputs: piece.num_inputs,
+      num_outputs: piece.num_outputs,
+      truth_table: piece.truth_table,
+      hideInternalStructure: piece.hideInternalStructure || false,
+    }));
+  }, [customPieces, selectedArsenalPieces]);
 
   // Initialize truth table when numInputs or numOutputs changes
   useEffect(() => {
@@ -429,6 +509,61 @@ export default function CreatePuzzleForm() {
     setData((prev) => ({
       ...prev,
       basic: { ...prev.basic, [field]: value },
+    }));
+  };
+
+  const handleArsenalSelection = (componentId: string, isSelected: boolean) => {
+    setData((prev) => {
+      // Ensure we have a valid array to work with
+      const currentIds = Array.isArray(prev.basic.allowedArsenalComponentIds) 
+        ? prev.basic.allowedArsenalComponentIds 
+        : [];
+      
+      // Build new array: add if selected, remove if not
+      let updated: string[];
+      if (isSelected) {
+        // Only add if not already present (prevent duplicates)
+        if (!currentIds.includes(componentId)) {
+          updated = [...currentIds, componentId];
+        } else {
+          updated = currentIds;
+        }
+      } else {
+        // Remove the component ID
+        updated = currentIds.filter((id) => id !== componentId);
+      }
+      
+      // Update display modes for the component
+      const modes = { ...prev.basic.arsenalComponentDisplayModes };
+      if (!isSelected && modes[componentId]) {
+        // Clear display mode when deselecting
+        delete modes[componentId];
+      } else if (isSelected && !modes[componentId]) {
+        // Set default mode when selecting
+        modes[componentId] = 'circuit';
+      }
+      
+      return {
+        ...prev,
+        basic: { 
+          ...prev.basic, 
+          allowedArsenalComponentIds: updated,
+          arsenalComponentDisplayModes: modes,
+        },
+      };
+    });
+  };
+
+  const handleArsenalDisplayModeChange = (componentId: string, mode: 'circuit' | 'description') => {
+    setData((prev) => ({
+      ...prev,
+      basic: {
+        ...prev.basic,
+        arsenalComponentDisplayModes: {
+          ...prev.basic.arsenalComponentDisplayModes,
+          [componentId]: mode,
+        },
+      },
     }));
   };
 
@@ -703,8 +838,40 @@ export default function CreatePuzzleForm() {
       };
     }
 
+    // Add selected arsenal pieces to catalog
+    for (const piece of selectedArsenalPieces) {
+      // Generate ports based on num_inputs and num_outputs
+      const ports: any[] = [];
+      
+      // Add input ports on the left
+      for (let i = 0; i < piece.num_inputs; i++) {
+        ports.push({
+          id: `IN${i}`,
+          kind: 'input',
+          offset: { row: i, col: 0 },
+        });
+      }
+      
+      // Add output ports on the right (width is 3 for consistency with gates)
+      for (let i = 0; i < piece.num_outputs; i++) {
+        ports.push({
+          id: `OUT${i}`,
+          kind: 'output',
+          offset: { row: i, col: 2 },
+        });
+      }
+      
+      catalog[piece.name] = {
+        id: piece.name,
+        label: piece.name,
+        cost: piece.cost,
+        size: { w: 3, h: Math.max(piece.num_inputs, piece.num_outputs) },
+        ports: ports,
+      };
+    }
+
     return catalog;
-  }, [data.basic.gateSet, customPieces]);
+  }, [data.basic.gateSet, customPieces, selectedArsenalPieces]);
 
   // Export solution from workstation
   const exportSolution = useCallback(async () => {
@@ -752,7 +919,7 @@ export default function CreatePuzzleForm() {
               input_stream: tc.inputStream,
               placed: placed,
               wires: wires,
-              custom_pieces: customPieces,
+              custom_pieces: allPiecesForSimulation,
             }),
           });
           
@@ -843,7 +1010,7 @@ export default function CreatePuzzleForm() {
               inputs: tc.inputs,
               placed: placed,
               wires: wires,
-              custom_pieces: customPieces,
+              custom_pieces: allPiecesForSimulation,
             }),
           });
           
@@ -938,7 +1105,7 @@ export default function CreatePuzzleForm() {
     }));
     
     alert('✓ Circuit validated! All test cases passed. Solution exported.');
-  }, [placed, wires, data.testCases]);
+  }, [placed, wires, data.testCases, allPiecesForSimulation, uiCatalog]);
 
   const handleAddInputField = () => {
     // Find the first input that hasn't been added to the form yet
@@ -969,6 +1136,10 @@ export default function CreatePuzzleForm() {
       alert("Piece name is required");
       return;
     }
+    if (!customPieceForm.description.trim()) {
+      alert("Description is required for custom pieces");
+      return;
+    }
     if (customPieceForm.numInputs < 1 || customPieceForm.numInputs > 5) {
       alert("Inputs must be between 1 and 5");
       return;
@@ -991,19 +1162,23 @@ export default function CreatePuzzleForm() {
     // Add to local list (note: will be saved when puzzle is created)
     const newPiece = {
       name: customPieceForm.name,
+      description: customPieceForm.description,
       cost: customPieceForm.cost,
       num_inputs: customPieceForm.numInputs,
       num_outputs: customPieceForm.numOutputs,
       truth_table: customPieceForm.truthTable,
+      hideInternalStructure: customPieceForm.hideInternalStructure,
     };
 
     setCustomPieces([...customPieces, newPiece]);
     setCustomPieceForm({
       name: "",
+      description: "",
       cost: 0,
       numInputs: 1,
       numOutputs: 1,
       truthTable: {},
+      hideInternalStructure: true,
     });
     alert("✓ Custom piece created! It will be saved with the puzzle.");
   };
@@ -1123,6 +1298,8 @@ export default function CreatePuzzleForm() {
           total_gate_count: data.basic.totalGateCount,
           gate_quotas: Object.keys(data.basic.gateQuotas).length > 0 ? data.basic.gateQuotas : undefined,
           allow_arsenal: data.basic.allowArsenal,
+          allowed_arsenal_component_ids: data.basic.allowedArsenalComponentIds.length > 0 ? data.basic.allowedArsenalComponentIds : undefined,
+          arsenal_component_display_modes: Object.keys(data.basic.arsenalComponentDisplayModes).length > 0 ? data.basic.arsenalComponentDisplayModes : undefined,
           board: {
             rows: data.basic.boardRows,
             cols: data.basic.boardCols,
@@ -1463,6 +1640,67 @@ export default function CreatePuzzleForm() {
                 If unchecked, solvers can only use basic gates. If checked, custom arsenal pieces are available.
               </p>
             </div>
+
+            {data.basic.allowArsenal && myArsenalData && myArsenalData.length > 0 && (
+              <div>
+                <label className="block text-[13px] font-medium text-foreground mb-2">
+                  Allowed Custom Components
+                </label>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Select which of your custom Arsenal components solvers can use. For each, choose how to display it: as a full circuit diagram or as a black-box description.
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-secondary/30">
+                  {myArsenalData.map((piece) => {
+                    const isIncluded = data.basic.allowedArsenalComponentIds.includes(String(piece.id));
+                    const displayMode = data.basic.arsenalComponentDisplayModes[String(piece.id)] || 'circuit';
+                    return (
+                      <div key={piece.id} className="flex items-center gap-2 text-[13px] hover:bg-secondary/50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={isIncluded}
+                          onChange={(e) =>
+                            handleArsenalSelection(String(piece.id), e.target.checked)
+                          }
+                          className="rounded border border-border"
+                        />
+                        <span className="font-medium flex-1">{piece.name}</span>
+                        {isIncluded && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleArsenalDisplayModeChange(String(piece.id), 'circuit')}
+                              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                                displayMode === 'circuit'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80'
+                              }`}
+                              title="Show full circuit diagram"
+                            >
+                              Circuit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleArsenalDisplayModeChange(String(piece.id), 'description')}
+                              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                                displayMode === 'description'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80'
+                              }`}
+                              title="Show only component description"
+                            >
+                              Description
+                            </button>
+                          </div>
+                        )}
+                        <span className="text-[11px] text-muted-foreground ml-auto">
+                          cost {piece.cost}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {data.basic.gateSet.length > 0 && (
               <div>
@@ -1926,12 +2164,22 @@ export default function CreatePuzzleForm() {
             </div>
 
             {/* Workstation Grid (with menu on left) */}
+            {(() => {
+              // DEBUG: Log data flow
+              console.group("🔍 WORKSTATION PALETTE DEBUG");
+              console.log("myArsenalData:", myArsenalData);
+              console.log("data.basic.allowedArsenalComponentIds:", data.basic.allowedArsenalComponentIds);
+              console.log("selectedArsenalPieces:", selectedArsenalPieces);
+              console.log("selectedArsenalPieces.length:", selectedArsenalPieces.length);
+              console.groupEnd();
+              return null;
+            })()}
             <div className="grid grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card h-[700px]">
               {/* Gate Palette Sidebar */}
               <div className="border-r p-3 overflow-y-auto bg-secondary/50">
                 <div className="text-[13px] font-semibold text-foreground mb-3">Available Gates</div>
-                {data.basic.gateSet.length === 0 && customPieces.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab or create pieces in "Custom Pieces" tab</p>
+                {data.basic.gateSet.length === 0 && customPieces.length === 0 && selectedArsenalPieces.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab, create pieces in "Custom Pieces" tab, or select Arsenal pieces in "Basic Info" tab</p>
                 ) : (
                   <div className="space-y-2">
                     {/* Basic Gates */}
@@ -1967,7 +2215,13 @@ export default function CreatePuzzleForm() {
                     {customPieces.length > 0 && data.basic.gateSet.length > 0 && 
                       <div className="my-2 pt-2 border-t border-border/50">
                         <div className="text-[11px] font-semibold text-muted-foreground mb-2">Custom Pieces</div>
-                        {customPieces.map((piece) => (
+                        {customPieces
+                          .filter(piece => {
+                            // Only show custom pieces that are in the allowed list for this puzzle
+                            const isAllowed = data.basic.allowedArsenalComponentIds.includes(String(piece.id || piece.name));
+                            return isAllowed;
+                          })
+                          .map((piece) => (
                           <div
                             key={`custom-${piece.name}`}
                             draggable
@@ -1983,6 +2237,32 @@ export default function CreatePuzzleForm() {
                             <div className="flex-1" />
                             <div className="text-[10px] text-muted-foreground flex-shrink-0">
                               cost {piece.cost} · pins {piece.numInputs + piece.numOutputs}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    }
+
+                    {/* Arsenal Pieces */}
+                    {selectedArsenalPieces.length > 0 && 
+                      <div className="my-2 pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold text-muted-foreground mb-2">Arsenal Pieces</div>
+                        {selectedArsenalPieces.map((piece) => (
+                          <div
+                            key={`arsenal-${piece.name}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              setDraggedPaletteComponentId(piece.name);
+                            }}
+                            onDragEnd={() => setDraggedPaletteComponentId(null)}
+                            className="flex items-center gap-2 p-2 border border-border/60 bg-blue-50/30 rounded-lg cursor-move hover:bg-blue-50/60 transition"
+                          >
+                            <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
+                            <div className="flex-1" />
+                            <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                              cost {piece.cost} · pins {piece.num_inputs + piece.num_outputs}
                             </div>
                           </div>
                         ))}
@@ -2054,6 +2334,16 @@ export default function CreatePuzzleForm() {
                     value={customPieceForm.name}
                     onChange={(e) => setCustomPieceForm({ ...customPieceForm, name: e.target.value })}
                     className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-medium text-foreground mb-2">Description *</label>
+                  <textarea
+                    placeholder="Describe what this component does and how it works..."
+                    value={customPieceForm.description}
+                    onChange={(e) => setCustomPieceForm({ ...customPieceForm, description: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-transparent p-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none h-20"
                   />
                 </div>
 
@@ -2179,7 +2469,8 @@ export default function CreatePuzzleForm() {
 
                 <button
                   onClick={handleCreateCustomPiece}
-                  className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                  disabled={!customPieceForm.name.trim() || !customPieceForm.description.trim()}
+                  className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   + Create Custom Piece
                 </button>
@@ -2199,34 +2490,26 @@ export default function CreatePuzzleForm() {
                         <th className="border p-2 text-left">Cost</th>
                         <th className="border p-2 text-left">Inputs</th>
                         <th className="border p-2 text-left">Outputs</th>
-                        <th className="border p-2 text-left">Truth Table Preview</th>
+                        <th className="border p-2 text-center">Truth Table</th>
                         <th className="border p-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {customPieces.map((piece, idx) => {
-                        // Parse truth table for preview
-                        let truthTablePreview = '';
-                        try {
-                          const truthTable = typeof piece.truth_table === 'string' 
-                            ? JSON.parse(piece.truth_table)
-                            : piece.truth_table;
-                          const entries = Object.entries(truthTable).slice(0, 2);
-                          truthTablePreview = entries.map(([k, v]) => `${k}→${v}`).join(', ');
-                          if (Object.keys(truthTable).length > 2) {
-                            truthTablePreview += ', ...';
-                          }
-                        } catch (e) {
-                          truthTablePreview = 'Invalid JSON';
-                        }
-                        
                         return (
                           <tr key={idx} className="hover:bg-secondary/50">
                             <td className="border p-2 font-medium text-[13px]">{piece.name}</td>
                             <td className="border p-2 font-mono text-[11px]">{piece.cost}</td>
                             <td className="border p-2 font-mono text-[11px]">{piece.num_inputs}</td>
                             <td className="border p-2 font-mono text-[11px]">{piece.num_outputs}</td>
-                            <td className="border p-2 font-mono text-[11px] text-muted-foreground">{truthTablePreview}</td>
+                            <td className="border p-2 text-center">
+                              <button
+                                onClick={() => setViewingCustomPieceTruthTable(idx)}
+                                className="px-3 py-1 rounded-lg bg-blue-50/50 text-blue-700 text-[13px] hover:bg-blue-100 transition-colors"
+                              >
+                                View
+                              </button>
+                            </td>
                             <td className="border p-2 text-center">
                               <button
                                 onClick={() => setCustomPieces(customPieces.filter((_, i) => i !== idx))}
@@ -2362,6 +2645,87 @@ export default function CreatePuzzleForm() {
           ) : (
             <div className="text-[13px] text-muted-foreground">
               No truth table available for this component.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Piece Truth Table Dialog */}
+      <Dialog
+        open={viewingCustomPieceTruthTable !== null}
+        onOpenChange={(open) => !open && setViewingCustomPieceTruthTable(null)}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Truth Table: {viewingCustomPieceTruthTable !== null ? customPieces[viewingCustomPieceTruthTable]?.name : ''}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingCustomPieceTruthTable !== null && customPieces[viewingCustomPieceTruthTable] ? (
+            <div className="overflow-x-auto rounded-lg border border-border/60">
+              <table className="w-full text-[13px] text-foreground">
+                <thead className="bg-secondary/50 text-[11px] font-medium uppercase text-muted-foreground">
+                  <tr>
+                    {Array.from({ length: customPieces[viewingCustomPieceTruthTable].num_inputs }).map((_, i) => (
+                      <th key={`in-${i}`} className="px-3 py-2 text-center border-r border-border">
+                        IN{i}
+                      </th>
+                    ))}
+                    {Array.from({ length: customPieces[viewingCustomPieceTruthTable].num_outputs }).map((_, i) => (
+                      <th key={`out-${i}`} className="px-3 py-2 text-center">
+                        OUT{i}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(() => {
+                    const piece = customPieces[viewingCustomPieceTruthTable];
+                    const truthTable = typeof piece.truth_table === 'string' 
+                      ? JSON.parse(piece.truth_table)
+                      : piece.truth_table;
+                    const numRows = Math.pow(2, piece.num_inputs);
+                    
+                    return Array.from({ length: numRows }).map((_, rowIdx) => {
+                      const inputs = rowIdx
+                        .toString(2)
+                        .padStart(piece.num_inputs, '0')
+                        .split('')
+                        .map(Number);
+                      const inputKey = inputs.join('');
+                      const outputs = truthTable[inputKey];
+                      
+                      return (
+                        <tr key={rowIdx} className="divide-x divide-border">
+                          {inputs.map((bit, bitIdx) => (
+                            <td key={`in-${rowIdx}-${bitIdx}`} className="px-3 py-2 text-center">
+                              {bit}
+                            </td>
+                          ))}
+                          {Array.from({ length: piece.num_outputs }).map((_, outIdx) => {
+                            let value = 0;
+                            if (piece.num_outputs === 1) {
+                              value = outputs ?? 0;
+                            } else if (typeof outputs === 'object' && outputs !== null) {
+                              value = outputs[`out${outIdx}`] ?? 0;
+                            }
+                            
+                            return (
+                              <td key={`out-${rowIdx}-${outIdx}`} className="px-3 py-2 text-center">
+                                {value}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-[13px] text-muted-foreground">
+              No custom piece selected or invalid truth table.
             </div>
           )}
         </DialogContent>

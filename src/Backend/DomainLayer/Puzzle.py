@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Set
+from typing import Optional, Set, List
 
 from Backend import settings
 from .Enums import GateType, PuzzleStatus, PuzzleDifficulty
@@ -23,6 +23,8 @@ class Puzzle:
     difficulty: PuzzleDifficulty = PuzzleDifficulty.EASY
     default_gate_set: Set[GateType] = field(default_factory=set)
     allow_arsenal: bool = True
+    allowed_arsenal_component_ids: Optional[List[str]] = None  # JSON list of allowed Arsenal component IDs
+    arsenal_component_display_modes: Optional[dict] = None  # JSON dict mapping component ID to display mode ('circuit' or 'description')
 
     # Constraint fields
     total_gate_count: Optional[int] = None
@@ -104,6 +106,10 @@ class Puzzle:
             "defaultGateSet": [g.value for g in sorted(self.default_gate_set, key=lambda x: x.value)],
             "allow_arsenal": self.allow_arsenal,
             "allowArsenal": self.allow_arsenal,
+            "allowed_arsenal_component_ids": self.allowed_arsenal_component_ids,
+            "allowedArsenalComponentIds": self.allowed_arsenal_component_ids,
+            "arsenal_component_display_modes": self.arsenal_component_display_modes,
+            "arsenalComponentDisplayModes": self.arsenal_component_display_modes,
             "total_gate_count": self.total_gate_count,
             "min_cycles": self.min_cycles,
             "max_cycles": self.max_cycles,
@@ -147,6 +153,8 @@ class Puzzle:
             board_rows=d.get("board_rows"),
             board_cols=d.get("board_cols"),
             allow_arsenal=d.get("allow_arsenal", True),
+            allowed_arsenal_component_ids=d.get("allowed_arsenal_component_ids") or d.get("allowedArsenalComponentIds"),
+            arsenal_component_display_modes=d.get("arsenal_component_display_modes") or d.get("arsenalComponentDisplayModes"),
             rating_count=int(d.get("rating_count", 0)),
             is_hall_of_fame=bool(d.get("is_hall_of_fame", d.get("isHallOfFame", False))),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
