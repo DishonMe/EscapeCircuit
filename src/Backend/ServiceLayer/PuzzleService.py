@@ -35,10 +35,17 @@ class PuzzleService:
         sanitized = re.sub(r'[\s-]+', '_', sanitized)
         return sanitized.lower().strip('_')
 
-    def _delete_riddle_files(self, puzzle_name: str) -> None:
-        """Delete riddle files/folders from the riddles directory matching the puzzle name.
-        Handles both: riddle_XX_puzzle_name_*.ext (files) and riddle_XX_puzzle_name/ (folders)
-        """
+    @staticmethod
+    def _sanitize_puzzle_name(name: str) -> str:
+        """Sanitize puzzle name for use in directory/file names (matches creation logic).
+        Convert spaces to underscores, convert to lowercase, and strip illegal characters."""
+        sanitized = re.sub(r'[^\w\s-]', '', name or '')
+        sanitized = re.sub(r'[\s-]+', '_', sanitized)
+        return sanitized.lower()
+
+    def _delete_riddle_files(self, puzzle_id: int, puzzle_name: str) -> None:
+        """Delete riddle directory for a puzzle using puzzle_id and name.
+        This uses the same naming convention as creation: riddle_{puzzle_id}_{sanitized_name}"""
         try:
             # Get riddles directory path
             current_file = pathlib.Path(__file__).resolve()
@@ -46,36 +53,33 @@ class PuzzleService:
             riddles_dir = root_dir / 'riddles'
             
             if not riddles_dir.exists():
+                print(f"[DELETE] Riddles directory not found: {riddles_dir}")
                 return
             
-            puzzle_slug = self._slugify_puzzle_name(puzzle_name)
-
-            def matches_riddle_item(item_name: str, is_dir: bool) -> bool:
-                item_lower = item_name.lower()
-                if puzzle_slug:
-                    if is_dir and re.fullmatch(rf'riddle_\d+_{re.escape(puzzle_slug)}', item_lower):
-                        return True
-                    if (not is_dir) and re.match(rf'riddle_\d+_{re.escape(puzzle_slug)}_', item_lower):
-                        return True
-                # Legacy fallback for older naming variants
-                return ("_" + puzzle_name.lower() + "_") in item_lower
-
-            deleted_count = 0
-            for item in riddles_dir.iterdir():
-                if matches_riddle_item(item.name, item.is_dir()):
-                    try:
-                        if item.is_file():
-                            item.unlink()
-                            print(f"[DELETE] Removed riddle file: {item.name}")
-                        elif item.is_dir():
-                            shutil.rmtree(item)
-                            print(f"[DELETE] Removed riddle folder: {item.name}")
-                        deleted_count += 1
-                    except Exception as e:
-                        print(f"[WARNING] Failed to delete {item.name}: {e}")
+            # Reconstruct directory name using the same logic as creation
+            sanitized_name = self._sanitize_puzzle_name(puzzle_name)
+            riddle_dir_name = f'riddle_{puzzle_id}_{sanitized_name}'
+            riddle_dir_path = riddles_dir / riddle_dir_name
             
-            if deleted_count > 0:
-                print(f"[DELETE] Removed {deleted_count} riddle item(s) for puzzle: {puzzle_name}")
+            # Delete the directory if it exists
+            if riddle_dir_path.exists():
+                try:
+                    shutil.rmtree(riddle_dir_path)
+                    print(f"✓ Successfully deleted puzzle directory: {riddle_dir_path}")
+                except Exception as e:
+                    print(f"⚠ Error deleting directory {riddle_dir_path}: {e}")
+            else:
+                print(f"[DELETE] Directory not found: {riddle_dir_path}")
+                # Try legacy search as fallback
+                puzzle_slug = self._slugify_puzzle_name(puzzle_name)
+                for item in riddles_dir.iterdir():
+                    if item.is_dir() and re.match(rf'riddle_\d+_{re.escape(puzzle_slug)}', item.name.lower()):
+                        try:
+                            shutil.rmtree(item)
+                            print(f"[DELETE] Removed legacy puzzle directory: {item.name}")
+                            return
+                        except Exception as e:
+                            print(f"[WARNING] Failed to delete legacy directory {item.name}: {e}")
         except Exception as e:
             print(f"[WARNING] Error during riddle cleanup: {e}")
 
@@ -660,8 +664,8 @@ class PuzzleService:
         self.repo.track_user_deletion(puzzle_name)
         self.repo.conn.commit()
         
-        # Delete riddle files from riddles directory
-        self._delete_riddle_files(puzzle_name)
+        # Delete riddle files from riddles directory (using puzzle_id for accurate path reconstruction)
+        self._delete_riddle_files(puzzle_id, puzzle_name)
         
         if not deleted:
             raise ValidationError("Failed to delete puzzle")

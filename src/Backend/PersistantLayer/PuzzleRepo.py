@@ -34,9 +34,11 @@ class PuzzleRepo:
             avg_difficulty REAL NOT NULL,
             avg_fun REAL NOT NULL,
             avg_clearness REAL NOT NULL,
+            min_gate_count INTEGER,
             total_gate_count INTEGER,
             min_cycles INTEGER,
             max_cycles INTEGER,
+            riddle_base_name TEXT,
             created_at TEXT NOT NULL
         );
         """)
@@ -47,6 +49,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'EASY';")
             if "instructions" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN instructions TEXT;")
+            if "min_gate_count" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN min_gate_count INTEGER;")
             if "total_gate_count" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN total_gate_count INTEGER;")
             if "min_cycles" not in cols:
@@ -69,6 +73,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN allowed_arsenal_component_ids TEXT;")
             if "arsenal_component_display_modes" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN arsenal_component_display_modes TEXT;")
+            if "riddle_base_name" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN riddle_base_name TEXT;")
         except Exception:
             pass
         self.conn.execute("""
@@ -81,16 +87,19 @@ class PuzzleRepo:
             input_stream TEXT,
             expected_output_stream TEXT,
             gate_name TEXT,
+            min_gate_limit INTEGER,
             gate_limit INTEGER,
             created_at TEXT NOT NULL,
             FOREIGN KEY(puzzle_id) REFERENCES puzzles(id) ON DELETE CASCADE
         );
         """)
-        # Migrate existing DBs - add gate_name and gate_limit columns if missing
+        # Migrate existing DBs - add gate_name, min_gate_limit and gate_limit columns if missing
         try:
             cols = {r[1] for r in self.conn.execute("PRAGMA table_info(puzzle_test_cases);").fetchall()}
             if "gate_name" not in cols:
                 self.conn.execute("ALTER TABLE puzzle_test_cases ADD COLUMN gate_name TEXT;")
+            if "min_gate_limit" not in cols:
+                self.conn.execute("ALTER TABLE puzzle_test_cases ADD COLUMN min_gate_limit INTEGER;")
             if "gate_limit" not in cols:
                 self.conn.execute("ALTER TABLE puzzle_test_cases ADD COLUMN gate_limit INTEGER;")
             # Remove old constraint columns if they exist (moved to puzzle-level)
@@ -146,11 +155,10 @@ class PuzzleRepo:
                 name, creator_user_id, description, status,
                 budget, creator_budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
-                total_gate_count, min_cycles, max_cycles,
+                min_gate_count, total_gate_count, min_cycles, max_cycles,
                 creator_comment, allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
@@ -165,6 +173,7 @@ class PuzzleRepo:
             puzzle.avg_difficulty,
             puzzle.avg_fun,
             puzzle.avg_clearness,
+            puzzle.min_gate_count,
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
@@ -200,6 +209,7 @@ class PuzzleRepo:
                 avg_difficulty=?,
                 avg_fun=?,
                 avg_clearness=?,
+                min_gate_count=?,
                 total_gate_count=?,
                 min_cycles=?,
                 max_cycles=?,
@@ -224,6 +234,7 @@ class PuzzleRepo:
             float(puzzle.avg_difficulty),
             float(puzzle.avg_fun),
             float(puzzle.avg_clearness),
+            puzzle.min_gate_count,
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
@@ -625,8 +636,8 @@ class PuzzleRepo:
 
     def add_test_case(self, tc: PuzzleTestCase) -> PuzzleTestCase:
         cur = self.conn.execute("""
-            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, gate_limit, created_at)
-            VALUES(?,?,?,?,?,?,?,?,?)
+            INSERT INTO puzzle_test_cases(puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, min_gate_limit, gate_limit, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
         """, (
             tc.puzzle_id,
             tc.kind.value,
@@ -635,6 +646,7 @@ class PuzzleRepo:
             json.dumps(tc.input_stream) if tc.input_stream else None,
             json.dumps(tc.expected_output_stream) if tc.expected_output_stream else None,
             tc.gate_name,
+            tc.min_gate_limit,
             tc.gate_limit,
             tc.created_at.isoformat(),
         ))
@@ -654,8 +666,13 @@ class PuzzleRepo:
                 "expected_outputs": json.loads(r["expected_outputs"]) if r["expected_outputs"] else {},
                 "input_stream": json.loads(r["input_stream"]) if r["input_stream"] else [],
                 "expected_output_stream": json.loads(r["expected_output_stream"]) if r["expected_output_stream"] else {},
-                "gate_name": r["gate_name"],
+                "gate_name": dict(r).get("gate_name"),
+                "min_gate_limit": dict(r).get("min_gate_limit"),
                 "gate_limit": dict(r).get("gate_limit"),
+                "min_gate_count": dict(r).get("min_gate_count"),
+                "max_gate_count": dict(r).get("max_gate_count"),
+                "min_cycles": dict(r).get("min_cycles"),
+                "max_cycles": dict(r).get("max_cycles"),
                 "created_at": r["created_at"],
             })
             for r in rows
@@ -893,6 +910,10 @@ class PuzzleRepo:
             creator_comment_val = None
         # Safely read constraint fields — may be missing in old DBs
         try:
+            min_gate_count = row["min_gate_count"]
+        except (IndexError, KeyError):
+            min_gate_count = None
+        try:
             total_gate_count = row["total_gate_count"]
         except (IndexError, KeyError):
             total_gate_count = None
@@ -939,6 +960,11 @@ class PuzzleRepo:
             arsenal_component_display_modes = json.loads(display_modes_json) if display_modes_json else None
         except (IndexError, KeyError, TypeError, ValueError):
             arsenal_component_display_modes = None
+        # Safely read riddle_base_name — may be missing in old DBs
+        try:
+            riddle_base_name = row["riddle_base_name"]
+        except (IndexError, KeyError):
+            riddle_base_name = None
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -952,6 +978,7 @@ class PuzzleRepo:
             "time_limit_seconds": row["time_limit_seconds"],
             "difficulty": diff_val or "EASY",
             "default_gate_set": gate_values,
+            "min_gate_count": min_gate_count,
             "total_gate_count": total_gate_count,
             "min_cycles": min_cycles,
             "max_cycles": max_cycles,
@@ -966,4 +993,5 @@ class PuzzleRepo:
             "avg_fun": float(row["avg_fun"]),
             "avg_clearness": float(row["avg_clearness"]),
             "created_at": row["created_at"],
+            "riddle_base_name": riddle_base_name,
         })

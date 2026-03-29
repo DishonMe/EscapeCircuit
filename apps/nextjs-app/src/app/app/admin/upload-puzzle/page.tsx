@@ -27,10 +27,12 @@ export default function UploadPuzzlePage() {
     config: File | null;
     solution: File | null;
     instructions: File | null;
+    pythonTests: File | null;
   }>({
     config: null,
     solution: null,
     instructions: null,
+    pythonTests: null,
   });
 
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -41,6 +43,10 @@ export default function UploadPuzzlePage() {
     { key: "config", label: "Configuration JSON", ext: ".json" },
     { key: "solution", label: "Sample Solution JSON", ext: ".json" },
     { key: "instructions", label: "Instructions LaTeX", ext: ".tex" },
+  ] as const;
+
+  const optionalFiles = [
+    { key: "pythonTests", label: "Python Tests (optional)", ext: ".py" },
   ] as const;
 
   const handleFileChange = (key: keyof typeof files, e: ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +92,9 @@ export default function UploadPuzzlePage() {
       formData.append("config_file", files.config!);
       formData.append("sample_solution_file", files.solution!);
       formData.append("instructions_file", files.instructions!);
+      if (files.pythonTests) {
+        formData.append("python_tests_file", files.pythonTests);
+      }
       formData.append("difficulty", difficulty);
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
@@ -168,10 +177,27 @@ export default function UploadPuzzlePage() {
       "inputs": {"A": 0, "B": 0, "C_in": 0},
       "expected_outputs": {"S": 0, "C_out": 0}
     },
-    ...more test cases...
+    {
+      "kind": "gate_count_limit",
+      "max_gate_count": 10,
+      "min_gate_count": 3
+    },
+    {
+      "kind": "gate_limit",
+      "gate_name": "AND",
+      "min_gate_limit": 1,
+      "gate_limit": 5
+    }
   ]
 }`}
             </pre>
+            <div className="mt-3 text-[12px] text-foreground/80 space-y-2">
+              <p><strong>Constraint Examples in test_cases:</strong></p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><code className="bg-black/20 px-1 rounded">"gate_count_limit"</code> - Total gate constraint: max_gate_count (limit), min_gate_count (minimum required)</li>
+                <li><code className="bg-black/20 px-1 rounded">"gate_limit"</code> - Per-gate type constraint: gate_name, gate_limit (max), min_gate_limit (min, optional)</li>
+              </ul>
+            </div>
           </details>
 
           <details className="border border-border p-4 rounded-lg bg-card">
@@ -222,16 +248,21 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
     "{\\"A\\": 0, \\"B\\": 0, \\"C_in\\": 0}": {"S": 0, "C_out": 0},
     "{\\"A\\": 0, \\"B\\": 0, \\"C_in\\": 1}": {"S": 1, "C_out": 0},
     "{\\"A\\": 0, \\"B\\": 1, \\"C_in\\": 0}": {"S": 1, "C_out": 0},
-    ...all 8 combinations...
+    "{\\"A\\": 0, \\"B\\": 1, \\"C_in\\": 1}": {"S": 0, "C_out": 1},
+    "{\\"A\\": 1, \\"B\\": 0, \\"C_in\\": 0}": {"S": 1, "C_out": 0},
+    "{\\"A\\": 1, \\"B\\": 0, \\"C_in\\": 1}": {"S": 0, "C_out": 1},
+    "{\\"A\\": 1, \\"B\\": 1, \\"C_in\\": 0}": {"S": 0, "C_out": 1},
+    "{\\"A\\": 1, \\"B\\": 1, \\"C_in\\": 1}": {"S": 1, "C_out": 1}
   },
-  "used_gates": ["AND", "NAND", "DFF"],
+  "placedComponents": [{"componentId": "AND", "x": 0, "y": 0}, ...],
+  "wires": [{"from": {...}, "to": {...}}, ...],
   "inputs": ["A", "B", "C_in"],
-  "outputs": ["S", "C_out"]
+  "outputs": ["S", "C_out"],
+  "totalCost": 25
 }`}
             </pre>
             <p className="mt-3 text-[13px] text-foreground/80">
-              The eval_map must contain entries for all possible input combinations.
-              Keys are JSON strings of the input dict, values are the expected outputs.
+              The eval_map must contain entries for all possible input combinations. The solution must pass all test cases.
             </p>
           </details>
 
@@ -242,8 +273,60 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
               <li>Instructions file must be LaTeX format</li>
               <li>Sample solution must pass all test cases</li>
               <li>All inputs/outputs in test cases must match config specification</li>
+              <li>Python tests file naming: riddle_XX_[name]_tests.py (optional)</li>
             </ul>
           </div>
+
+          <details className="border border-border p-4 rounded-lg bg-card">
+            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
+              🐍 Python Tests File (optional)
+            </summary>
+            <div className="mt-3 text-[12px] text-foreground/80 mb-3 space-y-2 bg-black/10 p-3 rounded-lg">
+              <p className="font-semibold">Available in test code:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><code className="bg-black/20 px-1 rounded">solution</code> - Full circuit dict: placedComponents, wires, inputs, outputs, totalCost</li>
+                <li><code className="bg-black/20 px-1 rounded">circuit</code> - Same as solution</li>
+                <li><code className="bg-black/20 px-1 rounded">placed_components</code> - Component list</li>
+                <li><code className="bg-black/20 px-1 rounded">wires</code> - Wire connections</li>
+              </ul>
+              <p className="font-semibold mt-2">Test Rules:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>REQUIRED:</strong> Define <code className="bg-black/20 px-1 rounded">def run_tests(solution):</code> function</li>
+                <li>Call your individual test functions from <code className="bg-black/20 px-1 rounded">run_tests()</code></li>
+                <li>No return statements needed</li>
+                <li>Use <code className="bg-black/20 px-1 rounded">raise Exception("message")</code> to fail</li>
+                <li>Silent pass on success (no error raised)</li>
+              </ul>
+            </div>
+            <pre className="p-3 bg-black/20 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+{`# Define individual test functions
+def test_uses_xor():
+    """Check solution uses at least one XOR gate"""
+    components = solution.get('placedComponents', [])
+    has_xor = any(c.get('componentId') == 'XOR' for c in components)
+    if not has_xor:
+        raise Exception("Solution must use at least one XOR gate")
+
+def test_min_components():
+    """Check solution has minimum components"""
+    components = solution.get('placedComponents', [])
+    if len(components) < 2:
+        raise Exception("Solution must have at least 2 components")
+
+def test_connections():
+    """Check circuit is properly wired"""
+    wires = solution.get('wires', [])
+    if len(wires) < 1:
+        raise Exception("Solution must have at least one wire connection")
+
+# REQUIRED: Main test runner function
+def run_tests(solution):
+    """Called automatically to run all tests"""
+    test_uses_xor()
+    test_min_components()
+    test_connections()`}
+            </pre>
+          </details>
         </div>
       )}
       
@@ -295,6 +378,11 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
     {
       "inputs": {"A": 0, "B": 0},
       "expected_outputs": {"S": 0}
+    },
+    {
+      "kind": "gate_count_limit",
+      "max_gate_count": 10,
+      "min_gate_count": 3
     }
   ]
 }`}
@@ -310,7 +398,8 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
     "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},
     "{\\"A\\": 0, \\"B\\": 1}": {"S": 1}
   },
-  "used_gates": ["XOR"],
+  "placedComponents": [...],
+  "wires": [...],
   "inputs": ["A", "B"],
   "outputs": ["S"]
 }`}
@@ -355,6 +444,24 @@ Use $...$ for math: $C_{out}$`}
             />
             {files[req.key] && !files[req.key]!.name.endsWith(req.ext) && (
               <span className="text-destructive text-[13px]">Invalid extension. Must be {req.ext}</span>
+            )}
+          </div>
+        ))}
+
+        {optionalFiles.map((opt) => (
+          <div key={opt.key} className="flex flex-col">
+            <label className="text-[13px] font-medium text-foreground mb-2">{opt.label}</label>
+            <input
+              type="file"
+              accept={opt.ext}
+              onChange={(e) => handleFileChange(opt.key, e)}
+              className="border border-border p-2 rounded-lg text-[13px] text-foreground"
+            />
+            {files[opt.key] && (
+              <p className="text-[12px] text-green-600 mt-1">✓ {files[opt.key]!.name} selected</p>
+            )}
+            {files[opt.key] && !files[opt.key]!.name.endsWith(opt.ext) && (
+              <span className="text-destructive text-[13px]">Invalid extension. Must be {opt.ext}</span>
             )}
           </div>
         ))}

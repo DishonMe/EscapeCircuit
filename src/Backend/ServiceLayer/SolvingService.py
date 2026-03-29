@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple, Optional
 import json
 
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -276,7 +276,7 @@ class SolvingService:
             structure_json=json.dumps(expanded_solution)
         )
         
-        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p)
+        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p, expanded_solution)
         
         if passed:
             cost_used = int(solution_payload.get("totalCost", 0))
@@ -479,7 +479,7 @@ class SolvingService:
             return {"solved": False, "message": fail_msg, "details": details}
 
     # ---------- Helper: Centralized Evaluation ----------
-    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None):
+    def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None, expanded_solution = None):
         """
         Evaluates circuit against test cases, handling both Combinatorial (single step)
         and Sequential (streams over time/cycles) logic.
@@ -503,13 +503,27 @@ class SolvingService:
                 if gate_name is None and isinstance(tc, dict):
                     gate_name = tc.get("gate_name")
                 
+                min_gate_limit = getattr(tc, "min_gate_limit", None)
+                if min_gate_limit is None and isinstance(tc, dict):
+                    min_gate_limit = tc.get("min_gate_limit")
+                
                 gate_limit = getattr(tc, "gate_limit", None)
                 if gate_limit is None and isinstance(tc, dict):
                     gate_limit = tc.get("gate_limit")
                 
-                if gate_name and gate_limit is not None:
+                if gate_name:
                     actual_count = actual_gates.get(gate_name, 0)
-                    if actual_count > gate_limit:
+                    # Check minimum gate limit
+                    if min_gate_limit is not None and actual_count < min_gate_limit:
+                        return False, f"Insufficient {gate_name} gates: Used {actual_count} but minimum required is {min_gate_limit}", [{
+                            "test_case_index": i,
+                            "gate_name": gate_name,
+                            "min_limit": min_gate_limit,
+                            "actual": actual_count,
+                            "error_type": "gate_limit_insufficient"
+                        }]
+                    # Check maximum gate limit
+                    if gate_limit is not None and actual_count > gate_limit:
                         return False, f"Gate limit exceeded: Used {actual_count} {gate_name} gates but limit is {gate_limit}", [{
                             "test_case_index": i,
                             "gate_name": gate_name,
@@ -520,21 +534,64 @@ class SolvingService:
             
             # Check total gate count limit (GATE_COUNT_LIMIT test case)
             if tc_kind == "gate_count_limit":
-                # Try test case first, then fall back to puzzle's total_gate_count
+                # Try test case first, then fall back to puzzle's min_gate_count/total_gate_count for min/max
+                min_gate_count = getattr(tc, "min_gate_count", None)
+                if min_gate_count is None and isinstance(tc, dict):
+                    min_gate_count = tc.get("min_gate_count")
+                if min_gate_count is None and puzzle:
+                    min_gate_count = getattr(puzzle, "min_gate_count", None)
+                    
                 max_gate_count = getattr(tc, "max_gate_count", None)
+                if max_gate_count is None and isinstance(tc, dict):
+                    max_gate_count = tc.get("max_gate_count")
                 if max_gate_count is None and puzzle:
                     max_gate_count = getattr(puzzle, "total_gate_count", None)
                 
-                if max_gate_count is not None:
-                    total_gates = sum(actual_gates.values())
-                    if total_gates > max_gate_count:
-                        return False, f"Total gate count exceeded: Used {total_gates} gates but limit is {max_gate_count}", [{
-                            "test_case_index": i,
-                            "gate_limit": max_gate_count,
-                            "actual_total": total_gates,
-                            "gate_breakdown": actual_gates,
-                            "error_type": "gate_count_limit_exceeded"
-                        }]
+                total_gates = sum(actual_gates.values())
+                
+                if min_gate_count is not None and total_gates < min_gate_count:
+                    return False, f"Insufficient gates: Used {total_gates} gates but minimum is {min_gate_count}", [{
+                        "test_case_index": i,
+                        "gate_limit": min_gate_count,
+                        "actual_total": total_gates,
+                        "gate_breakdown": actual_gates,
+                        "error_type": "gate_count_insufficient"
+                    }]
+                
+                if max_gate_count is not None and total_gates > max_gate_count:
+                    return False, f"Total gate count exceeded: Used {total_gates} gates but limit is {max_gate_count}", [{
+                        "test_case_index": i,
+                        "gate_limit": max_gate_count,
+                        "actual_total": total_gates,
+                        "gate_breakdown": actual_gates,
+                        "error_type": "gate_count_limit_exceeded"
+                    }]
+        
+        # --- CHECK GLOBAL PUZZLE CONSTRAINTS (if not already checked via test cases) ---
+        # Check if we need to validate global min/max gate count from puzzle object
+        if puzzle and not any(getattr(tc, 'kind', None) == 'gate_count_limit' for tc in (test_cases or [])):
+            # No gate_count_limit test case exists, so check the puzzle's global constraints
+            total_gates = sum(actual_gates.values())
+            min_gate_count = getattr(puzzle, "min_gate_count", None)
+            total_gate_count = getattr(puzzle, "total_gate_count", None)
+            
+            if min_gate_count is not None and total_gates < min_gate_count:
+                return False, f"Insufficient gates: Used {total_gates} gates but minimum is {min_gate_count}", [{
+                    "constraint_type": "global_min_gate_count",
+                    "required_minimum": min_gate_count,
+                    "actual_total": total_gates,
+                    "gate_breakdown": actual_gates,
+                    "error_type": "gate_count_insufficient"
+                }]
+            
+            if total_gate_count is not None and total_gates > total_gate_count:
+                return False, f"Total gate count exceeded: Used {total_gates} gates but maximum allowed is {total_gate_count}", [{
+                    "constraint_type": "global_max_gate_count",
+                    "required_maximum": total_gate_count,
+                    "actual_total": total_gates,
+                    "gate_breakdown": actual_gates,
+                    "error_type": "gate_count_limit_exceeded"
+                }]
         
         # --- LOGIC VALIDATION (Inputs/Outputs) ---
         placed = structure.get("placedComponents", [])
@@ -657,7 +714,240 @@ class SolvingService:
                     except Exception as e:
                         return False, str(e), [{"error": str(e)}]
 
+        # --- PYTHON TESTS VALIDATION ---
+        # Execute Python tests if they exist for this puzzle
+        if puzzle and hasattr(puzzle, 'riddle_base_name') and puzzle.riddle_base_name:
+            python_tests_result, python_tests_error, python_tests_details = self._run_python_tests(puzzle, expanded_solution)
+            if not python_tests_result:
+                return False, python_tests_error, python_tests_details
+
         return True, None, []
+
+    def _run_python_tests(self, puzzle, expanded_solution: Dict[str, Any]) -> Tuple[bool, Optional[str], List]:
+        """
+        Execute Python tests for a puzzle if they exist.
+        Returns: (passed: bool, error_message: str | None, details: list)
+        """
+        import pathlib
+        import sys
+        from io import StringIO
+        
+        print("[PYTHON TESTS] ========== Starting Python Tests Execution ==========")
+        
+        try:
+            # Step 1: Check if puzzle has riddle_base_name
+            print(f"[PYTHON TESTS] Puzzle object: {puzzle}")
+            print(f"[PYTHON TESTS] Has riddle_base_name attr: {hasattr(puzzle, 'riddle_base_name')}")
+            
+            if not hasattr(puzzle, 'riddle_base_name') or not puzzle.riddle_base_name:
+                print("[PYTHON TESTS] No riddle_base_name found, skipping tests")
+                return True, None, []
+            
+            riddle_base_name = puzzle.riddle_base_name
+            print(f"[PYTHON TESTS] Riddle base name: {riddle_base_name}")
+            
+            # Step 2: Construct path to Python tests file
+            root_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+            riddles_dir = root_dir / 'riddles'
+            tests_file_path = riddles_dir / riddle_base_name / f"{riddle_base_name}_tests.py"
+            
+            print(f"[PYTHON TESTS] Looking for tests file at: {tests_file_path}")
+            print(f"[PYTHON TESTS] Tests file exists: {tests_file_path.exists()}")
+            
+            if not tests_file_path.exists():
+                print(f"[PYTHON TESTS] Tests file not found at {tests_file_path}")
+                print(f"[PYTHON TESTS] Riddles dir exists: {riddles_dir.exists()}")
+                if riddles_dir.exists():
+                    print(f"[PYTHON TESTS] Riddles dir contents: {list(riddles_dir.iterdir())}")
+                    riddle_dir = riddles_dir / riddle_base_name
+                    if riddle_dir.exists():
+                        print(f"[PYTHON TESTS] Riddle dir contents: {list(riddle_dir.iterdir())}")
+                # No tests file found, but that's OK - tests are optional
+                return True, None, []
+            
+            print(f"[PYTHON TESTS] Loading tests from: {tests_file_path}")
+            
+            # Step 3: Read the tests file
+            try:
+                tests_code = tests_file_path.read_text(encoding='utf-8')
+                print(f"[PYTHON TESTS] Read {len(tests_code)} bytes of test code")
+                print(f"[PYTHON TESTS] Test code preview (first 200 chars):\n{tests_code[:200]}")
+            except Exception as e:
+                error_msg = f"Failed to read tests file: {str(e)}"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                return False, error_msg, [{"error_type": "read_error", "message": str(e)}]
+            
+            # Step 4: Prepare the test context with the solution data
+            test_context = {
+                'solution': expanded_solution,
+                'circuit': expanded_solution.get('circuit'),
+                'placed_components': expanded_solution.get('placedComponents') or expanded_solution.get('components', []),
+                'wires': expanded_solution.get('wires', []),
+            }
+            print(f"[PYTHON TESTS] Test context prepared with keys: {list(test_context.keys())}")
+            
+            # Step 5: Execute the test code
+            print(f"[PYTHON TESTS] Executing test code...")
+            try:
+                exec(tests_code, test_context)
+                print(f"[PYTHON TESTS] Test code executed successfully")
+                print(f"[PYTHON TESTS] Functions in context after exec: {[k for k in test_context.keys() if callable(test_context[k])]}")
+            except Exception as e:
+                error_msg = f"Failed to execute test code: {str(e)}"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                import traceback
+                traceback.print_exc()
+                return False, error_msg, [{"error_type": "exec_error", "message": str(e), "traceback": traceback.format_exc()}]
+            
+            # Step 6: Look for and call run_tests(solution) function
+            print(f"[PYTHON TESTS] Checking for run_tests function...")
+            
+            if 'run_tests' not in test_context:
+                error_msg = "No run_tests(solution) function found in test file. Test file must define a run_tests(solution) function."
+                print(f"[PYTHON TESTS] WARNING: {error_msg}")
+                return False, error_msg, [{"error_type": "missing_run_tests", "message": error_msg}]
+            
+            if not callable(test_context['run_tests']):
+                error_msg = "run_tests is defined but is not callable"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                return False, error_msg, [{"error_type": "not_callable", "message": error_msg}]
+            
+            print(f"[PYTHON TESTS] Found run_tests function, calling it with solution...")
+            
+            try:
+                # Call the test function with the solution
+                test_context['run_tests'](expanded_solution)
+                print(f"[PYTHON TESTS] run_tests(solution) completed successfully")
+            except AssertionError as e:
+                error_msg = f"Test assertion failed: {str(e)}"
+                print(f"[PYTHON TESTS] ASSERTION FAILED: {error_msg}")
+                import traceback
+                return False, error_msg, [{
+                    "error_type": "assertion_failed",
+                    "message": str(e),
+                    "traceback": traceback.format_exc()
+                }]
+            except Exception as e:
+                error_msg = f"Test execution error: {str(e)}"
+                print(f"[PYTHON TESTS] TEST ERROR: {error_msg}")
+                import traceback
+                return False, error_msg, [{
+                    "error_type": "test_error",
+                    "message": str(e),
+                    "exc_type": type(e).__name__,
+                    "traceback": traceback.format_exc()
+                }]
+            
+            # If we get here, all tests passed (no exceptions raised)
+            print(f"[PYTHON TESTS] ✓ All Python tests passed!")
+            print(f"[PYTHON TESTS] ========== Python Tests Completed Successfully ==========")
+            return True, None, [{"message": "All Python tests passed"}]
+            
+        except Exception as e:
+            error_msg = f"Unexpected error running Python tests: {str(e)}"
+            print(f"[PYTHON TESTS] UNEXPECTED ERROR: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return False, error_msg, [{
+                "error_type": "setup_error",
+                "message": str(e),
+                "traceback": traceback.format_exc()
+            }]
+
+    def _validate_python_test_code(self, test_code_str: str, expanded_solution: Dict[str, Any]) -> Tuple[bool, Optional[str], List]:
+        """
+        Validate Python test code against a solution without requiring the file to be on disk.
+        This is used during puzzle creation/upload validation to test the code in-memory.
+        Returns: (passed: bool, error_message: str | None, details: list)
+        """
+        print("[PYTHON TESTS] ========== Validating Python Test Code In-Memory ==========")
+        
+        try:
+            # Step 1: Parse/validate the code
+            print(f"[PYTHON TESTS] Test code length: {len(test_code_str)} bytes")
+            print(f"[PYTHON TESTS] Test code preview (first 200 chars):\n{test_code_str[:200]}")
+            
+            if not test_code_str or not test_code_str.strip():
+                error_msg = "Test code is empty"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                return False, error_msg, [{"error_type": "empty_code", "message": error_msg}]
+            
+            # Step 2: Prepare test context
+            test_context = {
+                'solution': expanded_solution,
+                'circuit': expanded_solution.get('circuit'),
+                'placed_components': expanded_solution.get('placedComponents') or expanded_solution.get('components', []),
+                'wires': expanded_solution.get('wires', []),
+            }
+            print(f"[PYTHON TESTS] Test context prepared with keys: {list(test_context.keys())}")
+            
+            # Step 3: Execute test code
+            print(f"[PYTHON TESTS] Executing test code...")
+            try:
+                exec(test_code_str, test_context)
+                print(f"[PYTHON TESTS] Test code executed successfully")
+                print(f"[PYTHON TESTS] Functions in context after exec: {[k for k in test_context.keys() if callable(test_context[k])]}")
+            except Exception as e:
+                error_msg = f"Failed to execute test code: {str(e)}"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                import traceback
+                traceback.print_exc()
+                return False, error_msg, [{"error_type": "exec_error", "message": str(e), "traceback": traceback.format_exc()}]
+            
+            # Step 4: Check for run_tests function
+            print(f"[PYTHON TESTS] Checking for run_tests function...")
+            
+            if 'run_tests' not in test_context:
+                error_msg = "No run_tests(solution) function found in test code. Test file must define a run_tests(solution) function."
+                print(f"[PYTHON TESTS] WARNING: {error_msg}")
+                return False, error_msg, [{"error_type": "missing_run_tests", "message": error_msg}]
+            
+            if not callable(test_context['run_tests']):
+                error_msg = "run_tests is defined but is not callable"
+                print(f"[PYTHON TESTS] ERROR: {error_msg}")
+                return False, error_msg, [{"error_type": "not_callable", "message": error_msg}]
+            
+            print(f"[PYTHON TESTS] Found run_tests function, calling it with sample solution...")
+            
+            # Step 5: Call run_tests function
+            try:
+                test_context['run_tests'](expanded_solution)
+                print(f"[PYTHON TESTS] run_tests(solution) completed successfully")
+            except AssertionError as e:
+                error_msg = f"Test assertion failed: {str(e)}"
+                print(f"[PYTHON TESTS] ASSERTION FAILED: {error_msg}")
+                import traceback
+                return False, error_msg, [{
+                    "error_type": "assertion_failed",
+                    "message": str(e),
+                    "traceback": traceback.format_exc()
+                }]
+            except Exception as e:
+                error_msg = f"Test execution error: {str(e)}"
+                print(f"[PYTHON TESTS] TEST ERROR: {error_msg}")
+                import traceback
+                return False, error_msg, [{
+                    "error_type": "test_error",
+                    "message": str(e),
+                    "exc_type": type(e).__name__,
+                    "traceback": traceback.format_exc()
+                }]
+            
+            # If we get here, all tests passed
+            print(f"[PYTHON TESTS] ✓ Python test code validated successfully against sample solution!")
+            print(f"[PYTHON TESTS] ========== Python Test Validation Complete ==========")
+            return True, None, [{"message": "Python test code passed validation"}]
+            
+        except Exception as e:
+            error_msg = f"Unexpected error validating Python test code: {str(e)}"
+            print(f"[PYTHON TESTS] UNEXPECTED ERROR: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return False, error_msg, [{
+                "error_type": "setup_error",
+                "message": str(e),
+                "traceback": traceback.format_exc()
+            }]
 
     def _expand_arsenal_pieces(self, solution_payload: Dict[str, Any]) -> Dict[str, Any]:
         """

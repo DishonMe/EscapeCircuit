@@ -17,8 +17,10 @@ class PuzzleTestCase:
     input_stream: list = field(default_factory=list)
     expected_output_stream: dict = field(default_factory=dict)
     gate_name: Optional[str] = None  # For GATE_LIMIT test cases: which gate type (e.g., "AND")
+    min_gate_limit: Optional[int] = None  # For GATE_LIMIT test cases: minimum count allowed for that gate
     gate_limit: Optional[int] = None  # For GATE_LIMIT test cases: max count allowed for that gate
-    max_gate_count: Optional[int] = None  # For GATE_COUNT_LIMIT: total gate count limit
+    min_gate_count: Optional[int] = None  # For GATE_COUNT_LIMIT: minimum total gate count
+    max_gate_count: Optional[int] = None  # For GATE_COUNT_LIMIT: maximum total gate count
     min_cycles: Optional[int] = None  # For LATENCY_LIMIT: minimum cycles required
     max_cycles: Optional[int] = None  # For LATENCY_LIMIT: maximum cycles allowed
     created_at: datetime = field(default_factory=utcnow)
@@ -32,17 +34,28 @@ class PuzzleTestCase:
         
         # Gate limit type validation (GATE_LIMIT with gate_name and gate_limit)
         if self.kind == TestCaseKind.GATE_LIMIT:
-            if not self.gate_name or not self.gate_limit:
-                raise ValidationError("GATE_LIMIT test case must have gate_name and gate_limit specified")
-            if self.gate_limit < 0:
-                raise ValidationError(f"Gate limit for '{self.gate_name}' must be non-negative integer")
+            if not self.gate_name:
+                raise ValidationError("GATE_LIMIT test case must have gate_name specified")
+            # At least one of min_gate_limit or gate_limit must be specified
+            if self.min_gate_limit is None and self.gate_limit is None:
+                raise ValidationError("GATE_LIMIT test case must have min_gate_limit and/or gate_limit specified")
+            if self.min_gate_limit is not None and self.min_gate_limit < 0:
+                raise ValidationError(f"Min gate limit for '{self.gate_name}' must be non-negative integer")
+            if self.gate_limit is not None and self.gate_limit < 0:
+                raise ValidationError(f"Max gate limit for '{self.gate_name}' must be non-negative integer")
+            if self.min_gate_limit is not None and self.gate_limit is not None and self.min_gate_limit > self.gate_limit:
+                raise ValidationError(f"min_gate_limit cannot be greater than gate_limit for '{self.gate_name}'")
             return
         
         if self.kind == TestCaseKind.GATE_COUNT_LIMIT:
-            # max_gate_count can be None (falls back to puzzle's total_gate_count)
+            # min_gate_count and max_gate_count both can be None (no constraint)
             # but if provided, must be > 0
+            if self.min_gate_count is not None and self.min_gate_count <= 0:
+                raise ValidationError("GATE_COUNT_LIMIT test case min_gate_count must be > 0 if provided")
             if self.max_gate_count is not None and self.max_gate_count <= 0:
                 raise ValidationError("GATE_COUNT_LIMIT test case max_gate_count must be > 0 if provided")
+            if self.min_gate_count is not None and self.max_gate_count is not None and self.min_gate_count > self.max_gate_count:
+                raise ValidationError("min_gate_count cannot be greater than max_gate_count")
             return
         
         if self.kind == TestCaseKind.LATENCY_LIMIT:
@@ -116,7 +129,9 @@ class PuzzleTestCase:
             "input_stream": self.input_stream,
             "expected_output_stream": self.expected_output_stream,
             "gate_name": self.gate_name,
+            "min_gate_limit": self.min_gate_limit,
             "gate_limit": self.gate_limit,
+            "min_gate_count": self.min_gate_count,
             "max_gate_count": self.max_gate_count,
             "min_cycles": self.min_cycles,
             "max_cycles": self.max_cycles,
@@ -135,7 +150,9 @@ class PuzzleTestCase:
             input_stream=d.get("input_stream", []),
             expected_output_stream=d.get("expected_output_stream", {}),
             gate_name=d.get("gate_name"),
+            min_gate_limit=d.get("min_gate_limit"),
             gate_limit=d.get("gate_limit"),
+            min_gate_count=d.get("min_gate_count"),
             max_gate_count=d.get("max_gate_count"),
             min_cycles=d.get("min_cycles"),
             max_cycles=d.get("max_cycles"),

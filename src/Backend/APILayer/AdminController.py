@@ -14,7 +14,7 @@ from Backend.ServiceLayer.logicEngineService import logicEngineService
 from Backend.DomainLayer.Circuit import Circuit
 from Backend.APILayer.auth_utils import verify_token
 from Backend.PersistantLayer._db import connect
-from insert_riddles import insert_riddle
+from insert_riddles import insert_riddle, insert_puzzle_to_db
 
 
 class AssignCreatorReq(BaseModel):
@@ -288,47 +288,28 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 if not riddles_dir.exists():
                     riddles_dir.mkdir(parents=True)
 
-                # Read config first to get puzzle name
-                config_content = await config_file.read()
-                config_data = json.loads(config_content)
-                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
-                puzzle_num = get_next_puzzle_number(riddles_dir)
-                sanitized_name = sanitize_puzzle_name(puzzle_name)
-                riddle_base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}'
-
                 temp_path = pathlib.Path(temp_dir)
 
-                # Helper to save files to TEMP directory (for validation)
-                def save_file_to_temp(upload_file, file_type):
-                    base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}_{file_type}'
-                    # Determine extension from original filename
-                    ext = pathlib.Path(upload_file.filename).suffix
-                    if not ext:
-                        # Default extensions
-                        if file_type == 'config':
-                            ext = '.json'
-                        elif file_type == 'instructions':
-                            ext = '.md'
-                        elif 'solution' in file_type:
-                            ext = '.json'
-                    dest_path = temp_path / (base_name + ext)
-                    with open(dest_path, "wb") as buffer:
-                        shutil.copyfileobj(upload_file.file, buffer)
-                    return str(dest_path)
+                # Read and save files to temp directory first
+                config_content = await config_file.read()
+                config_data = json.loads(config_content)
+                instructions_content = await instructions_file.read()
+                instructions_text = instructions_content.decode('utf-8')
+                solution_content = await sample_solution_file.read()
 
-                # Reset file pointers after reading config
-                await config_file.seek(0)
+                # Use temporary naming for temp files (will be renamed after DB insertion)
+                temp_base_name = 'temp_puzzle'
+                config_path = temp_path / f'{temp_base_name}_config.json'
+                instructions_path = temp_path / f'{temp_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
+                solution_path = temp_path / f'{temp_base_name}_sample_solution.json'
 
-                # Save to TEMP directory first
-                config_path = save_file_to_temp(config_file, 'config')
-                instructions_path = save_file_to_temp(instructions_file, 'instructions')
-                solution_path = save_file_to_temp(sample_solution_file, 'sample_solution')
+                config_path.write_bytes(config_content)
+                instructions_path.write_bytes(instructions_content)
+                solution_path.write_bytes(solution_content)
 
                 # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
                     config_data = json.load(cf)
-                
-                # Validate config structure
                 puzzle_config = config_data.get('puzzle', {})
                 if not puzzle_config:
                     raise ValidationError("Config missing 'puzzle' section")
@@ -401,8 +382,17 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                     with open(config_path, 'w', encoding='utf-8') as cf:
                         json.dump(config_data, cf, indent=2)
 
-                # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
-                instructions_ext = pathlib.Path(instructions_path).suffix or '.tex'
+                # ========== DATABASE INSERTION FIRST (to get puzzle_id for naming) ==========
+                conn.execute("PRAGMA foreign_keys = OFF")
+                puzzle_id = insert_puzzle_to_db(conn, config_data, instructions_text, user_id)
+                
+                # ========== CREATE DIRECTORY WITH PUZZLE ID NAMING CONVENTION ==========
+                # Directory name format: riddle_{puzzle_id}_{sanitized_puzzle_name}
+                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
+                sanitized_name = sanitize_puzzle_name(puzzle_name)
+                riddle_base_name = f'riddle_{puzzle_id}_{sanitized_name}'
+                
+                instructions_ext = pathlib.Path(instructions_file.filename or "").suffix or ".tex"
                 final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
                     riddles_dir,
                     riddle_base_name,
@@ -410,12 +400,12 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 )
                 final_config_path.parent.mkdir(parents=True, exist_ok=True)
                 
+                # ========== SAVE FILES TO THE FINAL DIRECTORY ==========
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
-
-                admin_id = 999
-                conn.execute("PRAGMA foreign_keys = OFF")
+                
+                # ========== INSERT TEST CASES AND COMPLETE PUZZLE SETUP ==========
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id)
 
                 return {"message": "Puzzle created successfully"}
@@ -461,15 +451,13 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 instructions_text = instructions_content.decode('utf-8')
                 _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
 
-                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
-                puzzle_num = get_next_puzzle_number(riddles_dir)
-                sanitized_name = sanitize_puzzle_name(puzzle_name)
-                riddle_base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}'
                 solution_content = await sample_solution_file.read()
-
-                config_path = temp_path / f'{riddle_base_name}_config.json'
-                instructions_path = temp_path / f'{riddle_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
-                solution_path = temp_path / f'{riddle_base_name}_sample_solution.json'
+                
+                # Use temporary naming for temp files (will be renamed after DB insertion)
+                temp_base_name = 'temp_puzzle'
+                config_path = temp_path / f'{temp_base_name}_config.json'
+                instructions_path = temp_path / f'{temp_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
+                solution_path = temp_path / f'{temp_base_name}_sample_solution.json'
 
                 config_path.write_bytes(config_content)
                 instructions_path.write_bytes(instructions_content)
@@ -537,8 +525,18 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                     with open(config_path, 'w', encoding='utf-8') as cf:
                         json.dump(config_data, cf, indent=2)
 
-                # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
-                instructions_ext = instructions_path.suffix or '.tex'
+                # ========== DATABASE INSERTION FIRST (to get puzzle_id for naming) ==========
+                admin_id = 999
+                conn.execute("PRAGMA foreign_keys = OFF")
+                puzzle_id = insert_puzzle_to_db(conn, config_data, instructions_text, admin_id)
+                
+                # ========== CREATE DIRECTORY WITH PUZZLE ID NAMING CONVENTION ==========
+                # Directory name format: riddle_{puzzle_id}_{sanitized_puzzle_name}
+                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
+                sanitized_name = sanitize_puzzle_name(puzzle_name)
+                riddle_base_name = f'riddle_{puzzle_id}_{sanitized_name}'
+                
+                instructions_ext = pathlib.Path(instructions_file.filename or "").suffix or ".tex"
                 final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
                     riddles_dir,
                     riddle_base_name,
@@ -546,12 +544,12 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 )
                 final_config_path.parent.mkdir(parents=True, exist_ok=True)
                 
+                # ========== SAVE FILES TO THE FINAL DIRECTORY ==========
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
-
-                admin_id = 999
-                conn.execute("PRAGMA foreign_keys = OFF")
+                
+                # ========== INSERT TEST CASES AND COMPLETE PUZZLE SETUP ==========
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), admin_id)
 
                 return {"message": "Puzzle uploaded successfully"}

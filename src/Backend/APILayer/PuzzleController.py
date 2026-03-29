@@ -5,6 +5,8 @@ import re
 from Backend import settings
 
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.DomainLayer.Puzzle import Puzzle
+from Backend.DomainLayer.Enums import PuzzleStatus
 from Backend.ServiceLayer.PuzzleService import PuzzleService
 from Backend.ServiceLayer.SolvingService import SolvingService
 from Backend.ServiceLayer.RatingService import RatingService
@@ -117,13 +119,16 @@ def sanitize_puzzle_name(name: str) -> str:
     return sanitized.lower()
 
 
-def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
-    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/."""
+def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/.
+    Returns: (config_path, instructions_path, solution_path, tests_path)
+    """
     riddle_dir = riddles_dir / riddle_base_name
     return (
         riddle_dir / f"{riddle_base_name}_config.json",
         riddle_dir / f"{riddle_base_name}_instructions{instructions_ext}",
         riddle_dir / f"{riddle_base_name}_sample_solution.json",
+        riddle_dir / f"{riddle_base_name}_tests.py",
     )
 
 
@@ -509,6 +514,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         config_file: UploadFile = File(...),
         instructions_file: UploadFile = File(...),
         sample_solution_file: UploadFile = File(...),
+        python_tests_file: UploadFile | None = File(None),
         difficulty: str = Form("EASY"),
         token: str = Depends(verify_token),
     ):
@@ -580,14 +586,22 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     return str(dest_path)
 
                 solution_content = await sample_solution_file.read()
+                
+                # Read Python tests file if provided
+                tests_content = None
+                if python_tests_file:
+                    tests_content = await python_tests_file.read()
 
                 config_path = temp_path / f'{riddle_base_name}_config.json'
                 instructions_path = temp_path / f'{riddle_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
                 solution_path = temp_path / f'{riddle_base_name}_sample_solution.json'
+                tests_path = temp_path / f'{riddle_base_name}_tests.py' if tests_content else None
 
                 config_path.write_bytes(config_content)
                 instructions_path.write_bytes(instructions_content)
                 solution_path.write_bytes(solution_content)
+                if tests_content and tests_path:
+                    tests_path.write_bytes(tests_content)
 
                 # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
@@ -650,17 +664,22 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     tc_kind = test_case.get('kind', 'blackbox')
                     
                     if tc_kind == 'gate_limit':
-                        # Gate limit constraint (per-gate maximum)
+                        # Gate limit constraint (per-gate limit - can be min, max, or both)
                         gate_name = test_case.get('gate_name')
+                        min_gate_limit = test_case.get('min_gate_limit')
                         gate_limit = test_case.get('gate_limit')
                         
                         print(f"\n[Test Case {i}] Gate Limit Constraint")
-                        print(f"  Gate: {gate_name}, Max Count: {gate_limit}")
+                        print(f"  Gate: {gate_name}, Min Count: {min_gate_limit}, Max Count: {gate_limit}")
                         
                         if not gate_name:
                             raise ValidationError(f"Gate limit test case {i} missing 'gate_name'")
-                        if gate_limit is None or gate_limit <= 0:
-                            raise ValidationError(f"Gate limit test case {i} missing or invalid 'gate_limit'")
+                        # At least one of min_gate_limit or gate_limit must be specified and valid
+                        if (min_gate_limit is None or min_gate_limit <= 0) and (gate_limit is None or gate_limit <= 0):
+                            raise ValidationError(f"Gate limit test case {i} must have either min_gate_limit or gate_limit specified and > 0")
+                        # If both are specified, min should not exceed max
+                        if min_gate_limit is not None and gate_limit is not None and min_gate_limit > gate_limit:
+                            raise ValidationError(f"Gate limit test case {i}: min_gate_limit ({min_gate_limit}) cannot exceed gate_limit ({gate_limit})")
                         
                         print(f"  ✓ Gate limit constraint valid")
                         
@@ -891,6 +910,94 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 
                 print(f"\n=== ✓ ALL {len(test_cases)} TEST CASES VALIDATED SUCCESSFULLY ===")
                 
+                # VALIDATE SAMPLE SOLUTION AGAINST ALL CONSTRAINTS
+                # This ensures the puzzle is actually solvable with the given constraints
+                print(f"\n=== VALIDATING SAMPLE SOLUTION AGAINST CONSTRAINTS ===")
+                
+                # Convert sample solution to expanded format for constraint validation
+                expanded_solution = solution_data.copy()
+                expanded_solution['circuit'] = solution_circuit_data or {}
+                expanded_solution['wires'] = solution_circuit_data.get("wires", []) if solution_circuit_data else []
+                
+                # Count gates in solution for gate constraint checks
+                # Handle both 'placed' and 'placedComponents' field names
+                placed_components = []
+                if solution_circuit_data:
+                    placed_components = solution_circuit_data.get("placedComponents") or solution_circuit_data.get("placed", [])
+                
+                # Also set it in expanded_solution for python tests
+                expanded_solution['placedComponents'] = placed_components
+                
+                gate_counts = {}
+                total_gates = 0
+                for comp in placed_components:
+                    comp_type = comp.get("componentId") or comp.get("type")
+                    if comp_type and comp_type not in ("INPUT", "OUTPUT", "CONST"):
+                        gate_counts[comp_type] = gate_counts.get(comp_type, 0) + 1
+                        total_gates += 1
+                
+                print(f"Sample solution has {total_gates} gates total: {gate_counts}")
+                print(f"Placed components: {len(placed_components)}")
+                for comp in placed_components:
+                    print(f"  - {comp.get('componentId')}: {comp.get('id')}")
+                
+                # Check constraint test cases
+                for i, test_case in enumerate(test_cases):
+                    tc_kind = test_case.get('kind', 'blackbox')
+                    
+                    if tc_kind == 'gate_limit':
+                        gate_name = test_case.get('gate_name')
+                        min_gate_limit = test_case.get('min_gate_limit')
+                        gate_limit = test_case.get('gate_limit')
+                        actual_count = gate_counts.get(gate_name, 0)
+                        
+                        print(f"[Test Case {i}] Gate Limit for {gate_name}: min={min_gate_limit}, max={gate_limit}, actual={actual_count}")
+                        
+                        if min_gate_limit is not None and actual_count < min_gate_limit:
+                            raise ValidationError(
+                                f"Sample solution violates gate_limit constraint: {gate_name} has {actual_count} gates "
+                                f"but minimum required is {min_gate_limit}"
+                            )
+                        if gate_limit is not None and actual_count > gate_limit:
+                            raise ValidationError(
+                                f"Sample solution violates gate_limit constraint: {gate_name} has {actual_count} gates "
+                                f"but maximum allowed is {gate_limit}"
+                            )
+                        print(f"  ✓ Gate limit constraint satisfied")
+                    
+                    elif tc_kind == 'gate_count_limit':
+                        min_gate_count = test_case.get('min_gate_count')
+                        max_gate_count = test_case.get('max_gate_count')
+                        
+                        print(f"[Test Case {i}] Total Gate Count: min={min_gate_count}, max={max_gate_count}, actual={total_gates}")
+                        
+                        if min_gate_count is not None and total_gates < min_gate_count:
+                            raise ValidationError(
+                                f"Sample solution violates gate_count_limit: has {total_gates} total gates "
+                                f"but minimum required is {min_gate_count}"
+                            )
+                        if max_gate_count is not None and total_gates > max_gate_count:
+                            raise ValidationError(
+                                f"Sample solution violates gate_count_limit: has {total_gates} total gates "
+                                f"but maximum allowed is {max_gate_count}"
+                            )
+                        print(f"  ✓ Gate count limit constraint satisfied")
+                
+                # Validate python tests against sample solution if present
+                if python_tests_file and tests_content:
+                    print(f"[Python Tests] Validating Python tests against sample solution...")
+                    # Decode the test content from bytes to string
+                    test_code_str = tests_content.decode('utf-8') if isinstance(tests_content, bytes) else tests_content
+                    python_tests_result, python_tests_error, python_tests_details = solving_service._validate_python_test_code(
+                        test_code_str,
+                        expanded_solution
+                    )
+                    if not python_tests_result:
+                        raise ValidationError(f"Sample solution fails Python tests: {python_tests_error}")
+                    print(f"  ✓ Python tests passed")
+                
+                print(f"✓ Sample solution satisfies ALL constraints\n")
+                
                 # CRITICAL: Verify solution actually works
                 # For blackbox tests: eval_map should contain input -> output mappings
                 # For stream tests: we validate by simulating the circuit (not by eval_map lookup)
@@ -925,11 +1032,29 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 for tc in test_cases:
                     tc_kind = tc.get('kind', 'blackbox')
                     
+                    # Remove gate_limit if invalid
+                    if tc_kind == 'gate_limit':
+                        gate_name = tc.get('gate_name')
+                        min_gate_limit = tc.get('min_gate_limit')
+                        gate_limit = tc.get('gate_limit')
+                        # At least one must be set and positive
+                        has_valid_min = min_gate_limit is not None and min_gate_limit > 0
+                        has_valid_max = gate_limit is not None and gate_limit > 0
+                        # At least one must be valid
+                        if not (has_valid_min or has_valid_max):
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+                    
                     # Remove gate_count_limit if invalid
-                    if tc_kind == 'gate_count_limit':
+                    elif tc_kind == 'gate_count_limit':
+                        min_gate_count = tc.get('min_gate_count')
                         max_gate_count = tc.get('max_gate_count')
-                        if max_gate_count is None or max_gate_count <= 0:
-                            print(f"[FILTER] Removing invalid gate_count_limit test case (max_gate_count={max_gate_count})")
+                        # At least one must be set and positive
+                        has_valid_min = min_gate_count is not None and min_gate_count > 0
+                        has_valid_max = max_gate_count is not None and max_gate_count > 0
+                        # At least one must be valid
+                        if not (has_valid_min or has_valid_max):
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
                             continue
                     
                     valid_test_cases.append(tc)
@@ -947,17 +1072,27 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     json.dump(config_data, cf, indent=2)
 
                 # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
+                # Add riddle_base_name to config for later file lookups
+                config_data.setdefault('puzzle', {})['riddle_base_name'] = riddle_base_name
+                
                 instructions_ext = instructions_path.suffix or '.tex'
-                final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
+                final_config_path, final_instructions_path, final_solution_path, final_tests_path = build_riddle_paths(
                     riddles_dir,
                     riddle_base_name,
                     instructions_ext,
                 )
                 final_config_path.parent.mkdir(parents=True, exist_ok=True)
                 
-                shutil.copy2(config_path, final_config_path)
+                # Write config file with riddle_base_name included
+                with open(final_config_path, 'w', encoding='utf-8') as cf:
+                    json.dump(config_data, cf, indent=2)
+                
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
+                
+                # Save Python tests file if provided
+                if tests_content:
+                    final_tests_path.write_bytes(tests_content)
 
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id, status='unpublished')
 
@@ -967,6 +1102,9 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 """, (puzzle_name,)).fetchone()
                 
                 puzzle_id = puzzle_result[0] if puzzle_result else None
+                
+                # COMMIT all changes before returning
+                conn.commit()
 
                 return {"message": "Puzzle created successfully", "puzzle_id": puzzle_id}
         except ValidationError as e:

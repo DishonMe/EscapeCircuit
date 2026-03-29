@@ -253,7 +253,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             UPDATE puzzles SET
                 description=?, instructions=?, budget=?, creator_budget=?, time_limit_seconds=?,
                 default_gate_set=?, difficulty=?,
-                total_gate_count=?, min_cycles=?, max_cycles=?,
+                min_gate_count=?, total_gate_count=?, min_cycles=?, max_cycles=?,
                 board_rows=?, board_cols=?,
                 allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?
             WHERE id=?
@@ -265,6 +265,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('time_limit_seconds'),
             gates_json,
             difficulty,
+            puzzle_data.get('min_gate_count'),
             puzzle_data.get('total_gate_count'),
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
@@ -273,6 +274,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             1 if puzzle_data.get('allow_arsenal', True) else 0,
             json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
+            puzzle_data.get('riddle_base_name'),
             puzzle_id
         ))
         # Clear old test cases for this puzzle (they get re-imported below)
@@ -284,7 +286,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 name, creator_user_id, description, instructions, status, budget, creator_budget,
                 time_limit_seconds, difficulty, default_gate_set, rating_count, 
                 avg_difficulty, avg_fun, avg_clearness,
-                total_gate_count, min_cycles, max_cycles,
+                min_gate_count, total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 board_rows, board_cols,
                 created_at
@@ -301,6 +303,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             difficulty,
             gates_json,
             0, 0.0, 0.0, 0.0,
+            puzzle_data.get('min_gate_count'),
             puzzle_data.get('total_gate_count'),
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
@@ -309,6 +312,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
+            puzzle_data.get('riddle_base_name'),
             utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid
@@ -372,11 +376,13 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         
         # Handle gate limit test cases
         gate_name = None
+        min_gate_limit = None
         gate_limit = None
         
         if kind == 'gate_limit':
-            # New structure: gate_name and gate_limit
+            # New structure: gate_name, min_gate_limit, and gate_limit
             gate_name = tc.get('gate_name')
+            min_gate_limit = tc.get('min_gate_limit')
             gate_limit = tc.get('gate_limit')
         
         # Note: Constraint values (max_gate_count, min_cycles, max_cycles) are now stored
@@ -384,8 +390,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         
         c.execute("""
             INSERT INTO puzzle_test_cases (
-                puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, gate_limit, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                puzzle_id, kind, inputs, expected_outputs, input_stream, expected_output_stream, gate_name, min_gate_limit, gate_limit, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_id,
             kind,
@@ -394,6 +400,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             input_stream_json,
             expected_output_stream_json,
             gate_name,
+            min_gate_limit,
             gate_limit,
             utcnow().isoformat()
         ))
@@ -481,6 +488,79 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         
     conn.commit()
     print(f"Inserted: {puzzle_data['name']}")
+
+
+def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator_id=999, status='published') -> int:
+    """
+    Insert a puzzle into the database FIRST (before files are created) and return the puzzle_id.
+    This allows the filename to use the actual database ID.
+    
+    Args:
+        conn: Database connection
+        config_data: Parsed config JSON data
+        instructions_text: Raw instructions text
+        creator_id: User ID of the creator (default admin)
+        status: Publication status
+        
+    Returns:
+        puzzle_id: The auto-incremented ID of the inserted puzzle
+    """
+    puzzle_data = config_data.get('puzzle', {})
+    gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
+    
+    # Difficulty mapping for seed puzzles
+    SEED_DIFFICULTY = {
+        "Binary Adder": "EASY",
+        "Half Adder": "EASY",
+        "Sequential Adder": "MEDIUM",
+        "Palindrome Detector": "EASY",
+        "2-Bit Comparator": "HARD",
+    }
+    difficulty = puzzle_data.get('difficulty', SEED_DIFFICULTY.get(puzzle_data['name'], 'EASY'))
+    description = puzzle_data.get('description', instructions_text)
+    
+    c = conn.cursor()
+    
+    # Check if puzzle already exists by name
+    existing = c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],)).fetchone()
+    
+    if existing:
+        puzzle_id = existing[0]
+    else:
+        # INSERT new puzzle
+        c.execute("""
+            INSERT INTO puzzles (
+                name, creator_user_id, description, instructions, status, budget, creator_budget,
+                time_limit_seconds, difficulty, default_gate_set, rating_count, 
+                avg_difficulty, avg_fun, avg_clearness,
+                total_gate_count, min_cycles, max_cycles,
+                allow_arsenal, board_rows, board_cols,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            puzzle_data['name'],
+            creator_id,
+            description,
+            instructions_text,
+            status,
+            puzzle_data.get('budget', 0),
+            puzzle_data.get('creator_budget'),
+            puzzle_data.get('time_limit_seconds'),
+            difficulty,
+            gates_json,
+            0, 0.0, 0.0, 0.0,
+            puzzle_data.get('total_gate_count'),
+            puzzle_data.get('min_cycles'),
+            puzzle_data.get('max_cycles'),
+            1 if puzzle_data.get('allow_arsenal', True) else 0,
+            puzzle_data.get('board', {}).get('rows'),
+            puzzle_data.get('board', {}).get('cols'),
+            utcnow().isoformat()
+        ))
+        puzzle_id = c.lastrowid
+        conn.commit()
+    
+    return puzzle_id
 
 def main():
     print(f"Using Riddles Directory: {RIDDLES_DIR}")
