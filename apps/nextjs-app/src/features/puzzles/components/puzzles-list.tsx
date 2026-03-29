@@ -54,7 +54,7 @@ export const PuzzlesList = () => {
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
   const [leaderboardPuzzleId, setLeaderboardPuzzleId] = useState<string | null>(null);
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1 });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
   const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
