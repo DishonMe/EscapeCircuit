@@ -255,7 +255,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 default_gate_set=?, difficulty=?,
                 min_gate_count=?, total_gate_count=?, min_cycles=?, max_cycles=?,
                 board_rows=?, board_cols=?,
-                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?
+                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?, riddle_base_name=?
             WHERE id=?
         """, (
             description,
@@ -288,9 +288,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
-                board_rows, board_cols,
+                board_rows, board_cols, riddle_base_name,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -533,10 +533,11 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
                 name, creator_user_id, description, instructions, status, budget, creator_budget,
                 time_limit_seconds, difficulty, default_gate_set, rating_count, 
                 avg_difficulty, avg_fun, avg_clearness,
-                total_gate_count, min_cycles, max_cycles,
-                allow_arsenal, board_rows, board_cols,
+                min_gate_count, total_gate_count, min_cycles, max_cycles,
+                allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
+                board_rows, board_cols, riddle_base_name,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -549,12 +550,16 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
             difficulty,
             gates_json,
             0, 0.0, 0.0, 0.0,
+            puzzle_data.get('min_gate_count'),
             puzzle_data.get('total_gate_count'),
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
             1 if puzzle_data.get('allow_arsenal', True) else 0,
+            json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
+            json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
+            puzzle_data.get('riddle_base_name'),
             utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid
@@ -630,7 +635,7 @@ def main():
             base_name = config_filename.replace('_config.json', '')
             config_dir = os.path.dirname(config_path)
             instr_path = os.path.join(config_dir, f"{base_name}_instructions.tex")
-            
+
             # Fallback to .md if .tex not found
             if not os.path.exists(instr_path):
                 instr_path = os.path.join(config_dir, f"{base_name}_instructions.md")
@@ -640,9 +645,9 @@ def main():
                 count += 1
             except Exception as e:
                 print(f"Error inserting {config_filename}: {e}")
-                    
+
         print(f"Done. Imported {count} riddles.")
-        
+
     finally:
         conn.close()
 

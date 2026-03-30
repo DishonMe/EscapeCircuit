@@ -152,16 +152,19 @@ class PuzzleRepo:
     def create(self, puzzle: Puzzle) -> Puzzle:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
-                name, creator_user_id, description, status,
+                name, creator_user_id, description, instructions, creator_comment, status,
                 budget, creator_budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
-                creator_comment, allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
+                riddle_base_name, allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
+            puzzle.instructions,
+            puzzle.creator_comment,
             puzzle.status.value,
             puzzle.budget,
             puzzle.creator_budget,
@@ -177,8 +180,8 @@ class PuzzleRepo:
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
-            puzzle.creator_comment,
-            int(puzzle.allow_arsenal),
+            puzzle.riddle_base_name,
+            1 if puzzle.allow_arsenal else 0,
             json.dumps(puzzle.allowed_arsenal_component_ids) if puzzle.allowed_arsenal_component_ids else None,
             json.dumps(puzzle.arsenal_component_display_modes) if puzzle.arsenal_component_display_modes else None,
             puzzle.created_at.isoformat(),
