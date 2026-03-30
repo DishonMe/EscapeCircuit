@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown';
 import { Link } from '@/components/ui/link';
+import { SettingsMenu } from '@/components/ui/settings-menu';
 import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useLogout, useUser } from '@/lib/auth';
@@ -157,6 +158,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="flex items-center gap-3">
           <XPBar currentXP={user.data?.xp ?? 0} />
           <ThemeToggle />
+          <SettingsMenu />
           <div className="hidden md:flex items-center gap-2 text-[13px]">
             <span className="font-medium text-foreground">{user.data?.username}</span>
             <span className="text-border">|</span>

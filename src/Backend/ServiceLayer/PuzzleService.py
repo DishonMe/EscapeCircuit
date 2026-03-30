@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 import pathlib
 import os
 import shutil
@@ -8,7 +8,7 @@ import json
 
 from Backend import settings
 from Backend.DomainLayer.Exceptions import ValidationError
-from Backend.DomainLayer.Enums import UserRole, PuzzleStatus
+from Backend.DomainLayer.Enums import UserRole, PuzzleStatus, GateType
 
 from Backend.PersistantLayer._db import transaction
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
@@ -374,13 +374,16 @@ class PuzzleService:
         
         try:
             # Custom pieces are ALWAYS available for this puzzle, regardless of allow_arsenal setting
+            # They are not filtered by gates - they're puzzle-specific components
             custom_components = self.arsenal_service.get_custom_pieces_for_puzzle(puzzle_id)
+            print(f"🎯 DEBUG [PuzzleService.get] Puzzle {puzzle_id}:")
+            print(f"   - customComponents: {len(custom_components)} found")
             
             # Arsenal pieces only available if arsenal is enabled for this puzzle
             if self.arsenal_service and getattr(p, 'allow_arsenal', True):
                 # Get list of allowed Arsenal component IDs from puzzle config
                 allowed_ids = getattr(p, 'allowed_arsenal_component_ids', None) or []
-                print(f"🎯 DEBUG [PuzzleService.get] Puzzle {puzzle_id}:")
+                print(f"   - allowArsenal: True")
                 print(f"   - allowed_arsenal_component_ids = {allowed_ids}")
                 
                 if allowed_ids:
@@ -388,16 +391,36 @@ class PuzzleService:
                     # The creator selected specific pieces - we need to fetch those exact pieces by their IDs
                     arsenal_components = self.arsenal_service.get_arsenal_pieces_by_ids(allowed_ids)
                     print(f"✅ Fetched {len(arsenal_components)} arsenal pieces by IDs for puzzle {puzzle_id}")
-                    
-                    # Log the returned arsenal_components to verify they have description
-                    print(f"\n📊 ARSENAL COMPONENTS RETURNED FROM SERVICE:")
-                    for i, component in enumerate(arsenal_components):
-                        print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
-                        print(f"       - description present: {('description' in component)}")
-                        print(f"       - description value: '{component.get('description', 'MISSING')}'")
-                        print(f"       - keys: {list(component.keys())}")
                 else:
-                    print(f"   - No allowed_arsenal_component_ids specified for puzzle {puzzle_id}")
+                    # If allow_arsenal is True but no specific pieces selected,
+                    # show the SOLVER's (current user's) arsenal pieces that use only allowed gates
+                    if user_id:
+                        print(f"   - No specific IDs selected; fetching all arsenal for solver (user {user_id})")
+                        # Get the allowed gates for this puzzle (convert from GateType enum to strings)
+                        allowed_gates_set = {g.value for g in p.default_gate_set} if p.default_gate_set else set()
+                        arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
+                            user_id, allowed_gates_set
+                        )
+                        print(f"✅ Fetched {len(arsenal_components)} arsenal pieces filtered by allowed gates: {allowed_gates_set}")
+                    else:
+                        print(f"   - No user_id found for solver")
+            else:
+                print(f"   - allowArsenal: False (no arsenal pieces available)")
+                
+            # Log the returned components to verify they have description
+            if arsenal_components:
+                print(f"\n📊 ARSENAL COMPONENTS RETURNED FROM SERVICE:")
+                for i, component in enumerate(arsenal_components):
+                    print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
+                    print(f"       - description present: {('description' in component)}")
+                    print(f"       - description value: '{component.get('description', 'MISSING')}'")
+                    print(f"       - keys: {list(component.keys())}")
+            
+            if custom_components:
+                print(f"\n📊 CUSTOM COMPONENTS RETURNED FROM SERVICE:")
+                for i, component in enumerate(custom_components):
+                    print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
+                    print(f"       - keys: {list(component.keys())}")
             
             # For backward compatibility, also include both in specialComponents
             d["specialComponents"] = custom_components + arsenal_components
@@ -406,9 +429,8 @@ class PuzzleService:
             d["arsenalComponents"] = arsenal_components
             
             print(f"\n✅ FINAL DICT RETURNED TO API:")
+            print(f"   - customComponents count: {len(d['customComponents'])}")
             print(f"   - arsenalComponents count: {len(d['arsenalComponents'])}")
-            if d['arsenalComponents']:
-                print(f"   - First component description: '{d['arsenalComponents'][0].get('description', 'MISSING')}'")
             
         except Exception as e:
             # If service fails, try to at least return custom pieces

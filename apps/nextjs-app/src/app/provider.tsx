@@ -10,6 +10,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { MainErrorFallback } from '@/components/errors/main';
 import { NavigationLoadingProvider } from '@/components/ui/navigation-loading/navigation-loading';
 import { Notifications } from '@/components/ui/notifications';
+import { SettingsProvider } from '@/context/settings-context';
 import { queryConfig } from '@/lib/react-query';
 
 type AppProviderProps = {
@@ -29,11 +30,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       <QueryClientProvider client={queryClient}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            <NavigationLoadingProvider>
-              {process.env.DEV && <ReactQueryDevtools />}
-              <Notifications />
-              {children}
-            </NavigationLoadingProvider>
+            <SettingsProvider>
+              <NavigationLoadingProvider>
+                {process.env.DEV && <ReactQueryDevtools />}
+                <Notifications />
+                {children}
+              </NavigationLoadingProvider>
+            </SettingsProvider>
           </ThemeProvider>
         </GoogleOAuthProvider>
       </QueryClientProvider>

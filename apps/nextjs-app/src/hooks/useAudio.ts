@@ -2,13 +2,17 @@
  * Hook for playing UI sound effects in the puzzle workstation.
  * Uses native Audio API with graceful fallback if sounds aren't available.
  * Sound files should be placed in /public/sounds/ directory.
+ * Respects user settings for sound enabled state and volume control.
  * 
  * Usage:
- *   const { playDrop, playBloop, playError, playSuccess } = useAudio();
+ *   const { playDrop, playWireConnect, playError, playSuccess } = useAudio();
  *   playDrop(); // Play component drop sound
  */
 
+'use client';
+
 import { useCallback } from 'react';
+import { useSettings } from '@/context/settings-context';
 
 export type AudioSoundType = 'drop' | 'wire' | 'error' | 'success';
 
@@ -22,7 +26,12 @@ const SOUND_MAP: Record<AudioSoundType, string[]> = {
 const resolvedSources = new Map<AudioSoundType, string | null>();
 
 export const useAudio = () => {
-  const playSound = useCallback((soundType: AudioSoundType, volume: number = 0.6) => {
+  const { soundEnabled, soundVolume } = useSettings();
+
+  const playSound = useCallback((soundType: AudioSoundType, baseVolume: number = 0.6) => {
+    // Don't play sound if sound effects are disabled
+    if (!soundEnabled) return;
+
     const cached = resolvedSources.get(soundType);
     const candidates = cached ? [cached] : SOUND_MAP[soundType];
 
@@ -32,7 +41,8 @@ export const useAudio = () => {
 
       try {
         const audio = new Audio(source);
-        audio.volume = Math.max(0, Math.min(1, volume));
+        // Use the user's selected volume multiplied by the base volume for specific sound types
+        audio.volume = Math.max(0, Math.min(1, baseVolume * soundVolume));
         const playResult = audio.play();
         if (typeof playResult?.then === 'function') {
           playResult
@@ -51,7 +61,7 @@ export const useAudio = () => {
     };
 
     tryPlay(0);
-  }, []);
+  }, [soundEnabled, soundVolume]);
 
   const playDrop = useCallback(() => {
     playSound('drop', 0.7);
