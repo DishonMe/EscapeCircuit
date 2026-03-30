@@ -328,12 +328,6 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         input_stream = tc.get('input_stream')
         expected_output_stream = tc.get('expected_output_stream')
         
-        # Handle test case data based on kind
-        inputs = tc.get('inputs')
-        expected_outputs = tc.get('expected_outputs')
-        input_stream = tc.get('input_stream')
-        expected_output_stream = tc.get('expected_output_stream')
-        
         # IMPORTANT: For stream test cases, normalize input_stream to dict format
         # Puzzle 3 uses: [1, 1, 1] (list of ints)
         # Puzzle 7 uses: [{"input_0": 0}, ...] (list of dicts)
