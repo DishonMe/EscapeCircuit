@@ -30,6 +30,8 @@ class TestSolvingServiceCreation:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -61,6 +63,8 @@ class TestSolvingServiceStartAttempt:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -131,6 +135,7 @@ class TestSolvingServiceSubmitSolution:
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
         self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -261,6 +266,7 @@ class TestSolvingServiceCreateAttemptBranches:
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
         self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -618,6 +624,7 @@ class TestSolvingServiceEdgeCases:
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
         self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -874,6 +881,9 @@ class TestSolvingServiceSimulate:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -940,6 +950,9 @@ class TestSolvingServiceValidateSolution:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -984,6 +997,9 @@ class TestSolvingServiceConcurrentAttempts:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -1036,6 +1052,8 @@ class TestSolvingServiceComplexCircuits:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -1100,6 +1118,9 @@ class TestSolvingServiceBudgetBoundaries:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -1190,6 +1211,8 @@ class TestSolvingServiceTimeBoundaries:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -1282,6 +1305,8 @@ class TestSolvingServiceFailureRecovery:
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
         self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
 
         self.service = SolvingService(
@@ -2618,6 +2643,9 @@ class TestGateLimitValidation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -2673,6 +2701,9 @@ class TestMedalCalculation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -2775,6 +2806,9 @@ class TestXPAwarding:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -2904,6 +2938,9 @@ class TestBudgetValidation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -2992,6 +3029,9 @@ class TestTimerValidation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -3113,6 +3153,9 @@ class TestFailedAttemptTracking:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -3161,6 +3204,9 @@ class TestCreatorXPAward:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -3221,6 +3267,9 @@ class TestEvaluateTestCasesLogic:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -3427,6 +3476,9 @@ class TestValidateSolutionMedalPaths:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -3619,6 +3671,9 @@ class TestValidateSolutionDifficultyTiers:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -3720,6 +3775,9 @@ class TestSimulateSolutionMethods:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -3735,7 +3793,7 @@ class TestSimulateSolutionMethods:
     def test_simulate_solution_single_step(self):
         """Simulate solution for single input set"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1, min_gate_count=0, total_gate_count=0, budget=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Mock(
             id=1, user_id=1, structure_json=json.dumps({})
         )
@@ -3749,7 +3807,7 @@ class TestSimulateSolutionMethods:
     def test_simulate_solution_sequence(self):
         """Simulate solution for sequence of inputs"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1, min_gate_count=0, total_gate_count=0, budget=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Mock(
             id=1, user_id=1, structure_json=json.dumps({})
         )
@@ -3775,6 +3833,9 @@ class TestExpandArsenalPieces:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -3822,6 +3883,9 @@ class TestValidateSolutionErrorCases:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -3847,7 +3911,7 @@ class TestValidateSolutionErrorCases:
     def test_validate_solution_no_test_cases(self):
         """Puzzle has no test cases"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1, min_gate_count=0, total_gate_count=0, budget=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_puzzle_repo.list_test_cases.return_value = []
         
         with pytest.raises(ValidationError):
@@ -3897,6 +3961,9 @@ class TestStartAttemptVariations:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -3961,6 +4028,9 @@ class TestSolvingServiceExtended:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_logic = Mock(spec=logicEngineService)
+        self.mock_logic.compute_cost = Mock(return_value=0)
+        self.mock_logic.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_logic.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_conn = Mock()
 
@@ -4071,7 +4141,7 @@ class TestSolvingServiceExtended:
 
     def test_submit_solution_sequential_fail_mismatch(self):
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000, creator_user_id=1, min_gate_count=0, total_gate_count=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Circuit(id=100, user_id=1, name="Fail", cost=10, structure_json='{}')
         
         tc = Mock()
@@ -4093,7 +4163,7 @@ class TestSolvingServiceExtended:
 
     def test_submit_solution_sequential_exception(self):
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000, creator_user_id=1, min_gate_count=0, total_gate_count=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Circuit(id=100, user_id=1, name="Ex", cost=10, structure_json='{}')
         
         tc = Mock()
@@ -4124,6 +4194,9 @@ class TestSubmitSolutionBudgetValidation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -4205,6 +4278,9 @@ class TestSubmitSolutionCircuitOwnership:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -4241,6 +4317,9 @@ class TestValidateSolutionPayloadHandling:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -4332,6 +4411,9 @@ class TestValidateSolutionCreatorXPEdgeCases:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         self.mock_notification = Mock()
@@ -4394,6 +4476,9 @@ class TestValidateSolutionWithoutUserRepo:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -4447,6 +4532,9 @@ class TestValidateSolutionDifficultyTierCalculation:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -4516,6 +4604,9 @@ class TestValidateSolutionFailedAttemptLogging:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -4562,6 +4653,9 @@ class TestValidateSolutionMedalUpgrades:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_user_repo = Mock(spec=UserRepo)
         
@@ -4627,6 +4721,9 @@ class TestExpandArsenalPiecesComplex:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -4681,6 +4778,9 @@ class TestSimulateSequenceWithStatefulCircuit:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = MagicMock(spec=logicEngineService)
+        self.mock_engine.compute_cost = Mock(return_value=0)
+        self.mock_engine.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         
         self.service = SolvingService(
@@ -4696,7 +4796,7 @@ class TestSimulateSequenceWithStatefulCircuit:
     def test_simulate_sequence_state_accumulation(self):
         """Verify state correctly accumulates across sequence steps"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, creator_user_id=1, min_gate_count=0, total_gate_count=0, budget=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Mock(
             id=1, user_id=1, structure_json=json.dumps({
                 "state": ["Q"],  # State output Q
@@ -5974,6 +6074,9 @@ class TestSolvingServiceExtended:
         self.mock_circuit_repo = Mock(spec=CircuitRepo)
         self.mock_auth = Mock(spec=AuthService)
         self.mock_logic = Mock(spec=logicEngineService)
+        self.mock_logic.compute_cost = Mock(return_value=0)
+        self.mock_logic.has_entry_for_inputs = Mock(return_value=True)
+        self.mock_logic.extract_gate_counts = Mock(return_value={})
         self.mock_xp = Mock(spec=XPService)
         self.mock_conn = Mock()
 
@@ -6088,7 +6191,7 @@ class TestSolvingServiceExtended:
     def test_submit_solution_sequential_fail_mismatch(self):
         """Test submit_solution with sequential output mismatch"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000, creator_user_id=1, min_gate_count=0, total_gate_count=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Circuit(id=100, user_id=1, name="Fail", cost=10, structure_json='{}')
         
         tc = Mock()
@@ -6111,7 +6214,7 @@ class TestSolvingServiceExtended:
     def test_submit_solution_sequential_exception(self):
         """Test submit_solution with sequential logic evaluation error"""
         self.mock_auth.require_user_id.return_value = 1
-        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000)
+        self.mock_puzzle_repo.get_by_id.return_value = Mock(id=1, budget=1000, creator_user_id=1, min_gate_count=0, total_gate_count=0, time_limit_seconds=None, avg_difficulty=2.0, avg_fun=2.0, avg_clearness=2.0, status=PuzzleStatus.PUBLISHED)
         self.mock_circuit_repo.get_by_id.return_value = Circuit(id=100, user_id=1, name="Ex", cost=10, structure_json='{}')
         
         tc = Mock()

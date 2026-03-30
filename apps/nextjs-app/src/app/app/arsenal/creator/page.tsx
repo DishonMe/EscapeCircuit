@@ -47,6 +47,7 @@ export default function ArsenalCreatorPage() {
   const [numInputs, setNumInputs] = useState(2);
   const [numOutputs, setNumOutputs] = useState(1);
   const [pieceName, setPieceName] = useState('');
+  const [pieceDescription, setPieceDescription] = useState('');
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ open: false });
@@ -299,6 +300,15 @@ export default function ArsenalCreatorPage() {
       return;
     }
 
+    if (!pieceDescription.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'A description is required for Arsenal components.',
+      });
+      return;
+    }
+
     if (placed.length === 0) {
       addNotification({
         type: 'error',
@@ -313,8 +323,9 @@ export default function ArsenalCreatorPage() {
     try {
       const { gates, usedArsenalPieceIds } = extractGatesAndArsenal();
 
-      await saveArsenalMutation.mutateAsync({
+      const savePayload = {
         name: pieceName.trim(),
+        description: pieceDescription.trim(),
         num_inputs: numInputs,
         num_outputs: numOutputs,
         structure_json: JSON.stringify({
@@ -326,7 +337,9 @@ export default function ArsenalCreatorPage() {
         basic_gates: JSON.stringify(gates),
         truth_table: {},
         used_arsenal_pieces: usedArsenalPieceIds,
-      } as any);
+      };
+
+      await saveArsenalMutation.mutateAsync(savePayload as any);
 
       addNotification({
         type: 'success',
@@ -335,6 +348,7 @@ export default function ArsenalCreatorPage() {
       });
 
       setShowNameDialog(false);
+      setPieceDescription('');
       setSaveState({ open: false });
       router.push(paths.app.arsenal.root.getHref());
     } catch (error: any) {
@@ -473,7 +487,7 @@ export default function ArsenalCreatorPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save Arsenal Piece</DialogTitle>
-            <DialogDescription>Give your custom logic piece a unique name.</DialogDescription>
+            <DialogDescription>Give your custom logic piece a unique name and description.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -486,9 +500,24 @@ export default function ArsenalCreatorPage() {
                 placeholder="Enter piece name (must be unique)"
                 className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e: any) => {
-                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Enter' && pieceName.trim() && pieceDescription.trim()) handleSave();
                 }}
               />
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-foreground block mb-2">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={pieceDescription}
+                onChange={(e: any) => setPieceDescription(e.target.value)}
+                placeholder="Describe what this component does and how it works..."
+                className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none h-20"
+              />
+              {!pieceDescription.trim() && (
+                <p className="text-[11px] text-red-600 mt-1">A description is required for Arsenal components.</p>
+              )}
             </div>
 
             <div className="bg-secondary/50 p-3 rounded-lg text-[13px] space-y-1">
@@ -520,7 +549,7 @@ export default function ArsenalCreatorPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saveState.open && saveState.saving}
+              disabled={saveState.open && saveState.saving || !pieceName.trim() || !pieceDescription.trim()}
             >
               {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
             </Button>

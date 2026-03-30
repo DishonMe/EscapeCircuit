@@ -364,6 +364,17 @@ export const WorkstationMenu = ({
   >(null);
   const [viewingTruthTableData, setViewingTruthTableData] = useState<any>(null);
 
+  // Diagnostic logging
+  useEffect(() => {
+    console.group("🎭 WorkstationMenu PROPS RECEIVED");
+    console.log("  allowArsenal:", allowArsenal);
+    console.log("  arsenal prop length:", arsenal.length);
+    console.log("  arsenal prop:", arsenal);
+    console.log("  basic prop length:", basic.length);
+    console.log("  custom prop length:", custom.length);
+    console.groupEnd();
+  }, [arsenal, allowArsenal, basic, custom]);
+
   useEffect(() => {
     if (!allowArsenal) return;
     setLoadedArsenal(loadArsenal());

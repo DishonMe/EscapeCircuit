@@ -391,7 +391,7 @@ class TestPuzzleTestCaseSerialization:
             expected_outputs={"r": 1}
         )
         d = test_case.to_dict()
-        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "input_stream", "expected_output_stream", "gate_name", "gate_limit", "max_gate_count", "min_cycles", "max_cycles", "created_at"}
+        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "input_stream", "expected_output_stream", "gate_name", "min_gate_limit", "gate_limit", "max_gate_count", "min_cycles", "max_cycles", "min_gate_count", "created_at"}
 
 
 class TestPuzzleTestCaseEdgeCases:
@@ -546,7 +546,7 @@ class TestPuzzleTestCaseGateLimit:
                 gate_name=None,
                 gate_limit=5
             )
-        assert "gate_name and gate_limit specified" in str(exc_info.value)
+        assert "GATE_LIMIT test case must have gate_name specified" in str(exc_info.value)
 
     def test_gate_limit_missing_gate_limit(self):
         with pytest.raises(ValidationError) as exc_info:
@@ -559,7 +559,7 @@ class TestPuzzleTestCaseGateLimit:
                 gate_name="AND",
                 gate_limit=None
             )
-        assert "gate_name and gate_limit specified" in str(exc_info.value)
+        assert "GATE_LIMIT test case must have min_gate_limit and/or gate_limit specified" in str(exc_info.value)
 
     def test_gate_limit_negative(self):
         with pytest.raises(ValidationError) as exc_info:

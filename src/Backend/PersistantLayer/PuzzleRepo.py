@@ -69,6 +69,10 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN is_hall_of_fame INTEGER NOT NULL DEFAULT 0;")
             if "creator_budget" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN creator_budget INTEGER;")
+            if "allowed_arsenal_component_ids" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN allowed_arsenal_component_ids TEXT;")
+            if "arsenal_component_display_modes" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN arsenal_component_display_modes TEXT;")
             if "riddle_base_name" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN riddle_base_name TEXT;")
         except Exception:
@@ -148,17 +152,19 @@ class PuzzleRepo:
     def create(self, puzzle: Puzzle) -> Puzzle:
         cur = self.conn.execute("""
             INSERT INTO puzzles(
-                name, creator_user_id, description, status,
+                name, creator_user_id, description, instructions, creator_comment, status,
                 budget, creator_budget, time_limit_seconds, difficulty, default_gate_set,
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
-                creator_comment, allow_arsenal,
+                riddle_base_name, allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
             puzzle.description,
+            puzzle.instructions,
+            puzzle.creator_comment,
             puzzle.status.value,
             puzzle.budget,
             puzzle.creator_budget,
@@ -174,8 +180,10 @@ class PuzzleRepo:
             puzzle.total_gate_count,
             puzzle.min_cycles,
             puzzle.max_cycles,
-            puzzle.creator_comment,
-            int(puzzle.allow_arsenal),
+            puzzle.riddle_base_name,
+            1 if puzzle.allow_arsenal else 0,
+            json.dumps(puzzle.allowed_arsenal_component_ids) if puzzle.allowed_arsenal_component_ids else None,
+            json.dumps(puzzle.arsenal_component_display_modes) if puzzle.arsenal_component_display_modes else None,
             puzzle.created_at.isoformat(),
         ))
         puzzle.id = int(cur.lastrowid)
@@ -208,7 +216,9 @@ class PuzzleRepo:
                 total_gate_count=?,
                 min_cycles=?,
                 max_cycles=?,
-                allow_arsenal=?
+                allow_arsenal=?,
+                allowed_arsenal_component_ids=?,
+                arsenal_component_display_modes=?
             WHERE id=?
         """, (
             puzzle.name,
@@ -232,6 +242,8 @@ class PuzzleRepo:
             puzzle.min_cycles,
             puzzle.max_cycles,
             1 if puzzle.allow_arsenal else 0,
+            json.dumps(puzzle.allowed_arsenal_component_ids) if puzzle.allowed_arsenal_component_ids else None,
+            json.dumps(puzzle.arsenal_component_display_modes) if puzzle.arsenal_component_display_modes else None,
             puzzle.id
         ))
 
@@ -939,6 +951,18 @@ class PuzzleRepo:
             creator_budget = int(creator_budget) if creator_budget is not None else None
         except (IndexError, KeyError, TypeError, ValueError):
             creator_budget = None
+        # Safely read allowed_arsenal_component_ids — may be missing in old DBs
+        try:
+            allowed_arsenal_ids_json = row["allowed_arsenal_component_ids"]
+            allowed_arsenal_component_ids = json.loads(allowed_arsenal_ids_json) if allowed_arsenal_ids_json else None
+        except (IndexError, KeyError, TypeError, ValueError):
+            allowed_arsenal_component_ids = None
+        # Safely read arsenal_component_display_modes — may be missing in old DBs
+        try:
+            display_modes_json = row["arsenal_component_display_modes"]
+            arsenal_component_display_modes = json.loads(display_modes_json) if display_modes_json else None
+        except (IndexError, KeyError, TypeError, ValueError):
+            arsenal_component_display_modes = None
         # Safely read riddle_base_name — may be missing in old DBs
         try:
             riddle_base_name = row["riddle_base_name"]
@@ -962,6 +986,8 @@ class PuzzleRepo:
             "min_cycles": min_cycles,
             "max_cycles": max_cycles,
             "allow_arsenal": allow_arsenal,
+            "allowed_arsenal_component_ids": allowed_arsenal_component_ids,
+            "arsenal_component_display_modes": arsenal_component_display_modes,
             "board_rows": board_rows,
             "board_cols": board_cols,
             "rating_count": int(row["rating_count"]),

@@ -10,6 +10,7 @@ class SaveCircuitReq(BaseModel):
     name: str
     cost: int = 0
     structure_json: str
+    description: str = ""  # Optional description for Arsenal pieces
 
 
 def build_circuit_router(circuit_service: CircuitService) -> APIRouter:

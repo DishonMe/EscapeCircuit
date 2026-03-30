@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -163,6 +164,30 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
 
+  // ===== DIAGNOSTIC LOGGING =====
+  useEffect(() => {
+    if (!puzzle) return;
+    console.group("📊 CLIENT [PuzzleWorkstation]: PUZZLE LOADED - ARSENAL DIAGNOSTIC");
+    console.log("  Puzzle ID:", puzzle.id);
+    console.log("  Puzzle Title:", puzzle.title);
+    console.log("  allowArsenal:", puzzle.allowArsenal);
+    console.log("  allowedArsenalComponentIds:", puzzle.allowedArsenalComponentIds);
+    console.log("  customComponents count:", (puzzle.customComponents || []).length);
+    console.log("  arsenalComponents count:", (puzzle.arsenalComponents || []).length);
+    console.log("  specialComponents count:", (puzzle.specialComponents || []).length);
+    
+    if (puzzle.arsenalComponents && puzzle.arsenalComponents.length > 0) {
+      console.log("\n  ⚙️ ARSENAL COMPONENTS IN PUZZLE OBJECT:");
+      puzzle.arsenalComponents.forEach((comp: any, idx: number) => {
+        console.log(`  [${idx}] ${comp.id} (${comp.type}):`);
+        console.log(`      - description key present: ${'description' in comp}`);
+        console.log(`      - description value: ${JSON.stringify(comp.description)}`);
+        console.log(`      - all keys: ${Object.keys(comp).sort()}`);
+      });
+    }
+    console.groupEnd();
+  }, [puzzle]);
+
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedComponent, setSelectedComponent] =
@@ -220,6 +245,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     outputSteps: Record<string, string>[];
     gateOutputSteps: Record<string, string>[];
   } | null>(null);
+  const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(null);
+  const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<string | null>(null);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -467,6 +494,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [puzzle?.defaultGateSet, puzzle?.filteredBasicComponents]);
 
   const allowArsenal = puzzle?.allowArsenal ?? true;
+  const allowedArsenalComponentIds = useMemo(() => {
+    const allowed = (puzzle?.allowedArsenalComponentIds as string[]) ?? [];
+    return new Set(allowed);
+  }, [puzzle?.allowedArsenalComponentIds]);
+
+  const arsenalComponentDisplayModes = useMemo(() => {
+    return (puzzle?.arsenalComponentDisplayModes as Record<string, 'circuit' | 'description'>) ?? {};
+  }, [puzzle?.arsenalComponentDisplayModes]);
 
   const customComponents = useMemo(() => {
     // Custom pieces are always available
@@ -476,10 +511,45 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const arsenalComponents = useMemo(() => {
     // Arsenal pieces only show if allowArsenal is true
     if (!allowArsenal) {
+      console.log("  🚫 arsenalComponents: allowArsenal is false, returning empty");
       return EMPTY_COMPONENTS;
     }
-    return puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
-  }, [puzzle?.arsenalComponents, allowArsenal]);
+    const allArsenalComponents = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
+    
+    console.group("  🔧 COMPUTED: arsenalComponents");
+    console.log("    allowArsenal:", allowArsenal);
+    console.log("    allArsenalComponents.length:", allArsenalComponents.length);
+    console.log("    allowedArsenalComponentIds.size:", allowedArsenalComponentIds.size);
+    
+    // CRITICAL DEBUG: Log EXACT description values
+    allArsenalComponents.forEach((comp: any, idx: number) => {
+      const desc = comp.description;
+      console.log(`    [${idx}] ${comp.id} (${comp.type}):`);
+      console.log(`        - description key exists: ${'description' in comp}`);
+      console.log(`        - description value: ${JSON.stringify(desc)}`);
+      console.log(`        - description type: ${typeof desc}`);
+      console.log(`        - description is empty string: ${desc === ''}`);
+      console.log(`        - description is null: ${desc === null}`);
+      console.log(`        - description is undefined: ${desc === undefined}`);
+      console.log(`        - description truthy?: ${!!desc}`);
+      console.log(`        - full object keys: ${Object.keys(comp)}`);
+    });
+    
+    // If allowedArsenalComponentIds is specified and not empty, filter to only those components
+    if (allowedArsenalComponentIds.size > 0) {
+      const filtered = allArsenalComponents.filter((component) => 
+        allowedArsenalComponentIds.has(String(component.id))
+      );
+      console.log("    After ID filter:", filtered.length, "components");
+      console.groupEnd();
+      return filtered;
+    }
+    
+    // If no specific components are selected, allow all
+    console.log("    No ID filter applied, returning all components");
+    console.groupEnd();
+    return allArsenalComponents;
+  }, [puzzle?.arsenalComponents, allowArsenal, allowedArsenalComponentIds]);
 
   const specialComponents = useMemo(() => {
     // For backward compatibility with componentCatalog
@@ -500,7 +570,27 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const componentCatalog = useMemo(() => {
     const byId = new Map<string, CircuitComponent>();
     for (const c of basicComponents) byId.set(c.id, c);
-    for (const c of specialComponents) byId.set(c.id, c);
+    
+    console.group("🏗️ CONSTRUCTING componentCatalog from specialComponents");
+    for (const c of specialComponents) {
+      console.log(`  Adding ${c.id} (${c.type}):`, {
+        hasDescription: !!(c as any).description,
+        descriptionLength: ((c as any).description || "").length,
+        descriptionPreview: ((c as any).description || "").substring(0, 50),
+        is_arsenal: (c as any).is_arsenal,
+      });
+      byId.set(c.id, c);
+    }
+    console.log("📊 Final componentCatalog entries:");
+    for (const [id, comp] of byId.entries()) {
+      if ((comp as any).is_arsenal) {
+        console.log(`  ${id}:`, {
+          hasDescription: !!(comp as any).description,
+          description: (comp as any).description,
+        });
+      }
+    }
+    console.groupEnd();
     return byId;
   }, [basicComponents, specialComponents]);
 
@@ -1767,6 +1857,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           debuggerGateBits={currentGateBits}
           debuggerSequences={debugSequences}
           onDebuggerSequenceChange={onInlineSequenceChange}
+          onInspectComponent={setInspectingPlacedId}
+          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
         />
 
         <div className="flex flex-col gap-3">
@@ -2027,6 +2119,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   draggedPaletteComponentId={sandboxDraggedPaletteComponentId}
                   boardRows={puzzle.board_rows ?? 15}
                   boardCols={puzzle.board_cols ?? 30}
+                  onInspectComponent={setInspectingSandboxPlacedId}
                 />
               </div>
             </div>
@@ -2286,6 +2379,424 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         showLink={false}
       />
 
+      {/* Component Inspection Dialog - Main Workstation */}
+      {inspectingPlacedId && placed.find(p => p.id === inspectingPlacedId) && (
+        <InspectionDialog
+          placedId={inspectingPlacedId}
+          placed={placed}
+          componentCatalog={componentCatalog}
+          uiCatalog={uiCatalog}
+          isOpen={!!inspectingPlacedId}
+          onClose={() => setInspectingPlacedId(null)}
+          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+        />
+      )}
+
+      {/* Component Inspection Dialog - Sandbox */}
+      {inspectingSandboxPlacedId && sandboxPlaced.find(p => p.id === inspectingSandboxPlacedId) && (
+        <InspectionDialog
+          placedId={inspectingSandboxPlacedId}
+          placed={sandboxPlaced}
+          componentCatalog={componentCatalog}
+          uiCatalog={uiCatalog}
+          isOpen={!!inspectingSandboxPlacedId}
+          onClose={() => setInspectingSandboxPlacedId(null)}
+          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+        />
+      )}
+
     </div>
   );
+};
+
+interface InspectionDialogProps {
+  placedId: string;
+  placed: PlacedGridComponent[];
+  componentCatalog: Map<string, CircuitComponent>;
+  uiCatalog: Record<string, ComponentDef>;
+  isOpen: boolean;
+  onClose: () => void;
+  arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
+}
+
+const InspectionDialog = ({
+  placedId,
+  placed,
+  componentCatalog,
+  uiCatalog,
+  isOpen,
+  onClose,
+  arsenalComponentDisplayModes,
+}: InspectionDialogProps) => {
+  const placedComponent = placed.find(p => p.id === placedId);
+  if (!placedComponent) return null;
+
+  const uiDef = uiCatalog[placedComponent.componentId];
+  const catalogEntry = componentCatalog.get(placedComponent.componentId);
+
+  // Immediate logging on render
+  console.group("🔍 InspectionDialog RENDER");
+  console.log("  placedComponent.componentId:", placedComponent.componentId);
+  console.log("  componentCatalog.size:", componentCatalog.size);
+  console.log("  catalogEntry exists:", !!catalogEntry);
+  if (catalogEntry) {
+    console.log("  catalogEntry keys:", Object.keys(catalogEntry));
+    console.log("  catalogEntry.description:", (catalogEntry as any).description);
+  }
+  console.groupEnd();
+
+  if (!uiDef || !catalogEntry) return null;
+
+  // Determine visibility mode for this component (if it's an Arsenal piece in a puzzle context)
+  const componentId = String(placedComponent.componentId);
+  // Map both snake_case and camelCase for API compatibility
+  const visibilityMode = arsenalComponentDisplayModes?.[componentId] || 
+                         (arsenalComponentDisplayModes as any)?.[componentId.replace(/([A-Z])/g, '_$1').toLowerCase()];
+  
+  // Debug: Log the inspection data
+  useEffect(() => {
+    if (isOpen && catalogEntry) {
+      console.group('🔍 InspectionDialog INSPECTION DATA');
+      console.log('placedId:', placedId);
+      console.log('componentId:', componentId);
+      console.log('visibilityMode:', visibilityMode);
+      console.log('arsenalComponentDisplayModes:', arsenalComponentDisplayModes);
+      console.log('description field:', (catalogEntry as any).description);
+      console.log('description type:', typeof (catalogEntry as any).description);
+      console.log('description length:', ((catalogEntry as any).description || '').length);
+      console.log('description preview:', ((catalogEntry as any).description || '').substring(0, 100) + '...');
+      console.log('is_arsenal:', (catalogEntry as any).is_arsenal);
+      console.log('used_basic_types:', (catalogEntry as any).used_basic_types);
+      console.log('Full catalogEntry:', JSON.parse(JSON.stringify(catalogEntry)));
+      console.groupEnd();
+    }
+  }, [isOpen, catalogEntry, placedId, placedComponent, uiDef, visibilityMode, componentId]);
+
+  const inputs = uiDef.ports.filter(p => p.kind === 'input');
+  const outputs = uiDef.ports.filter(p => p.kind === 'output');
+
+  // Determine if arsenal and has internal structure
+  const isArsenal = (catalogEntry as any).is_arsenal === true;
+  const hasSolution = !!(catalogEntry as any).solution;
+  const hasUsedBasicTypes = Array.isArray((catalogEntry as any).used_basic_types) && (catalogEntry as any).used_basic_types.length > 0;
+  const hasStructure = hasSolution || hasUsedBasicTypes;
+  const isHidden = (catalogEntry as any).hide_internal_structure === true;
+  
+  // STRICT Visibility Mode Enforcement:
+  // If visibilityMode is set, ONLY show what's requested
+  // If visibilityMode is NOT set, show normal behavior (both description and structure)
+  const showDescription = isArsenal 
+    ? visibilityMode !== 'circuit'  // For arsenal: show description unless explicitly circuit-only
+    : true; // For basic gates: always show description section
+  
+  const showInternalStructure = isArsenal
+    ? visibilityMode !== 'description'  // For arsenal: show structure unless explicitly description-only
+    : false; // For basic gates: never show internal structure
+  
+  const showIOMap = !isArsenal; // I/O Map ONLY for basic gates, never for Arsenal pieces
+
+  // Parse internal structure for circuit preview
+  const parsedSolution = useMemo(() => {
+    try {
+      const solution = (catalogEntry as any).solution;
+      if (!solution) return null;
+      const parsed = typeof solution === 'string' ? JSON.parse(solution) : solution;
+      return {
+        placed: parsed.placed || [],
+        wires: parsed.wires || [],
+      };
+    } catch (e) {
+      console.error('Failed to parse solution:', e);
+      return null;
+    }
+  }, [(catalogEntry as any).solution]);
+
+  // Map description from both camelCase and snake_case for API compatibility
+  const getDescriptionContent = () => {
+    const entry = catalogEntry as any;
+    // Try camelCase first
+    if (entry.description && String(entry.description).trim()) {
+      return entry.description;
+    }
+    // Try snake_case as fallback
+    if (entry.description_text && String(entry.description_text).trim()) {
+      return entry.description_text;
+    }
+    // Try description_text_field as another fallback
+    if (entry.descriptionTextField && String(entry.descriptionTextField).trim()) {
+      return entry.descriptionTextField;
+    }
+    return "";
+  };
+
+  const mappedDescriptionContent = getDescriptionContent();
+  const hasValidDescription = mappedDescriptionContent !== "" && mappedDescriptionContent !== null;
+
+  // Helper to generate curved wire paths (same logic as workstation grid)
+  const getCurvedWirePath = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const controlX = Math.max(28, Math.abs(dx) * 0.38);
+    const droopY = Math.max(8, Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04));
+    const c1x = from.x + controlX;
+    const c1y = from.y + droopY;
+    const c2x = to.x - controlX;
+    const c2y = to.y + droopY;
+    return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <svg className="size-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="8" />
+              <path d="M12 8v4" />
+              <path d="M9 12h6" />
+            </svg>
+            {uiDef.label}
+          </DialogTitle>
+          <DialogDescription>
+            Component details, description, and internal circuit structure
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Description Section - if present and not hidden by visibility mode */}
+          {showDescription && hasValidDescription && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+              <h3 className="mb-2 text-[13px] font-semibold text-foreground">📝 Description</h3>
+              <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed font-normal">
+                {mappedDescriptionContent}
+              </p>
+            </div>
+          )}
+          {showDescription && !hasValidDescription && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-[12px] text-amber-900">
+                ℹ️ No description provided for this component.
+              </p>
+            </div>
+          )}
+
+          {/* I/O Map Section - ONLY for basic gates */}
+          {showIOMap && (
+            <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+              <h3 className="mb-3 text-[13px] font-semibold text-foreground">I/O Map</h3>
+              
+              <div className="space-y-2">
+                <div className="text-[12px]">
+                  <span className="font-medium text-foreground">Inputs: </span>
+                  <span className="text-muted-foreground">
+                    {inputs.length} ({inputs.map(p => p.id).join(', ')})
+                  </span>
+                </div>
+                
+                <div className="text-[12px]">
+                  <span className="font-medium text-foreground">Outputs: </span>
+                  <span className="text-muted-foreground">
+                    {outputs.length} ({outputs.map(p => p.id).join(', ')})
+                  </span>
+                </div>
+              </div>
+
+              {/* Port details table */}
+              <div className="mt-4 rounded-md border border-border/40 overflow-hidden">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-secondary">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-foreground">Port</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {uiDef.ports.map((port) => (
+                      <tr key={port.id} className="border-t border-border/40">
+                        <td className="px-3 py-2 font-mono text-foreground">{port.id}</td>
+                        <td className="px-3 py-2">
+                          <span className={cn(
+                            "inline-block px-2 py-0.5 rounded text-[11px] font-medium",
+                            port.kind === 'input'
+                              ? "bg-green-100/80 text-green-700"
+                              : "bg-purple-100/80 text-purple-700"
+                          )}>
+                            {port.kind === 'input' ? 'Input' : 'Output'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Internal Structure Section - Arsenal pieces only, if not hidden by visibility mode */}
+          {showInternalStructure && isArsenal && (
+            <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+              <h3 className="mb-3 text-[13px] font-semibold text-foreground">🔧 Internal Circuit Structure</h3>
+              
+              {isHidden ? (
+                <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-[12px] text-amber-900 font-medium">
+                    ⚠️ The internal structure of this component is hidden by the creator.
+                  </p>
+                </div>
+              ) : hasStructure ? (
+                <div className="space-y-3">
+                  {/* Show basic gates list */}
+                  {hasUsedBasicTypes && (
+                    <div>
+                      <p className="text-[12px] font-medium text-foreground mb-2">Gates Used:</p>
+                      <div className="pl-3 space-y-1">
+                        {((catalogEntry as any).used_basic_types || []).map((gate: string) => (
+                          <div key={gate} className="flex items-center gap-2">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <span className="text-[12px] text-muted-foreground">{gate}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Circuit Preview - Render actual gates and wires */}
+                  {hasSolution && parsedSolution && (parsedSolution.placed.length > 0 || parsedSolution.wires.length > 0) && (
+                    <div className="mt-4 pt-4 border-t border-cyan-200">
+                      <p className="text-[12px] font-medium text-foreground mb-2">Circuit Preview:</p>
+                      <div className="relative w-full bg-slate-50 rounded border border-slate-200 overflow-auto" style={{ minHeight: '200px', maxHeight: '300px' }}>
+                        {/* Mini grid canvas */}
+                        <svg
+                          className="absolute inset-0 pointer-events-none"
+                          width="100%"
+                          height="100%"
+                          style={{ minWidth: '100%', minHeight: '100%' }}
+                        >
+                          {/* Draw wires */}
+                          {(parsedSolution.wires || []).map((wire: any, idx: number) => {
+                            // Find the placed components to locate ports
+                            const fromComp = parsedSolution.placed.find((p: any) => p.id === wire.from?.componentId);
+                            const toComp = parsedSolution.placed.find((p: any) => p.id === wire.to?.componentId);
+                            
+                            if (!fromComp || !toComp) return null;
+                            
+                            // Rough scaling: 18px per grid cell
+                            const CELL_SIZE = 16;
+                            const SCALE = 0.65;
+                            const fromX = (fromComp.origin?.col ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
+                            const fromY = (fromComp.origin?.row ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
+                            const toX = (toComp.origin?.col ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
+                            const toY = (toComp.origin?.row ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
+                            
+                            const wirePath = getCurvedWirePath({ x: fromX, y: fromY }, { x: toX, y: toY });
+                            
+                            return (
+                              <path
+                                key={`wire-${idx}`}
+                                d={wirePath}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth="1.5"
+                                opacity="0.7"
+                              />
+                            );
+                          })}
+                        </svg>
+
+                        {/* Render mini gates */}
+                        <div className="absolute inset-0 pointer-events-none" style={{ perspective: '1000px' }}>
+                          {(parsedSolution.placed || []).map((placed: any) => {
+                            const CELL_SIZE = 16;
+                            const SCALE = 0.65;
+                            const left = (placed.origin?.col ?? 0) * CELL_SIZE * SCALE;
+                            const top = (placed.origin?.row ?? 0) * CELL_SIZE * SCALE;
+                            const width = 2 * CELL_SIZE * SCALE;
+                            const height = 2 * CELL_SIZE * SCALE;
+                            
+                            // Find component definition for this placed component
+                            const uiDef = uiCatalog[placed.componentId];
+                            if (!uiDef) return null;
+                            
+                            return (
+                              <div
+                                key={placed.id}
+                                className="absolute border border-slate-300 bg-white rounded text-[9px] font-bold text-slate-700 flex items-center justify-center pointer-events-none"
+                                style={{
+                                  left: `${left}px`,
+                                  top: `${top}px`,
+                                  width: `${width}px`,
+                                  height: `${height}px`,
+                                  fontSize: '9px',
+                                  lineHeight: '1',
+                                }}
+                                title={uiDef.label}
+                              >
+                                {uiDef.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-2 italic">
+                        This component contains {parsedSolution.placed?.length || 0} gate(s) connected by {parsedSolution.wires?.length || 0} wire(s).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-md bg-slate-50 border border-slate-200 p-3">
+                  <p className="text-[12px] text-slate-600">
+                    No internal structure information available.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Basic Gate Info */}
+          {!isArsenal && getBasicGateInfo(catalogEntry.type) && (
+            <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+              <h3 className="mb-3 text-[13px] font-semibold text-foreground">Gate Information</h3>
+              <p className="text-[12px] text-muted-foreground">
+                {getBasicGateInfo(catalogEntry.type)}
+              </p>
+            </div>
+          )}
+
+          {/* Metadata */}
+          {catalogEntry.cost !== undefined && (
+            <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-medium text-foreground">Cost:</span>
+                <span className="text-[12px] font-bold text-blue-600">{catalogEntry.cost}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const getBasicGateInfo = (gateType: string): string | null => {
+  const info: Record<string, string> = {
+    AND: 'Outputs 1 only when both inputs are 1.',
+    OR: 'Outputs 1 when at least one input is 1.',
+    NOT: 'Inverts the input: outputs 1 if input is 0, and 0 if input is 1.',
+    XOR: 'Exclusive OR: outputs 1 when inputs differ.',
+    NAND: 'NOT AND: outputs 0 only when both inputs are 1.',
+    NOR: 'NOT OR: outputs 1 only when both inputs are 0.',
+    XNOR: 'Exclusive NOR: outputs 1 when inputs are the same.',
+    DFF: 'D Flip-Flop: stores state based on clock input.',
+  };
+  return info[gateType] ?? null;
 };

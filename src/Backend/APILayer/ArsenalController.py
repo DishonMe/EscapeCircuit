@@ -13,6 +13,7 @@ class SaveArsenalPieceReq(BaseModel):
     num_inputs: int
     num_outputs: int
     structure_json: str
+    description: str = ""  # CRITICAL: Description field was being silently dropped by Pydantic!
     basic_gates: str = ""  # Optional, calculated by service if not provided
     truth_table: dict = {}
     used_arsenal_pieces: List[int] = []  # IDs of other arsenal pieces used as components

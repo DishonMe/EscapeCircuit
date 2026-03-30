@@ -15,6 +15,7 @@ export interface ArsenalPiece {
 
 export interface SaveArsenalPiecePayload {
   name: string;
+  description?: string;  // Description for the Arsenal component
   num_inputs: number;
   num_outputs: number;
   structure_json: string;
@@ -26,6 +27,16 @@ export interface SaveArsenalPiecePayload {
 export const saveArsenalPiece = (
   payload: SaveArsenalPiecePayload,
 ): Promise<ArsenalPiece> => {
+  console.group('📤 ARSENAL SAVE: Sending payload to backend');
+  console.log('  name:', payload.name);
+  console.log('  description:', payload.description);
+  console.log('  num_inputs:', payload.num_inputs);
+  console.log('  num_outputs:', payload.num_outputs);
+  console.log('  structure_json length:', payload.structure_json?.length);
+  console.log('  basic_gates:', payload.basic_gates);
+  console.log('  Full payload:', JSON.stringify(payload, null, 2));
+  console.groupEnd();
+  
   return api.post('/arsenal', payload);
 };
 

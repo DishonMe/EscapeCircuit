@@ -19,6 +19,7 @@ class Circuit:
     num_inputs: int = 0  # Number of inputs (for arsenal pieces)
     num_outputs: int = 0  # Number of outputs (for arsenal pieces)
     puzzle_id: int | None = None  # For puzzle-specific custom pieces
+    description: str = ""  # Description of the component (for Arsenal pieces)
 
     def __post_init__(self) -> None:
         if self.id < 0:
@@ -115,6 +116,23 @@ class Circuit:
         """Convert arsenal piece or custom piece to CircuitComponent format for display/placement"""
         total_pins = self.num_inputs + self.num_outputs
         
+        # Parse basic_gates to get list of gate types
+        used_basic_types = []
+        if self.basic_gates:
+            try:
+                gates = json.loads(self.basic_gates)
+                used_basic_types = gates if isinstance(gates, list) else []
+            except (json.JSONDecodeError, ValueError):
+                used_basic_types = []
+        
+        # Parse solution from structure_json
+        solution = None
+        try:
+            structure = json.loads(self.structure_json) if self.structure_json else {}
+            solution = structure
+        except (json.JSONDecodeError, ValueError):
+            solution = None
+        
         return {
             "id": str(self.id),  # Use circuit ID as component ID for placement
             "type": self.name,  # Use circuit name as the type/label
@@ -126,6 +144,10 @@ class Circuit:
             "num_inputs": self.num_inputs,
             "num_outputs": self.num_outputs,
             "puzzle_id": self.puzzle_id,  # Non-null indicates custom piece, null indicates arsenal piece
+            "used_basic_types": used_basic_types,  # Array of gate types
+            "solution": solution,  # The component's internal structure
+            "hide_internal_structure": False,  # Default: show internal structure (can be customized later)
+            "description": self.description,  # Component description from database
         }
 
     @staticmethod
