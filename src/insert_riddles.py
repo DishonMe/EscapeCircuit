@@ -322,7 +322,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         # Determine test case kind - could be 'blackbox', 'gate_limit', or 'gate_count_limit'
         kind = tc.get('kind', 'blackbox')
         
-        # Handle sequential variation
+        # Handle sequential variation 
         inputs = tc.get('inputs')
         expected_outputs = tc.get('expected_outputs')
         input_stream = tc.get('input_stream')
