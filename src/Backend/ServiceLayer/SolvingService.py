@@ -256,13 +256,19 @@ class SolvingService:
         
         # Check if arsenal pieces are allowed in this puzzle
         if not getattr(p, 'allow_arsenal', True):
-            # Check if solution contains any arsenal pieces (numeric componentIds)
+            # Check if solution contains any PERSONAL arsenal pieces (numeric componentIds that are NOT custom pieces)
             placed_components = solution_payload.get("placedComponents", []) or solution_payload.get("components", [])
             for placed in placed_components:
                 component_id = placed.get("componentId")
-                # If componentId is numeric, it's an arsenal piece
+                # If componentId is numeric, it might be an arsenal piece
                 if isinstance(component_id, int) or (isinstance(component_id, str) and component_id.isdigit()):
-                    raise ValidationError("Arsenal pieces are not allowed in this puzzle. Only basic gates (AND, OR, XOR, NOT, NAND, NOR, XNOR, DFF) are permitted.")
+                    # Check if this is a custom piece (puzzle-specific) or personal arsenal piece
+                    component = self.circuit_repo.get_by_id(int(component_id))
+                    
+                    # Custom pieces (with puzzle_id set) are always allowed
+                    # Only personal arsenal pieces (puzzle_id is None) are blocked
+                    if component and component.puzzle_id is None:
+                        raise ValidationError("Arsenal pieces are not allowed in this puzzle. Only basic gates (AND, OR, XOR, NOT, NAND, NOR, XNOR, DFF) are permitted.")
         
         # Expand arsenal pieces in the solution
         expanded_solution = self._expand_arsenal_pieces(solution_payload)

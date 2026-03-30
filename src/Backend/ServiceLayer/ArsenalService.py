@@ -247,11 +247,18 @@ class ArsenalService:
         
         Custom pieces are stored with puzzle_id set and is_arsenal=true.
         They are unique to the puzzle and available to all solvers.
+        Always available regardless of allow_arsenal setting.
         """
         try:
             pieces = self.repo.list_custom_pieces_by_puzzle(puzzle_id)
-            return [piece.to_circuit_component() for piece in pieces]
+            result = [piece.to_circuit_component() for piece in pieces]
+            if result:
+                print(f"✅ Custom pieces for puzzle {puzzle_id}: found {len(result)} pieces")
+            return result
         except Exception as e:
+            print(f"❌ ERROR getting custom pieces for puzzle {puzzle_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def get_arsenal_pieces_by_ids(self, piece_ids: List[int]) -> List[dict]:
@@ -282,6 +289,43 @@ class ArsenalService:
                     continue
             
             return components
+        except Exception as e:
+            return []
+
+    def get_user_arsenal_filtered_by_gates(self, user_id: int, allowed_gates: Set[str]) -> List[dict]:
+        """Get all arsenal pieces for a user, filtered by allowed gates.
+        
+        Used when a puzzle allows arsenal but doesn't specify which pieces.
+        Returns only pieces whose basic gates are all in the allowed set.
+        
+        Args:
+            user_id: Creator's user ID
+            allowed_gates: Set of allowed gate types
+            
+        Returns:
+            List of CircuitComponent dicts that use only allowed gates
+        """
+        try:
+            if not user_id:
+                return []
+            
+            arsenal = self.repo.list_arsenal_by_user(user_id)
+            available = []
+            
+            for piece in arsenal:
+                try:
+                    # Parse the basic gates for this piece
+                    gates = json.loads(piece.basic_gates) if piece.basic_gates else []
+                    gates_set = set(gates)
+                    
+                    # Include this piece only if ALL its gates are allowed
+                    if gates_set.issubset(allowed_gates):
+                        available.append(piece.to_circuit_component())
+                except (json.JSONDecodeError, ValueError):
+                    # Skip pieces with invalid JSON
+                    continue
+            
+            return available
         except Exception as e:
             return []
 

@@ -8,6 +8,7 @@ import Confetti from 'react-confetti';
 
 import { Button } from '@/components/ui/button';
 import { useAudio } from '@/hooks/useAudio';
+import { useSettings } from '@/context/settings-context';
 import {
   Dialog,
   DialogContent,
@@ -160,6 +161,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const startTime = useRef(Date.now());
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
+  const { visualEffectsEnabled } = useSettings();
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
@@ -247,6 +249,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   } | null>(null);
   const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(null);
   const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<string | null>(null);
+
+  // DEBUG: Log visual effects status
+  useEffect(() => {
+    console.log('[DEBUG] visualEffectsEnabled:', visualEffectsEnabled, 'showFirstSolveCelebration:', showFirstSolveCelebration, 'victoryFx.visible:', victoryFx.visible);
+  }, [visualEffectsEnabled, showFirstSolveCelebration, victoryFx.visible]);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -1650,7 +1657,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      {showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
+      {visualEffectsEnabled && showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
         <Confetti
           width={viewportSize.width}
           height={viewportSize.height}
@@ -1661,7 +1668,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         />
       ) : null}
 
-      {victoryFx.visible ? (
+      {visualEffectsEnabled && victoryFx.visible ? (
         <div
           key={victoryFx.key}
           className="pointer-events-none fixed left-1/2 top-1/2 z-[120] -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200 bg-white px-5 py-2 font-semibold text-sky-700 shadow-xl"

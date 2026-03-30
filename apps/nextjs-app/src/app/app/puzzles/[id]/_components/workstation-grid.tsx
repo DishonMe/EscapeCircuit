@@ -12,6 +12,7 @@ import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
 import { RippleEffect } from '@/components/ripple-effect';
 import { useAudio } from '@/hooks/useAudio';
+import { useSettings } from '@/context/settings-context';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 import { LogicNode } from './node';
@@ -166,6 +167,7 @@ export const WorkstationGrid = ({
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
   const notifications = useNotifications();
   const { playDrop, playWireConnect } = useAudio();
+  const { visualEffectsEnabled } = useSettings();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -1403,7 +1405,7 @@ export const WorkstationGrid = ({
         )}
 
         {/* Ripple Effects */}
-        {activeRipples.map((ripple) => (
+        {visualEffectsEnabled && activeRipples.map((ripple) => (
           <RippleEffect key={ripple.id} x={ripple.x} y={ripple.y} />
         ))}
 
