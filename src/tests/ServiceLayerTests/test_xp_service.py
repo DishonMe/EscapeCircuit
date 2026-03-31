@@ -265,20 +265,23 @@ class TestXPServiceMedalCalculation:
         medal = self.service.calculate_medal(passed=True, time_taken=30, time_limit=60, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.GOLD
 
-    def test_medal_bronze_no_time_limit(self):
-        # No time limit set, over budget -> only budget condition could count
+    def test_medal_silver_no_time_limit(self):
+        # No time limit set = automatic timer bonus (1 condition), over budget (no budget bonus)
+        # Result: 1 bonus condition = SILVER
         medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=15, budget=10)
-        assert medal == Medal.BRONZE
-
-    def test_medal_silver_no_time_limit_but_beats_creator_budget(self):
-        # No time limit, beats creator budget -> 1 condition
-        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.SILVER
 
-    def test_medal_bronze_no_creator_budget_set(self):
-        # No creator_budget and no time limit -> no bonuses -> BRONZE
+    def test_medal_gold_no_time_limit_beats_creator_budget(self):
+        # No time limit = automatic timer bonus (1 condition), beats creator budget (1 condition)
+        # Result: 2 bonus conditions = GOLD (maximum XP for untimed puzzles!)
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10, creator_budget=10)
+        assert medal == Medal.GOLD
+
+    def test_medal_silver_no_creator_budget_no_time_limit(self):
+        # No time limit = automatic timer bonus (1 condition), no creator budget
+        # Result: 1 bonus condition = SILVER
         medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=None, cost_used=5, budget=10)
-        assert medal == Medal.BRONZE
+        assert medal == Medal.SILVER
 
     def test_medal_bronze_creator_budget_not_met(self):
         # cost exceeds creator_budget -> no budget bonus
@@ -298,6 +301,18 @@ class TestXPServiceMedalCalculation:
     def test_medal_gold_timer_and_creator_budget(self):
         # Beats both timer and creator_budget -> GOLD
         medal = self.service.calculate_medal(passed=True, time_taken=20, time_limit=60, cost_used=3, budget=20, creator_budget=5)
+        assert medal == Medal.GOLD
+
+    def test_medal_silver_no_time_limit_zero(self):
+        # time_limit=0 also means no time limit = automatic timer bonus (1 condition), over budget
+        # Result: 1 bonus condition = SILVER
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=0, cost_used=15, budget=10)
+        assert medal == Medal.SILVER
+
+    def test_medal_gold_no_time_limit_zero_beats_creator_budget(self):
+        # time_limit=0 = automatic timer bonus (1 condition), beats creator budget (1 condition)
+        # Result: 2 bonus conditions = GOLD (maximum XP for untimed puzzles!)
+        medal = self.service.calculate_medal(passed=True, time_taken=10, time_limit=0, cost_used=5, budget=10, creator_budget=10)
         assert medal == Medal.GOLD
 
 class TestXPServiceArsenalCapacity:
