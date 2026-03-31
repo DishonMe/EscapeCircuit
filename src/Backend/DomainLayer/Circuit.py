@@ -110,6 +110,7 @@ class Circuit:
             "num_inputs": self.num_inputs,
             "num_outputs": self.num_outputs,
             "puzzle_id": self.puzzle_id,
+            "description": self.description,
         }
 
     def to_circuit_component(self) -> dict:

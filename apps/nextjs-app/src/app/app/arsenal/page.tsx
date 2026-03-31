@@ -237,13 +237,6 @@ export default function ArsenalPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewDetails(piece)}
-                      >
-                        Info
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={() => handleRename(piece)}
                       >
                         Rename
@@ -427,6 +420,13 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
 
   return (
     <div className="space-y-4">
+      {/* Description */}
+      {piece.description && (
+        <div className="bg-foreground/5 border border-border/40 rounded-lg p-3">
+          <p className="text-sm text-foreground">{piece.description}</p>
+        </div>
+      )}
+
       {/* Circuit Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">

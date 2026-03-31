@@ -11,6 +11,7 @@ export interface ArsenalPiece {
   basic_gates: string; // JSON string
   truth_table: string; // JSON string
   structure_json: string;
+  description?: string; // Description of the Arsenal piece
 }
 
 export interface SaveArsenalPiecePayload {

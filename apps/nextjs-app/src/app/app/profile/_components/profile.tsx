@@ -457,6 +457,13 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
 
   return (
     <div className="space-y-4">
+      {/* Description */}
+      {piece.description && (
+        <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
+          <p className="text-sm text-foreground">{piece.description}</p>
+        </div>
+      )}
+
       {/* Circuit Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">

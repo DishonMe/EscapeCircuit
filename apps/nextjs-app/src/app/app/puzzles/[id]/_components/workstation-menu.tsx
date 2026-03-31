@@ -23,6 +23,7 @@ type ArsenalCircuit = {
   name: string;
   usedBasicTypes: string[];
   solution: CircuitSolution;
+  description?: string;
 };
 
 const ARSENAL_KEY = 'escapecircuit.arsenal.v1';
@@ -410,6 +411,7 @@ export const WorkstationMenu = ({
         name: component.type,
         usedBasicTypes: [],
         solution: (component as any).solution || { structure: {} },
+        description: (component as any).description,
       };
       setViewingCircuitPreviewFor(arsenalCircuit);
       return;
@@ -682,6 +684,13 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
 
   return (
     <div className="space-y-4">
+      {/* Description */}
+      {arsenalCircuit.description && (
+        <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
+          <p className="text-sm text-foreground">{arsenalCircuit.description}</p>
+        </div>
+      )}
+
       {/* Circuit Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
