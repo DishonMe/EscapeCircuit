@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from 'react';
 
-import { Boxes, CircuitBoard, Gift, Medal, PackageOpen, Trophy } from 'lucide-react';
+import { Boxes, CircuitBoard, Gift, Medal, PackageOpen, Trophy, Eye } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getLevelInfo } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
-import { useMyArsenal } from '@/features/arsenal/api';
+import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
 import { useUser } from '@/lib/auth';
+import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type { PlacedGridComponent, Wire, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 
 type EntryProps = {
   label: string;
@@ -171,6 +173,7 @@ export const Profile = () => {
   const user = useUser();
   const { data: arsenal = [] } = useMyArsenal();
   const [rewardsOpen, setRewardsOpen] = useState(false);
+  const [previewPiece, setPreviewPiece] = useState<ArsenalPiece | null>(null);
 
   if (!user?.data) return null;
   const userData = user.data as any;
@@ -288,17 +291,24 @@ export const Profile = () => {
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Build a custom circuit piece to see it here.</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {arsenal.map((piece) => (
               <div
                 key={String(piece.id)}
-                className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/50"
               >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{piece.name}</h3>
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">cost {piece.cost}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{piece.name}</p>
                 </div>
-                <MiniCircuitPreview structureRaw={piece.structure_json} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={() => setPreviewPiece(piece)}
+                >
+                  <Eye size={16} className="mr-1" />
+                  Preview
+                </Button>
               </div>
             ))}
           </div>
@@ -322,6 +332,21 @@ export const Profile = () => {
           <p className="text-sm text-slate-500 dark:text-slate-400">No saved puzzles yet.</p>
         )}
       </section>
+
+      {/* Circuit Preview Dialog */}
+      {previewPiece && (
+        <Dialog open={!!previewPiece} onOpenChange={(open) => !open && setPreviewPiece(null)}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{previewPiece.name} - Circuit Preview</DialogTitle>
+              <DialogDescription>
+                Read-only preview of the circuit. No modifications allowed.
+              </DialogDescription>
+            </DialogHeader>
+            <CircuitPreviewContent piece={previewPiece} />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={rewardsOpen} onOpenChange={setRewardsOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -375,3 +400,137 @@ export const Profile = () => {
     </div>
   );
 };
+
+function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
+  const parseStructure = (
+    structureJson: string
+  ): {
+    numInputs: number;
+    numOutputs: number;
+    placed: PlacedGridComponent[];
+    wires: Wire[];
+  } => {
+    try {
+      return JSON.parse(structureJson || '{}');
+    } catch {
+      return { numInputs: 0, numOutputs: 0, placed: [], wires: [] };
+    }
+  };
+
+  const structure = parseStructure(piece.structure_json);
+  const { placed, wires } = structure;
+
+  // Build input/output labels
+  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
+  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+
+  // Build catalog with standard component definitions
+  // Size formula: width=3, height=max(inputs, outputs)
+  const catalog: Record<string, ComponentDef> = {
+    AND: { id: 'AND', label: 'AND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    OR: { id: 'OR', label: 'OR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NOT: { id: 'NOT', label: 'NOT', cost: 1, size: { w: 3, h: 1 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } }] },
+    XOR: { id: 'XOR', label: 'XOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NAND: { id: 'NAND', label: 'NAND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NOR: { id: 'NOR', label: 'NOR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    XNOR: { id: 'XNOR', label: 'XNOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+  };
+
+  // Add any custom arsenal pieces as components
+  placed.forEach((comp) => {
+    if (!catalog[comp.componentId]) {
+      catalog[comp.componentId] = {
+        id: comp.componentId,
+        label: comp.componentId,
+        cost: 1,
+        size: { w: 1, h: 1 },
+        ports: [
+          { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+          { id: 'P1', kind: 'output', offset: { row: 0, col: 0 } },
+        ],
+      };
+    }
+  });
+
+  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
+  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+
+  return (
+    <div className="space-y-4">
+      {/* Circuit Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
+          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
+          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Components</p>
+          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+          <p className="text-lg font-semibold text-foreground">{piece.cost}</p>
+        </div>
+      </div>
+
+      {/* Circuit Grid - Read-only Workstation */}
+      <div 
+        className="border border-border/60 rounded-lg bg-background overflow-hidden relative" 
+        style={{ height: '500px' }}
+      >
+        <style>{`
+          [data-preview-mode="true"] button[title*="Delete"],
+          [data-preview-mode="true"] button[title*="Cancel wiring"],
+          [data-preview-mode="true"] button[title*="Clear Grid"] {
+            display: none !important;
+          }
+          [data-preview-mode="true"] [role="button"],
+          [data-preview-mode="true"] svg circle,
+          [data-preview-mode="true"] svg rect,
+          [data-preview-mode="true"] svg text,
+          [data-preview-mode="true"] svg polyline {
+            pointer-events: none !important;
+          }
+        `}</style>
+        <div data-preview-mode="true" style={{ width: '100%', height: '100%' }}>
+          <WorkstationGrid
+            puzzleId={`arsenal-preview-${piece.id}`}
+            inputs={inputLabels}
+            outputs={outputLabels}
+            catalog={catalog}
+            placed={placed}
+            wires={wires}
+            selectedComponent={{ mode: 'none' }}
+            onSelectedComponentChange={() => {}} // Read-only: no changes
+            onPlacedChange={() => {}}             // Read-only: no changes
+            onWiresChange={() => {}}              // Read-only: no changes
+            draggedPaletteComponentId={null}
+            isChecking={false}
+            boardRows={gridRows}
+            boardCols={gridCols}
+          />
+        </div>
+      </div>
+
+      {/* Component Legend */}
+      {placed.length > 0 && (
+        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
+          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+          <div className="flex flex-wrap gap-2">
+            {placed
+              .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
+              .map((comp) => (
+                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
+                  <span className="text-foreground/70">{comp.componentId}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
