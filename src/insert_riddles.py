@@ -225,6 +225,11 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     basic_circuits = config.get('basic_circuits', []) or puzzle_data.get('basic_circuits', [])
     custom_pieces = config.get('custom_pieces', []) or puzzle_data.get('custom_pieces', [])
     
+    # Extract initial_board if present (pre-placed locked components)
+    initial_board_json = None
+    if puzzle_data.get('initial_board'):
+        initial_board_json = json.dumps(puzzle_data['initial_board'])
+    
     # Determine gates JSON
     gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
 
@@ -255,7 +260,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 default_gate_set=?, difficulty=?,
                 min_gate_count=?, total_gate_count=?, min_cycles=?, max_cycles=?,
                 board_rows=?, board_cols=?,
-                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?, riddle_base_name=?
+                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?, riddle_base_name=?, initial_board_json=?
             WHERE id=?
         """, (
             description,
@@ -275,6 +280,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('riddle_base_name'),
+            initial_board_json,
             puzzle_id
         ))
         # Clear old test cases for this puzzle (they get re-imported below)
@@ -288,9 +294,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
-                board_rows, board_cols, riddle_base_name,
+                board_rows, board_cols, riddle_base_name, initial_board_json,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -313,6 +319,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
             puzzle_data.get('riddle_base_name'),
+            initial_board_json,
             utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid

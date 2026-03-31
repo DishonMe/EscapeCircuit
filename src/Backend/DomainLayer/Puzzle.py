@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Set, List
+import json
 
 from Backend import settings
 from .Enums import GateType, PuzzleStatus, PuzzleDifficulty
@@ -36,6 +37,9 @@ class Puzzle:
     # Board dimensions (None = use defaults)
     board_rows: Optional[int] = None
     board_cols: Optional[int] = None
+
+    # Initial board configuration: JSON string containing locked placed components and wires
+    initial_board_json: Optional[str] = None
 
     rating_count: int = 0
     is_hall_of_fame: bool = False
@@ -118,6 +122,8 @@ class Puzzle:
             "max_cycles": self.max_cycles,
             "board_rows": self.board_rows if self.board_rows is not None else settings.PUZZLE_DEFAULT_BOARD_ROWS,
             "board_cols": self.board_cols if self.board_cols is not None else settings.PUZZLE_DEFAULT_BOARD_COLS,
+            "initial_board_json": self.initial_board_json,
+            "initial_board": json.loads(self.initial_board_json) if self.initial_board_json else None,
             "rating": self.avg_difficulty, # Frontend expects 'rating' (number)
             "rating_count": self.rating_count,
             "is_hall_of_fame": self.is_hall_of_fame,
@@ -135,6 +141,15 @@ class Puzzle:
     @staticmethod
     def from_dict(d: dict) -> "Puzzle":
         from datetime import datetime
+        import json as json_module
+        
+        # Parse initial_board: accept either JSON string or parsed object
+        initial_board_json = None
+        if "initial_board_json" in d:
+            initial_board_json = d["initial_board_json"]
+        elif "initial_board" in d and d["initial_board"] is not None:
+            initial_board_json = json_module.dumps(d["initial_board"])
+        
         return Puzzle(
             id=int(d.get("id", 0)),
             name=d["name"],
@@ -160,6 +175,7 @@ class Puzzle:
             allow_arsenal=d.get("allow_arsenal", True),
             allowed_arsenal_component_ids=d.get("allowed_arsenal_component_ids") or d.get("allowedArsenalComponentIds"),
             arsenal_component_display_modes=d.get("arsenal_component_display_modes") or d.get("arsenalComponentDisplayModes"),
+            initial_board_json=initial_board_json,
             rating_count=int(d.get("rating_count", 0)),
             is_hall_of_fame=bool(d.get("is_hall_of_fame", d.get("isHallOfFame", False))),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),

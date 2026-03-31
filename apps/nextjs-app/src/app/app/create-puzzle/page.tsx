@@ -33,7 +33,7 @@ import {
 import type { Wire } from "@/types/api";
 import { cn } from "@/utils/cn";
 
-type TabName = "basic" | "test-cases" | "python-tests" | "instructions" | "solution" | "custom-pieces";
+type TabName = "basic" | "test-cases" | "python-tests" | "instructions" | "initial-board" | "solution" | "custom-pieces";
 
 interface BasicInfo {
   name: string;
@@ -347,6 +347,12 @@ export default function CreatePuzzleForm() {
   const [selectedComponent, setSelectedComponent] = useState<SelectedComponentState>({ mode: 'none' });
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
 
+  // Workstation state for initial board design (locked components)
+  const [initialBoardPlaced, setInitialBoardPlaced] = useState<PlacedGridComponent[]>([]);
+  const [initialBoardWires, setInitialBoardWires] = useState<Wire[]>([]);
+  const [initialBoardSelectedComponent, setInitialBoardSelectedComponent] = useState<SelectedComponentState>({ mode: 'none' });
+  const [initialBoardDraggedPaletteComponentId, setInitialBoardDraggedPaletteComponentId] = useState<string | null>(null);
+
   const [data, setData] = useState<CreatePuzzleData>({
     basic: {
       name: "",
@@ -507,6 +513,19 @@ export default function CreatePuzzleForm() {
       setPrevNumOutputs(customPieceForm.numOutputs);
     }
   }, [customPieceForm.numInputs, customPieceForm.numOutputs, prevNumInputs, prevNumOutputs]);
+
+  // Wrapper callbacks to auto-lock components/wires on initial board
+  const handleInitialBoardPlacedChange = (newPlaced: PlacedGridComponent[]) => {
+    // Ensure all items are locked
+    const lockedPlaced = newPlaced.map(c => ({ ...c, isLocked: true }));
+    setInitialBoardPlaced(lockedPlaced);
+  };
+
+  const handleInitialBoardWiresChange = (newWires: Wire[]) => {
+    // Ensure all wires are locked
+    const lockedWires = newWires.map(w => ({ ...w, isLocked: true }));
+    setInitialBoardWires(lockedWires);
+  };
 
   const handleBasicChange = (
     field: keyof BasicInfo,
@@ -878,6 +897,29 @@ export default function CreatePuzzleForm() {
 
     return catalog;
   }, [data.basic.gateSet, customPieces, selectedArsenalPieces]);
+
+  // Handler: When switching FROM initial-board TO solution tab, auto-populate solution with all initial board components
+  const handleTabChange = (tab: TabName) => {
+    if (tab === 'solution' && activeTab === 'initial-board') {
+      // Auto-populate solution tab with all initial board components (they're all locked by default)
+      const allPlaced = initialBoardPlaced;
+      const allWires = initialBoardWires;
+      
+      // Merge items into solution (avoid duplicates by ID)
+      setPlaced((prev) => {
+        const idMap = new Map(prev.map((c) => [c.id, c]));
+        allPlaced.forEach((c) => idMap.set(c.id, c));
+        return Array.from(idMap.values());
+      });
+      
+      setWires((prev) => {
+        const idMap = new Map(prev.map((w) => [w.id, w]));
+        allWires.forEach((w) => idMap.set(w.id, w));
+        return Array.from(idMap.values());
+      });
+    }
+    setActiveTab(tab);
+  };
 
   // Export solution from workstation
   const exportSolution = useCallback(async () => {
@@ -1326,6 +1368,28 @@ export default function CreatePuzzleForm() {
             rows: data.basic.boardRows,
             cols: data.basic.boardCols,
           },
+          // Initial board: locked components pre-placed for solver
+          initial_board: initialBoardPlaced.length > 0 || initialBoardWires.length > 0 
+            ? {
+                locked_placed: initialBoardPlaced
+                  .filter((c) => c.isLocked)
+                  .map((c) => ({
+                    id: c.id,
+                    componentId: c.componentId,
+                    origin: c.origin,
+                    rotation: c.rotation,
+                    isLocked: true,
+                  })),
+                locked_wires: initialBoardWires
+                  .filter((w) => w.isLocked)
+                  .map((w) => ({
+                    id: w.id,
+                    from: w.from,
+                    to: w.to,
+                    isLocked: true,
+                  })),
+              }
+            : undefined,
         },
         test_cases: convertedTestCases,
       };
@@ -1424,11 +1488,11 @@ export default function CreatePuzzleForm() {
 
       {/* Tabs */}
       <div className="flex border-b mb-6">
-        {(["basic", "test-cases", "python-tests", "custom-pieces", "instructions", "solution"] as TabName[]).map(
+        {(["basic", "test-cases", "python-tests", "custom-pieces", "instructions", "initial-board", "solution"] as TabName[]).map(
           (tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-6 py-2 text-[13px] font-semibold transition-colors ${
                 activeTab === tab
                   ? "border-b-2 border-foreground text-foreground"
@@ -1445,7 +1509,9 @@ export default function CreatePuzzleForm() {
                       ? "Custom Pieces"
                       : tab === "instructions"
                         ? "Instructions"
-                        : "Solution"}
+                        : tab === "initial-board"
+                          ? "Initial Board"
+                          : "Solution"}
             </button>
           )
         )}
@@ -1944,7 +2010,7 @@ export default function CreatePuzzleForm() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('basic')}
+                      onClick={() => handleTabChange('basic')}
                       className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] text-foreground hover:bg-secondary transition-colors"
                     >
                       Open Basic Info
@@ -2196,8 +2262,84 @@ export default function CreatePuzzleForm() {
           </div>
         )}
 
-        {activeTab === "solution" && (
+        {activeTab === "initial-board" && (
           <div className="space-y-4">
+            <div className="bg-secondary/50 border border-border p-4 rounded-lg">
+              <h3 className="font-semibold text-foreground mb-2">📌 Design Your Initial Board (Pre-placed Locked Components)</h3>
+              <div className="text-[13px] text-foreground mb-3 space-y-2">
+                <p>
+                  <strong>Instructions:</strong> Place the components that will be pre-placed for the solver. All components you place here are automatically locked and will:
+                </p>
+                <ul className="list-disc list-inside ml-2 space-y-1">
+                  <li>Be immovable (cannot be dragged by solver)</li>
+                  <li>Be undeletable (cannot be removed by solver)</li>
+                  <li>Be mandatory (must be connected to validate the solution)</li>
+                  <li>Be counted in the puzzle cost</li>
+                </ul>
+                <p className="text-blue-700 font-semibold mt-2">
+                  💡 Just drag and place components. They automatically get a 🔒 icon and dashed wires when locked.
+                </p>
+              </div>
+            </div>
+
+            {/* Workstation Grid for Initial Board (similar to Solution) */}
+            <div className="grid grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card h-[700px]">
+              {/* Gate Palette Sidebar */}
+              <div className="border-r p-3 overflow-y-auto bg-secondary/50">
+                <div className="text-[13px] font-semibold text-foreground mb-3">Available Components</div>
+                {data.basic.gateSet.length === 0 && customPieces.length === 0 && selectedArsenalPieces.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab</p>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Basic Gates */}
+                    {data.basic.gateSet.map((gateName) => (
+                      <div
+                        key={`initial-gate-${gateName}`}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.dataTransfer.setData('application/x-escapecircuit-component', gateName);
+                          setInitialBoardDraggedPaletteComponentId(gateName);
+                        }}
+                        onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
+                        className="flex items-center gap-2 p-2 border border-border bg-card rounded-lg cursor-move hover:bg-secondary/50 transition"
+                      >
+                        <span className="font-medium text-[13px] text-foreground">{gateName}</span>
+                        <div className="flex-1" />
+                        <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                          cost {GATE_PROPERTIES[gateName]?.cost ?? 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Workstation Grid */}
+              <div className="overflow-hidden rounded-lg border border-border">
+                <WorkstationGrid
+                  puzzleId="initial-board"
+                  inputs={data.basic.inputs}
+                  outputs={data.basic.outputs}
+                  catalog={uiCatalog}
+                  placed={initialBoardPlaced}
+                  wires={initialBoardWires}
+                  selectedComponent={initialBoardSelectedComponent}
+                  onSelectedComponentChange={setInitialBoardSelectedComponent}
+                  onPlacedChange={handleInitialBoardPlacedChange}
+                  onWiresChange={handleInitialBoardWiresChange}
+                  draggedPaletteComponentId={initialBoardDraggedPaletteComponentId}
+                  boardRows={data.basic.boardRows}
+                  boardCols={data.basic.boardCols}
+                  isEditMode={true}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "solution" && (
+          <div className="space-y-6">
             <div className="bg-secondary/50 border border-border p-4 rounded-lg">
               <h3 className="font-semibold text-foreground mb-2">⚡ Design Your Solution Circuit</h3>
               <div className="text-[13px] text-foreground mb-3 space-y-2">
