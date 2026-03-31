@@ -346,11 +346,11 @@ export const WorkstationGrid = ({
 
       if (selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0) {
         console.log('[Delete Key] Deleting components:', selectedEntity.placedIds);
-        // Delete all selected components (skip locked ones)
+        // Delete all selected components (skip locked ones unless in edit mode)
         for (const placedId of selectedEntity.placedIds) {
           const component = placed.find((c) => c.id === placedId);
-          if (component?.isLocked) {
-            console.log('[Delete] Cannot delete locked component:', placedId);
+          if (component?.isLocked && !isEditMode) {
+            console.log('[Delete] Cannot delete locked component (not in edit mode):', placedId);
             continue;
           }
           console.log('[Delete] Removing component:', placedId);
@@ -359,10 +359,10 @@ export const WorkstationGrid = ({
       } else if (selectedEntity.type === 'wire') {
         console.log('[Delete Key] Deleting wire:', selectedEntity.wireId);
         const wire = wires.find((w) => w.id === selectedEntity.wireId);
-        if (!wire?.isLocked) {
+        if (!wire?.isLocked || isEditMode) {
           removeWire(selectedEntity.wireId);
         } else {
-          console.log('[Delete] Cannot delete locked wire:', selectedEntity.wireId);
+          console.log('[Delete] Cannot delete locked wire (not in edit mode):', selectedEntity.wireId);
         }
       }
     };
@@ -1976,8 +1976,8 @@ export const WorkstationGrid = ({
                       </button>
                     )}
 
-                    {/* Delete Button - Hidden if locked */}
-                    {!p.isLocked && (
+                    {/* Delete Button - Hidden if locked (unless in edit mode) */}
+                    {(!p.isLocked || isEditMode) && (
                     <button
                       type="button"
                       className="flex size-5 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
@@ -1992,7 +1992,7 @@ export const WorkstationGrid = ({
                         e.stopPropagation();
                         triggerDeleteComponent(p.id);
                       }}
-                      title="Delete component"
+                      title={p.isLocked && isEditMode ? "Delete locked component" : "Delete component"}
                     >
                       <svg
                         viewBox="0 0 24 24"
