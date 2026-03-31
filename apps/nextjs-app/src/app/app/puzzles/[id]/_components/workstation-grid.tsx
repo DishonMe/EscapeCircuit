@@ -41,6 +41,7 @@ export type PlacedGridComponent = {
   componentId: string; // catalog id
   origin: HoleCoord;
   rotation: 0 | 90;
+  isLocked?: boolean; // If true, component is immovable, undeletable, and mandatory to use
 };
 
 export type PortAddress = {
@@ -132,6 +133,7 @@ export const WorkstationGrid = ({
   debuggerSequences = {},
   onDebuggerSequenceChange,
   onInspectComponent,
+  isEditMode = false,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -162,6 +164,7 @@ export const WorkstationGrid = ({
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
+  isEditMode?: boolean;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -343,14 +346,24 @@ export const WorkstationGrid = ({
 
       if (selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0) {
         console.log('[Delete Key] Deleting components:', selectedEntity.placedIds);
-        // Delete all selected components
+        // Delete all selected components (skip locked ones)
         for (const placedId of selectedEntity.placedIds) {
+          const component = placed.find((c) => c.id === placedId);
+          if (component?.isLocked) {
+            console.log('[Delete] Cannot delete locked component:', placedId);
+            continue;
+          }
           console.log('[Delete] Removing component:', placedId);
           removeComponent(placedId);
         }
       } else if (selectedEntity.type === 'wire') {
         console.log('[Delete Key] Deleting wire:', selectedEntity.wireId);
-        removeWire(selectedEntity.wireId);
+        const wire = wires.find((w) => w.id === selectedEntity.wireId);
+        if (!wire?.isLocked) {
+          removeWire(selectedEntity.wireId);
+        } else {
+          console.log('[Delete] Cannot delete locked wire:', selectedEntity.wireId);
+        }
       }
     };
 
@@ -1542,6 +1555,9 @@ export const WorkstationGrid = ({
               : isRecentlyConnected
                 ? '#bfdbfe'
                 : '#93c5fd';
+            
+            // Check if wire is locked (at least one endpoint is locked)
+            const isWireLocked = w.isLocked === true;
 
             return (
               <g key={w.id}>
@@ -1555,6 +1571,7 @@ export const WorkstationGrid = ({
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={isPowerSurge ? 4.2 : isSelected ? 3 : isRecentlyConnected ? 4 : 2}
+                  strokeDasharray={isWireLocked ? '6,3' : undefined}
                   style={{
                     filter: isDeleteWarn
                       ? 'drop-shadow(0 0 8px rgba(239,68,68,0.85))'
@@ -1748,6 +1765,10 @@ export const WorkstationGrid = ({
 
             const left = origin.col * CELL_PX;
             const top = origin.row * CELL_PX;
+            
+            if (p.isLocked) {
+              console.log('[Render] Locked component:', {id: p.id, componentId: p.componentId, isLocked: p.isLocked, label: def.label});
+            }
 
             const isSelected =
               selectedEntity.type === 'component' &&
@@ -1814,6 +1835,12 @@ export const WorkstationGrid = ({
                     });
                   } else {
                     setSelectedEntity({ type: 'component', placedIds: [p.id] });
+                  }
+
+                  // Prevent drag if component is locked (but allow in edit mode)
+                  if (p.isLocked && !isEditMode) {
+                    console.log('[Locked Component] Cannot drag locked component:', p.id);
+                    return;
                   }
 
                   const el = containerRef.current;
@@ -1949,7 +1976,8 @@ export const WorkstationGrid = ({
                       </button>
                     )}
 
-                    {/* Delete Button */}
+                    {/* Delete Button - Hidden if locked */}
+                    {!p.isLocked && (
                     <button
                       type="button"
                       className="flex size-5 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
@@ -1978,6 +2006,29 @@ export const WorkstationGrid = ({
                         <path d="M6 6l1 16h10l1-16" />
                       </svg>
                     </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Lock Indicator (🔒 icon for locked components) */}
+                {p.isLocked && (
+                  <div
+                    className="absolute top-0 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor: '#fbbf24',
+                      borderRadius: '50%',
+                      border: '2px solid #f59e0b',
+                      fontSize: '12px',
+                      lineHeight: '1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title="This component is locked and cannot be moved or deleted"
+                  >
+                    🔒
                   </div>
                 )}
 
