@@ -8,8 +8,7 @@ export interface PuzzleFilters {
   page?: number;
   search?: string;
   creator?: string;
-  minDifficulty?: number;
-  maxDifficulty?: number;
+  selectedDifficulties?: number[];
   onlyExperiencedDifficulty?: boolean;
   minClearness?: number;
   maxClearness?: number;
@@ -40,8 +39,10 @@ export const getPuzzles = (
 
   if (filters.search !== undefined) params.search = filters.search;
   if (filters.creator !== undefined) params.creator = filters.creator;
-  if (filters.minDifficulty !== undefined) params.min_difficulty = filters.minDifficulty;
-  if (filters.maxDifficulty !== undefined) params.max_difficulty = filters.maxDifficulty;
+  if (filters.selectedDifficulties && filters.selectedDifficulties.length > 0) {
+    params.min_difficulty = Math.min(...filters.selectedDifficulties);
+    params.max_difficulty = Math.max(...filters.selectedDifficulties);
+  }
   if (filters.creator_id !== undefined) params.creator_id = filters.creator_id;
   if (filters.experienceLevel && filters.experienceLevel !== 'all') {
     params.creator_experience_level = filters.experienceLevel;
