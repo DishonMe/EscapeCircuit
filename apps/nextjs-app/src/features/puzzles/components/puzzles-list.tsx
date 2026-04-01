@@ -55,7 +55,7 @@ export const PuzzlesList = () => {
   const [leaderboardPuzzleId, setLeaderboardPuzzleId] = useState<string | null>(null);
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<PuzzleFilters>({ page: 1 });
+  const [filters, setFilters] = useState<PuzzleFilters>({ page: 1, selectedDifficulties: [1, 2, 3] });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
   const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
 
@@ -178,7 +178,7 @@ export const PuzzlesList = () => {
             variant="ghost"
             size="sm"
             onClick={() => {
-              setFilters({ page: 1 });
+              setFilters({ page: 1, selectedDifficulties: [1, 2, 3] });
               setCreatorSearchInput('');
             }}
             className="text-muted-foreground text-[13px]"
@@ -192,7 +192,7 @@ export const PuzzlesList = () => {
       {/* Filter Panel */}
       {showFilters && (
         <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-          {/* Top Level: name, creator, min difficulty, min fun, min clearness */}
+          {/* Top Level: name, creator, difficulty, min fun, min clearness */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Search Name */}
             <div>
@@ -218,19 +218,42 @@ export const PuzzlesList = () => {
               />
             </div>
 
-            {/* Min Difficulty */}
+            {/* Difficulty */}
             <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Difficulty</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.minDifficulty || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, minDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              >
-                <option value="">Any</option>
-                <option value="1">Easy</option>
-                <option value="2">Medium</option>
-                <option value="3">Hard</option>
-              </select>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Difficulty</label>
+              <div className="space-y-2">
+                {[
+                  { value: 1, label: 'Easy' },
+                  { value: 2, label: 'Medium' },
+                  { value: 3, label: 'Hard' },
+                ].map((difficulty) => (
+                  <div key={difficulty.value} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`difficulty-${difficulty.value}`}
+                      checked={(filters.selectedDifficulties || []).includes(difficulty.value)}
+                      onChange={(e) => {
+                        const selected = filters.selectedDifficulties || [1, 2, 3];
+                        const newSelected = e.target.checked
+                          ? [...selected, difficulty.value].sort()
+                          : selected.filter((d) => d !== difficulty.value);
+                        setFilters({
+                          ...filters,
+                          selectedDifficulties: newSelected.length > 0 ? newSelected : undefined,
+                          page: 1,
+                        });
+                      }}
+                      className="rounded border border-border"
+                    />
+                    <label
+                      htmlFor={`difficulty-${difficulty.value}`}
+                      className="text-[13px] cursor-pointer"
+                    >
+                      {difficulty.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Min Fun */}
@@ -264,7 +287,7 @@ export const PuzzlesList = () => {
             </div>
           </div>
 
-          {/* Mid Level: order, max difficulty, max fun, max clearness */}
+          {/* Mid Level: order, max fun, max clearness */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Order By */}
             <div>
@@ -278,21 +301,6 @@ export const PuzzlesList = () => {
                 <option value="difficulty">Difficulty</option>
                 <option value="fun">Fun</option>
                 <option value="clearness">Clearness</option>
-              </select>
-            </div>
-
-            {/* Max Difficulty */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Difficulty</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.maxDifficulty || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, maxDifficulty: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              >
-                <option value="">Any</option>
-                <option value="1">Easy</option>
-                <option value="2">Medium</option>
-                <option value="3">Hard</option>
               </select>
             </div>
 
