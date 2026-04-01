@@ -13,6 +13,8 @@ import {
   X,
   Bookmark,
   Trophy,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { useMemo, useState, ChangeEvent, useEffect } from 'react';
 
@@ -58,6 +60,21 @@ export const PuzzlesList = () => {
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1, selectedDifficulties: [1, 2, 3] });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
   const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    Object.entries(filters).forEach(([key, value]) => {
+      if (key === 'page' || !value) return;
+      if (key === 'selectedDifficulties') {
+        if (Array.isArray(value) && !(value.length === 3 && value.includes(1) && value.includes(2) && value.includes(3))) {
+          count++;
+        }
+        return;
+      }
+      if (value && value !== 1) count++;
+    });
+    return count;
+  };
 
   useEffect(() => {
     setFilters((prev) => {
@@ -171,9 +188,9 @@ export const PuzzlesList = () => {
           className="gap-2"
         >
           <Filter className="size-4" />
-          Filters {Object.values(filters).filter((v) => v && v !== 1).length > 0 && `(${Object.values(filters).filter((v) => v && v !== 1).length})`}
+          Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
         </Button>
-        {Object.values(filters).filter((v) => v && v !== 1).length > 0 && (
+        {getActiveFilterCount() > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -339,15 +356,29 @@ export const PuzzlesList = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {/* Direction */}
             <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.orderDirection || 'ASC'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any, page: 1 })}
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction: </label>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => {
+                  const currentDirection = filters.orderDirection || 'ASC';
+                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
+                  setFilters({ ...filters, orderDirection: newDirection as any, page: 1 });
+                }}
+                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
               >
-                <option value="ASC">Ascending</option>
-                <option value="DESC">Descending</option>
-              </select>
+                {(filters.orderDirection || 'ASC') === 'ASC' ? (
+                  <>
+                    <ArrowUp className="size-3 inline-block" />
+                    <span> Ascending</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDown className="size-3 inline-block" />
+                    <span> Descending</span>
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Experience Level */}
