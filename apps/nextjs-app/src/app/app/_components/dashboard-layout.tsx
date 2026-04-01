@@ -77,7 +77,10 @@ const ThemeToggle = () => {
           ? 'bg-slate-800 text-slate-100 hover:bg-slate-700'
           : 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50/50',
       )}
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      onClick={() => {
+        clearPaletteTheme();
+        setTheme(isDark ? 'light' : 'dark');
+      }}
       aria-label="Toggle dark mode"
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
@@ -104,9 +107,14 @@ const PALETTES = [
   'amber',
 ] as const;
 
+const clearPaletteTheme = () => {
+  document.documentElement.removeAttribute('data-palette');
+  localStorage.removeItem(PALETTE_STORAGE_KEY);
+};
+
 const PaletteShuffleToggle = () => {
   const [mounted, setMounted] = useState(false);
-  const [activePalette, setActivePalette] = useState<string>('ruby');
+  const [activePalette, setActivePalette] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -114,13 +122,7 @@ const PaletteShuffleToggle = () => {
     if (saved && PALETTES.includes(saved as (typeof PALETTES)[number])) {
       document.documentElement.setAttribute('data-palette', saved);
       setActivePalette(saved);
-      return;
     }
-
-    const fallback = PALETTES[0];
-    document.documentElement.setAttribute('data-palette', fallback);
-    localStorage.setItem(PALETTE_STORAGE_KEY, fallback);
-    setActivePalette(fallback);
   }, []);
 
   const applyPalette = (palette: string) => {
@@ -156,7 +158,7 @@ const PaletteShuffleToggle = () => {
       className="size-8 rounded-full transition-colors text-pink-600 hover:bg-pink-50 dark:text-pink-300 dark:hover:bg-pink-950/40"
       onClick={shufflePalette}
       aria-label="Shuffle color theme"
-      title={`Shuffle color theme (current: ${activePalette})`}
+      title={`Shuffle color theme${activePalette ? ` (current: ${activePalette})` : ''}`}
     >
       <Flower2 className="size-4" />
     </Button>
