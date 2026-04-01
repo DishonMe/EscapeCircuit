@@ -1,21 +1,5 @@
-### Description
-[Provide a clear and concise description of the changes made in this PR]
+## Sample Pull Request Template Description
 
-### Related Issues
-<!-- use #<number-of-issue> to link issues -->
-[Link to related issues or indicate "None"]
+This is a sample pull request template. You can customize it to fit your project's needs.
 
-### Checklist
-- [ ] I am confident this code can be pushed to deployment (if not provide mitigation plan)
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-
-### Testing
-[Describe the tests that you ran to verify your changes.]
-
-### Screenshots (For UI/UX changes mandatory)
-[Attach screenshots to demonstrate the visual changes]
-
-### Additional Information
-<!-- Optional: -->
-[Any other information that might be useful]
+Don't forget to commit your template file to the repository so that it can be used for future pull requests!
