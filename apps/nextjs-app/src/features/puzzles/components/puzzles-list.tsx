@@ -209,8 +209,8 @@ export const PuzzlesList = () => {
       {/* Filter Panel */}
       {showFilters && (
         <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-          {/* Top Level: name, creator, difficulty, min fun, min clearness */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {/* Top Level: name, creator, difficulty, and all ratings */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7">
             {/* Search Name */}
             <div>
               <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Name</label>
@@ -282,7 +282,7 @@ export const PuzzlesList = () => {
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.minFun || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -297,28 +297,10 @@ export const PuzzlesList = () => {
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.minClearness || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
-            </div>
-          </div>
-
-          {/* Mid Level: order, max fun, max clearness */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Order By */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.orderBy || 'created_at'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
-              >
-                <option value="created_at">Newest</option>
-                <option value="difficulty">Difficulty</option>
-                <option value="fun">Fun</option>
-                <option value="clearness">Clearness</option>
-              </select>
             </div>
 
             {/* Max Fun */}
@@ -330,7 +312,7 @@ export const PuzzlesList = () => {
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.maxFun || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
@@ -345,21 +327,36 @@ export const PuzzlesList = () => {
                 max="5"
                 step="0.5"
                 placeholder="0-5"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.maxClearness || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
               />
             </div>
           </div>
 
-          {/* Last Level: direction, experienced/inexperienced/all, and medal filter */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Bottom Level: order, direction, experience, medal */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Order By */}
+            <div>
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
+              <select
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                value={filters.orderBy || 'created_at'}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
+              >
+                <option value="created_at">Newest</option>
+                <option value="difficulty">Difficulty</option>
+                <option value="fun">Fun</option>
+                <option value="clearness">Clearness</option>
+              </select>
+            </div>
+
             {/* Direction */}
             <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction: </label>
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
               <Button
                 variant="outline"
-                size="xs"
+                size="sm"
                 onClick={() => {
                   const currentDirection = filters.orderDirection || 'ASC';
                   const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
