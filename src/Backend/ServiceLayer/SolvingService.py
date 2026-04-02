@@ -364,6 +364,22 @@ class SolvingService:
             #     transaction (C2).  This prevents two concurrent solves of the
             #     same puzzle from both reading stale progress and double-awarding XP.
             with transaction(self.conn):
+                # IDEMPOTENCY CHECK: Prevent duplicate solves from retries
+                # If a solve was just created for this user/puzzle, return it instead
+                recent_solve = self.solve_repo.get_recent_solve(user_id, puzzle_id, seconds=5) if hasattr(self.solve_repo, 'get_recent_solve') else None
+                if recent_solve:
+                    # This is a retry - return the cached result
+                    print(f"[SOLVING_SERVICE] Duplicate solve detected (retry), returning cached result for puzzle_id={puzzle_id}")
+                    medal_name = ["NONE", "BRONZE", "SILVER", "GOLD"][int(recent_solve["highest_medal"])] if recent_solve["highest_medal"] else "NONE"
+                    return {
+                        "passed": True,
+                        "message": "Puzzle already solved moments ago - returning cached result",
+                        "medal": medal_name,
+                        "medal_value": int(recent_solve["highest_medal"]) if recent_solve["highest_medal"] else 0,
+                        "xp_earned": int(recent_solve["xp_earned"]) if recent_solve["xp_earned"] else 0,
+                        "first_time_solve": False,
+                    }
+                
                 attempt_id = None
                 if hasattr(self.solve_repo, 'add_solve'):
                     attempt_id = self.solve_repo.add_solve(
@@ -372,6 +388,7 @@ class SolvingService:
                         time_taken_seconds=time_taken_s,
                         xp_earned=raw_xp,
                         medal=medal.value if isinstance(medal, Medal) else int(medal),
+                        cost_used=cost_used,
                     )
 
                 if hasattr(self.solve_repo, 'upsert_progress'):

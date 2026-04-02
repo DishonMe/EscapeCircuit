@@ -313,18 +313,37 @@ class SolveRepo:
         ).fetchall()
         return {int(r["puzzle_id"]): int(r["solver_count"]) for r in rows}
 
-    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0) -> int:
-        """Convenience: insert a passed attempt with time/xp/medal metadata and return its id."""
+    def get_recent_solve(self, user_id: int, puzzle_id: int, seconds: int = 5):
+        """Get the most recent solve for this user/puzzle if it's within the last N seconds."""
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        cutoff = utcnow() - timedelta(seconds=seconds)
+        row = self.conn.execute(
+            """
+            SELECT id, submitted_at, cost_used, time_taken_seconds, xp_earned, highest_medal
+            FROM solve_attempts
+            WHERE user_id = ? AND puzzle_id = ? AND passed = 1 
+                AND submitted_at IS NOT NULL
+                AND submitted_at > ?
+            ORDER BY submitted_at DESC
+            LIMIT 1
+            """,
+            (int(user_id), int(puzzle_id), cutoff.isoformat()),
+        ).fetchone()
+        return row
+
+    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0) -> int:
+        """Convenience: insert a passed attempt with time/xp/medal/cost metadata and return its id."""
         from Backend.DomainLayer.Utils import utcnow
         now = utcnow()
         cur = self.conn.execute(
             """
             INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed,
-                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal)
-            VALUES(?,?,?,?,1,?,?,?,?)
+                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used)
+            VALUES(?,?,?,?,1,?,?,?,?,?)
             """,
             (int(puzzle_id), int(user_id), now.isoformat(), now.isoformat(),
-             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal)),
+             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used)),
         )
         return int(cur.lastrowid)
 
