@@ -1923,7 +1923,6 @@ export const WorkstationGrid = ({
                   <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
-                    {(!p.isLocked || isEditMode) && (
                     <button
                       type="button"
                       className="flex size-5 items-center justify-center rounded-full bg-card text-red-600 shadow-sm ring-1 ring-border transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
