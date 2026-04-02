@@ -64,20 +64,20 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setLeaderboardType("time")}
-          className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
             leaderboardType === "time"
-              ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white'
-              : 'text-muted-foreground hover:text-gray-900 dark:hover:text-white'
+              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
+              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
           ⏱️ Fastest Time
         </button>
         <button
           onClick={() => setLeaderboardType("cost")}
-          className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
             leaderboardType === "cost"
-              ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white'
-              : 'text-muted-foreground hover:text-gray-900 dark:hover:text-white'
+              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
+              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
           💰 Lowest Cost
