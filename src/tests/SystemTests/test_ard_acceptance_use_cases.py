@@ -560,7 +560,7 @@ class TestUseCase6EarnRewardsAndLevelUp:
             creator_token,
             name="UC6 Standard XP",
             budget=0,
-            time_limit=None,
+            time_limit=5,
             difficulty="HARD",
         )
 
@@ -1355,7 +1355,7 @@ class TestAddedAcceptanceTestsDuplicates:
             creator_token,
             name="ADD UC6 Standard XP",
             budget=0,
-            time_limit=None,
+            time_limit=5,
             difficulty="HARD",
         )
 
@@ -1439,7 +1439,7 @@ class TestAddedAcceptanceTestsDuplicates:
             creator_token,
             name="ADD UC6 Boundary Medal",
             budget=1,
-            time_limit=None,
+            time_limit=5,
             difficulty="EASY",
         )
 

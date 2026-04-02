@@ -1918,39 +1918,11 @@ export const WorkstationGrid = ({
                   setDraggedComponent(null);
                 }}
               >
-                {/* Selected Action Buttons: Inspect & Delete (Outside) */}
+                {/* Selected Action Buttons: Delete (Outside) */}
                 {isSelected && !isDragging && (
                   <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
-                    {/* Inspect Button - Only for custom/Arsenal components */}
-                    {!(() => {
-                      const gateType = def.label.split(' ')[0];
-                      return ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'DFF'].includes(gateType);
-                    })() && (
-                      <button
-                        type="button"
-                        className="flex size-5 items-center justify-center rounded-full bg-card text-blue-600 shadow-sm ring-1 ring-border transition-all hover:scale-110 hover:bg-blue-100 hover:text-blue-700 hover:ring-blue-300"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onInspectComponent?.(p.id);
-                        }}
-                        title="Inspect component"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="size-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <circle cx="12" cy="12" r="8" />
-                          <path d="M12 8v4" />
-                          <path d="M9 12h6" />
-                        </svg>
-                      </button>
-                    )}
-
-                    {/* Delete Button - Hidden if locked (unless in edit mode) */}
+                    {/* Delete Button */}
+                    {(!p.isLocked || isEditMode) && (
                     {(!p.isLocked || isEditMode) && (
                     <button
                       type="button"

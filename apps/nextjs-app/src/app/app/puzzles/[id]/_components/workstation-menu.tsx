@@ -8,18 +8,23 @@ import { createRoot } from 'react-dom/client';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { WorkstationGrid } from './workstation-grid';
+import type { PlacedGridComponent, ComponentDef } from './workstation-grid';
 import { CircuitComponent, CircuitSolution } from '@/types/api';
 import { cn } from '@/utils/cn';
 import { LogicNode, type LogicNodeDefinition } from './node';
+import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 
 type ArsenalCircuit = {
   id: string;
   name: string;
   usedBasicTypes: string[];
   solution: CircuitSolution;
+  description?: string;
 };
 
 const ARSENAL_KEY = 'escapecircuit.arsenal.v1';
@@ -250,6 +255,7 @@ const DraggableItem = ({
   onInfoClick,
   onDragStart,
   onDragEnd,
+  category = 'basic',
 }: {
   component: CircuitComponent;
   node: LogicNodeDefinition;
@@ -259,7 +265,13 @@ const DraggableItem = ({
   onInfoClick?: () => void;
   onDragStart?: (id: string) => void;
   onDragEnd?: () => void;
+  category?: 'basic' | 'custom' | 'arsenal';
 }) => {
+  const getInfoTitle = () => {
+    if (category === 'arsenal') return 'View Circuit Preview';
+    return 'View Truth Table';
+  };
+
   return (
       <div
         className={cn(
@@ -279,7 +291,7 @@ const DraggableItem = ({
             'text-muted-foreground hover:text-foreground transition-colors cursor-help opacity-100',
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
           )}
-          title="View Truth Table"
+          title={getInfoTitle()}
         >
           <Info size={16} />
         </button>
@@ -363,6 +375,9 @@ export const WorkstationMenu = ({
     string | null
   >(null);
   const [viewingTruthTableData, setViewingTruthTableData] = useState<any>(null);
+  const [viewingCircuitPreviewFor, setViewingCircuitPreviewFor] = useState<
+    ArsenalCircuit | null
+  >(null);
 
 
   useEffect(() => {
@@ -378,7 +393,22 @@ export const WorkstationMenu = ({
     );
   }, [allowArsenal, loadedArsenal, filteredBasicTypes]);
 
-  const handleInfoClick = (componentId: string, component: CircuitComponent) => {
+  const handleInfoClick = (componentId: string, component: CircuitComponent, category: 'basic' | 'custom' | 'arsenal' = 'basic') => {
+    // Show circuit preview ONLY for arsenal pieces
+    if (category === 'arsenal') {
+      // Convert component to ArsenalCircuit format
+      const arsenalCircuit: ArsenalCircuit = {
+        id: component.id,
+        name: component.type,
+        usedBasicTypes: [],
+        solution: (component as any).solution || { structure: {} },
+        description: (component as any).description,
+      };
+      setViewingCircuitPreviewFor(arsenalCircuit);
+      return;
+    }
+    
+    // Show truth table for basic gates and custom pieces
     setViewingTruthTableFor(component.type || componentId);
     
     // Check if component has truth_table data (from API arsenal pieces)
@@ -421,9 +451,10 @@ export const WorkstationMenu = ({
                 inPalette
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => handleInfoClick(c.id, c)}
+                onInfoClick={() => handleInfoClick(c.id, c, 'basic')}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
+                category="basic"
               />
             ))}
           </div>
@@ -445,9 +476,10 @@ export const WorkstationMenu = ({
                 inPalette
                 isSelected={selectedComponentId === c.id}
                 onSelect={onSelectComponent}
-                onInfoClick={() => handleInfoClick(c.id, c)}
+                onInfoClick={() => handleInfoClick(c.id, c, 'custom')}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
+                category="custom"
               />
             ))}
           </div>
@@ -470,9 +502,10 @@ export const WorkstationMenu = ({
                   inPalette
                   isSelected={selectedComponentId === c.id}
                   onSelect={onSelectComponent}
-                  onInfoClick={() => handleInfoClick(c.id, c)}
+                  onInfoClick={() => handleInfoClick(c.id, c, 'arsenal')}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}
+                  category="arsenal"
                 />
               ))}
             </div>
@@ -509,6 +542,7 @@ export const WorkstationMenu = ({
         </Category>
       ) : null}
 
+      {/* Truth Table Dialog for basic gates and custom pieces */}
       <Dialog
         open={Boolean(viewingTruthTableFor)}
         onOpenChange={(open) => !open && setViewingTruthTableFor(null)}
@@ -557,6 +591,216 @@ export const WorkstationMenu = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Circuit Preview Dialog for arsenal pieces */}
+      <Dialog
+        open={Boolean(viewingCircuitPreviewFor)}
+        onOpenChange={(open) => !open && setViewingCircuitPreviewFor(null)}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingCircuitPreviewFor?.name} - Circuit Preview</DialogTitle>
+            <DialogDescription>
+              Read-only preview of the circuit. No modifications allowed.
+            </DialogDescription>
+          </DialogHeader>
+          {viewingCircuitPreviewFor && (
+            <CircuitPreviewContent arsenalCircuit={viewingCircuitPreviewFor} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
+function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCircuit }) {
+  const { data: myArsenal } = useMyArsenal();
+
+  const parseStructure = (solution: any): {
+    numInputs: number;
+    numOutputs: number;
+    placed: PlacedGridComponent[];
+    wires: any[];
+  } => {
+    try {
+      // Try to get structure from different possible locations
+      const struct = solution.structure || solution || {};
+      
+      return {
+        numInputs: struct.numInputs || 0,
+        numOutputs: struct.numOutputs || 0,
+        placed: struct.placed || struct.placedComponents || [],
+        wires: struct.wires || [],
+      };
+    } catch {
+      return { numInputs: 0, numOutputs: 0, placed: [], wires: [] };
+    }
+  };
+
+  const structure = parseStructure(arsenalCircuit.solution);
+  const { placed, wires } = structure;
+
+  // Build input/output labels
+  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
+  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+
+  // Build map of arsenal pieces by ID for quick lookup
+  const arsenalMap = new Map<string, ArsenalPiece>();
+  if (myArsenal) {
+    myArsenal.forEach((ap) => {
+      arsenalMap.set(String(ap.id), ap);
+    });
+  }
+
+  // Build catalog with standard component definitions
+  // Size formula: width=3, height=max(inputs, outputs)
+  const catalog: Record<string, ComponentDef> = {
+    AND: { id: 'AND', label: 'AND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    OR: { id: 'OR', label: 'OR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NOT: { id: 'NOT', label: 'NOT', cost: 1, size: { w: 3, h: 1 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } }] },
+    XOR: { id: 'XOR', label: 'XOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NAND: { id: 'NAND', label: 'NAND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    NOR: { id: 'NOR', label: 'NOR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    XNOR: { id: 'XNOR', label: 'XNOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+  };
+
+  // Add any custom arsenal pieces as components
+  placed.forEach((comp) => {
+    if (!catalog[comp.componentId]) {
+      const arsenalPiece = arsenalMap.get(comp.componentId);
+      if (arsenalPiece && (arsenalPiece as any).is_arsenal) {
+        // Arsenal piece sizing: width=3, height=max(inputs, outputs)
+        const numInputs = (arsenalPiece as any).num_inputs ?? 0;
+        const numOutputs = (arsenalPiece as any).num_outputs ?? 0;
+        const maxPorts = Math.max(numInputs, numOutputs);
+        const size = { w: 3, h: Math.max(1, maxPorts) };
+        
+        // Generate ports for arsenal pieces
+        const ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        for (let i = 0; i < numInputs; i++) {
+          ports.push({
+            id: `in${i}`,
+            kind: 'input',
+            offset: { row: Math.min(i, size.h - 1), col: 0 },
+          });
+        }
+        for (let i = 0; i < numOutputs; i++) {
+          ports.push({
+            id: `out${i}`,
+            kind: 'output',
+            offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
+          });
+        }
+        
+        catalog[comp.componentId] = {
+          id: comp.componentId,
+          label: arsenalPiece.name,
+          cost: arsenalPiece.cost,
+          size,
+          ports,
+        };
+      } else {
+        // Fallback for unknown components
+        catalog[comp.componentId] = {
+          id: comp.componentId,
+          label: comp.componentId,
+          cost: 1,
+          size: { w: 3, h: 1 },
+          ports: [
+            { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+            { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } },
+          ],
+        };
+      }
+    }
+  });
+
+  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
+  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+
+  return (
+    <div className="space-y-4">
+      {/* Description */}
+      {arsenalCircuit.description && (
+        <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
+          <p className="text-sm text-foreground">{arsenalCircuit.description}</p>
+        </div>
+      )}
+
+      {/* Circuit Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
+          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
+          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Components</p>
+          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+        </div>
+        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+          <p className="text-lg font-semibold text-foreground">{(arsenalCircuit.solution as any)?.totalCost || 0}</p>
+        </div>
+      </div>
+
+      {/* Circuit Grid - Read-only Workstation */}
+      <div 
+        className="border border-border/60 rounded-lg bg-background overflow-hidden relative" 
+        style={{ height: '500px' }}
+      >
+        <style>{`
+          [data-preview-mode="true"] button[title*="Delete"],
+          [data-preview-mode="true"] button[title*="Cancel wiring"],
+          [data-preview-mode="true"] button[title*="Clear Grid"] {
+            display: none !important;
+          }
+          [data-preview-mode="true"] [role="button"],
+          [data-preview-mode="true"] svg circle,
+          [data-preview-mode="true"] svg rect,
+          [data-preview-mode="true"] svg text,
+          [data-preview-mode="true"] svg polyline {
+            pointer-events: none !important;
+          }
+        `}</style>
+        <div data-preview-mode="true" style={{ width: '100%', height: '100%' }}>
+          <WorkstationGrid
+            puzzleId={`arsenal-preview-${arsenalCircuit.id}`}
+            inputs={inputLabels}
+            outputs={outputLabels}
+            catalog={catalog}
+            placed={placed}
+            wires={wires}
+            selectedComponent={{ mode: 'none' }}
+            onSelectedComponentChange={() => {}} // Read-only: no changes
+            onPlacedChange={() => {}}             // Read-only: no changes
+            onWiresChange={() => {}}              // Read-only: no changes
+            draggedPaletteComponentId={null}
+            isChecking={false}
+            boardRows={gridRows}
+            boardCols={gridCols}
+          />
+        </div>
+      </div>
+
+      {/* Component Legend */}
+      {placed.length > 0 && (
+        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
+          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+          <div className="flex flex-wrap gap-2">
+            {placed
+              .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
+              .map((comp) => (
+                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
+                  <span className="text-foreground/70">{comp.componentId}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

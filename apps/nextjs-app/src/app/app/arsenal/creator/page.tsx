@@ -219,11 +219,11 @@ export default function ArsenalCreatorPage() {
       let ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }>;
       
       if (isArsenal) {
-        // Arsenal piece sizing: width=4, height=max(inputs, outputs)
+        // Arsenal piece sizing: width=3, height=max(inputs, outputs)
         const numInputs = (def as any).num_inputs ?? 0;
         const numOutputs = (def as any).num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
-        size = { w: 4, h: Math.max(1, maxPorts) };
+        size = { w: 3, h: Math.max(1, maxPorts) };
         
         // Generate ports for arsenal pieces
         const ports_list: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
