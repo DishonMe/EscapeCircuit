@@ -87,9 +87,9 @@ const LEVEL_BENEFIT_CHANGES: LevelBenefitChange[] = LEVEL_BENEFITS
   .filter((entry): entry is LevelBenefitChange => entry !== null);
 
 const Entry = ({ label, value }: EntryProps) => (
-  <div className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70 sm:grid-cols-[140px_1fr]">
-    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
-    <dd className="text-sm text-slate-900 dark:text-slate-100">{value}</dd>
+  <div className="grid grid-cols-1 gap-1 rounded-xl border border-border bg-card/70 px-4 py-3 sm:grid-cols-[140px_1fr]">
+    <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+    <dd className="text-sm text-foreground">{value}</dd>
   </div>
 );
 
@@ -123,7 +123,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
   const parsed = parseStructure(structureRaw);
   if (!parsed) {
     return (
-      <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900" />
+      <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-dashed border-border bg-secondary" />
     );
   }
 
@@ -132,7 +132,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
   const nodeById = new Map(placed.map((node) => [node.id, node]));
 
   return (
-    <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/70">
+    <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-border bg-secondary">
       <div className="absolute inset-0 origin-top-left scale-[0.5]" style={{ width: '200%', height: '200%' }}>
         {wires.map((wire) => {
           const fromNode = nodeById.get(wire.from.componentId);
@@ -156,7 +156,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
         {placed.map((node) => (
           <div
             key={node.id}
-            className="absolute flex h-9 w-14 items-center justify-center rounded-md border border-slate-300 bg-white text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className="absolute flex h-9 w-14 items-center justify-center rounded-md border border-border bg-card text-[10px] font-semibold text-foreground"
             style={{ left: node.x * 44 + 6, top: node.y * 44 + 6 }}
           >
             {node.componentId}
@@ -172,8 +172,11 @@ export const Profile = () => {
   const { data: arsenal = [] } = useMyArsenal();
   const [rewardsOpen, setRewardsOpen] = useState(false);
 
-  if (!user?.data) return null;
-  const userData = user.data as any;
+  const userData = user?.data as any;
+  const currentXp = Number(userData?.xp ?? 0);
+  const levelInfo = useMemo(() => getLevelInfo(currentXp), [currentXp]);
+
+  if (!userData) return null;
 
   const formatDateOnly = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -191,21 +194,19 @@ export const Profile = () => {
   const bronzeMedals = Number(medals.bronze ?? 0);
   const medalsTotal = userData.medals?.total ?? 0;
   const savedPuzzleCount = userData.saved_puzzles?.length ?? 0;
-  const currentXp = Number(userData.xp ?? 0);
-  const levelInfo = useMemo(() => getLevelInfo(currentXp), [currentXp]);
 
   return (
     <div className="space-y-5">
       <section className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-secondary text-lg font-semibold text-foreground">
                 {initials}
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{displayName}</h1>
-                <p className="text-sm text-slate-600 dark:text-slate-300">Circuit Operator Profile</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
+                <p className="text-sm text-muted-foreground">Circuit Operator Profile</p>
               </div>
             </div>
             <EditBio />
@@ -220,9 +221,9 @@ export const Profile = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="col-span-2 rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <CircuitBoard size={16} />
                 Progress
               </div>
@@ -230,73 +231,73 @@ export const Profile = () => {
                 <Button variant="ghost" size="sm" onClick={() => setRewardsOpen(true)}>
                   Rewards
                 </Button>
-                <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold text-foreground">
                   Level {levelInfo.level}
                 </span>
               </div>
             </div>
-            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              XP to next level: <span className="font-semibold text-slate-900 dark:text-slate-100">{levelInfo.xpIntoLevel}/{levelInfo.xpForLevel}</span>
+            <p className="mt-3 text-sm text-muted-foreground">
+              XP to next level: <span className="font-semibold text-foreground">{levelInfo.xpIntoLevel}/{levelInfo.xpForLevel}</span>
             </p>
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{levelInfo.level}</span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+              <span className="text-xs font-semibold text-muted-foreground">{levelInfo.level}</span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
                   style={{ width: `${levelInfo.pct}%` }}
                 />
               </div>
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{levelInfo.level + 1}</span>
+              <span className="text-xs font-semibold text-muted-foreground">{levelInfo.level + 1}</span>
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{currentXp}/{levelInfo.nextThreshold} total XP</p>
+            <p className="mt-2 text-xs text-muted-foreground">{currentXp}/{levelInfo.nextThreshold} total XP</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><Trophy size={16} /> Medals</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{medalsTotal}</p>
+          <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-muted-foreground"><Trophy size={16} /> Medals</div>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{medalsTotal}</p>
             <div className="mt-2 space-y-1 text-xs">
-              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-500" /> Gold</span>
                 <span className="font-semibold">{goldMedals}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
-                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-slate-400" /> Silver</span>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-muted-foreground" /> Silver</span>
                 <span className="font-semibold">{silverMedals}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-700 dark:text-slate-200">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-700" /> Bronze</span>
                 <span className="font-semibold">{bronzeMedals}</span>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400"><Boxes size={16} /> Saved Puzzles</div>
-            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{savedPuzzleCount}</p>
+          <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-muted-foreground"><Boxes size={16} /> Saved Puzzles</div>
+            <p className="mt-3 text-3xl font-semibold text-foreground">{savedPuzzleCount}</p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+      <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Arsenal</h2>
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{arsenal.length} saved</span>
+          <h2 className="text-lg font-semibold text-foreground">Arsenal</h2>
+          <span className="text-xs font-medium text-muted-foreground">{arsenal.length} saved</span>
         </div>
 
         {arsenal.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center dark:border-slate-700 dark:bg-slate-950/70">
-            <PackageOpen className="mx-auto mb-3 size-10 text-slate-400" />
-            <p className="text-base font-medium text-slate-700 dark:text-slate-200">Your Arsenal is empty</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Build a custom circuit piece to see it here.</p>
+          <div className="rounded-2xl border border-dashed border-border bg-secondary px-6 py-10 text-center">
+            <PackageOpen className="mx-auto mb-3 size-10 text-muted-foreground" />
+            <p className="text-base font-medium text-muted-foreground">Your Arsenal is empty</p>
+            <p className="mt-1 text-sm text-muted-foreground">Build a custom circuit piece to see it here.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {arsenal.map((piece) => (
               <div
                 key={String(piece.id)}
-                className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+                className="rounded-2xl border border-border bg-card/80 p-3 shadow-sm"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{piece.name}</h3>
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">cost {piece.cost}</span>
+                  <h3 className="text-sm font-semibold text-foreground">{piece.name}</h3>
+                  <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">cost {piece.cost}</span>
                 </div>
                 <MiniCircuitPreview structureRaw={piece.structure_json} />
               </div>
@@ -305,21 +306,21 @@ export const Profile = () => {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">Saved Puzzles</h2>
+      <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold text-foreground">Saved Puzzles</h2>
         {userData.saved_puzzles?.length ? (
           <ul className="grid gap-2 md:grid-cols-2">
             {userData.saved_puzzles.map((puzzle: any) => (
-              <li key={puzzle.id} className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/70">
-                <Link href={`${paths.app.puzzles.getHref()}/${puzzle.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline dark:text-slate-100">
+              <li key={puzzle.id} className="rounded-xl border border-border bg-card/70 px-3 py-2 text-sm">
+                <Link href={`${paths.app.puzzles.getHref()}/${puzzle.id}`} className="font-medium text-foreground underline-offset-2 hover:underline">
                   {puzzle.name}
                 </Link>
-                <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({puzzle.status})</span>
+                <span className="ml-2 text-xs text-muted-foreground">({puzzle.status})</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No saved puzzles yet.</p>
+          <p className="text-sm text-muted-foreground">No saved puzzles yet.</p>
         )}
       </section>
 
@@ -335,9 +336,9 @@ export const Profile = () => {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div className="max-h-[430px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="max-h-[430px] overflow-auto rounded-xl border border-border">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <thead className="sticky top-0 bg-secondary text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-left">Level</th>
                     <th className="px-3 py-2 text-left">Change</th>
@@ -347,12 +348,12 @@ export const Profile = () => {
                   {LEVEL_BENEFIT_CHANGES.map((benefit) => (
                     <tr
                       key={benefit.level}
-                      className={benefit.level === levelInfo.level ? 'bg-cyan-50/70 dark:bg-cyan-950/30' : 'bg-white dark:bg-slate-900'}
+                      className={benefit.level === levelInfo.level ? 'bg-cyan-50/70 dark:bg-cyan-950/30' : 'bg-card'}
                     >
-                      <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2 font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                      <td className="whitespace-nowrap border-t border-border px-3 py-2 font-semibold text-foreground">
                         Level {benefit.level}
                       </td>
-                      <td className="border-t border-slate-200 px-3 py-2 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                      <td className="border-t border-border px-3 py-2 text-muted-foreground">
                         {benefit.changes.join(' | ')}
                       </td>
                     </tr>
@@ -361,11 +362,11 @@ export const Profile = () => {
               </table>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
-              <p className="text-sm text-slate-700 dark:text-slate-200">
+            <div className="rounded-xl border border-border bg-secondary p-3">
+              <p className="text-sm text-muted-foreground">
                 You are level {levelInfo.level}. Next level in {Math.max(0, levelInfo.nextThreshold - currentXp)} XP.
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Starting values at level 1 are: Arsenal slots 5, Published puzzles 5, Unpublished puzzles 5.
               </p>
             </div>

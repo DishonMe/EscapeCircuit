@@ -31,7 +31,7 @@ const DrawerOverlay = React.forwardRef<
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 
 const drawerVariants = cva(
-  'fixed z-50 gap-4 rounded-md border border-slate-200 bg-white p-6 text-slate-900 shadow-xl transition ease-in-out dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out sm:rounded-md',
+  'fixed z-50 gap-4 rounded-md border border-border bg-card p-6 text-card-foreground shadow-xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out sm:rounded-md',
   {
     variants: {
       side: {
@@ -109,7 +109,7 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn('text-lg font-semibold tracking-tight text-slate-950 dark:text-white', className)}
+    className={cn('text-lg font-semibold tracking-tight text-foreground', className)}
     {...props}
   />
 ));
@@ -121,7 +121,7 @@ const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-slate-600 dark:text-slate-400', className)}
+    className={cn('text-sm text-muted-foreground', className)}
     {...props}
   />
 ));

@@ -26,7 +26,7 @@ export const SettingsMenu = () => {
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400"
+        className="size-8 rounded-full text-muted-foreground"
         aria-label="Settings"
         disabled
       >
@@ -43,7 +43,7 @@ export const SettingsMenu = () => {
           size="icon"
           className={cn(
             'size-8 rounded-full transition-colors',
-            'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800',
+            'text-muted-foreground hover:text-foreground hover:bg-secondary',
           )}
           aria-label="Settings"
           title="Settings"
@@ -61,7 +61,7 @@ export const SettingsMenu = () => {
         <div className="px-3 py-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Volume2 className="size-4 text-slate-600 dark:text-slate-400" />
+              <Volume2 className="size-4 text-muted-foreground" />
               <label htmlFor="sound-toggle" className="text-[13px] font-medium text-foreground cursor-pointer">
                 Sound Effects
               </label>
@@ -73,14 +73,14 @@ export const SettingsMenu = () => {
                 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
                 soundEnabled
                   ? 'bg-emerald-600'
-                  : 'bg-slate-300 dark:bg-slate-600',
+                  : 'bg-muted',
               )}
               role="switch"
               aria-checked={soundEnabled}
             >
               <span
                 className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  'inline-block h-4 w-4 transform rounded-full bg-card transition-transform',
                   soundEnabled ? 'translate-x-4' : 'translate-x-0.5',
                 )}
               />
@@ -100,7 +100,7 @@ export const SettingsMenu = () => {
               value={Math.round(soundVolume * 100)}
               onChange={(e) => setSoundVolume(parseInt(e.target.value) / 100)}
               disabled={!soundEnabled}
-              className="w-full h-1.5 bg-slate-300 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-emerald-600 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-emerald-600 [&::-moz-range-thumb]:border-0"
+              className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-emerald-600 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-emerald-600 [&::-moz-range-thumb]:border-0"
               aria-label="Sound volume"
             />
           </div>
@@ -112,7 +112,7 @@ export const SettingsMenu = () => {
         <div className="px-3 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Wand2 className="size-4 text-slate-600 dark:text-slate-400" />
+              <Wand2 className="size-4 text-muted-foreground" />
               <label htmlFor="effects-toggle" className="text-[13px] font-medium text-foreground cursor-pointer">
                 Visual Effects
               </label>
@@ -124,14 +124,14 @@ export const SettingsMenu = () => {
                 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
                 visualEffectsEnabled
                   ? 'bg-emerald-600'
-                  : 'bg-slate-300 dark:bg-slate-600',
+                  : 'bg-muted',
               )}
               role="switch"
               aria-checked={visualEffectsEnabled}
             >
               <span
                 className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  'inline-block h-4 w-4 transform rounded-full bg-card transition-transform',
                   visualEffectsEnabled ? 'translate-x-4' : 'translate-x-0.5',
                 )}
               />
