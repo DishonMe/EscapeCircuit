@@ -31,7 +31,7 @@ const BASIC_GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'];
  */
 const getGateSVG = (label: string) => {
   const commonProps = {
-    stroke: 'black',
+    stroke: 'currentColor',
     fill: 'none',
     strokeWidth: 2.5,
     strokeLinecap: 'round' as const,
@@ -171,8 +171,8 @@ export const LogicNode = ({
   return (
     <div
       className={cn(
-        'group relative text-[10px] text-slate-800 dark:text-slate-100',
-        !isBasicGate && 'rounded border bg-white dark:bg-slate-800',
+        'group relative text-[10px] text-foreground',
+        !isBasicGate && 'rounded border bg-card',
         className,
       )}
       style={{
@@ -188,7 +188,7 @@ export const LogicNode = ({
             {getGateSVG(gateType)}
           </div>
           <span className={cn(
-            "select-none text-[7px] font-bold text-black relative z-10",
+            "select-none text-[7px] font-bold text-foreground relative z-10",
             gateType === 'XNOR' ? 'text-[6px]' : 'text-[7px]',
             gateType === 'XNOR' && 'translate-x-[2px]', 
             gateType === 'NOT' && 'absolute left-1/4 top-1/2 -translate-y-1/2'
@@ -198,7 +198,7 @@ export const LogicNode = ({
         </div>
       ) : (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="select-none text-[9px] font-semibold tracking-wide text-slate-800 dark:text-slate-100">
+          <span className="select-none text-[9px] font-semibold tracking-wide text-foreground">
             {node.label}
           </span>
         </div>

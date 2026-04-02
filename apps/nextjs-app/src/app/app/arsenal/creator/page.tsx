@@ -23,7 +23,11 @@ import {
   type SelectedComponentState,
 } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { WorkstationMenu } from '@/app/app/puzzles/[id]/_components/workstation-menu';
-import { CircuitDebugger } from '@/components/circuit-debugger';
+import dynamic from 'next/dynamic';
+const CircuitDebugger = dynamic(
+  () => import('@/components/circuit-debugger').then(mod => ({ default: mod.CircuitDebugger })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center p-8 text-muted-foreground">Loading debugger...</div> }
+);
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },

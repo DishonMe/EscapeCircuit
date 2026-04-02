@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Loader, ChevronDown } from 'lucide-react';
-import { useState, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 
 import { useUser } from '@/lib/auth';
 import { useCreatorNotificationsHistory, NotificationFilters } from '@/features/notifications/api';
@@ -22,10 +22,15 @@ const NotificationsPage = () => {
 
   // Only allow creators and admins to view this page
   const userRole = user.data?.role?.toLowerCase() || '';
-  if (user.status === 'success' && userRole !== 'creator' && userRole !== 'admin') {
-    router.push('/app');
-    return null;
-  }
+  const shouldRedirect = user.status === 'success' && userRole !== 'creator' && userRole !== 'admin';
+
+  useEffect(() => {
+    if (shouldRedirect) {
+      router.push('/app');
+    }
+  }, [shouldRedirect, router]);
+
+  if (shouldRedirect) return null;
 
   return (
     <div className="max-w-6xl">
@@ -53,7 +58,7 @@ const NotificationsPage = () => {
           <div className="mt-4 flex flex-wrap gap-4 rounded-lg border border-border bg-secondary/50 p-4">
             {/* Type Filter */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Type</label>
+              <label className="text-sm font-medium text-muted-foreground">Type</label>
               <select
                 className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.notifType || ''}
@@ -69,11 +74,11 @@ const NotificationsPage = () => {
 
             {/* Puzzle Name Filter */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Puzzle Name</label>
+              <label className="text-sm font-medium text-muted-foreground">Puzzle Name</label>
               <input
                 type="text"
                 placeholder="Search puzzle..."
-                className="w-full rounded border border-gray-300 text-gray-500 px-3 py-2 text-sm"
+                className="w-full rounded border border-border text-muted-foreground px-3 py-2 text-sm"
                 value={filters.puzzleName || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, puzzleName: e.target.value || undefined })}
               />
@@ -81,11 +86,11 @@ const NotificationsPage = () => {
 
             {/* Actor Username Filter */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Actor</label>
+              <label className="text-sm font-medium text-muted-foreground">Actor</label>
               <input
                 type="text"
                 placeholder="Search user..."
-                className="w-full rounded border border-gray-300 text-gray-500 px-3 py-2 text-sm"
+                className="w-full rounded border border-border text-muted-foreground px-3 py-2 text-sm"
                 value={filters.actorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, actorUsername: e.target.value || undefined })}
               />
@@ -93,7 +98,7 @@ const NotificationsPage = () => {
 
             {/* Order By */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Order By</label>
+              <label className="text-sm font-medium text-muted-foreground">Order By</label>
               <select
                 className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
@@ -106,7 +111,7 @@ const NotificationsPage = () => {
 
             {/* Direction */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Direction</label>
+              <label className="text-sm font-medium text-muted-foreground">Direction</label>
               <select
                 className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderDirection || 'ASC'}

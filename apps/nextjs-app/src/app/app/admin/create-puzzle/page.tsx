@@ -399,12 +399,6 @@ export default function CreatePuzzleForm() {
       initializedForm.inputStream = inputStream;
       initializedForm.expectedOutputStream = outputArrays;
       
-      // Log for debugging
-      console.log('Stream test case created:', {
-        numCycles,
-        inputStream,
-        expectedOutputStream: outputArrays,
-      });
     }
 
     setData((prev) => ({
@@ -526,24 +520,17 @@ export default function CreatePuzzleForm() {
     let simulationErrors: string[] = [];
     let hasSimulationErrors = false;
     
-    console.log('[EXPORT] Starting solution export...');
-    console.log('[EXPORT] Test cases:', data.testCases);
-    
     // Check if circuit exists
     if (placed.length === 0 && wires.length === 0) {
       alert('❌ No circuit designed! Please add gates and wires before exporting.');
       return;
     }
     
-    console.log('[EXPORT] Circuit has', placed.length, 'components and', wires.length, 'wires');
-    
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
     const baseUrl = apiUrl.replace(/\/api\/?$/, "");
     
     // Simulate circuit for each test case
     for (const tc of data.testCases) {
-      console.log('[EXPORT] Processing test case:', tc.kind, tc);
-      
       if (tc.kind === 'stream') {
         // === STREAM TEST CASE: Simulate entire sequence, then extract eval_map entries ===
         if (!tc.inputStream || !tc.expectedOutputStream) {
@@ -551,10 +538,6 @@ export default function CreatePuzzleForm() {
           hasSimulationErrors = true;
           continue;
         }
-        
-        console.log('[EXPORT-STREAM] Found stream test case with', tc.inputStream.length, 'cycles');
-        console.log('[EXPORT-STREAM] Input stream:', tc.inputStream);
-        console.log('[EXPORT-STREAM] Expected output:', tc.expectedOutputStream);
         
         try {
           // Simulate the entire sequence at once to preserve state
@@ -568,8 +551,6 @@ export default function CreatePuzzleForm() {
             }),
           });
           
-          console.log('[EXPORT-STREAM] Response status:', response.status);
-          
           if (!response.ok) {
             const err = await response.json();
             console.error('[EXPORT-STREAM] API Error:', err);
@@ -578,8 +559,6 @@ export default function CreatePuzzleForm() {
           
           const result = await response.json();
           const cycleOutputs = result.cycle_outputs || {};
-          
-          console.log('[EXPORT-STREAM] Cycle outputs:', cycleOutputs);
           
           // Extract outputs for each cycle and build eval_map
           for (let cycleIdx = 0; cycleIdx < tc.inputStream.length; cycleIdx++) {
@@ -605,8 +584,6 @@ export default function CreatePuzzleForm() {
               reorderedCycleOutputs[key] = cycleActualOutputs[key];
             }
             
-            console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(reorderedCycleOutputs)}`);
-            
             // Create eval_map key for this input - MUST be sorted for backend lookup
             const sortedInputKeys: string[] = Object.keys(cycleInput).sort();
             const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, cycleInput[k]])), undefined, '');
@@ -615,9 +592,7 @@ export default function CreatePuzzleForm() {
             // with different outputs due to state. We'll use the first occurrence.
             if (!(evalKey in evalMap)) {
               evalMap[evalKey] = reorderedCycleOutputs;
-              console.log('[EXPORT-STREAM] Added eval_map entry:', evalKey, '->', reorderedCycleOutputs);
             } else {
-              console.log('[EXPORT-STREAM] Skipped duplicate eval_map entry for:', evalKey);
             }
             
             // Check if this cycle matches expected output
@@ -637,14 +612,11 @@ export default function CreatePuzzleForm() {
         }
       } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
         // === BLACKBOX TEST CASE ===
-        console.log('[EXPORT-BLACKBOX] Processing blackbox test case:', tc);
         const testInputs = tc.inputs || {};
         const expectedOutputs = tc.expectedOutputs || {};
 
         const sortedInputKeys: string[] = Object.keys(testInputs).sort();
         const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, testInputs[k]])), undefined, '');
-        
-        console.log('[EXPORT-BLACKBOX] Eval key:', key);
         
         try {
           // Call backend API to actually simulate the circuit
@@ -657,8 +629,6 @@ export default function CreatePuzzleForm() {
               wires: wires,
             }),
           });
-          
-          console.log('[EXPORT-BLACKBOX] Response status:', response.status);
           
           if (!response.ok) {
             const err = await response.json();
@@ -676,16 +646,11 @@ export default function CreatePuzzleForm() {
             reorderedOutputs[key] = simulatedOutputs[key];
           }
           
-          console.log('[EXPORT-BLACKBOX] Simulated outputs:', simulatedOutputs);
-          console.log('[EXPORT-BLACKBOX] Reordered outputs:', reorderedOutputs);
-          
           // Store the ACTUAL circuit output, not the expected output
           evalMap[key] = reorderedOutputs;
           
           // Check if it matches expected
           const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(expectedOutputs);
-          console.log('[EXPORT-BLACKBOX] Expected:', expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
-          
           if (!matches) {
             simulationErrors.push(
               `Test ${Object.keys(testInputs).map((k: string) => `${k}=${testInputs[k]}`).join(',')}: ` +
@@ -700,10 +665,6 @@ export default function CreatePuzzleForm() {
         }
       }
     }
-    
-    console.log('[EXPORT] Final eval_map:', evalMap);
-    console.log('[EXPORT] Simulation errors:', simulationErrors);
-    console.log('[EXPORT] Has errors:', hasSimulationErrors);
     
     if (hasSimulationErrors) {
       alert(
@@ -731,8 +692,6 @@ export default function CreatePuzzleForm() {
         })),
       },
     };
-    
-    console.log('[EXPORT] Generated solution:', solution);
     
     setData((prev) => ({
       ...prev,
