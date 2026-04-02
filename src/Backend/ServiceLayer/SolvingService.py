@@ -365,18 +365,19 @@ class SolvingService:
             #     same puzzle from both reading stale progress and double-awarding XP.
             with transaction(self.conn):
                 # IDEMPOTENCY CHECK: Prevent duplicate solves from retries
-                # If a solve was just created for this user/puzzle, return it instead
-                recent_solve = self.solve_repo.get_recent_solve(user_id, puzzle_id, seconds=5) if hasattr(self.solve_repo, 'get_recent_solve') else None
-                if recent_solve:
-                    # This is a retry - return the cached result
-                    print(f"[SOLVING_SERVICE] Duplicate solve detected (retry), returning cached result for puzzle_id={puzzle_id}")
-                    medal_name = ["NONE", "BRONZE", "SILVER", "GOLD"][int(recent_solve["highest_medal"])] if recent_solve["highest_medal"] else "NONE"
+                # Only detect exact duplicate submissions (same solution), allow different solutions
+                solution_json = json.dumps(solution_payload)
+                duplicate_solve = self.solve_repo.get_duplicate_submission(user_id, puzzle_id, solution_json, seconds=5) if hasattr(self.solve_repo, 'get_duplicate_submission') else None
+                if duplicate_solve:
+                    # This is a retry with the exact same solution - return the cached result
+                    print(f"[SOLVING_SERVICE] Exact duplicate submission detected (retry), returning cached result for puzzle_id={puzzle_id}")
+                    medal_name = ["NONE", "BRONZE", "SILVER", "GOLD"][int(duplicate_solve["highest_medal"])] if duplicate_solve["highest_medal"] else "NONE"
                     return {
                         "passed": True,
-                        "message": "Puzzle already solved moments ago - returning cached result",
+                        "message": "You just submitted this exact solution - returning cached result",
                         "medal": medal_name,
-                        "medal_value": int(recent_solve["highest_medal"]) if recent_solve["highest_medal"] else 0,
-                        "xp_earned": int(recent_solve["xp_earned"]) if recent_solve["xp_earned"] else 0,
+                        "medal_value": int(duplicate_solve["highest_medal"]) if duplicate_solve["highest_medal"] else 0,
+                        "xp_earned": int(duplicate_solve["xp_earned"]) if duplicate_solve["xp_earned"] else 0,
                         "first_time_solve": False,
                     }
                 
@@ -389,6 +390,7 @@ class SolvingService:
                         xp_earned=raw_xp,
                         medal=medal.value if isinstance(medal, Medal) else int(medal),
                         cost_used=cost_used,
+                        solution_json=solution_json,
                     )
 
                 if hasattr(self.solve_repo, 'upsert_progress'):
