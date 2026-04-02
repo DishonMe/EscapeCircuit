@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield, Moon, Sun } from 'lucide-react';
+import { Folder, Home, PanelLeft, MessageSquare, Users, User2, Gamepad2, Zap, Bell, Shield, Moon, Sun, Flower2 } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -77,7 +77,10 @@ const ThemeToggle = () => {
           ? 'bg-slate-800 text-slate-100 hover:bg-slate-700'
           : 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50/50',
       )}
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      onClick={() => {
+        clearPaletteTheme();
+        setTheme(isDark ? 'light' : 'dark');
+      }}
       aria-label="Toggle dark mode"
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
@@ -86,6 +89,78 @@ const ThemeToggle = () => {
       ) : (
         <Sun className="size-4" />
       )}
+    </Button>
+  );
+};
+
+const PALETTE_STORAGE_KEY = 'escapecircuit-palette';
+const PALETTES = [
+  'ruby',
+  'ocean',
+  'sunflower',
+  'cocoa',
+  'mint',
+  'grape',
+  'coral',
+  'teal',
+  'slate',
+  'amber',
+] as const;
+
+const clearPaletteTheme = () => {
+  document.documentElement.removeAttribute('data-palette');
+  localStorage.removeItem(PALETTE_STORAGE_KEY);
+};
+
+const PaletteShuffleToggle = () => {
+  const [mounted, setMounted] = useState(false);
+  const [activePalette, setActivePalette] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem(PALETTE_STORAGE_KEY);
+    if (saved && PALETTES.includes(saved as (typeof PALETTES)[number])) {
+      document.documentElement.setAttribute('data-palette', saved);
+      setActivePalette(saved);
+    }
+  }, []);
+
+  const applyPalette = (palette: string) => {
+    document.documentElement.setAttribute('data-palette', palette);
+    localStorage.setItem(PALETTE_STORAGE_KEY, palette);
+    setActivePalette(palette);
+  };
+
+  const shufflePalette = () => {
+    const nextPool = PALETTES.filter((palette) => palette !== activePalette);
+    const nextPalette = nextPool[Math.floor(Math.random() * nextPool.length)] || PALETTES[0];
+    applyPalette(nextPalette);
+  };
+
+  if (!mounted) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 rounded-full text-foreground/70"
+        aria-label="Shuffle color theme"
+        disabled
+      >
+        <Flower2 className="size-4" />
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-8 rounded-full transition-colors text-pink-600 hover:bg-pink-50 dark:text-pink-300 dark:hover:bg-pink-950/40"
+      onClick={shufflePalette}
+      aria-label="Shuffle color theme"
+      title={`Shuffle color theme${activePalette ? ` (current: ${activePalette})` : ''}`}
+    >
+      <Flower2 className="size-4" />
     </Button>
   );
 };
@@ -158,6 +233,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="flex items-center gap-3">
           <XPBar currentXP={user.data?.xp ?? 0} />
           <ThemeToggle />
+          <PaletteShuffleToggle />
           <SettingsMenu />
           <div className="hidden md:flex items-center gap-2 text-[13px]">
             <span className="font-medium text-foreground">{user.data?.username}</span>

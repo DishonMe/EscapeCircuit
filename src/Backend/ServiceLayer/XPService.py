@@ -91,8 +91,9 @@ class XPService:
 
         bonus_count = 0
 
-        # Condition 1: Beats the timer
-        if time_limit is not None and time_limit > 0 and time_taken <= time_limit:
+        # Condition 1: Beats the timer (or no time limit exists)
+        # When time_limit is None or 0, automatically award timer bonus (no time pressure)
+        if time_limit is None or time_limit == 0 or time_taken <= time_limit:
             bonus_count += 1
 
         # Condition 2: Creator Budget (cost <= creator's solution cost)

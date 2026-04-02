@@ -75,6 +75,8 @@ class PuzzleRepo:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN arsenal_component_display_modes TEXT;")
             if "riddle_base_name" not in cols:
                 self.conn.execute("ALTER TABLE puzzles ADD COLUMN riddle_base_name TEXT;")
+            if "initial_board_json" not in cols:
+                self.conn.execute("ALTER TABLE puzzles ADD COLUMN initial_board_json TEXT;")
         except Exception:
             pass
         self.conn.execute("""
@@ -157,8 +159,8 @@ class PuzzleRepo:
                 rating_count, is_hall_of_fame, avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
                 riddle_base_name, allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
-                created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                initial_board_json, created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             puzzle.name,
             puzzle.creator_user_id,
@@ -184,6 +186,7 @@ class PuzzleRepo:
             1 if puzzle.allow_arsenal else 0,
             json.dumps(puzzle.allowed_arsenal_component_ids) if puzzle.allowed_arsenal_component_ids else None,
             json.dumps(puzzle.arsenal_component_display_modes) if puzzle.arsenal_component_display_modes else None,
+            puzzle.initial_board_json,
             puzzle.created_at.isoformat(),
         ))
         puzzle.id = int(cur.lastrowid)
@@ -218,7 +221,8 @@ class PuzzleRepo:
                 max_cycles=?,
                 allow_arsenal=?,
                 allowed_arsenal_component_ids=?,
-                arsenal_component_display_modes=?
+                arsenal_component_display_modes=?,
+                initial_board_json=?
             WHERE id=?
         """, (
             puzzle.name,
@@ -244,6 +248,7 @@ class PuzzleRepo:
             1 if puzzle.allow_arsenal else 0,
             json.dumps(puzzle.allowed_arsenal_component_ids) if puzzle.allowed_arsenal_component_ids else None,
             json.dumps(puzzle.arsenal_component_display_modes) if puzzle.arsenal_component_display_modes else None,
+            puzzle.initial_board_json,
             puzzle.id
         ))
 
@@ -968,6 +973,11 @@ class PuzzleRepo:
             riddle_base_name = row["riddle_base_name"]
         except (IndexError, KeyError):
             riddle_base_name = None
+        # Safely read initial_board_json — may be missing in old DBs
+        try:
+            initial_board_json = row["initial_board_json"]
+        except (IndexError, KeyError):
+            initial_board_json = None
         return Puzzle.from_dict({
             "id": int(row["id"]),
             "name": row["name"],
@@ -997,4 +1007,5 @@ class PuzzleRepo:
             "avg_clearness": float(row["avg_clearness"]),
             "created_at": row["created_at"],
             "riddle_base_name": riddle_base_name,
+            "initial_board_json": initial_board_json,
         })

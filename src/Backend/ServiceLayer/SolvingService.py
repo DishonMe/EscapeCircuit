@@ -378,7 +378,8 @@ class SolvingService:
                     new_best_medal = medal.value if isinstance(medal, Medal) else int(medal)
                     timer_upgraded = getattr(old_progress, 'timer_upgraded', False)
                     tight_upgraded = getattr(old_progress, 'tight_upgraded', False)
-                    if p.time_limit_seconds and time_taken_s <= p.time_limit_seconds:
+                    # If there's no time limit OR time was within the limit, mark timer as upgraded
+                    if p.time_limit_seconds is None or p.time_limit_seconds == 0 or time_taken_s <= p.time_limit_seconds:
                         timer_upgraded = True
                     p_creator_budget = getattr(p, 'creator_budget', None)
                     if isinstance(p_creator_budget, int) and p_creator_budget > 0 and cost_used <= p_creator_budget:

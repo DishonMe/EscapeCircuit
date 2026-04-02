@@ -169,6 +169,17 @@ export type Puzzle = Entity<{
   user_rating?: RatingEntry | null;
   // Rating metrics (injected by browse/get endpoints)
   rating_metrics?: RatingMetrics;
+  // Initial board: locked components pre-placed for solver
+  initial_board?: { 
+    locked_placed: Array<{
+      id: string;
+      componentId: string;
+      origin: { row: number; col: number };
+      rotation: 0 | 90;
+      isLocked?: boolean;
+    }>;
+    locked_wires: Wire[];
+  } | null;
 }>;
 
 export type CircuitComponent = {
@@ -193,12 +204,14 @@ export type PlacedComponent = {
   componentId: string;
   x: number;
   y: number;
+  isLocked?: boolean;
 };
 
 export type Wire = {
   id: string;
   from: { componentId: string; pinIndex: number; portId: string };
   to: { componentId: string; pinIndex: number; portId: string };
+  isLocked?: boolean;
 };
 
 export type CircuitSolution = {

@@ -262,6 +262,62 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   }, [puzzle?.is_solved]);
 
+  // Initialize placed/wires with locked components from initial_board
+  // These are pre-placed by the puzzle creator and cannot be moved/deleted by the solver
+  // This MUST run whenever puzzle loads, or whenever placed/wires might have been cleared
+  useEffect(() => {
+    console.log('[InitialBoard] Checking for initial_board...');
+    console.log('[InitialBoard] puzzle?.initial_board:', puzzle?.initial_board);
+    
+    if (!puzzle?.initial_board) {
+      console.log('[InitialBoard] No initial_board found, returning');
+      return;
+    }
+    
+    const { locked_placed, locked_wires } = puzzle.initial_board;
+    console.log('[InitialBoard] locked_placed:', locked_placed);
+    console.log('[InitialBoard] locked_wires:', locked_wires);
+    console.log('[InitialBoard] Current placed:', placed);
+    
+    // CRITICAL: Ensure locked items are ALWAYS present on the board
+    // If they're missing, re-add them (handles "Try Again" scenario)
+    if (locked_placed && locked_placed.length > 0) {
+      console.log('[InitialBoard] Ensuring', locked_placed.length, 'locked components are present');
+      setPlaced((prev) => {
+        // Check which locked items are missing
+        const existingIds = new Set(prev.map((c) => c.id));
+        const missingLocked = (locked_placed || [])
+          .filter((c) => !existingIds.has(c.id))
+          .map((c) => ({ ...c, isLocked: true }));
+        
+        if (missingLocked.length > 0) {
+          console.log('[InitialBoard] Re-adding', missingLocked.length, 'missing locked components');
+          return [...prev, ...missingLocked];
+        }
+        console.log('[InitialBoard] All locked components already present');
+        return prev;
+      });
+    }
+    
+    if (locked_wires && locked_wires.length > 0) {
+      console.log('[InitialBoard] Ensuring', locked_wires.length, 'locked wires are present');
+      setWires((prev) => {
+        // Check which locked wires are missing
+        const existingIds = new Set(prev.map((w) => w.id));
+        const missingLocked = (locked_wires || [])
+          .filter((w) => !existingIds.has(w.id))
+          .map((w) => ({ ...w, isLocked: true }));
+        
+        if (missingLocked.length > 0) {
+          console.log('[InitialBoard] Re-adding', missingLocked.length, 'missing locked wires');
+          return [...prev, ...missingLocked];
+        }
+        console.log('[InitialBoard] All locked wires already present');
+        return prev;
+      });
+    }
+  }, [puzzle?.initial_board, placed.length, wires.length]);
+
   useEffect(() => {
     const tick = () => {
       setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
@@ -1398,6 +1454,33 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     if (issues.length) {
       setConnectivityIssues(issues);
       return;
+    }
+
+    // Validate that all locked components are used (have at least 1 connected wire)
+    const lockedComponentIds = placed
+      .filter((c) => c.isLocked === true)
+      .map((c) => c.id);
+
+    if (lockedComponentIds.length > 0) {
+      const connectedLockedIds = new Set<string>();
+      for (const wire of wires) {
+        if (lockedComponentIds.includes(wire.from.componentId)) {
+          connectedLockedIds.add(wire.from.componentId);
+        }
+        if (lockedComponentIds.includes(wire.to.componentId)) {
+          connectedLockedIds.add(wire.to.componentId);
+        }
+      }
+
+      const unusedLockedIds = lockedComponentIds.filter((id) => !connectedLockedIds.has(id));
+      if (unusedLockedIds.length > 0) {
+        notifications.addNotification({
+          type: 'warning',
+          title: 'Pre-placed Components Not Connected',
+          message: `You must connect and use all pre-placed locked components! ${unusedLockedIds.length} component(s) are not connected to any wires. (Look for 🔒 icons on the board)`,
+        });
+        return;
+      }
     }
 
     setIsPowerSurge(true);
