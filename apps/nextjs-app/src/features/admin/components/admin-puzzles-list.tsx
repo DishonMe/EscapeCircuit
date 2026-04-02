@@ -268,10 +268,10 @@ export const AdminPuzzlesList = () => {
                   })
                 }
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="">All Statuses</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="draft">Draft</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="published">Published</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="unpublished">Unpublished</option>
+                <option className="text-foreground bg-card" value="">All Statuses</option>
+                <option className="text-foreground bg-card" value="draft">Draft</option>
+                <option className="text-foreground bg-card" value="published">Published</option>
+                <option className="text-foreground bg-card" value="unpublished">Unpublished</option>
               </select>
             </div>
 
@@ -290,11 +290,11 @@ export const AdminPuzzlesList = () => {
                   })
                 }
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="created_at">Created Date</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="name">Name</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="rating_count">Rating Count</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="avg_fun">Fun Rating</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="avg_clearness">Clearness Rating</option>
+                <option className="text-foreground bg-card" value="created_at">Created Date</option>
+                <option className="text-foreground bg-card" value="name">Name</option>
+                <option className="text-foreground bg-card" value="rating_count">Rating Count</option>
+                <option className="text-foreground bg-card" value="avg_fun">Fun Rating</option>
+                <option className="text-foreground bg-card" value="avg_clearness">Clearness Rating</option>
               </select>
             </div>
 
@@ -313,8 +313,8 @@ export const AdminPuzzlesList = () => {
                   })
                 }
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="DESC">Descending</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="ASC">Ascending</option>
+                <option className="text-foreground bg-card" value="DESC">Descending</option>
+                <option className="text-foreground bg-card" value="ASC">Ascending</option>
               </select>
             </div>
           </div>

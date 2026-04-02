@@ -15,25 +15,40 @@ if command -v lsof >/dev/null 2>&1; then
     kill -9 ${LISTEN_PIDS} 2>/dev/null || true
   fi
 fi
+# Note: Do NOT delete WAL/SHM files — SQLite recovers them automatically
+# and deleting them can lose committed data
 sleep 2
 echo "Done."
 echo
 
 echo "Initializing database..."
-python3 src/init_db.py
+if ! python3 src/init_db.py; then
+  echo "Database initialization failed."
+  exit 1
+fi
 echo
 
 echo "Loading riddles..."
-python3 src/insert_riddles.py
+if ! python3 src/insert_riddles.py; then
+  echo "Riddle loading failed."
+  exit 1
+fi
 echo
 
 echo "Seeding admin user..."
-python3 src/seed_admin.py
+if ! python3 src/seed_admin.py; then
+  echo "Admin user seeding failed."
+  exit 1
+fi
 echo
 
 echo "Installing frontend dependencies..."
 cd apps/nextjs-app
-npm install
+if ! npm install; then
+  echo "Frontend dependency installation failed."
+  cd ../..
+  exit 1
+fi
 cd ../..
 echo
 

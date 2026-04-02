@@ -4,7 +4,8 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import Confetti from 'react-confetti';
+import dynamic from 'next/dynamic';
+const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 import { Button } from '@/components/ui/button';
 import { useAudio } from '@/hooks/useAudio';
@@ -36,7 +37,10 @@ import {
 } from './workstation-grid';
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
-import { CircuitDebugger } from '@/components/circuit-debugger';
+const CircuitDebugger = dynamic(
+  () => import('@/components/circuit-debugger').then(mod => ({ default: mod.CircuitDebugger })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center p-8 text-muted-foreground">Loading debugger...</div> }
+);
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
@@ -166,29 +170,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
 
-  // ===== DIAGNOSTIC LOGGING =====
-  useEffect(() => {
-    if (!puzzle) return;
-    console.group("📊 CLIENT [PuzzleWorkstation]: PUZZLE LOADED - ARSENAL DIAGNOSTIC");
-    console.log("  Puzzle ID:", puzzle.id);
-    console.log("  Puzzle Title:", puzzle.title);
-    console.log("  allowArsenal:", puzzle.allowArsenal);
-    console.log("  allowedArsenalComponentIds:", puzzle.allowedArsenalComponentIds);
-    console.log("  customComponents count:", (puzzle.customComponents || []).length);
-    console.log("  arsenalComponents count:", (puzzle.arsenalComponents || []).length);
-    console.log("  specialComponents count:", (puzzle.specialComponents || []).length);
-    
-    if (puzzle.arsenalComponents && puzzle.arsenalComponents.length > 0) {
-      console.log("\n  ⚙️ ARSENAL COMPONENTS IN PUZZLE OBJECT:");
-      puzzle.arsenalComponents.forEach((comp: any, idx: number) => {
-        console.log(`  [${idx}] ${comp.id} (${comp.type}):`);
-        console.log(`      - description key present: ${'description' in comp}`);
-        console.log(`      - description value: ${JSON.stringify(comp.description)}`);
-        console.log(`      - all keys: ${Object.keys(comp).sort()}`);
-      });
-    }
-    console.groupEnd();
-  }, [puzzle]);
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
@@ -250,10 +231,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(null);
   const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<string | null>(null);
 
-  // DEBUG: Log visual effects status
-  useEffect(() => {
-    console.log('[DEBUG] visualEffectsEnabled:', visualEffectsEnabled, 'showFirstSolveCelebration:', showFirstSolveCelebration, 'victoryFx.visible:', victoryFx.visible);
-  }, [visualEffectsEnabled, showFirstSolveCelebration, victoryFx.visible]);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -266,53 +243,40 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   // These are pre-placed by the puzzle creator and cannot be moved/deleted by the solver
   // This MUST run whenever puzzle loads, or whenever placed/wires might have been cleared
   useEffect(() => {
-    console.log('[InitialBoard] Checking for initial_board...');
-    console.log('[InitialBoard] puzzle?.initial_board:', puzzle?.initial_board);
-    
     if (!puzzle?.initial_board) {
-      console.log('[InitialBoard] No initial_board found, returning');
       return;
     }
-    
+
     const { locked_placed, locked_wires } = puzzle.initial_board;
-    console.log('[InitialBoard] locked_placed:', locked_placed);
-    console.log('[InitialBoard] locked_wires:', locked_wires);
-    console.log('[InitialBoard] Current placed:', placed);
-    
+
     // CRITICAL: Ensure locked items are ALWAYS present on the board
     // If they're missing, re-add them (handles "Try Again" scenario)
     if (locked_placed && locked_placed.length > 0) {
-      console.log('[InitialBoard] Ensuring', locked_placed.length, 'locked components are present');
       setPlaced((prev) => {
         // Check which locked items are missing
         const existingIds = new Set(prev.map((c) => c.id));
         const missingLocked = (locked_placed || [])
           .filter((c) => !existingIds.has(c.id))
           .map((c) => ({ ...c, isLocked: true }));
-        
+
         if (missingLocked.length > 0) {
-          console.log('[InitialBoard] Re-adding', missingLocked.length, 'missing locked components');
           return [...prev, ...missingLocked];
         }
-        console.log('[InitialBoard] All locked components already present');
         return prev;
       });
     }
-    
+
     if (locked_wires && locked_wires.length > 0) {
-      console.log('[InitialBoard] Ensuring', locked_wires.length, 'locked wires are present');
       setWires((prev) => {
         // Check which locked wires are missing
         const existingIds = new Set(prev.map((w) => w.id));
         const missingLocked = (locked_wires || [])
           .filter((w) => !existingIds.has(w.id))
           .map((w) => ({ ...w, isLocked: true }));
-        
+
         if (missingLocked.length > 0) {
-          console.log('[InitialBoard] Re-adding', missingLocked.length, 'missing locked wires');
           return [...prev, ...missingLocked];
         }
-        console.log('[InitialBoard] All locked wires already present');
         return prev;
       });
     }
@@ -574,43 +538,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const arsenalComponents = useMemo(() => {
     // Arsenal pieces only show if allowArsenal is true
     if (!allowArsenal) {
-      console.log("  🚫 arsenalComponents: allowArsenal is false, returning empty");
       return EMPTY_COMPONENTS;
     }
     const allArsenalComponents = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
-    
-    console.group("  🔧 COMPUTED: arsenalComponents");
-    console.log("    allowArsenal:", allowArsenal);
-    console.log("    allArsenalComponents.length:", allArsenalComponents.length);
-    console.log("    allowedArsenalComponentIds.size:", allowedArsenalComponentIds.size);
-    
-    // CRITICAL DEBUG: Log EXACT description values
-    allArsenalComponents.forEach((comp: any, idx: number) => {
-      const desc = comp.description;
-      console.log(`    [${idx}] ${comp.id} (${comp.type}):`);
-      console.log(`        - description key exists: ${'description' in comp}`);
-      console.log(`        - description value: ${JSON.stringify(desc)}`);
-      console.log(`        - description type: ${typeof desc}`);
-      console.log(`        - description is empty string: ${desc === ''}`);
-      console.log(`        - description is null: ${desc === null}`);
-      console.log(`        - description is undefined: ${desc === undefined}`);
-      console.log(`        - description truthy?: ${!!desc}`);
-      console.log(`        - full object keys: ${Object.keys(comp)}`);
-    });
-    
+
     // If allowedArsenalComponentIds is specified and not empty, filter to only those components
     if (allowedArsenalComponentIds.size > 0) {
-      const filtered = allArsenalComponents.filter((component) => 
+      const filtered = allArsenalComponents.filter((component) =>
         allowedArsenalComponentIds.has(String(component.id))
       );
-      console.log("    After ID filter:", filtered.length, "components");
-      console.groupEnd();
       return filtered;
     }
-    
+
     // If no specific components are selected, allow all
-    console.log("    No ID filter applied, returning all components");
-    console.groupEnd();
     return allArsenalComponents;
   }, [puzzle?.arsenalComponents, allowArsenal, allowedArsenalComponentIds]);
 
@@ -634,26 +574,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const byId = new Map<string, CircuitComponent>();
     for (const c of basicComponents) byId.set(c.id, c);
     
-    console.group("🏗️ CONSTRUCTING componentCatalog from specialComponents");
     for (const c of specialComponents) {
-      console.log(`  Adding ${c.id} (${c.type}):`, {
-        hasDescription: !!(c as any).description,
-        descriptionLength: ((c as any).description || "").length,
-        descriptionPreview: ((c as any).description || "").substring(0, 50),
-        is_arsenal: (c as any).is_arsenal,
-      });
       byId.set(c.id, c);
     }
-    console.log("📊 Final componentCatalog entries:");
-    for (const [id, comp] of byId.entries()) {
-      if ((comp as any).is_arsenal) {
-        console.log(`  ${id}:`, {
-          hasDescription: !!(comp as any).description,
-          description: (comp as any).description,
-        });
-      }
-    }
-    console.groupEnd();
     return byId;
   }, [basicComponents, specialComponents]);
 
@@ -2270,7 +2193,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 `}</style>
                 {renderedInstructionsHtml ? (
                   <div
-                    className="prose prose-sm max-w-none rounded-md border border-slate-300 bg-white p-4 text-slate-900 [&_*]:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[&_*]:text-slate-100"
+                    className="prose prose-sm max-w-none rounded-md border border-border bg-card p-4 text-card-foreground [&_*]:text-card-foreground"
                     dangerouslySetInnerHTML={{ __html: renderedInstructionsHtml }}
                   />
                 ) : (
@@ -2399,7 +2322,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     You have reached the maximum XP for this puzzle.
                   </p>
                 )}
-                <p className="font-medium text-gray-900 dark:text-white mt-4">Congrats! Your solution passed all test cases.</p>
+                <p className="font-medium text-foreground mt-4">Congrats! Your solution passed all test cases.</p>
               </div>
             ) : (
               <div className="text-muted-foreground">
@@ -2524,17 +2447,6 @@ const InspectionDialog = ({
   const uiDef = uiCatalog[placedComponent.componentId];
   const catalogEntry = componentCatalog.get(placedComponent.componentId);
 
-  // Immediate logging on render
-  console.group("🔍 InspectionDialog RENDER");
-  console.log("  placedComponent.componentId:", placedComponent.componentId);
-  console.log("  componentCatalog.size:", componentCatalog.size);
-  console.log("  catalogEntry exists:", !!catalogEntry);
-  if (catalogEntry) {
-    console.log("  catalogEntry keys:", Object.keys(catalogEntry));
-    console.log("  catalogEntry.description:", (catalogEntry as any).description);
-  }
-  console.groupEnd();
-
   if (!uiDef || !catalogEntry) return null;
 
   // Determine visibility mode for this component (if it's an Arsenal piece in a puzzle context)
@@ -2543,24 +2455,6 @@ const InspectionDialog = ({
   const visibilityMode = arsenalComponentDisplayModes?.[componentId] || 
                          (arsenalComponentDisplayModes as any)?.[componentId.replace(/([A-Z])/g, '_$1').toLowerCase()];
   
-  // Debug: Log the inspection data
-  useEffect(() => {
-    if (isOpen && catalogEntry) {
-      console.group('🔍 InspectionDialog INSPECTION DATA');
-      console.log('placedId:', placedId);
-      console.log('componentId:', componentId);
-      console.log('visibilityMode:', visibilityMode);
-      console.log('arsenalComponentDisplayModes:', arsenalComponentDisplayModes);
-      console.log('description field:', (catalogEntry as any).description);
-      console.log('description type:', typeof (catalogEntry as any).description);
-      console.log('description length:', ((catalogEntry as any).description || '').length);
-      console.log('description preview:', ((catalogEntry as any).description || '').substring(0, 100) + '...');
-      console.log('is_arsenal:', (catalogEntry as any).is_arsenal);
-      console.log('used_basic_types:', (catalogEntry as any).used_basic_types);
-      console.log('Full catalogEntry:', JSON.parse(JSON.stringify(catalogEntry)));
-      console.groupEnd();
-    }
-  }, [isOpen, catalogEntry, placedId, placedComponent, uiDef, visibilityMode, componentId]);
 
   const inputs = uiDef.ports.filter(p => p.kind === 'input');
   const outputs = uiDef.ports.filter(p => p.kind === 'output');
@@ -2813,7 +2707,7 @@ const InspectionDialog = ({
                             return (
                               <div
                                 key={placed.id}
-                                className="absolute border border-slate-300 bg-white rounded text-[9px] font-bold text-slate-700 flex items-center justify-center pointer-events-none"
+                                className="absolute border border-border bg-card rounded text-[9px] font-bold text-foreground flex items-center justify-center pointer-events-none"
                                 style={{
                                   left: `${left}px`,
                                   top: `${top}px`,
@@ -2830,7 +2724,7 @@ const InspectionDialog = ({
                           })}
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-600 mt-2 italic">
+                      <p className="text-[11px] text-muted-foreground mt-2 italic">
                         This component contains {parsedSolution.placed?.length || 0} gate(s) connected by {parsedSolution.wires?.length || 0} wire(s).
                       </p>
                     </div>
@@ -2838,7 +2732,7 @@ const InspectionDialog = ({
                 </div>
               ) : (
                 <div className="rounded-md bg-slate-50 border border-slate-200 p-3">
-                  <p className="text-[12px] text-slate-600">
+                  <p className="text-[12px] text-muted-foreground">
                     No internal structure information available.
                   </p>
                 </div>

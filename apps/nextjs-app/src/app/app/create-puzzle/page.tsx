@@ -414,25 +414,15 @@ export default function CreatePuzzleForm() {
 
   // Compute filtered arsenal pieces that are selected for this puzzle
   const selectedArsenalPieces = useMemo(() => {
-    console.group("🔧 selectedArsenalPieces COMPUTATION");
-    console.log("  myArsenalData available?", !!myArsenalData, "length:", myArsenalData?.length);
-    console.log("  myArsenalData:", myArsenalData);
-    console.log("  allowedArsenalComponentIds:", data.basic.allowedArsenalComponentIds);
-    
     if (!myArsenalData || !data.basic.allowedArsenalComponentIds) {
-      console.log("  ❌ EARLY EXIT: Missing myArsenalData or allowedArsenalComponentIds");
-      console.groupEnd();
       return [];
     }
     
     const filtered = myArsenalData.filter(piece => {
       const pieceIdStr = String(piece.id);
       const isIncluded = data.basic.allowedArsenalComponentIds.includes(pieceIdStr);
-      console.log(`  Piece ID ${pieceIdStr} ("${piece.name}"):`, isIncluded ? "✓ INCLUDED" : "✗ filtered out");
       return isIncluded;
     });
-    
-    console.log(`  → Found ${filtered.length} matching pieces after filter`);
     
     const result = filtered.map(piece => {
       // Parse structure to extract num_inputs and num_outputs
@@ -465,8 +455,6 @@ export default function CreatePuzzleForm() {
       };
     });
     
-    console.log(`  ✓ Returning ${result.length} populated pieces`);
-    console.groupEnd();
     return result;
   }, [myArsenalData, data.basic.allowedArsenalComponentIds]);
 
@@ -711,12 +699,6 @@ export default function CreatePuzzleForm() {
       initializedForm.inputStream = inputStream;
       initializedForm.expectedOutputStream = outputArrays;
       
-      // Log for debugging
-      console.log('Stream test case created:', {
-        numCycles,
-        inputStream,
-        expectedOutputStream: outputArrays,
-      });
     }
 
     setData((prev) => ({
@@ -928,24 +910,17 @@ export default function CreatePuzzleForm() {
     let simulationErrors: string[] = [];
     let hasSimulationErrors = false;
     
-    console.log('[EXPORT] Starting solution export...');
-    console.log('[EXPORT] Test cases:', data.testCases);
-    
     // Check if circuit exists
     if (placed.length === 0 && wires.length === 0) {
       alert('❌ No circuit designed! Please add gates and wires before exporting.');
       return;
     }
     
-    console.log('[EXPORT] Circuit has', placed.length, 'components and', wires.length, 'wires');
-    
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8081/api";
     const baseUrl = apiUrl.replace(/\/api\/?$/, "");
     
     // Simulate circuit for each test case
     for (const tc of data.testCases) {
-      console.log('[EXPORT] Processing test case:', tc.kind, tc);
-      
       if (tc.kind === 'stream') {
         // === STREAM TEST CASE: Simulate entire sequence, then extract eval_map entries ===
         if (!tc.inputStream || !tc.expectedOutputStream) {
@@ -953,10 +928,6 @@ export default function CreatePuzzleForm() {
           hasSimulationErrors = true;
           continue;
         }
-        
-        console.log('[EXPORT-STREAM] Found stream test case with', tc.inputStream.length, 'cycles');
-        console.log('[EXPORT-STREAM] Input stream:', tc.inputStream);
-        console.log('[EXPORT-STREAM] Expected output:', tc.expectedOutputStream);
         
         try {
           // Simulate the entire sequence at once to preserve state
@@ -971,8 +942,6 @@ export default function CreatePuzzleForm() {
             }),
           });
           
-          console.log('[EXPORT-STREAM] Response status:', response.status);
-          
           if (!response.ok) {
             const err = await response.json();
             console.error('[EXPORT-STREAM] API Error:', err);
@@ -981,8 +950,6 @@ export default function CreatePuzzleForm() {
           
           const result = await response.json();
           const cycleOutputs = result.cycle_outputs || {};
-          
-          console.log('[EXPORT-STREAM] Cycle outputs:', cycleOutputs);
           
           // Extract outputs for each cycle and build eval_map
           for (let cycleIdx = 0; cycleIdx < tc.inputStream.length; cycleIdx++) {
@@ -1008,8 +975,6 @@ export default function CreatePuzzleForm() {
               reorderedCycleOutputs[key] = cycleActualOutputs[key];
             }
             
-            console.log(`[EXPORT-STREAM] Cycle ${cycleIdx}: input=${JSON.stringify(cycleInput)}, expected=${JSON.stringify(cycleExpectedOutputs)}, actual=${JSON.stringify(reorderedCycleOutputs)}`);
-            
             // Create eval_map key for this input - MUST be sorted for backend lookup
             const sortedInputKeys: string[] = Object.keys(cycleInput).sort();
             const evalKey = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, cycleInput[k]])), undefined, '');
@@ -1018,9 +983,6 @@ export default function CreatePuzzleForm() {
             // with different outputs due to state. We'll use the first occurrence.
             if (!(evalKey in evalMap)) {
               evalMap[evalKey] = reorderedCycleOutputs;
-              console.log('[EXPORT-STREAM] Added eval_map entry:', evalKey, '->', reorderedCycleOutputs);
-            } else {
-              console.log('[EXPORT-STREAM] Skipped duplicate eval_map entry for:', evalKey);
             }
             
             // Check if this cycle matches expected output
@@ -1040,14 +1002,11 @@ export default function CreatePuzzleForm() {
         }
       } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
         // === BLACKBOX TEST CASE ===
-        console.log('[EXPORT-BLACKBOX] Processing blackbox test case:', tc);
         const testInputs = tc.inputs || {};
         const expectedOutputs = tc.expectedOutputs || {};
 
         const sortedInputKeys: string[] = Object.keys(testInputs).sort();
         const key = JSON.stringify(Object.fromEntries(sortedInputKeys.map((k: string) => [k, testInputs[k]])), undefined, '');
-        
-        console.log('[EXPORT-BLACKBOX] Eval key:', key);
         
         try {
           // Call backend API to actually simulate the circuit
@@ -1061,8 +1020,6 @@ export default function CreatePuzzleForm() {
               custom_pieces: allPiecesForSimulation,
             }),
           });
-          
-          console.log('[EXPORT-BLACKBOX] Response status:', response.status);
           
           if (!response.ok) {
             const err = await response.json();
@@ -1080,16 +1037,12 @@ export default function CreatePuzzleForm() {
             reorderedOutputs[key] = simulatedOutputs[key];
           }
           
-          console.log('[EXPORT-BLACKBOX] Simulated outputs:', simulatedOutputs);
-          console.log('[EXPORT-BLACKBOX] Reordered outputs:', reorderedOutputs);
-          
           // Store the ACTUAL circuit output, not the expected output
           evalMap[key] = reorderedOutputs;
           
           // Check if it matches expected
           const matches = JSON.stringify(reorderedOutputs) === JSON.stringify(expectedOutputs);
-          console.log('[EXPORT-BLACKBOX] Expected:', expectedOutputs, 'Actual:', reorderedOutputs, 'Match:', matches);
-          
+
           if (!matches) {
             simulationErrors.push(
               `Test ${Object.keys(testInputs).map((k: string) => `${k}=${testInputs[k]}`).join(',')}: ` +
@@ -1104,10 +1057,6 @@ export default function CreatePuzzleForm() {
         }
       }
     }
-    
-    console.log('[EXPORT] Final eval_map:', evalMap);
-    console.log('[EXPORT] Simulation errors:', simulationErrors);
-    console.log('[EXPORT] Has errors:', hasSimulationErrors);
     
     if (hasSimulationErrors) {
       alert(
@@ -1141,8 +1090,6 @@ export default function CreatePuzzleForm() {
         })),
       },
     };
-    
-    console.log('[EXPORT] Generated solution:', solution);
     
     setData((prev) => ({
       ...prev,
@@ -2375,16 +2322,6 @@ export default function CreatePuzzleForm() {
             </div>
 
             {/* Workstation Grid (with menu on left) */}
-            {(() => {
-              // DEBUG: Log data flow
-              console.group("🔍 WORKSTATION PALETTE DEBUG");
-              console.log("myArsenalData:", myArsenalData);
-              console.log("data.basic.allowedArsenalComponentIds:", data.basic.allowedArsenalComponentIds);
-              console.log("selectedArsenalPieces:", selectedArsenalPieces);
-              console.log("selectedArsenalPieces.length:", selectedArsenalPieces.length);
-              console.groupEnd();
-              return null;
-            })()}
             <div className="grid grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card h-[700px]">
               {/* Gate Palette Sidebar */}
               <div className="border-r p-3 overflow-y-auto bg-secondary/50">

@@ -42,7 +42,7 @@ const StarInput = ({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[13px] font-medium text-white">
+      <span className="text-[13px] font-medium text-foreground">
         {label}
       </span>
       <div className="flex items-center gap-1">

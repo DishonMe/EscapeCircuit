@@ -396,7 +396,7 @@ export const MyPuzzles = () => {
                     placeholder="Enter a message for people solving this puzzle..."
                     rows={4}
                   />
-                  <p className="text-[11px] text-white mt-1">
+                  <p className="text-[11px] text-muted-foreground mt-1">
                     • Only one comment allowed per puzzle
                     • Use this to note corrections or provide important clarifications
                   </p>
@@ -405,7 +405,7 @@ export const MyPuzzles = () => {
               <DialogFooter>
                 <button
                   onClick={() => setCommentingPuzzle(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-black dark:text-background bg-transparent hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground bg-transparent hover:bg-secondary transition-colors"
                 >
                   Cancel
                 </button>

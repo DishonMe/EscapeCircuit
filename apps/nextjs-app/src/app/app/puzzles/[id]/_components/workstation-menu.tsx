@@ -130,8 +130,8 @@ const Category = ({
   children: React.ReactNode;
 }) => {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-subtle transition-all duration-300 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100">
-      <div className="mb-2 text-[13px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</div>
+    <div className="rounded-xl border border-border bg-card p-3 text-card-foreground shadow-subtle transition-all duration-300">
+      <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
       {children}
     </div>
   );
@@ -275,10 +275,10 @@ const DraggableItem = ({
   return (
       <div
         className={cn(
-          'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:text-foreground',
+          'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
           isSelected
-            ? 'border-sky-500 bg-sky-100 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-slate-800'
-            : 'border-slate-200 bg-slate-50 dark:border-border/60 dark:bg-slate-900',
+            ? 'border-sky-500 bg-sky-100 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-secondary'
+            : 'border-border bg-secondary',
         )}
       >
         <button
@@ -288,7 +288,7 @@ const DraggableItem = ({
             onInfoClick?.();
           }}
           className={cn(
-            'text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-help opacity-100',
+            'text-muted-foreground hover:text-foreground transition-colors cursor-help opacity-100',
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
           )}
           title={getInfoTitle()}
@@ -311,7 +311,7 @@ const DraggableItem = ({
               root.render(
                 <LogicNode
                   node={node}
-                  className="border-slate-300 dark:border-slate-600 opacity-80 shadow-xl"
+                  className="border-border opacity-80 shadow-xl"
                 />,
               );
             });
@@ -336,9 +336,9 @@ const DraggableItem = ({
           onClick={() => onSelect?.(component.id)}
           className="flex flex-1 cursor-grab active:cursor-grabbing items-center justify-between"
         >
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{component.type}</span>
+          <span className="font-semibold text-foreground">{component.type}</span>
           {inPalette ? (
-            <span className="text-xs text-foreground/75 dark:text-slate-300">
+            <span className="text-xs text-muted-foreground">
               cost {component.cost} · pins {component.pins}
             </span>
           ) : null}
@@ -379,16 +379,6 @@ export const WorkstationMenu = ({
     ArsenalCircuit | null
   >(null);
 
-  // Diagnostic logging
-  useEffect(() => {
-    console.group("🎭 WorkstationMenu PROPS RECEIVED");
-    console.log("  allowArsenal:", allowArsenal);
-    console.log("  arsenal prop length:", arsenal.length);
-    console.log("  arsenal prop:", arsenal);
-    console.log("  basic prop length:", basic.length);
-    console.log("  custom prop length:", custom.length);
-    console.groupEnd();
-  }, [arsenal, allowArsenal, basic, custom]);
 
   useEffect(() => {
     if (!allowArsenal) return;
@@ -563,8 +553,8 @@ export const WorkstationMenu = ({
           </DialogHeader>
           {viewingTruthTableData ? (
             <div className="overflow-hidden rounded-lg border border-border/60">
-              <table className="w-full text-[13px] text-slate-900 dark:text-slate-100">
-                <thead className="bg-slate-100 text-[11px] font-medium uppercase text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+              <table className="w-full text-[13px] text-foreground">
+                <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
                   <tr>
                     {viewingTruthTableData.inputs.map((i: string) => (
                       <th key={i} className="px-3 py-2 text-center">
@@ -583,9 +573,9 @@ export const WorkstationMenu = ({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {viewingTruthTableData.rows.map((row: string[], idx: number) => (
-                    <tr key={idx} className="divide-x divide-border bg-white dark:bg-slate-900">
+                    <tr key={idx} className="divide-x divide-border bg-card">
                       {row.map((cell: string, cIdx: number) => (
-                        <td key={cIdx} className="px-3 py-2 text-center text-slate-900 dark:text-slate-100">
+                        <td key={cIdx} className="px-3 py-2 text-center text-foreground">
                           {cell}
                         </td>
                       ))}

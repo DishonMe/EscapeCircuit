@@ -202,11 +202,11 @@ export const UsersList = () => {
                 value={filters.role || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, role: (e.target.value || undefined) as any })}
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="">All Roles</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="solver">Solver</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="creator">Creator</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="pending_creator">Pending Creator</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="admin">Admin</option>
+                <option className="text-foreground bg-card" value="">All Roles</option>
+                <option className="text-foreground bg-card" value="solver">Solver</option>
+                <option className="text-foreground bg-card" value="creator">Creator</option>
+                <option className="text-foreground bg-card" value="pending_creator">Pending Creator</option>
+                <option className="text-foreground bg-card" value="admin">Admin</option>
               </select>
             </div>
 
@@ -218,9 +218,9 @@ export const UsersList = () => {
                 value={filters.experienceLevel || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any })}
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="all">All</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="experienced">Experienced (Lvl 5+)</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="inexperienced">Inexperienced (Lvl 1-4)</option>
+                <option className="text-foreground bg-card" value="all">All</option>
+                <option className="text-foreground bg-card" value="experienced">Experienced (Lvl 5+)</option>
+                <option className="text-foreground bg-card" value="inexperienced">Inexperienced (Lvl 1-4)</option>
               </select>
             </div>
 
@@ -232,10 +232,10 @@ export const UsersList = () => {
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="created_at">Creation Date</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="level">Level</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="experienced">Experienced Status</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="role">Role</option>
+                <option className="text-foreground bg-card" value="created_at">Creation Date</option>
+                <option className="text-foreground bg-card" value="level">Level</option>
+                <option className="text-foreground bg-card" value="experienced">Experienced Status</option>
+                <option className="text-foreground bg-card" value="role">Role</option>
               </select>
             </div>
 
@@ -247,8 +247,8 @@ export const UsersList = () => {
                 value={filters.orderDirection || 'ASC'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
               >
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="ASC">Ascending</option>
-                <option className="text-gray-900 bg-white dark:text-white dark:bg-gray-800" value="DESC">Descending</option>
+                <option className="text-foreground bg-card" value="ASC">Ascending</option>
+                <option className="text-foreground bg-card" value="DESC">Descending</option>
               </select>
             </div>
           </div>

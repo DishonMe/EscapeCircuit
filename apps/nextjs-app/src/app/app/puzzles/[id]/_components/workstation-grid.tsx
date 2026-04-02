@@ -251,30 +251,22 @@ export const WorkstationGrid = ({
 
       if (isCopyKey) {
         e.preventDefault();
-        console.log('[Copy] selectedEntity:', selectedEntity);
         // Copy: collect selected components and their internal wires
         if (selectedEntity.type === 'component' && selectedEntity.placedIds && selectedEntity.placedIds.length > 0) {
           const selectedIds = new Set(selectedEntity.placedIds);
           const selectedComps = placed.filter((p) => selectedIds.has(p.id));
-          console.log('[Copy] Selected components:', selectedComps);
           // Only copy internal wires (both endpoints in selection)
           const internalWires = wires.filter(
             (w) => selectedIds.has(w.from.componentId) && selectedIds.has(w.to.componentId)
           );
-          console.log('[Copy] Internal wires:', internalWires);
           setClipboard({ components: selectedComps, wires: internalWires });
-          console.log('[Copy] Clipboard set:', { components: selectedComps, wires: internalWires });
-        } else {
-          console.log('[Copy] No components selected or wrong type');
         }
       }
 
       if (isPasteKey) {
         e.preventDefault();
-        console.log('[Paste] clipboard:', clipboard);
         // Paste: clone components and wires with new IDs and offset
         if (clipboard && clipboard.components.length > 0) {
-          console.log('[Paste] Starting paste with', clipboard.components.length, 'components');
           const idMap = new Map<string, string>();
           const newComponents: PlacedGridComponent[] = [];
           const newWires: Wire[] = [];
@@ -293,7 +285,6 @@ export const WorkstationGrid = ({
               rotation: comp.rotation,
             });
           });
-          console.log('[Paste] New components created:', newComponents);
 
           // Create new wires using ID map
           clipboard.wires.forEach((wire, idx) => {
@@ -307,10 +298,8 @@ export const WorkstationGrid = ({
               });
             }
           });
-          console.log('[Paste] New wires created:', newWires);
 
           // Add to placed/wires (budget guard runs in onPlacedChange)
-          console.log('[Paste] Calling onPlacedChange with', newComponents.length, 'new components');
           onPlacedChange([...placed, ...newComponents]);
           onWiresChange([...wires, ...newWires]);
 
@@ -319,9 +308,6 @@ export const WorkstationGrid = ({
             type: 'component',
             placedIds: Array.from(idMap.values()),
           });
-          console.log('[Paste] Auto-selected new components:', Array.from(idMap.values()));
-        } else {
-          console.log('[Paste] Clipboard is empty or null');
         }
       }
     };
@@ -342,27 +328,20 @@ export const WorkstationGrid = ({
       }
 
       e.preventDefault();
-      console.log('[Delete Key] selectedEntity:', selectedEntity);
 
       if (selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0) {
-        console.log('[Delete Key] Deleting components:', selectedEntity.placedIds);
         // Delete all selected components (skip locked ones unless in edit mode)
         for (const placedId of selectedEntity.placedIds) {
           const component = placed.find((c) => c.id === placedId);
           if (component?.isLocked && !isEditMode) {
-            console.log('[Delete] Cannot delete locked component (not in edit mode):', placedId);
             continue;
           }
-          console.log('[Delete] Removing component:', placedId);
           removeComponent(placedId);
         }
       } else if (selectedEntity.type === 'wire') {
-        console.log('[Delete Key] Deleting wire:', selectedEntity.wireId);
         const wire = wires.find((w) => w.id === selectedEntity.wireId);
         if (!wire?.isLocked || isEditMode) {
           removeWire(selectedEntity.wireId);
-        } else {
-          console.log('[Delete] Cannot delete locked wire (not in edit mode):', selectedEntity.wireId);
         }
       }
     };
@@ -1323,11 +1302,11 @@ export const WorkstationGrid = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded-md border border-gray-300 bg-white p-3">
-        <div className="mb-1 text-sm font-medium text-gray-900">
+      <div className="rounded-md border border-border bg-card p-3">
+        <div className="mb-1 text-sm font-medium text-foreground">
           Working Area
         </div>
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-muted-foreground">
           {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan. Click/drag ports to
           wire. While placing, press R to rotate.
         </div>
@@ -1336,7 +1315,7 @@ export const WorkstationGrid = ({
       <div
         ref={containerRef}
         className={cn(
-          'relative h-[calc(100vh-18rem)] overflow-hidden rounded-md border border-gray-300 bg-white transition-[box-shadow,transform,border-color] duration-300 cursor-crosshair',
+          'relative h-[calc(100vh-18rem)] overflow-hidden rounded-md border border-border bg-card transition-[box-shadow,transform,border-color] duration-300 cursor-crosshair',
           isPowerSurge && 'workstation-board-surge',
           boardFeedback === 'success' && 'workstation-board-success border-emerald-400',
           boardFeedback === 'failure' && 'workstation-board-failure border-red-400',
@@ -1402,7 +1381,7 @@ export const WorkstationGrid = ({
       >
         {isChecking && (
           <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-white/45 backdrop-blur-[2px]">
-            <div className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-xl shadow-blue-500/10">
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card/80 px-4 py-3 text-sm font-medium text-foreground shadow-xl shadow-blue-500/10">
               <Spinner size="md" className="text-blue-500" />
               <span>Running the circuit...</span>
             </div>
@@ -1441,7 +1420,7 @@ export const WorkstationGrid = ({
         <button
           type="button"
           ref={trashRef}
-          className="absolute right-3 top-3 z-30 flex size-10 items-center justify-center rounded border border-gray-200 bg-gray-50 text-gray-600 hover:bg-red-50 hover:text-red-600"
+          className="absolute right-3 top-3 z-30 flex size-10 items-center justify-center rounded border border-border bg-secondary text-muted-foreground hover:bg-red-50 hover:text-red-600"
           title={
             wireDraft
               ? 'Cancel wiring'
@@ -1731,8 +1710,8 @@ export const WorkstationGrid = ({
                           portOcc
                             ? 'size-3 bg-blue-400'
                             : occ
-                              ? 'size-3 bg-gray-400'
-                              : 'size-1 bg-gray-300 hover:bg-gray-400',
+                              ? 'size-3 bg-muted-foreground/50'
+                              : 'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50',
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -1766,10 +1745,6 @@ export const WorkstationGrid = ({
             const left = origin.col * CELL_PX;
             const top = origin.row * CELL_PX;
             
-            if (p.isLocked) {
-              console.log('[Render] Locked component:', {id: p.id, componentId: p.componentId, isLocked: p.isLocked, label: def.label});
-            }
-
             const isSelected =
               selectedEntity.type === 'component' &&
               selectedEntity.placedIds.includes(p.id);
@@ -1801,7 +1776,7 @@ export const WorkstationGrid = ({
                   isPowerSurge && 'workstation-component-surge',
                   isSelected
                     ? 'border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.55),0_0_18px_rgba(59,130,246,0.28)]'
-                    : 'border-slate-300 dark:border-slate-600',
+                    : 'border-border',
                   recentlyPlacedId === p.id && 'workstation-component-pop',
                   isDragging ? 'z-50 opacity-80 shadow-xl' : 'z-10',
                 )}
@@ -1839,7 +1814,6 @@ export const WorkstationGrid = ({
 
                   // Prevent drag if component is locked (but allow in edit mode)
                   if (p.isLocked && !isEditMode) {
-                    console.log('[Locked Component] Cannot drag locked component:', p.id);
                     return;
                   }
 
@@ -1949,9 +1923,10 @@ export const WorkstationGrid = ({
                   <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
+                    {(!p.isLocked || isEditMode) && (
                     <button
                       type="button"
-                      className="flex size-5 items-center justify-center rounded-full bg-white text-red-600 shadow-sm ring-1 ring-gray-200 transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                      className="flex size-5 items-center justify-center rounded-full bg-card text-red-600 shadow-sm ring-1 ring-border transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
                       onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
                       onMouseLeave={() =>
                         setHoveredDeleteComponentId((current) =>
@@ -2028,7 +2003,7 @@ export const WorkstationGrid = ({
                     <div key={port.id}>
                       {debuggerActive ? (
                         <div
-                          className="pointer-events-none absolute z-30 flex size-3 items-center justify-center rounded border border-slate-400 bg-white text-[8px] font-bold leading-none text-slate-700"
+                          className="pointer-events-none absolute z-30 flex size-3 items-center justify-center rounded border border-border bg-card text-[8px] font-bold leading-none text-foreground"
                           style={{
                             left: pl + (CELL_PX - 8) / 2 - 6,
                             top: pt + (CELL_PX - 8) / 2 - 9,
@@ -2265,7 +2240,7 @@ export const WorkstationGrid = ({
         </div>
 
         {debuggerActive ? (
-          <div className="pointer-events-none absolute right-3 top-14 z-30 rounded border border-slate-300 bg-white/90 px-2 py-1 text-[11px] text-slate-700 shadow-sm backdrop-blur-sm">
+          <div className="pointer-events-none absolute right-3 top-14 z-30 rounded border border-border bg-card/90 px-2 py-1 text-[11px] text-foreground shadow-sm backdrop-blur-sm">
             Step {debuggerStepCount ? debuggerStepIndex + 1 : 0}/{debuggerStepCount || 0}
           </div>
         ) : null}
