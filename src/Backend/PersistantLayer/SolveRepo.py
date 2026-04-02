@@ -58,6 +58,7 @@ class SolveRepo:
             "time_taken_seconds INTEGER",
             "xp_earned INTEGER DEFAULT 0",
             "highest_medal INTEGER DEFAULT 0",
+            "solution_hash TEXT",
         ]:
             self._add_column_if_missing("solve_attempts", coldef)
 
@@ -313,18 +314,52 @@ class SolveRepo:
         ).fetchall()
         return {int(r["puzzle_id"]): int(r["solver_count"]) for r in rows}
 
-    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0) -> int:
-        """Convenience: insert a passed attempt with time/xp/medal metadata and return its id."""
+    def get_duplicate_submission(self, user_id: int, puzzle_id: int, solution_json: str, seconds: int = 5):
+        """Get a recent solve with the EXACT same solution (detects network retries).
+        Only returns a match if the solution JSON is identical, not just any recent solve.
+        """
+        import hashlib
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        
+        cutoff = (utcnow() - timedelta(seconds=seconds)).isoformat()
+        solution_hash = hashlib.md5(solution_json.encode()).hexdigest()
+        
+        row = self.conn.execute(
+            """
+            SELECT id, submitted_at, cost_used, time_taken_seconds, xp_earned, highest_medal
+            FROM solve_attempts
+            WHERE user_id = ? AND puzzle_id = ? AND passed = 1 
+                AND submitted_at IS NOT NULL
+                AND submitted_at > ?
+                AND solution_hash = ?
+            ORDER BY submitted_at DESC
+            LIMIT 1
+            """,
+            (int(user_id), int(puzzle_id), cutoff, solution_hash),
+        ).fetchone()
+        return dict(row) if row else None
+        return row
+
+    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0, solution_json: str = None) -> int:
+        """Convenience: insert a passed attempt with time/xp/medal/cost metadata and return its id."""
+        import hashlib
         from Backend.DomainLayer.Utils import utcnow
         now = utcnow()
+        
+        # Compute solution hash if solution is provided
+        solution_hash = None
+        if solution_json:
+            solution_hash = hashlib.md5(solution_json.encode()).hexdigest()
+        
         cur = self.conn.execute(
             """
             INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed,
-                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal)
-            VALUES(?,?,?,?,1,?,?,?,?)
+                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used, solution_hash)
+            VALUES(?,?,?,?,1,?,?,?,?,?,?)
             """,
             (int(puzzle_id), int(user_id), now.isoformat(), now.isoformat(),
-             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal)),
+             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used), solution_hash),
         )
         return int(cur.lastrowid)
 

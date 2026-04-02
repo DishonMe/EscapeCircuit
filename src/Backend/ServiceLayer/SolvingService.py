@@ -364,6 +364,30 @@ class SolvingService:
             #     transaction (C2).  This prevents two concurrent solves of the
             #     same puzzle from both reading stale progress and double-awarding XP.
             with transaction(self.conn):
+                # IDEMPOTENCY CHECK: Prevent duplicate solves from retries
+                # Only detect exact duplicate submissions (same solution), allow different solutions
+                solution_json = json.dumps(solution_payload)
+                duplicate_solve = self.solve_repo.get_duplicate_submission(user_id, puzzle_id, solution_json, seconds=5) if hasattr(self.solve_repo, 'get_duplicate_submission') else None
+                if duplicate_solve and isinstance(duplicate_solve, dict):
+                    # Only treat as a true retry if the time is also very similar (within 1 second)
+                    # Otherwise, allow re-submission to try for better performance
+                    previous_time = duplicate_solve.get("time_taken_seconds", 0)
+                    if previous_time is not None and abs(int(time_taken_s) - int(previous_time)) <= 1:
+                        # This is a true retry with the exact same solution and time - return the cached result
+                        print(f"[SOLVING_SERVICE] Exact duplicate submission detected (retry), returning cached result for puzzle_id={puzzle_id}")
+                        medal_name = ["NONE", "BRONZE", "SILVER", "GOLD"][int(duplicate_solve["highest_medal"])] if duplicate_solve["highest_medal"] else "NONE"
+                        return {
+                            "solved": True,
+                            "message": "You just submitted this exact solution - returning cached result",
+                            "medal": medal_name,
+                            "medal_value": int(duplicate_solve["highest_medal"]) if duplicate_solve["highest_medal"] else 0,
+                            "xp_earned": 0,
+                            "puzzle_total_xp": int(duplicate_solve["xp_earned"]) if duplicate_solve["xp_earned"] else 0,
+                            "xp_left_for_max": 0,
+                            "time_taken": 0,
+                            "first_time_solve": False,
+                        }
+                
                 attempt_id = None
                 if hasattr(self.solve_repo, 'add_solve'):
                     attempt_id = self.solve_repo.add_solve(
@@ -372,6 +396,8 @@ class SolvingService:
                         time_taken_seconds=time_taken_s,
                         xp_earned=raw_xp,
                         medal=medal.value if isinstance(medal, Medal) else int(medal),
+                        cost_used=cost_used,
+                        solution_json=solution_json,
                     )
 
                 if hasattr(self.solve_repo, 'upsert_progress'):
