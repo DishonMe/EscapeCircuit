@@ -402,6 +402,8 @@ export const Profile = () => {
 };
 
 function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
+  const { data: myArsenal } = useMyArsenal();
+
   const parseStructure = (
     structureJson: string
   ): {
@@ -424,6 +426,14 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
   const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
   const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
 
+  // Build map of arsenal pieces by ID for quick lookup
+  const arsenalMap = new Map<string, ArsenalPiece>();
+  if (myArsenal) {
+    myArsenal.forEach((ap) => {
+      arsenalMap.set(String(ap.id), ap);
+    });
+  }
+
   // Build catalog with standard component definitions
   // Size formula: width=3, height=max(inputs, outputs)
   const catalog: Record<string, ComponentDef> = {
@@ -439,16 +449,51 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
   // Add any custom arsenal pieces as components
   placed.forEach((comp) => {
     if (!catalog[comp.componentId]) {
-      catalog[comp.componentId] = {
-        id: comp.componentId,
-        label: comp.componentId,
-        cost: 1,
-        size: { w: 1, h: 1 },
-        ports: [
-          { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
-          { id: 'P1', kind: 'output', offset: { row: 0, col: 0 } },
-        ],
-      };
+      const arsenalPiece = arsenalMap.get(comp.componentId);
+      if (arsenalPiece && (arsenalPiece as any).is_arsenal) {
+        // Arsenal piece sizing: width=3, height=max(inputs, outputs)
+        const numInputs = (arsenalPiece as any).num_inputs ?? 0;
+        const numOutputs = (arsenalPiece as any).num_outputs ?? 0;
+        const maxPorts = Math.max(numInputs, numOutputs);
+        const size = { w: 3, h: Math.max(1, maxPorts) };
+        
+        // Generate ports for arsenal pieces
+        const ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        for (let i = 0; i < numInputs; i++) {
+          ports.push({
+            id: `in${i}`,
+            kind: 'input',
+            offset: { row: Math.min(i, size.h - 1), col: 0 },
+          });
+        }
+        for (let i = 0; i < numOutputs; i++) {
+          ports.push({
+            id: `out${i}`,
+            kind: 'output',
+            offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
+          });
+        }
+        
+        catalog[comp.componentId] = {
+          id: comp.componentId,
+          label: arsenalPiece.name,
+          cost: arsenalPiece.cost,
+          size,
+          ports,
+        };
+      } else {
+        // Fallback for unknown components
+        catalog[comp.componentId] = {
+          id: comp.componentId,
+          label: comp.componentId,
+          cost: 1,
+          size: { w: 3, h: 1 },
+          ports: [
+            { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+            { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } },
+          ],
+        };
+      }
     }
   });
 
