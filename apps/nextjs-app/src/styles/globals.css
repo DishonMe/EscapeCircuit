@@ -293,6 +293,35 @@ svg {
   color: inherit;
 }
 
+/* Fix select dropdowns for dark mode */
+/* Target select elements and override Tailwind's bg-transparent */
+select {
+  color-scheme: light;
+  appearance: auto !important;
+  background-color: hsl(var(--input)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark select {
+  color-scheme: dark;
+  appearance: auto !important;
+  background-color: hsl(var(--input)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* For Firefox and other browsers - style the option elements */
+select option,
+select optgroup {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--input));
+}
+
+.dark select option,
+.dark select optgroup {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--input));
+}
+
 /* Tech scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
