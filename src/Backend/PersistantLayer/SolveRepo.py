@@ -58,6 +58,7 @@ class SolveRepo:
             "time_taken_seconds INTEGER",
             "xp_earned INTEGER DEFAULT 0",
             "highest_medal INTEGER DEFAULT 0",
+            "solution_hash TEXT",
         ]:
             self._add_column_if_missing("solve_attempts", coldef)
 
