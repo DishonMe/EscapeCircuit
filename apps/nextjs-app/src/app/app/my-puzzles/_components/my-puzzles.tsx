@@ -173,7 +173,7 @@ export const MyPuzzles = () => {
         </div>
 
         {/* Create Puzzle Button - Only here */}
-        <div className="mb-6 flex gap-3">
+        <div className="mb-6 flex gap-3 tour-my-puzzles-create">
           <Link
             href={paths.app.createPuzzle.getHref()}
             onClick={handleCreatePuzzleClick}
@@ -192,7 +192,7 @@ export const MyPuzzles = () => {
         </div>
 
         {/* Published/Unpublished Toggle */}
-        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-4 tour-my-puzzles-tabs">
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -324,7 +324,7 @@ export const MyPuzzles = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 tour-my-puzzles-actions">
                     <div className="flex gap-2">
                       <button
                         onClick={() => setViewingPuzzle(puzzle)}

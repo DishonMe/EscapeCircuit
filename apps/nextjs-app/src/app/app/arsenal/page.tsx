@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +23,10 @@ import {
 } from '@/features/arsenal/api';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { PlacedGridComponent, Wire, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type { PlacedGridComponent, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type { Wire } from '@/types/api';
+import GuidedTour from '@/components/ui/guided-tour';
+import { arsenalTourSteps } from '@/config/tourSteps';
 
 const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [
   [2, 5],
@@ -62,6 +65,24 @@ export default function ArsenalPage() {
   const [showTruthTable, setShowTruthTable] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [deletingPieceId, setDeletingPieceId] = useState<number | null>(null);
+  const [runTour, setRunTour] = useState(false);
+
+  // Auto-start tour on first visit
+  useEffect(() => {
+    const tourCompleted = localStorage.getItem('escapecircuit.tour.arsenal.status');
+    if (!tourCompleted) {
+      setRunTour(true);
+    }
+  }, []);
+
+  const handleTourCallback = (data: any) => {
+    const { action, type, status } = data;
+    // Mark tour as completed when user finishes or skips
+    if (status === 'finished' || status === 'skipped') {
+      localStorage.setItem('escapecircuit.tour.arsenal.status', 'completed');
+      setRunTour(false);
+    }
+  };
 
   const handleDelete = async (piece: ArsenalPiece) => {
     const confirmed = window.confirm(
@@ -152,35 +173,44 @@ export default function ArsenalPage() {
   const maxSlots = calculateArsenalSlots(level);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
-          <div className="flex items-center gap-1 text-foreground/85">
-            <span>
-              {isAdmin
-                ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
-                : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
-            </span>
-            {!isAdmin && (
-              <InfoPopup>
-                <p className="font-medium text-foreground mb-1">Arsenal Capacity</p>
-                <p>Your arsenal slots increase as you level up:</p>
-                <ul className="mt-1 space-y-0.5 list-disc list-inside">
-                  <li>Level 1-2: 5 slots</li>
-                  <li>Level 3-4: 10 slots</li>
-                  <li>Level 5-6: 20 slots</li>
-                  <li>Level 7-8: 35 slots</li>
-                  <li>Level 9+: 50 slots</li>
-                </ul>
-              </InfoPopup>
-            )}
+    <>
+      <GuidedTour
+        steps={arsenalTourSteps}
+        tourName="arsenal"
+        run={runTour}
+        callback={handleTourCallback}
+      />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
+            <div className="flex items-center gap-1 text-foreground/85">
+              <span>
+                {isAdmin
+                  ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
+                  : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
+              </span>
+              {!isAdmin && (
+                <InfoPopup>
+                  <p className="font-medium text-foreground mb-1">Arsenal Capacity</p>
+                  <p>Your arsenal slots increase as you level up:</p>
+                  <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                    <li>Level 1-2: 5 slots</li>
+                    <li>Level 3-4: 10 slots</li>
+                    <li>Level 5-6: 20 slots</li>
+                    <li>Level 7-8: 35 slots</li>
+                    <li>Level 9+: 50 slots</li>
+                  </ul>
+                </InfoPopup>
+              )}
+            </div>
           </div>
-        </div>
-        <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
-          + Create New Piece
-        </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
+              + Create New Piece
+            </Button>
+          </div>
       </div>
 
       {/* Arsenal Grid */}
@@ -194,7 +224,7 @@ export default function ArsenalPage() {
       ) : (
         <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full tour-arsenal-list">
               <thead className="bg-muted/70">
                 <tr>
                   <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">Name</th>
@@ -223,7 +253,7 @@ export default function ArsenalPage() {
                     <td className="px-6 py-4 text-[13px] text-foreground/80">
                       {parseBasicGates(piece.basic_gates).join(', ') || 'None'}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
+                    <td className="px-6 py-4 text-right space-x-2 tour-arsenal-actions">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -231,6 +261,7 @@ export default function ArsenalPage() {
                           setSelectedPiece(piece);
                           setShowPreview(true);
                         }}
+                        className="tour-arsenal-preview"
                       >
                         Preview
                       </Button>
@@ -361,6 +392,7 @@ export default function ArsenalPage() {
         </Dialog>
       )}
     </div>
+    </>
   );
 }
 

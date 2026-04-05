@@ -5,6 +5,8 @@ import {
 } from '@tanstack/react-query';
 
 import { getPuzzlesQueryOptions } from '@/features/puzzles/api/get-puzzles';
+import GuidedTour from '@/components/ui/guided-tour';
+import { browsePuzzlesTourSteps } from '@/config/tourSteps';
 
 import { Puzzles } from './_components/puzzles';
 
@@ -30,6 +32,10 @@ const PuzzlesPage = async ({
 
   return (
     <HydrationBoundary state={dehydratedState}>
+      <GuidedTour
+        steps={browsePuzzlesTourSteps}
+        tourName="browse-puzzles"
+      />
       <Puzzles />
     </HydrationBoundary>
   );

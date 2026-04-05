@@ -1,0 +1,71 @@
+"use client";
+
+import React, { useEffect, useState, useLayoutEffect } from "react";
+import { usePathname } from "next/navigation";
+
+export default function GuidedTour({ steps, ...props }: any) {
+  const [JoyrideComponent, setJoyrideComponent] = useState<any>(null);
+  const pathname = usePathname();
+  const [active, setActive] = useState(true);
+
+  // 1. Instant Kill on Path Change
+  useLayoutEffect(() => {
+    setActive(false);
+    const timer = setTimeout(() => setActive(true), 300);
+    return () => {
+      setActive(false);
+      clearTimeout(timer);
+    };
+  }, [pathname]);
+
+  // 2. Global Event Listener: Kill tour on navigation clicks, but NOT Joyride button clicks
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // 1. Check if the click happened inside a Joyride tooltip or beacon
+      const isJoyrideClick = target.closest('.react-joyride__tooltip') || 
+                             target.closest('.react-joyride__beacon');
+
+      // 2. Only kill the tour if it's a navigation-related click NOT inside Joyride
+      if (!isJoyrideClick && (target.closest('a') || target.closest('button'))) {
+        setActive(false);
+      }
+    };
+
+    window.addEventListener('click', handleGlobalClick, { capture: true });
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  useEffect(() => {
+    import("react-joyride").then((module) => {
+      const Component = module.default || (module as any).Joyride || module;
+      setJoyrideComponent(() => Component);
+    }).catch(err => console.error("Failed to load react-joyride", err));
+  }, []);
+
+  // Return null immediately if not active or not loaded
+  if (!JoyrideComponent || !active) return null;
+
+  const fixedSteps = steps?.map((step: any) => ({
+    ...step,
+    disableBeacon: true,
+    disableScrolling: true,
+  })) || [];
+
+  return (
+    <JoyrideComponent
+      {...props}
+      steps={fixedSteps}
+      run={props.run && active}
+      disableBeacon={true}
+      disableScrolling={true}
+      scrollToFirstStep={false}
+      styles={{
+        options: {
+          zIndex: 0, // Drop the Z-index so it's always behind your loading screen
+        },
+      }}
+    />
+  );
+}
