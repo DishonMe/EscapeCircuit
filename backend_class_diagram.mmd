@@ -1,0 +1,1001 @@
+classDiagram
+direction LR
+namespace APILayer {
+  class AdminController
+  class ArsenalController
+  class auth_utils
+  class CircuitController
+  class DebuggerController
+  class DiscussionController
+  class middleware
+  class PuzzleController
+  class RatingController
+  class UserController
+}
+namespace ServiceLayer {
+  class AdminService {
+    +audit_log
+    +auth
+    +notification_repo
+    +puzzle_repo
+    +rating_repo
+    +solve_repo
+    +user_repo
+    +_delete_riddle_files(puzzle_id, puzzle_name)
+    +_require_admin(session_token)
+    +_require_admin_or_creator(session_token)
+    +_sanitize_puzzle_name(name)
+    +_slugify_puzzle_name(name)
+    +admin_unpublish_puzzle(session_token, puzzle_id)
+    +assign_creator(session_token, target_user_id)
+    +confirm_remove_creator(session_token, target_user_id, action)
+    +delete_puzzle(session_token, puzzle_id)
+    +list_audit_log(session_token, limit, offset, action_type)
+    +list_puzzles(session_token, limit, offset, search, status, creator_id, creator_username, date_from, date_to, order_by, order_direction)
+    +remove_creator(session_token, target_user_id)
+    +update_creator_puzzle_limits(session_token, target_user_id, max_published, max_unpublished)
+  }
+  class ArsenalService {
+    +MAX_ARSENAL_SIZE
+    +MAX_INPUTS
+    +MAX_OUTPUTS
+    +MIN_INPUTS
+    +MIN_OUTPUTS
+    +auth
+    +engine
+    +repo
+    +user_repo
+    +xp
+    +_calculate_arsenal_cost(gates, used_arsenal_ids, user_id)
+    +_calculate_truth_table(num_inputs, num_outputs, structure)
+    +_extract_basic_gates(structure_json)
+    +_flatten_used_arsenal_pieces(basic_gates, used_arsenal_ids, user_id)
+    +_is_admin(role)
+    +_resolve_max_slots_for_level(user_level)
+    +delete_arsenal_piece(session_token, piece_id)
+    +get_arsenal_piece(session_token, piece_id)
+    +get_arsenal_pieces_by_ids(piece_ids)
+    +get_available_pieces_for_puzzle(session_token, allowed_gates)
+    +get_custom_pieces_for_puzzle(puzzle_id)
+    +get_user_arsenal_filtered_by_gates(user_id, allowed_gates)
+    +list_my_arsenal(session_token)
+    +rename_arsenal_piece(session_token, piece_id, new_name)
+    +save_arsenal_piece(session_token, payload)
+  }
+  class AuthService {
+    +_lock
+    +_sessions
+    +session_ttl_seconds
+    +user_repo
+    +_cleanup_expired_locked()
+    +_is_expired(now, s)
+    +login(username, password)
+    +login_external(user_id)
+    +logout(token)
+    +require_user_id(token)
+  }
+  class CircuitService {
+    +auth
+    +engine
+    +repo
+    +user_repo
+    +xp
+    +_is_admin(role)
+    +_resolve_max_slots_for_level(user_level)
+    +delete_circuit(session_token, circuit_id)
+    +get_circuit(session_token, circuit_id)
+    +list_my_circuits(session_token)
+    +save_circuit(session_token, payload)
+  }
+  class DiscussionService {
+    +auth
+    +discussion_repo
+    +engagement
+    +notification_repo
+    +reply_repo
+    +report_repo
+    +user_repo
+    +xp
+    +_enrich_reply(reply, user_id)
+    +_get_report_target_author_id(report)
+    +_require_admin(token)
+    +ban_user_for_report(token, report_id)
+    +bookmark_discussion(token, discussion_id)
+    +create_discussion(token, payload)
+    +delete_discussion(token, discussion_id)
+    +delete_reported_content(token, report_id)
+    +follow_discussion(token, discussion_id)
+    +get_discussion(token, discussion_id)
+    +list_discussions(token, limit, offset, category, puzzle_id, author_id, sort_by, search, bookmarked_only)
+    +list_reports(token, status, limit, offset)
+    +lock_discussion(token, discussion_id)
+    +lock_reported_discussion(token, report_id)
+    +pin_discussion(token, discussion_id)
+    +react_to_discussion(token, discussion_id, reaction_type)
+    +report_discussion(token, discussion_id, reason, details)
+    +report_reply(token, reply_id, reason, details)
+    +update_discussion(token, discussion_id, payload)
+    +update_report_status(token, report_id, status)
+    +view_discussion(token, discussion_id)
+    +vote_discussion(token, discussion_id, value)
+    +warn_user_for_report(token, report_id)
+  }
+  class NotificationService {
+    +auth
+    +repo
+    +get_all(token, notif_type, puzzle_name, actor_username, date_from, date_to, order_by, order_direction, limit, offset)
+    +get_unread(token, notif_type, puzzle_name, actor_username, date_from, date_to, order_by, order_direction, limit, offset)
+    +mark_all_read(token)
+    +notify_creator_rating(creator_user_id, rater_username, puzzle_name, xp_amount)
+    +notify_creator_solve(creator_user_id, solver_username, puzzle_name, xp_amount)
+  }
+  class PuzzleService {
+    +arsenal_service
+    +auth
+    +repo
+    +solve_repo
+    +user_repo
+    +_count_published_puzzles(creator_user_id)
+    +_count_unpublished_puzzles(creator_user_id)
+    +_delete_riddle_files(puzzle_id, puzzle_name)
+    +_enrich_puzzle(p_dict)
+    +_is_admin(role)
+    +_is_creator_blocked(user)
+    +_sanitize_puzzle_name(name)
+    +_slugify_puzzle_name(name)
+    +add_test_case(session_token, puzzle_id, payload)
+    +browse(session_token, limit, offset, search, creator_id, creator_username, creator_experience_level, min_difficulty, max_difficulty, only_experienced_difficulty, min_clearness, max_clearness, only_experienced_clearness, min_fun, max_fun, only_experienced_fun, date_from, date_to, order_by, order_direction, order_only_experienced)
+    +create_puzzle(session_token, payload)
+    +delete_puzzle(session_token, puzzle_id)
+    +get(session_token, puzzle_id)
+    +list_my_puzzles(session_token, limit, offset, search, order_by, order_direction)
+    +list_test_cases(session_token, puzzle_id)
+    +publish(session_token, puzzle_id)
+    +search(session_token, q, only_published)
+    +unpublish(session_token, puzzle_id)
+    +update_puzzle(session_token, puzzle_id, payload)
+  }
+  class RatingService {
+    +_DIFFICULTY_MAP
+    +auth
+    +notification_service
+    +puzzle_repo
+    +rating_repo
+    +solve_repo
+    +xp_service
+    +_can_rate(user_id, puzzle_id, client_elapsed)
+    +_exp_weight(rating)
+    +_recalculate_and_store(puzzle_id)
+    +_store_rating(token, puzzle_id, difficulty, fun, clearness, client_elapsed, allow_existing)
+    +_weighted_avg(values, weights)
+    +create_rating(token, puzzle_id, payload)
+    +edit_rating(token, puzzle_id, difficulty, fun, clearness, client_elapsed)
+    +get_my_rating(token, puzzle_id)
+    +get_puzzle_metrics(puzzle_id)
+    +list_ratings(token, puzzle_id)
+    +list_ratings_for_puzzle(token, puzzle_id)
+    +rate_puzzle(token, puzzle_id, difficulty, fun, clearness, client_elapsed)
+    +remove_rating(token, puzzle_id)
+    +submit_rating(token, puzzle_id, payload)
+    +update_rating(token, puzzle_id, payload)
+    +xp()
+  }
+  class ReplyService {
+    +auth
+    +discussion_repo
+    +engagement
+    +reply_repo
+    +user_repo
+    +xp
+    +accept_reply(token, reply_id)
+    +create_reply(token, discussion_id, payload)
+    +delete_reply(token, reply_id)
+    +get_replies(token, discussion_id, limit, offset)
+    +react_to_reply(token, reply_id, reaction_type)
+    +update_reply(token, reply_id, payload)
+    +vote_reply(token, reply_id, value)
+  }
+  class SessionInfo {
+    +created_at
+    +last_seen
+    +user_id
+  }
+  class SolvingService {
+    +auth
+    +circuit_repo
+    +conn
+    +logic_engine
+    +notification_service
+    +puzzle_repo
+    +solve_repo
+    +user_repo
+    +xp_service
+    +_evaluate_test_cases(circuit, test_cases, puzzle, expanded_solution)
+    +_expand_arsenal_pieces(solution_payload)
+    +_run_python_tests(puzzle, expanded_solution)
+    +_run_simulation(puzzle_id, expanded_solution, inputs)
+    +_simulate_sequence(puzzle_id, solution_payload, input_sequences)
+    +_simulate_single_step(puzzle_id, solution_payload, inputs)
+    +_validate_python_test_code(test_code_str, expanded_solution)
+    +engine()
+    +simulate_solution(token, puzzle_id, solution_payload, inputs, is_sequence)
+    +start_attempt(token, puzzle_id)
+    +submit_solution(token, puzzle_id, payload)
+    +validate_solution(token, puzzle_id, solution_payload, time_taken)
+    +xp()
+  }
+  class UserService {
+    +auth
+    +user_repo
+    +xp
+    +accept_creator_role(session_token)
+    +decline_creator_role(session_token)
+    +delete_user(session_token, target_user_id)
+    +google_complete_registration(payload)
+    +google_login(token)
+    +list_users(session_token, limit, offset, username_search, role, date_from, date_to, min_level, max_level, experience_level, order_by, order_direction)
+    +login(payload)
+    +logout(session_token)
+    +me(session_token)
+    +register(payload)
+    +set_role(session_token, payload)
+    +update_user_bio(user_id, bio)
+  }
+  class XPService {
+    +BASE_XP
+    +MEDAL_BONUS
+    +SOLVE_REWARD_CREATOR
+    +rating_creator_xp
+    +rating_rater_xp
+    +user_repo
+    +_apply_xp(user_id, delta)
+    +award_creator_solve_xp(creator_user_id, solver_user_id)
+    +award_rating_xp(rater_user_id, creator_user_id, first_time_rating)
+    +award_solve_xp(user_id, difficulty_tier, is_first_solve, timer_beaten, already_solved_before, **kwargs)
+    +calculate_level(xp_total)
+    +calculate_medal(passed, time_taken, time_limit, cost_used, budget, creator_budget)
+    +calculate_solve_xp(difficulty, medal, previous_best_xp)
+    +calculate_xp_for_level(level)
+    +get_arsenal_limit(xp_total)
+    +is_experienced(xp_total)
+    +tier_from_avg_difficulty(avg_difficulty)
+  }
+  class logicEngineService {
+    +_compute_gate(gtype, inputs)
+    +_load(structure_json)
+    +compute_cost(structure_json)
+    +evaluate(circuit, inputs, data)
+    +extract_gate_counts(structure_json)
+    +extract_used_gates(structure_json)
+    +has_entry_for_inputs(circuit, inputs)
+    +simulate(data, inputs, arsenal_pieces)
+    +validate_gate_usage(structure_json, allowed_basic)
+  }
+}
+namespace DomainLayer {
+  class AuditActionType {
+    +ASSIGN_CREATOR
+    +DELETE_PUZZLE
+    +REMOVE_CREATOR
+    +UNPUBLISH_PUZZLE
+  }
+  class Circuit {
+    +basic_gates
+    +cost
+    +description
+    +id
+    +is_arsenal
+    +name
+    +num_inputs
+    +num_outputs
+    +puzzle_id
+    +structure_json
+    +truth_table
+    +user_id
+    +__post_init__()
+    +calculate_cost(special_gates)
+    +from_dict(d)
+    +get_cost()
+    +get_id()
+    +get_list_of_gates()
+    +get_name()
+    +get_string_representation()
+    +get_structure_json()
+    +get_truth_table()
+    +get_user_id()
+    +set_cost(value)
+    +set_name(value)
+    +set_structure_json(value)
+    +to_circuit_component()
+    +to_dict()
+  }
+  class Discussion {
+    +accepted_reply_id
+    +author_id
+    +body
+    +category
+    +created_at
+    +id
+    +is_locked
+    +is_pinned
+    +puzzle_id
+    +reply_count
+    +title
+    +updated_at
+    +upvotes
+    +view_count
+    +__post_init__()
+    +from_dict(d)
+    +to_dict()
+  }
+  class DomainError {
+  }
+  class GateType {
+    +AND
+    +DFF
+    +NAND
+    +NOR
+    +NOT
+    +OR
+    +XNOR
+    +XOR
+  }
+  class Medal {
+    +BRONZE
+    +GOLD
+    +NONE
+    +SILVER
+  }
+  class Puzzle {
+    +allow_arsenal
+    +allowed_arsenal_component_ids
+    +arsenal_component_display_modes
+    +avg_clearness
+    +avg_clearness_exp
+    +avg_difficulty
+    +avg_difficulty_exp
+    +avg_fun
+    +avg_fun_exp
+    +board_cols
+    +board_rows
+    +budget
+    +clearness_decided
+    +clearness_decided_exp
+    +created_at
+    +creator_budget
+    +creator_comment
+    +creator_user_id
+    +default_gate_set
+    +description
+    +difficulty
+    +fun_decided
+    +fun_decided_exp
+    +id
+    +initial_board_json
+    +instructions
+    +is_hall_of_fame
+    +max_cycles
+    +min_cycles
+    +min_gate_count
+    +name
+    +rating_count
+    +rating_count_exp
+    +riddle_base_name
+    +status
+    +time_limit_seconds
+    +total_gate_count
+    +__post_init__()
+    +enforce_budget(circuit_cost)
+    +from_dict(d)
+    +get_avg_clearness()
+    +get_avg_difficulty()
+    +get_avg_fun()
+    +get_budget()
+    +get_created_at()
+    +get_creator_budget()
+    +get_creator_user_id()
+    +get_default_gate_set()
+    +get_description()
+    +get_id()
+    +get_name()
+    +get_rating_count()
+    +get_status()
+    +get_time_limit_seconds()
+    +publish()
+    +set_avg_clearness(value)
+    +set_avg_difficulty(value)
+    +set_avg_fun(value)
+    +set_budget(value)
+    +set_creator_budget(value)
+    +set_creator_user_id(value)
+    +set_default_gate_set(value)
+    +set_description(value)
+    +set_name(value)
+    +set_rating_count(value)
+    +set_status(value)
+    +set_time_limit_seconds(value)
+    +to_dict()
+    +unpublish()
+  }
+  class PuzzleDifficulty {
+    +EASY
+    +HARD
+    +MEDIUM
+  }
+  class PuzzleStatus {
+    +DRAFT
+    +PUBLISHED
+    +UNPUBLISHED
+  }
+  class PuzzleTestCase {
+    +created_at
+    +expected_output_stream
+    +expected_outputs
+    +gate_limit
+    +gate_name
+    +id
+    +input_stream
+    +inputs
+    +kind
+    +max_cycles
+    +max_gate_count
+    +min_cycles
+    +min_gate_count
+    +min_gate_limit
+    +puzzle_id
+    +__post_init__()
+    +from_dict(d)
+    +get_created_at()
+    +get_expected_outputs()
+    +get_id()
+    +get_inputs()
+    +get_kind()
+    +get_puzzle_id()
+    +set_expected_outputs(value)
+    +set_inputs(value)
+    +set_kind(value)
+    +set_puzzle_id(value)
+    +to_dict()
+  }
+  class Rating {
+    +clearness
+    +created_at
+    +difficulty
+    +fun
+    +id
+    +is_experienced_at_rating
+    +puzzle_id
+    +user_id
+    +__post_init__()
+    +from_dict(d)
+    +get_clearness()
+    +get_created_at()
+    +get_difficulty()
+    +get_fun()
+    +get_id()
+    +get_is_experienced_at_rating()
+    +get_puzzle_id()
+    +get_user_id()
+    +is_experienced()
+    +set_clearness(value)
+    +set_difficulty(value)
+    +set_fun(value)
+    +set_is_experienced_at_rating(value)
+    +set_user_id(value)
+    +to_dict()
+  }
+  class ReactionType {
+    +GENIUS
+    +HELPFUL
+    +INSIGHTFUL
+    +SPOT_ON
+    +THINKING
+  }
+  class Reply {
+    +author_id
+    +body
+    +created_at
+    +discussion_id
+    +downvotes
+    +id
+    +is_accepted
+    +parent_reply_id
+    +updated_at
+    +upvotes
+    +__post_init__()
+    +from_dict(d)
+    +to_dict()
+  }
+  class SolveAttempt {
+    +circuit_id
+    +cost_used
+    +fail_reason
+    +id
+    +passed
+    +puzzle_id
+    +started_at
+    +submitted_at
+    +time_used_seconds
+    +user_id
+    +__post_init__()
+    +attempted_minutes()
+    +elapsed_seconds()
+    +from_dict(d)
+    +get_circuit_id()
+    +get_fail_reason()
+    +get_id()
+    +get_passed()
+    +get_puzzle_id()
+    +get_started_at()
+    +get_submitted_at()
+    +get_user_id()
+    +mark_submitted(passed, circuit_id, fail_reason)
+    +set_circuit_id(value)
+    +set_fail_reason(value)
+    +set_passed(value)
+    +set_puzzle_id(value)
+    +set_started_at(value)
+    +set_submitted_at(value)
+    +set_user_id(value)
+    +to_dict()
+  }
+  class TestCaseKind {
+    +BLACKBOX
+    +GATE_COUNT_LIMIT
+    +GATE_LIMIT
+    +LATENCY_LIMIT
+    +STREAM
+    +WHITEBOX
+  }
+  class ThreadCategory {
+    +BUG_REPORT
+    +FEATURE_REQUEST
+    +GENERAL
+    +PUZZLE_HELP
+    +PUZZLE_TIPS
+    +SHOWCASE
+    +SOLUTIONS
+  }
+  class User {
+    +bio
+    +created_at
+    +email
+    +id
+    +is_discussion_banned
+    +max_published_puzzles
+    +max_unpublished_puzzles
+    +role
+    +username
+    +xp
+    +__post_init__()
+    +add_xp(amount)
+    +from_dict(d)
+    +get_created_at()
+    +get_id()
+    +get_puzzle_capacity()
+    +get_role()
+    +get_username()
+    +get_xp()
+    +is_experienced()
+    +level()
+    +set_role(value)
+    +set_username(value)
+    +set_xp(value)
+    +to_dict()
+  }
+  class UserRole {
+    +ADMIN
+    +CREATOR
+    +PENDING_CREATOR
+    +SOLVER
+  }
+  class ValidationError {
+  }
+}
+namespace PersistantLayer {
+  class AuditLogRepo {
+    +conn
+    +_ensure_schema()
+    +create(admin_user_id, action_type, target_user_id, target_puzzle_id, details)
+    +list_all(limit, offset, action_type, admin_user_id)
+  }
+  class CircuitRepo {
+    +conn
+    +_ensure_schema()
+    +count_user_components(user_id)
+    +create(circuit, commit)
+    +delete(circuit_id, user_id)
+    +get_by_id(circuit_id)
+    +list_arsenal_by_user(user_id)
+    +list_by_user(user_id)
+    +list_custom_pieces_by_puzzle(puzzle_id)
+    +update(circuit)
+  }
+  class DiscussionRepo {
+    +conn
+    +_build_where(category, puzzle_id, author_id, search, bookmarked_user_id)
+    +_ensure_schema()
+    +_has_legacy_bookmark_table()
+    +_row_to_discussion(row)
+    +add_bookmark(user_id, discussion_id)
+    +count(category, puzzle_id, author_id, search, bookmarked_user_id)
+    +create(discussion)
+    +delete(discussion_id)
+    +get_by_id(discussion_id)
+    +get_by_ids(discussion_ids)
+    +get_user_bookmarks(user_id)
+    +increment_reply_count(discussion_id, delta, commit)
+    +increment_view_count(discussion_id)
+    +is_bookmarked(user_id, discussion_id)
+    +list_all(limit, offset, category, puzzle_id, author_id, sort_by, search, bookmarked_user_id, prioritize_bookmarked_user_id)
+    +remove_bookmark(user_id, discussion_id)
+    +set_accepted_reply(discussion_id, reply_id)
+    +sync_upvotes_from_votes(discussion_id, commit)
+    +update(discussion_id, fields)
+  }
+  class EngagementRepo {
+    +conn
+    +_ensure_schema()
+    +count_discussion_votes(discussion_id)
+    +count_reply_votes(reply_id)
+    +get_bulk_reply_engagement(reply_ids, user_id)
+    +get_discussion_engagement(discussion_id, user_id)
+    +get_discussion_reactions(discussion_id)
+    +get_discussion_vote(discussion_id, user_id)
+    +get_follower_ids(discussion_id)
+    +get_reply_engagement(reply_id, user_id)
+    +get_reply_reactions(reply_id)
+    +get_reply_vote(reply_id, user_id)
+    +get_user_bookmarked_ids(user_id)
+    +get_user_discussion_reactions(discussion_id, user_id)
+    +get_user_reply_reactions(reply_id, user_id)
+    +is_bookmarked(discussion_id, user_id)
+    +is_following(discussion_id, user_id)
+    +set_discussion_vote(discussion_id, user_id, value)
+    +set_reply_vote(reply_id, user_id, value)
+    +toggle_bookmark(discussion_id, user_id)
+    +toggle_discussion_reaction(discussion_id, user_id, reaction_type)
+    +toggle_follow(discussion_id, user_id)
+    +toggle_reply_reaction(reply_id, user_id, reaction_type)
+    +try_award_engagement_xp(target_type, target_id, actor_user_id, xp_type, commit)
+  }
+  class NotificationRepo {
+    +conn
+    +_ensure_schema()
+    +count_notifications(user_id, notif_type, puzzle_name, date_from, date_to, only_unread)
+    +create(user_id, notif_type, message, xp_amount, puzzle_name, actor_username, commit)
+    +get_all(user_id, notif_type, puzzle_name, actor_username, date_from, date_to, order_by, order_direction, limit, offset)
+    +get_unread(user_id, notif_type, puzzle_name, actor_username, date_from, date_to, order_by, order_direction, limit, offset)
+    +mark_all_read(user_id)
+  }
+  class PuzzleProgress {
+    +best_medal
+    +best_xp
+    +first_solved_at
+    +max_xp_reached
+    +puzzle_id
+    +tight_upgraded
+    +timer_upgraded
+    +total_xp_awarded
+    +user_id
+    +xp_applied
+  }
+  class PuzzleRepo {
+    +conn
+    +_difficulty_to_level(difficulty_value)
+    +_ensure_schema()
+    +_min_xp_for_level(level)
+    +_row_to_puzzle(row)
+    +add_test_case(tc)
+    +count_all_for_admin(search, status, creator_id, creator_username, date_from, date_to)
+    +count_published(search, creator_id, creator_username, creator_experience_level, min_difficulty, max_difficulty, only_experienced_difficulty, min_clearness, max_clearness, only_experienced_clearness, min_fun, max_fun, only_experienced_fun, date_from, date_to)
+    +create(puzzle)
+    +delete(puzzle_id)
+    +delete_by_ids(puzzle_ids)
+    +get_admin_deleted_puzzle_names()
+    +get_by_creator_and_status(creator_user_id, status)
+    +get_by_id(puzzle_id)
+    +get_deleted_puzzle_names()
+    +get_user_deleted_puzzle_names()
+    +list_all_for_admin(limit, offset, search, status, creator_id, creator_username, date_from, date_to, order_by, order_direction)
+    +list_published(limit, offset, search, creator_id, creator_username, creator_experience_level, min_difficulty, max_difficulty, only_experienced_difficulty, min_clearness, max_clearness, only_experienced_clearness, min_fun, max_fun, only_experienced_fun, date_from, date_to, order_by, order_direction, order_only_experienced)
+    +list_saved_puzzles(user_id)
+    +list_test_cases(puzzle_id)
+    +mark_hall_of_fame(puzzle_id)
+    +remove_saved_puzzle(user_id, puzzle_id)
+    +save_for_later(user_id, puzzle_id, created_at)
+    +search_by_name(q, only_published, limit)
+    +track_admin_deletion(puzzle_name)
+    +track_user_deletion(puzzle_name)
+    +unpublish_puzzle(puzzle_id)
+    +update(puzzle)
+    +update_rating_aggregates(puzzle_id, **kwargs)
+  }
+  class RatingRepo {
+    +conn
+    +_ensure_schema()
+    +add_rating(rating, commit)
+    +delete(puzzle_id, user_id)
+    +delete_by_puzzle(puzzle_id)
+    +delete_rating(puzzle_id, user_id)
+    +get_by_puzzle_user(puzzle_id, user_id)
+    +get_ratings_for_puzzle(puzzle_id)
+    +get_user_rating(puzzle_id, user_id)
+    +list_by_puzzle(puzzle_id)
+    +try_mark_xp_awarded(puzzle_id, user_id)
+    +update_rating(rating, commit)
+    +upsert(rating, commit)
+  }
+  class ReplyRepo {
+    +conn
+    +_ensure_schema()
+    +_row_to_reply(row)
+    +clear_accepted_for_discussion(discussion_id, commit)
+    +count_by_discussion(discussion_id)
+    +create(reply, commit)
+    +delete(reply_id, commit)
+    +get_by_id(reply_id)
+    +get_by_ids(reply_ids)
+    +list_by_discussion(discussion_id, limit, offset)
+    +list_children(parent_reply_id)
+    +list_top_level(discussion_id, limit, offset)
+    +sync_votes_from_votes(reply_id, commit)
+    +update(reply_id, fields, commit)
+    +update_votes(reply_id, upvotes, downvotes, commit)
+  }
+  class ReportRepo {
+    +conn
+    +_ensure_schema()
+    +_row_to_dict(row)
+    +count(status)
+    +create(reporter_id, target_type, target_id, reason, details)
+    +get_by_id(report_id)
+    +has_reported(reporter_id, target_type, target_id)
+    +list_all(status, limit, offset)
+    +update_status(report_id, status)
+  }
+  class ScopedConnection {
+    +_counter
+    +__getattr__(name)
+    +__setattr__(name, value)
+    +_get_conn()
+    +close()
+    +close_all()
+    +commit()
+    +cursor()
+    +execute(sql, parameters)
+    +executemany(sql, seq_of_parameters)
+    +executescript(sql_script)
+    +get_raw_connection()
+    +in_transaction()
+    +isolation_level(value)
+    +rollback()
+    +row_factory(value)
+  }
+  class SolveRepo {
+    +conn
+    +_add_column_if_missing(table, coldef)
+    +_ensure_schema()
+    +_table_columns(table)
+    +add_solve(user_id, puzzle_id, time_taken_seconds, xp_earned, medal, cost_used, solution_json)
+    +claim_xp_delta(user_id, puzzle_id)
+    +create_attempt(attempt)
+    +delete_by_puzzle(puzzle_id)
+    +delete_by_puzzle_ids(puzzle_ids)
+    +first_attempt_started_at(user_id, puzzle_id)
+    +get_best_xp_for_puzzle(user_id, puzzle_id)
+    +get_duplicate_submission(user_id, puzzle_id, solution_json, seconds)
+    +get_leaderboard(puzzle_id, limit)
+    +get_leaderboard_by_cost(puzzle_id, limit)
+    +get_open_attempt(user_id, puzzle_id)
+    +get_progress(user_id, puzzle_id)
+    +get_solve_status_map(user_id)
+    +get_solved_counts()
+    +get_total_time_on_puzzle(user_id, puzzle_id)
+    +has_passed(user_id, puzzle_id)
+    +has_passed_before_attempt(user_id, puzzle_id, attempt_id)
+    +try_award_creator_solve_xp(puzzle_id, solver_user_id)
+    +update_attempt(attempt)
+    +upsert_progress(progress, xp_delta)
+  }
+  class UserRepo {
+    +conn
+    +_build_where(username_search, role, date_from, date_to, min_xp, max_xp, experience_level)
+    +_ensure_schema()
+    +_hash_password(password, salt)
+    +_min_xp_for_level(level)
+    +_row_to_user(row)
+    +ban_from_discussions(user_id)
+    +count_all(username_search, role, date_from, date_to, min_xp, max_xp, experience_level)
+    +create(user, password)
+    +delete(user_id)
+    +get_by_email(email)
+    +get_by_id(user_id)
+    +get_by_ids(user_ids)
+    +get_by_username(username)
+    +increment_xp(user_id, delta)
+    +list_all(limit, offset, username_search, role, date_from, date_to, min_xp, max_xp, experience_level, order_by, order_direction)
+    +unban_from_discussions(user_id)
+    +update_puzzle_limits(user_id, max_published, max_unpublished)
+    +update_role(user_id, role)
+    +update_role_if(user_id, new_role, expected_role)
+    +update_xp(user_id, xp)
+    +verify_login(username, password)
+  }
+}
+namespace OutsideScript {
+  class InsertRiddlesScript {
+    +DB_PATH
+    +PROJECT_ROOT
+    +RIDDLES_DIR
+    +SCRIPT_DIR
+    +clean_database(conn)
+    +get_or_create_admin(conn)
+    +get_seed_puzzle_names(riddles_dir)
+    +insert_puzzle_to_db(conn, config_data, instructions_text, creator_id, status)
+    +insert_riddle(conn, config_path, instructions_path, creator_id, status)
+    +iter_riddle_config_paths(riddles_dir)
+    +latex_to_html(latex_text)
+    +main()
+    +normalize_truth_table(truth_table)
+    +utcnow()
+  }
+}
+AdminController --> AdminService
+AdminController --> ValidationError
+AdminController --> logicEngineService
+AdminService --> AuditActionType
+AdminService --> AuditLogRepo
+AdminService --> AuthService
+AdminService --> NotificationRepo
+AdminService --> PuzzleRepo
+AdminService --> PuzzleStatus
+AdminService --> RatingRepo
+AdminService --> SolveRepo
+AdminService --> UserRepo
+AdminService --> UserRole
+AdminService --> ValidationError
+ArsenalController --> ArsenalService
+ArsenalController --> SolvingService
+ArsenalController --> ValidationError
+ArsenalService --> AuthService
+ArsenalService --> Circuit
+ArsenalService --> CircuitRepo
+ArsenalService --> GateType
+ArsenalService --> UserRepo
+ArsenalService --> UserRole
+ArsenalService --> ValidationError
+ArsenalService --> XPService
+ArsenalService --> logicEngineService
+AuthService --> SessionInfo
+AuthService --> UserRepo
+AuthService --> ValidationError
+Circuit --> GateType
+Circuit --> ValidationError
+CircuitController --> CircuitService
+CircuitController --> ValidationError
+CircuitRepo --> Circuit
+CircuitService --> AuthService
+CircuitService --> Circuit
+CircuitService --> CircuitRepo
+CircuitService --> GateType
+CircuitService --> UserRepo
+CircuitService --> UserRole
+CircuitService --> ValidationError
+CircuitService --> XPService
+CircuitService --> logicEngineService
+DebuggerController --> Circuit
+DebuggerController --> ValidationError
+DebuggerController --> logicEngineService
+Discussion --> ThreadCategory
+DiscussionController --> DiscussionService
+DiscussionController --> ReplyService
+DiscussionController --> ValidationError
+DiscussionRepo --> Discussion
+DiscussionService --> AuthService
+DiscussionService --> Discussion
+DiscussionService --> DiscussionRepo
+DiscussionService --> EngagementRepo
+DiscussionService --> NotificationRepo
+DiscussionService --> ReactionType
+DiscussionService --> ReplyRepo
+DiscussionService --> ReportRepo
+DiscussionService --> ThreadCategory
+DiscussionService --> UserRepo
+DiscussionService --> UserRole
+DiscussionService --> ValidationError
+DiscussionService --> XPService
+InsertRiddlesScript --> CircuitRepo
+InsertRiddlesScript --> PuzzleRepo
+InsertRiddlesScript --> RatingRepo
+InsertRiddlesScript --> UserRepo
+NotificationService --> AuthService
+NotificationService --> NotificationRepo
+Puzzle --> GateType
+Puzzle --> PuzzleDifficulty
+Puzzle --> PuzzleStatus
+Puzzle --> ValidationError
+PuzzleController --> AdminService
+PuzzleController --> PuzzleService
+PuzzleController --> RatingService
+PuzzleController --> SolvingService
+PuzzleController --> ValidationError
+PuzzleProgress --> SolveAttempt
+PuzzleRepo --> GateType
+PuzzleRepo --> Puzzle
+PuzzleRepo --> PuzzleDifficulty
+PuzzleRepo --> PuzzleStatus
+PuzzleRepo --> PuzzleTestCase
+PuzzleService --> AuthService
+PuzzleService --> GateType
+PuzzleService --> Puzzle
+PuzzleService --> PuzzleDifficulty
+PuzzleService --> PuzzleRepo
+PuzzleService --> PuzzleStatus
+PuzzleService --> PuzzleTestCase
+PuzzleService --> SolveRepo
+PuzzleService --> TestCaseKind
+PuzzleService --> UserRepo
+PuzzleService --> UserRole
+PuzzleService --> ValidationError
+PuzzleTestCase --> TestCaseKind
+PuzzleTestCase --> ValidationError
+Rating --> ValidationError
+RatingController --> RatingService
+RatingController --> ValidationError
+RatingRepo --> Rating
+RatingService --> AuthService
+RatingService --> PuzzleRepo
+RatingService --> Rating
+RatingService --> RatingRepo
+RatingService --> SolveRepo
+RatingService --> ValidationError
+RatingService --> XPService
+ReplyRepo --> Reply
+ReplyService --> AuthService
+ReplyService --> DiscussionRepo
+ReplyService --> EngagementRepo
+ReplyService --> ReactionType
+ReplyService --> Reply
+ReplyService --> ReplyRepo
+ReplyService --> UserRepo
+ReplyService --> UserRole
+ReplyService --> ValidationError
+ReplyService --> XPService
+SolveAttempt --> ValidationError
+SolveRepo --> PuzzleProgress
+SolveRepo --> SolveAttempt
+SolvingService --> AuthService
+SolvingService --> Circuit
+SolvingService --> CircuitRepo
+SolvingService --> Medal
+SolvingService --> PuzzleDifficulty
+SolvingService --> PuzzleProgress
+SolvingService --> PuzzleRepo
+SolvingService --> PuzzleStatus
+SolvingService --> SolveAttempt
+SolvingService --> SolveRepo
+SolvingService --> UserRepo
+SolvingService --> ValidationError
+SolvingService --> XPService
+SolvingService --> logicEngineService
+User --> UserRole
+User --> ValidationError
+UserController --> NotificationService
+UserController --> UserService
+UserController --> ValidationError
+UserRepo --> User
+UserRepo --> UserRole
+UserRepo --> ValidationError
+UserService --> AuthService
+UserService --> User
+UserService --> UserRepo
+UserService --> UserRole
+UserService --> ValidationError
+UserService --> XPService
+ValidationError --> DomainError
+XPService --> Medal
+XPService --> PuzzleDifficulty
+XPService --> UserRepo
+logicEngineService --> Circuit
+logicEngineService --> ValidationError
