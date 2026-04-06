@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,7 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type { PlacedGridComponent, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type { Wire } from '@/types/api';
-import GuidedTour from '@/components/ui/guided-tour';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { arsenalTourSteps } from '@/config/tourSteps';
 
 const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [
@@ -65,24 +65,6 @@ export default function ArsenalPage() {
   const [showTruthTable, setShowTruthTable] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [deletingPieceId, setDeletingPieceId] = useState<number | null>(null);
-  const [runTour, setRunTour] = useState(false);
-
-  // Auto-start tour on first visit
-  useEffect(() => {
-    const tourCompleted = localStorage.getItem('escapecircuit.tour.arsenal.status');
-    if (!tourCompleted) {
-      setRunTour(true);
-    }
-  }, []);
-
-  const handleTourCallback = (data: any) => {
-    const { action, type, status } = data;
-    // Mark tour as completed when user finishes or skips
-    if (status === 'finished' || status === 'skipped') {
-      localStorage.setItem('escapecircuit.tour.arsenal.status', 'completed');
-      setRunTour(false);
-    }
-  };
 
   const handleDelete = async (piece: ArsenalPiece) => {
     const confirmed = window.confirm(
@@ -174,11 +156,12 @@ export default function ArsenalPage() {
 
   return (
     <>
-      <GuidedTour
-        steps={arsenalTourSteps}
+      <PageTourLauncher
         tourName="arsenal"
-        run={runTour}
-        callback={handleTourCallback}
+        pageTitle="My Arsenal"
+        pageDescription="Explore your saved custom pieces, preview them, and manage actions like rename or delete."
+        steps={arsenalTourSteps}
+        side="left"
       />
       <div className="space-y-6">
         {/* Header */}

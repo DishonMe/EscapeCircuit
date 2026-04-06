@@ -32,7 +32,7 @@ import {
 } from "@/app/app/puzzles/[id]/_components/workstation-grid";
 import type { Wire } from "@/types/api";
 import { cn } from "@/utils/cn";
-import GuidedTour from "@/components/ui/guided-tour";
+import { PageTourLauncher } from "@/components/ui/page-tour-launcher";
 import { createPuzzleTourSteps } from "@/config/tourSteps";
 
 type TabName = "basic" | "test-cases" | "python-tests" | "instructions" | "initial-board" | "solution" | "custom-pieces";
@@ -413,7 +413,6 @@ export default function CreatePuzzleForm() {
   const [customPieces, setCustomPieces] = useState<any[]>([]);
   const [prevNumInputs, setPrevNumInputs] = useState(1);
   const [prevNumOutputs, setPrevNumOutputs] = useState(1);
-  const [runTour, setRunTour] = useState(false);
 
   // Compute filtered arsenal pieces that are selected for this puzzle
   const selectedArsenalPieces = useMemo(() => {
@@ -504,23 +503,6 @@ export default function CreatePuzzleForm() {
       setPrevNumOutputs(customPieceForm.numOutputs);
     }
   }, [customPieceForm.numInputs, customPieceForm.numOutputs, prevNumInputs, prevNumOutputs]);
-
-  // Auto-start tour on first visit
-  useEffect(() => {
-    const tourCompleted = localStorage.getItem('escapecircuit.tour.create-puzzle.completed');
-    if (!tourCompleted) {
-      setRunTour(true);
-    }
-  }, []);
-
-  const handleTourCallback = (data: any) => {
-    const { action, type, status } = data;
-    // Mark tour as completed when user finishes or skips
-    if (status === 'finished' || status === 'skipped') {
-      localStorage.setItem('escapecircuit.tour.create-puzzle.completed', 'true');
-      setRunTour(false);
-    }
-  };
 
   // Wrapper callbacks to auto-lock components/wires on initial board
   const handleInitialBoardPlacedChange = (newPlaced: PlacedGridComponent[]) => {
@@ -1451,11 +1433,12 @@ export default function CreatePuzzleForm() {
 
   return (
     <>
-      <GuidedTour
-        steps={createPuzzleTourSteps}
+      <PageTourLauncher
         tourName="create-puzzle"
-        run={runTour}
-        callback={handleTourCallback}
+        pageTitle="Create Puzzle"
+        pageDescription="Learn the tabs and controls for building, testing, documenting, and publishing your puzzle."
+        steps={createPuzzleTourSteps}
+        side="left"
       />
       <div className="p-8 max-w-6xl mx-auto">
         <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
