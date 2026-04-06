@@ -19,15 +19,7 @@ import {
 import { useMemo, useState, ChangeEvent, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import GuidedTour from '@/components/ui/guided-tour';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { Link } from '@/components/ui/link';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { paths } from '@/config/paths';
@@ -60,7 +52,6 @@ export const PuzzlesList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1, selectedDifficulties: [1, 2, 3] });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
-  const [runTour, setRunTour] = useState(false);
 
   const tourSteps = [
     {
@@ -73,23 +64,6 @@ export const PuzzlesList = () => {
       content: 'Click on any puzzle card here to enter the Workstation and start solving!',
     }
   ];
-
-  // Auto-start tour on first visit
-  useEffect(() => {
-    const tourCompleted = localStorage.getItem('escapecircuit.tour.browse-puzzles.completed');
-    if (!tourCompleted) {
-      setRunTour(true);
-    }
-  }, []);
-
-  const handleTourCallback = (data: any) => {
-    const { action, type, status } = data;
-    // Mark tour as completed when user finishes or skips
-    if (status === 'finished' || status === 'skipped') {
-      localStorage.setItem('escapecircuit.tour.browse-puzzles.completed', 'true');
-      setRunTour(false);
-    }
-  };
 
   const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
 
@@ -211,44 +185,12 @@ export const PuzzlesList = () => {
 
   return (
     <>
-      <GuidedTour
+      <PageTourLauncher
+        tourName="browse-puzzles"
+        pageTitle="Circuit Puzzles"
+        pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the ? button."
         steps={tourSteps}
-        run={runTour}
-        continuous
-        scrollToFirstStep
-        showSkipButton
-        showProgress
-        styles={{
-          options: {
-            primaryColor: 'hsl(var(--foreground))',
-            textColor: 'hsl(var(--foreground))',
-            backgroundColor: 'hsl(var(--card))',
-            zIndex: 10000,
-          },
-          button: {
-            backgroundColor: 'hsl(var(--foreground))',
-            color: 'hsl(var(--card))',
-            fontSize: '13px',
-            borderRadius: '6px',
-            padding: '6px 12px',
-          },
-          tooltip: {
-            backgroundColor: 'hsl(var(--card))',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            color: 'hsl(var(--foreground))',
-            fontSize: '13px',
-            lineHeight: '1.5',
-            padding: '12px 16px',
-          },
-        }}
-        locale={{
-          last: 'Finish',
-          skip: 'Skip',
-          next: 'Next',
-          back: 'Back',
-        }}
-        callback={handleTourCallback}
+        side="left"
       />
       <div className="space-y-6">
       {/* Filter Controls */}

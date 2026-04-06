@@ -18,7 +18,7 @@ export default function GuidedTour({ steps, ...props }: any) {
     };
   }, [pathname]);
 
-  // 2. Global Event Listener: Kill tour on navigation clicks, but NOT Joyride button clicks
+  // 2. Global Event Listener: Kill tour on navigation link clicks, but NOT Joyride button clicks
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -27,8 +27,8 @@ export default function GuidedTour({ steps, ...props }: any) {
       const isJoyrideClick = target.closest('.react-joyride__tooltip') || 
                              target.closest('.react-joyride__beacon');
 
-      // 2. Only kill the tour if it's a navigation-related click NOT inside Joyride
-      if (!isJoyrideClick && (target.closest('a') || target.closest('button'))) {
+      // 2. Only kill the tour if it's a navigation-related link click NOT inside Joyride
+      if (!isJoyrideClick && target.closest('a')) {
         setActive(false);
       }
     };
@@ -53,6 +53,14 @@ export default function GuidedTour({ steps, ...props }: any) {
     disableScrolling: true,
   })) || [];
 
+  const mergedStyles = {
+    ...(props.styles || {}),
+    options: {
+      ...((props.styles && props.styles.options) || {}),
+      zIndex: 10020,
+    },
+  };
+
   return (
     <JoyrideComponent
       {...props}
@@ -61,11 +69,7 @@ export default function GuidedTour({ steps, ...props }: any) {
       disableBeacon={true}
       disableScrolling={true}
       scrollToFirstStep={false}
-      styles={{
-        options: {
-          zIndex: 0, // Drop the Z-index so it's always behind your loading screen
-        },
-      }}
+      styles={mergedStyles}
     />
   );
 }

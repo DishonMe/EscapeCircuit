@@ -46,7 +46,7 @@ import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderbo
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { Bug, ChevronDown, StepBack, StepForward } from 'lucide-react';
-import GuidedTour from '@/components/ui/guided-tour';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { workstationTourSteps } from '@/config/tourSteps';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
@@ -232,7 +232,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   } | null>(null);
   const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(null);
   const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<string | null>(null);
-  const [runTour, setRunTour] = useState(false);
 
 
   // Sync isSolved from API data (so page refresh preserves solved state)
@@ -315,23 +314,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       cancelled = true;
     };
   }, [puzzle?.id]);
-
-  // Auto-start tour on first visit
-  useEffect(() => {
-    const tourCompleted = localStorage.getItem('escapecircuit.tour.puzzle-workstation.completed');
-    if (!tourCompleted) {
-      setRunTour(true);
-    }
-  }, []);
-
-  const handleTourCallback = (data: any) => {
-    const { action, type, status } = data;
-    // Mark tour as completed when user finishes or skips
-    if (status === 'finished' || status === 'skipped') {
-      localStorage.setItem('escapecircuit.tour.puzzle-workstation.completed', 'true');
-      setRunTour(false);
-    }
-  };
 
   const notifications = useNotifications();
 
@@ -1683,7 +1665,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   return (
     <>
-      <GuidedTour steps={workstationTourSteps} tourName="puzzle-workstation" run={runTour} callback={handleTourCallback} />
+      <PageTourLauncher
+        tourName="puzzle-workstation"
+        pageTitle="Puzzle Workstation"
+        pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
+        steps={workstationTourSteps}
+        side="left"
+      />
       <div className="flex w-full flex-col gap-3">
       {visualEffectsEnabled && showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
         <Confetti
