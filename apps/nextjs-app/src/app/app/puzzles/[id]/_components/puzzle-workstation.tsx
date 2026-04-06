@@ -1983,7 +1983,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         <button
           type="button"
           onClick={() => setShowSandbox(!showSandbox)}
-          className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm hover:bg-card transition-colors"
+          className="workstation-sandbox-toggle flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm transition-colors hover:bg-card"
         >
           <ChevronDown
             size={16}

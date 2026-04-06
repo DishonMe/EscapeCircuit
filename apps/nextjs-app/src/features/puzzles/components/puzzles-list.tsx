@@ -19,6 +19,14 @@ import {
 import { useMemo, useState, ChangeEvent, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { Link } from '@/components/ui/link';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
@@ -56,12 +64,21 @@ export const PuzzlesList = () => {
   const tourSteps = [
     {
       target: '.puzzle-filters-button',
-      content: 'Use these filters and sort options to find specific puzzles by difficulty, fun rating, or completion status.',
+      content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
       disableBeacon: true,
     },
     {
+      target: '.puzzle-instructions-button',
+      content: 'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+    },
+    {
+      target: '.dialog-close-button',
+      content: 'Use the Close button to exit the instructions and return to the puzzle list.',
+      placement: 'left',
+    },
+    {
       target: '.puzzle-card-action',
-      content: 'Click on any puzzle card here to enter the Workstation and start solving!',
+      content: 'Click to start solving!',
     }
   ];
 
@@ -553,8 +570,8 @@ export const PuzzlesList = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className={`text-[13px] flex items-center ${puzzle.creatorComment ? 'flex-1' : ''}`}
                 onClick={() => setDetailsPuzzleId(puzzle.id)}
+                className={`text-[13px] flex items-center puzzle-instructions-button ${puzzle.creatorComment ? 'flex-1' : ''}`}
               >
                 📋 Instructions
               </Button>

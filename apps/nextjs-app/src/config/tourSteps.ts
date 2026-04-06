@@ -11,6 +11,18 @@ export const browsePuzzlesTourSteps: Step[] = [
     placement: 'bottom',
   },
   {
+    target: '.puzzle-instructions-button',
+    content:
+      'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+    placement: 'bottom',
+  },
+  {
+    target: '.dialog-close-button',
+    content:
+      'Use the Close button to exit the instructions and return to the puzzle list.',
+    placement: 'left',
+  },
+  {
     target: '.puzzle-sort-dropdown',
     content:
       'Sort puzzles by creation date, difficulty level, fun rating, or clarity. Find the perfect puzzle to work on next!',
@@ -67,8 +79,20 @@ export const workstationTourSteps: Step[] = [
   {
     target: '.workstation-instructions-button',
     content:
-      'Refer back to the puzzle instructions at any time. They contain the problem statement, constraints, and hints from the puzzle creator.',
+      'Refer back to the puzzle instructions to understand the problem statement, constraints, and hints from the puzzle creator.',
     placement: 'left',
+  },
+  {
+    target: '.dialog-close-button',
+    content:
+      'Use the Close button to exit the instructions and return to the workstation.',
+    placement: 'left',
+  },
+  {
+    target: '.workstation-sandbox-toggle',
+    content:
+      'This is the Sandbox: a safe area where you can experiment freely without changing your current puzzle solution state.',
+    placement: 'top',
   },
 ];
 

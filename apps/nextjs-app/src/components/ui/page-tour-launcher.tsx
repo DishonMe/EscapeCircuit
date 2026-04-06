@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
-import { CircleHelp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { HelpCircle } from 'lucide-react';
 
 import GuidedTour from '@/components/ui/guided-tour';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/utils/cn';
 
 type PageTourLauncherProps = {
@@ -95,22 +95,61 @@ export function PageTourLauncher({
 }: PageTourLauncherProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [runTour, setRunTour] = useState(false);
+  const [tourInstanceId, setTourInstanceId] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  const storageKey = `escapecircuit.tour.${tourName}.completed`;
+  const normalizedSteps = (steps || []).map((step: any) => ({
+    ...step,
+    skipBeacon: true,
+  }));
 
   const handleStartTour = () => {
     setDialogOpen(false);
+    setCurrentStepIndex(0);
+    setTourInstanceId((current) => current + 1);
     setRunTour(true);
   };
 
   const handleTourCallback = (data: any) => {
-    const { status } = data;
+    const { status, index } = data;
+
+    if (typeof index === 'number') {
+      setCurrentStepIndex(index);
+    }
 
     if (status === 'finished' || status === 'skipped') {
-      localStorage.setItem(storageKey, 'true');
       setRunTour(false);
     }
   };
+
+  const currentStep = normalizedSteps[currentStepIndex];
+
+  const isInstructionStep =
+    typeof currentStep?.target === 'string' && currentStep.target.includes('instructions-button');
+
+  const handleTourAdvanceClick = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    const isInstructionButtonClick =
+      target.closest('.puzzle-instructions-button') || target.closest('.workstation-instructions-button');
+
+    if (!runTour || !isInstructionStep || !isInstructionButtonClick) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      const primaryButton = document.querySelector('[data-action="primary"]') as HTMLButtonElement | null;
+      primaryButton?.click();
+    }, 120);
+  };
+
+  useEffect(() => {
+    if (!runTour) {
+      return;
+    }
+
+    window.addEventListener('click', handleTourAdvanceClick, true);
+    return () => window.removeEventListener('click', handleTourAdvanceClick, true);
+  }, [runTour, currentStepIndex, normalizedSteps]);
 
   return (
     <>
@@ -120,43 +159,49 @@ export function PageTourLauncher({
           side === 'left' ? 'left-4 sm:left-6' : 'right-4 sm:right-6',
         )}
       >
-        <button
+        <Button
           type="button"
+          size="icon"
           onClick={() => setDialogOpen(true)}
-          aria-label={`Open ${pageTitle} tutorial`}
+          aria-label={`Start ${pageTitle} tutorial`}
           className={cn(
-            'flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-[0_18px_45px_rgba(0,0,0,0.35)] transition-transform duration-200 hover:scale-105 hover:bg-foreground/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
+            'size-12 rounded-full border-2 border-black bg-white text-black shadow-[0_18px_45px_rgba(0,0,0,0.35)] hover:bg-zinc-100 dark:border-white dark:bg-black dark:text-white dark:hover:bg-zinc-900',
             buttonClassName,
           )}
         >
-          <CircleHelp className="size-7" aria-hidden="true" />
-          <span className="sr-only">Open tutorial</span>
-        </button>
+          <HelpCircle className="size-6" />
+        </Button>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Start {pageTitle} tutorial?</DialogTitle>
+            <DialogTitle>Start tutorial for {pageTitle}?</DialogTitle>
             <DialogDescription>{pageDescription}</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
               Not now
             </Button>
-            <Button onClick={handleStartTour}>Start tutorial</Button>
+            <Button type="button" onClick={handleStartTour}>
+              Start tutorial
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <GuidedTour
-        steps={steps}
+        key={`${tourName}-${tourInstanceId}`}
+        steps={normalizedSteps}
         tourName={tourName}
         run={runTour}
         continuous
-        scrollToFirstStep
+        scrollToFirstStep={false}
+        skipScroll
         showSkipButton={false}
         showProgress={false}
+        skipBeacon
         callback={handleTourCallback}
         tooltipComponent={TourTooltip}
         styles={{
