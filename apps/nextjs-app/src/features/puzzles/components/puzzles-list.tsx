@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { Link } from '@/components/ui/link';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { paths } from '@/config/paths';
@@ -59,6 +60,28 @@ export const PuzzlesList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<PuzzleFilters>({ page: 1, selectedDifficulties: [1, 2, 3] });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
+
+  const tourSteps = [
+    {
+      target: '.puzzle-filters-button',
+      content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
+      disableBeacon: true,
+    },
+    {
+      target: '.puzzle-instructions-button',
+      content: 'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+    },
+    {
+      target: '.dialog-close-button',
+      content: 'Use the Close button to exit the instructions and return to the puzzle list.',
+      placement: 'left',
+    },
+    {
+      target: '.puzzle-card-action',
+      content: 'Click to start solving!',
+    }
+  ];
+
   const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
 
   const getActiveFilterCount = () => {
@@ -178,14 +201,22 @@ export const PuzzlesList = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <PageTourLauncher
+        tourName="browse-puzzles"
+        pageTitle="Circuit Puzzles"
+        pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the ? button."
+        steps={tourSteps}
+        side="left"
+      />
+      <div className="space-y-6">
       {/* Filter Controls */}
       <div className="flex items-center justify-between gap-4">
         <Button
           variant="outline"
           size="sm"
           onClick={() => setShowFilters(!showFilters)}
-          className="gap-2"
+          className="gap-2 puzzle-filters-button"
         >
           <Filter className="size-4" />
           Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
@@ -340,7 +371,7 @@ export const PuzzlesList = () => {
             <div>
               <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
               <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring puzzle-sort-dropdown"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
               >
@@ -524,7 +555,7 @@ export const PuzzlesList = () => {
                 variant="outline"
                 size="sm"
                 className={cn(
-                  'text-[13px] flex items-center gap-2',
+                  'text-[13px] flex items-center gap-2 puzzle-save-button',
                   puzzle.is_saved && 'border-yellow-200/60 bg-yellow-50/50'
                 )}
                 onClick={() => saveMutation.mutate({ puzzleId: puzzle.id })}
@@ -539,8 +570,8 @@ export const PuzzlesList = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className={`text-[13px] flex items-center ${puzzle.creatorComment ? 'flex-1' : ''}`}
                 onClick={() => setDetailsPuzzleId(puzzle.id)}
+                className={`text-[13px] flex items-center puzzle-instructions-button ${puzzle.creatorComment ? 'flex-1' : ''}`}
               >
                 📋 Instructions
               </Button>
@@ -557,7 +588,7 @@ export const PuzzlesList = () => {
             </div>
 
             {/* Rating and leaderboard */}
-            <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3">
+            <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3 puzzle-rating-section">
               {/* Already Rated Badge */}
               {puzzle.user_rating && (
                 <div className="flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 w-full">
@@ -712,7 +743,7 @@ export const PuzzlesList = () => {
             <div className="mt-4 flex justify-center">
               <Link
                 href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full max-w-xs rounded-lg bg-foreground px-4 py-3 text-center text-sm font-semibold text-background shadow-md transition-colors hover:bg-foreground/90"
+                className="w-full max-w-xs rounded-lg bg-foreground px-4 py-3 text-center text-sm font-semibold text-background shadow-md transition-colors hover:bg-foreground/90 puzzle-card-action"
               >
                 Solve Puzzle
               </Link>
@@ -799,5 +830,6 @@ export const PuzzlesList = () => {
         </div>
       )}
     </div>
+    </>
   );
 };

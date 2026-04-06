@@ -13,7 +13,8 @@ import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
 import { useUser } from '@/lib/auth';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { PlacedGridComponent, Wire, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type { PlacedGridComponent, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type { Wire } from '@/types/api';
 
 type EntryProps = {
   label: string;

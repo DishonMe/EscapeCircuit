@@ -6,7 +6,7 @@ import {
 
 import { getPuzzlesQueryOptions } from '@/features/puzzles/api/get-puzzles';
 
-import { MyPuzzles } from './_components/my-puzzles';
+import { MyPuzzlesClient } from './_components/my-puzzles-client';
 
 export const metadata = {
   title: 'My Created Puzzles',
@@ -30,7 +30,7 @@ const MyPuzzlesPage = async ({
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <MyPuzzles />
+      <MyPuzzlesClient />
     </HydrationBoundary>
   );
 };

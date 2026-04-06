@@ -46,6 +46,8 @@ import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderbo
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { Bug, ChevronDown, StepBack, StepForward } from 'lucide-react';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import { workstationTourSteps } from '@/config/tourSteps';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -1662,7 +1664,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const visibleBasics = basicComponents;
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <>
+      <PageTourLauncher
+        tourName="puzzle-workstation"
+        pageTitle="Puzzle Workstation"
+        pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
+        steps={workstationTourSteps}
+        side="left"
+      />
+      <div className="flex w-full flex-col gap-3">
       {visualEffectsEnabled && showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
         <Confetti
           width={viewportSize.width}
@@ -1711,7 +1721,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds}
             />
             {!isInlineDebugger ? (
-              <Button variant="outline" size="sm" onClick={enterInlineDebugger}>
+              <Button variant="outline" size="sm" className="workstation-debugger-button" onClick={enterInlineDebugger}>
                 <Bug className="mr-1 size-4" />
                 Debugger
               </Button>
@@ -1754,13 +1764,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             >
               Rate Puzzle
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowPuzzleInfo(true)}>
+            <Button variant="outline" size="sm" className="workstation-instructions-button" onClick={() => setShowPuzzleInfo(true)}>
               Instructions
             </Button>
             <div className="relative">
               <Button
                 size="sm"
-                className="transition-all hover:scale-105 active:scale-95"
+                className="workstation-check-button transition-all hover:scale-105 active:scale-95"
                 onClick={checkSolution}
                 isLoading={isChecking}
               >
@@ -1822,8 +1832,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       </div>
 
       <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
-        <WorkstationMenu
-          basic={visibleBasics}
+        <div className="workstation-component-menu">
+          <WorkstationMenu
+            basic={visibleBasics}
           custom={customComponents}
           arsenal={arsenalComponents}
           componentDefs={uiCatalog}
@@ -1840,8 +1851,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onDragStart={setDraggedPaletteComponentId}
           onDragEnd={() => setDraggedPaletteComponentId(null)}
         />
+        </div>
 
-        <WorkstationGrid
+        <div className="workstation-grid">
+          <WorkstationGrid
           puzzleId={puzzle.id}
           inputs={inputs}
           outputs={outputs}
@@ -1873,6 +1886,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onInspectComponent={setInspectingPlacedId}
           arsenalComponentDisplayModes={arsenalComponentDisplayModes}
         />
+        </div>
 
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
@@ -1969,7 +1983,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         <button
           type="button"
           onClick={() => setShowSandbox(!showSandbox)}
-          className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm hover:bg-card transition-colors"
+          className="workstation-sandbox-toggle flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm transition-colors hover:bg-card"
         >
           <ChevronDown
             size={16}
@@ -2419,6 +2433,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       )}
 
     </div>
+    </>
   );
 };
 

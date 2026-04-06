@@ -32,6 +32,8 @@ import {
 } from "@/app/app/puzzles/[id]/_components/workstation-grid";
 import type { Wire } from "@/types/api";
 import { cn } from "@/utils/cn";
+import GuidedTour from "@/components/ui/guided-tour";
+import { createPuzzleTourSteps } from "@/config/tourSteps";
 
 type TabName = "basic" | "test-cases" | "python-tests" | "instructions" | "initial-board" | "solution" | "custom-pieces";
 
@@ -411,6 +413,7 @@ export default function CreatePuzzleForm() {
   const [customPieces, setCustomPieces] = useState<any[]>([]);
   const [prevNumInputs, setPrevNumInputs] = useState(1);
   const [prevNumOutputs, setPrevNumOutputs] = useState(1);
+  const [runTour, setRunTour] = useState(false);
 
   // Compute filtered arsenal pieces that are selected for this puzzle
   const selectedArsenalPieces = useMemo(() => {
@@ -501,6 +504,23 @@ export default function CreatePuzzleForm() {
       setPrevNumOutputs(customPieceForm.numOutputs);
     }
   }, [customPieceForm.numInputs, customPieceForm.numOutputs, prevNumInputs, prevNumOutputs]);
+
+  // Auto-start tour on first visit
+  useEffect(() => {
+    const tourCompleted = localStorage.getItem('escapecircuit.tour.create-puzzle.completed');
+    if (!tourCompleted) {
+      setRunTour(true);
+    }
+  }, []);
+
+  const handleTourCallback = (data: any) => {
+    const { action, type, status } = data;
+    // Mark tour as completed when user finishes or skips
+    if (status === 'finished' || status === 'skipped') {
+      localStorage.setItem('escapecircuit.tour.create-puzzle.completed', 'true');
+      setRunTour(false);
+    }
+  };
 
   // Wrapper callbacks to auto-lock components/wires on initial board
   const handleInitialBoardPlacedChange = (newPlaced: PlacedGridComponent[]) => {
@@ -1430,39 +1450,58 @@ export default function CreatePuzzleForm() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
+    <>
+      <GuidedTour
+        steps={createPuzzleTourSteps}
+        tourName="create-puzzle"
+        run={runTour}
+        callback={handleTourCallback}
+      />
+      <div className="p-8 max-w-6xl mx-auto">
+        <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
 
-      {/* Tabs */}
-      <div className="flex border-b mb-6">
-        {(["basic", "test-cases", "python-tests", "custom-pieces", "instructions", "initial-board", "solution"] as TabName[]).map(
-          (tab) => (
-            <button
-              key={tab}
-              onClick={() => handleTabChange(tab)}
-              className={`px-6 py-2 text-[13px] font-semibold transition-colors ${
-                activeTab === tab
-                  ? "border-b-2 border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab === "basic"
-                ? "Basic Info"
-                : tab === "test-cases"
-                  ? "Test Cases"
-                  : tab === "python-tests"
-                    ? "Python Tests"
-                    : tab === "custom-pieces"
-                      ? "Custom Pieces"
-                      : tab === "instructions"
-                        ? "Instructions"
-                        : tab === "initial-board"
-                          ? "Initial Board"
-                          : "Solution"}
-            </button>
-          )
-        )}
-      </div>
+        {/* Tabs */}
+        <div className="flex border-b mb-6">
+          {(["basic", "test-cases", "python-tests", "custom-pieces", "instructions", "initial-board", "solution"] as TabName[]).map(
+            (tab) => (
+              <button
+                key={tab}
+                className={`px-6 py-2 text-[13px] font-semibold transition-colors ${
+                  tab === "basic"
+                    ? "create-puzzle-basic-tab"
+                    : tab === "test-cases"
+                      ? "create-puzzle-test-cases-tab"
+                      : tab === "custom-pieces"
+                        ? "create-puzzle-custom-pieces-tab"
+                        : tab === "instructions"
+                          ? "create-puzzle-instructions-tab"
+                          : tab === "solution"
+                            ? "create-puzzle-solution-tab"
+                            : ""
+                } ${
+                  activeTab === tab
+                    ? "border-b-2 border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => handleTabChange(tab)}
+              >
+                {tab === "basic"
+                  ? "Basic Info"
+                  : tab === "test-cases"
+                    ? "Test Cases"
+                    : tab === "python-tests"
+                      ? "Python Tests"
+                      : tab === "custom-pieces"
+                        ? "Custom Pieces"
+                        : tab === "instructions"
+                          ? "Instructions"
+                          : tab === "initial-board"
+                            ? "Initial Board"
+                            : "Solution"}
+              </button>
+            )
+          )}
+        </div>
 
       {/* Tab Content */}
       <div className="mb-8">
@@ -2763,7 +2802,7 @@ def run_tests(solution):
         </button>
         <button
           onClick={() => setShowConfirm("submit")}
-          className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
+          className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50 create-puzzle-publish-button"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Creating..." : "Create Puzzle"}
@@ -2952,6 +2991,7 @@ def run_tests(solution):
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }
