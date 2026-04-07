@@ -5,7 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -235,6 +235,67 @@ export const WorkstationGrid = ({
   const [clipboard, setClipboard] = useState<{ components: PlacedGridComponent[], wires: Wire[] } | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
 
+  const canCopySelection =
+    selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0;
+  const canPasteSelection = Boolean(clipboard && clipboard.components.length > 0);
+
+  const copySelectionToClipboard = useCallback(() => {
+    if (selectedEntity.type !== 'component' || selectedEntity.placedIds.length === 0) {
+      return;
+    }
+
+    const selectedIds = new Set(selectedEntity.placedIds);
+    const selectedComps = placed.filter((p) => selectedIds.has(p.id));
+    const internalWires = wires.filter(
+      (w) => selectedIds.has(w.from.componentId) && selectedIds.has(w.to.componentId),
+    );
+
+    setClipboard({ components: selectedComps, wires: internalWires });
+  }, [selectedEntity, placed, wires]);
+
+  const pasteFromClipboard = useCallback(() => {
+    if (!clipboard || clipboard.components.length === 0) {
+      return;
+    }
+
+    const idMap = new Map<string, string>();
+    const newComponents: PlacedGridComponent[] = [];
+    const newWires: Wire[] = [];
+
+    clipboard.components.forEach((comp, idx) => {
+      const newId = `${comp.componentId}:${Date.now()}-${idx}`;
+      idMap.set(comp.id, newId);
+      newComponents.push({
+        id: newId,
+        componentId: comp.componentId,
+        origin: {
+          row: clamp(comp.origin.row + 2, 0, gridRows - 1),
+          col: clamp(comp.origin.col + 2, 0, gridCols - 1),
+        },
+        rotation: comp.rotation,
+      });
+    });
+
+    clipboard.wires.forEach((wire, idx) => {
+      const newFromId = idMap.get(wire.from.componentId);
+      const newToId = idMap.get(wire.to.componentId);
+      if (newFromId && newToId) {
+        newWires.push({
+          id: `${wire.id}:${Date.now()}-${idx}`,
+          from: { ...wire.from, componentId: newFromId },
+          to: { ...wire.to, componentId: newToId },
+        });
+      }
+    });
+
+    onPlacedChange([...placed, ...newComponents]);
+    onWiresChange([...wires, ...newWires]);
+    setSelectedEntity({
+      type: 'component',
+      placedIds: Array.from(idMap.values()),
+    });
+  }, [clipboard, gridRows, gridCols, onPlacedChange, onWiresChange, placed, wires]);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setBootSequenceActive(false);
@@ -251,70 +312,18 @@ export const WorkstationGrid = ({
 
       if (isCopyKey) {
         e.preventDefault();
-        // Copy: collect selected components and their internal wires
-        if (selectedEntity.type === 'component' && selectedEntity.placedIds && selectedEntity.placedIds.length > 0) {
-          const selectedIds = new Set(selectedEntity.placedIds);
-          const selectedComps = placed.filter((p) => selectedIds.has(p.id));
-          // Only copy internal wires (both endpoints in selection)
-          const internalWires = wires.filter(
-            (w) => selectedIds.has(w.from.componentId) && selectedIds.has(w.to.componentId)
-          );
-          setClipboard({ components: selectedComps, wires: internalWires });
-        }
+        copySelectionToClipboard();
       }
 
       if (isPasteKey) {
         e.preventDefault();
-        // Paste: clone components and wires with new IDs and offset
-        if (clipboard && clipboard.components.length > 0) {
-          const idMap = new Map<string, string>();
-          const newComponents: PlacedGridComponent[] = [];
-          const newWires: Wire[] = [];
-
-          // Create new components with offset
-          clipboard.components.forEach((comp, idx) => {
-            const newId = `${comp.componentId}:${Date.now()}-${idx}`;
-            idMap.set(comp.id, newId);
-            newComponents.push({
-              id: newId,
-              componentId: comp.componentId,
-              origin: {
-                row: clamp(comp.origin.row + 2, 0, gridRows - 1),
-                col: clamp(comp.origin.col + 2, 0, gridCols - 1),
-              },
-              rotation: comp.rotation,
-            });
-          });
-
-          // Create new wires using ID map
-          clipboard.wires.forEach((wire, idx) => {
-            const newFromId = idMap.get(wire.from.componentId);
-            const newToId = idMap.get(wire.to.componentId);
-            if (newFromId && newToId) {
-              newWires.push({
-                id: `${wire.id}:${Date.now()}-${idx}`,
-                from: { ...wire.from, componentId: newFromId },
-                to: { ...wire.to, componentId: newToId },
-              });
-            }
-          });
-
-          // Add to placed/wires (budget guard runs in onPlacedChange)
-          onPlacedChange([...placed, ...newComponents]);
-          onWiresChange([...wires, ...newWires]);
-
-          // Auto-select newly pasted components
-          setSelectedEntity({
-            type: 'component',
-            placedIds: Array.from(idMap.values()),
-          });
-        }
+        pasteFromClipboard();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, placed, wires, clipboard, gridRows, gridCols, onPlacedChange, onWiresChange]);
+  }, [copySelectionToClipboard, pasteFromClipboard]);
 
   // Keyboard deletion (Delete / Backspace)
   useEffect(() => {
@@ -1308,7 +1317,7 @@ export const WorkstationGrid = ({
         </div>
         <div className="text-xs text-muted-foreground">
           {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan. Click/drag ports to
-          wire. While placing, press R to rotate.
+          wire. While placing, press R to rotate. Use Copy/Paste buttons or Ctrl+C/Ctrl+V.
         </div>
       </div>
 
@@ -1417,6 +1426,38 @@ export const WorkstationGrid = ({
         ) : null}
 
         {/* Trash */}
+        <div
+          className="absolute right-16 top-3 z-30 flex items-center gap-2"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-10 px-3"
+            onClick={(e) => {
+              e.stopPropagation();
+              copySelectionToClipboard();
+            }}
+            disabled={!canCopySelection}
+            title="Copy selected components (Ctrl+C)"
+          >
+            Copy
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-10 px-3"
+            onClick={(e) => {
+              e.stopPropagation();
+              pasteFromClipboard();
+            }}
+            disabled={!canPasteSelection}
+            title="Paste copied components (Ctrl+V)"
+          >
+            Paste
+          </Button>
+        </div>
+
         <button
           type="button"
           ref={trashRef}
