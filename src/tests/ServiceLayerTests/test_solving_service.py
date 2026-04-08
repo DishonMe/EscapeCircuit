@@ -6235,5 +6235,137 @@ class TestSolvingServiceExtended:
         assert "Cycle 0 error: Boom" in result["fail_reason"]
 
 
+class TestSolvingServiceGateLimitBuckets:
+    @staticmethod
+    def _make_service():
+        mock_conn = Mock(spec=sqlite3.Connection)
+        mock_solve_repo = Mock()
+        mock_puzzle_repo = Mock()
+        mock_circuit_repo = Mock()
+        mock_auth = Mock()
+        mock_engine = Mock()
+        mock_engine.evaluate.return_value = {}
+        mock_xp = Mock()
+
+        service = SolvingService(
+            mock_conn,
+            mock_solve_repo,
+            mock_puzzle_repo,
+            mock_circuit_repo,
+            mock_auth,
+            mock_engine,
+            mock_xp,
+        )
+        return service, mock_circuit_repo
+
+    @staticmethod
+    def _make_circuit(component_ids):
+        placed = [
+            {"id": f"c{i}", "componentId": component_id, "x": i, "y": 0}
+            for i, component_id in enumerate(component_ids, start=1)
+        ]
+        return Circuit(
+            id=1,
+            user_id=1,
+            name="Limit test circuit",
+            cost=0,
+            structure_json=json.dumps({"placedComponents": placed, "wires": []}),
+        )
+
+    def test_shared_arsenal_is_excluded_from_private_arsenal_total_limit(self):
+        service, mock_circuit_repo = self._make_service()
+
+        shared_piece = Mock()
+        shared_piece.is_arsenal = True
+        shared_piece.puzzle_id = None
+        shared_piece.name = "SharedAdder"
+        mock_circuit_repo.get_by_id.side_effect = lambda cid: {200: shared_piece}.get(cid)
+
+        puzzle = Mock()
+        puzzle.allowed_arsenal_component_ids = ["200"]
+        puzzle.riddle_base_name = None
+
+        circuit = self._make_circuit(["200"])
+
+        private_total_limit = {
+            "kind": "gate_limit",
+            "gate_name": "__ARSENAL_TOTAL__",
+            "gate_limit": 0,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [private_total_limit], puzzle)
+        assert passed is True
+        assert msg is None
+        assert details == []
+
+        shared_total_limit = {
+            "kind": "gate_limit",
+            "gate_name": "__ARSENAL_SHARED_TOTAL__",
+            "gate_limit": 0,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [shared_total_limit], puzzle)
+        assert passed is False
+        assert "Gate limit exceeded" in msg
+
+    def test_custom_piece_limit_by_reserved_name_fails_with_max_zero_when_used(self):
+        service, mock_circuit_repo = self._make_service()
+
+        custom_piece = Mock()
+        custom_piece.is_arsenal = True
+        custom_piece.puzzle_id = 99
+        custom_piece.name = "SpecialMux"
+        mock_circuit_repo.get_by_id.side_effect = lambda cid: {400: custom_piece}.get(cid)
+
+        puzzle = Mock()
+        puzzle.allowed_arsenal_component_ids = []
+        puzzle.riddle_base_name = None
+
+        circuit = self._make_circuit(["400"])
+
+        tc = {
+            "kind": "gate_limit",
+            "gate_name": "__CUSTOM_PIECE__:SpecialMux",
+            "gate_limit": 0,
+        }
+
+        passed, msg, details = service._evaluate_test_cases(circuit, [tc], puzzle)
+        assert passed is False
+        assert "Gate limit exceeded" in msg
+        assert details[0]["error_type"] == "gate_limit_exceeded"
+
+    def test_shared_arsenal_each_limit_is_checked_separately_from_private_each_limit(self):
+        service, mock_circuit_repo = self._make_service()
+
+        shared_piece = Mock()
+        shared_piece.is_arsenal = True
+        shared_piece.puzzle_id = None
+        shared_piece.name = "SharedPiece"
+        mock_circuit_repo.get_by_id.side_effect = lambda cid: {200: shared_piece}.get(cid)
+
+        puzzle = Mock()
+        puzzle.allowed_arsenal_component_ids = ["200"]
+        puzzle.riddle_base_name = None
+
+        circuit = self._make_circuit(["200", "200"])
+
+        private_each_limit = {
+            "kind": "gate_limit",
+            "gate_name": "__ARSENAL_EACH__",
+            "gate_limit": 1,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [private_each_limit], puzzle)
+        assert passed is True
+        assert msg is None
+        assert details == []
+
+        shared_each_limit = {
+            "kind": "gate_limit",
+            "gate_name": "__ARSENAL_SHARED_EACH__",
+            "gate_limit": 1,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [shared_each_limit], puzzle)
+        assert passed is False
+        assert "Shared arsenal per-piece limit exceeded" in msg
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

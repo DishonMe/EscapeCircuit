@@ -751,6 +751,42 @@ export default function CreatePuzzleForm() {
       return;
     }
 
+    if (
+      data.basic.minGateCount !== null &&
+      data.basic.totalGateCount !== null &&
+      data.basic.minGateCount > data.basic.totalGateCount
+    ) {
+      alert("Minimum Gate Count cannot exceed Gate Limit");
+      return;
+    }
+
+    for (const [gateName, minValue] of Object.entries(data.basic.minGateQuotas)) {
+      if (Number(minValue) < 0) {
+        alert(`Invalid minimum limit for ${gateName}. Use a non-negative integer.`);
+        return;
+      }
+    }
+
+    for (const [gateName, maxValue] of Object.entries(data.basic.gateQuotas)) {
+      if (Number(maxValue) <= 0) {
+        alert(`Maximum limit for ${gateName} must be greater than 0.`);
+        return;
+      }
+    }
+
+    const quotaNames = new Set([
+      ...Object.keys(data.basic.minGateQuotas),
+      ...Object.keys(data.basic.gateQuotas),
+    ]);
+    for (const gateName of quotaNames) {
+      const minValue = data.basic.minGateQuotas[gateName];
+      const maxValue = data.basic.gateQuotas[gateName];
+      if (minValue !== undefined && maxValue !== undefined && minValue > maxValue) {
+        alert(`Minimum limit for ${gateName} cannot exceed maximum limit.`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);

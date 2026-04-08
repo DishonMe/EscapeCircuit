@@ -69,6 +69,13 @@ interface TestCase {
   expectedOutputStream?: Record<string, number[]>;
 }
 
+type GateLimitTarget = {
+  name: string;
+  category: 'basic' | 'custom' | 'shared-arsenal';
+  cost: number;
+  pins: number;
+};
+
 // Helper functions for parsing binary string format
 const parseBinaryString = (str: string): number[] => {
   const trimmed = str.trim();
@@ -120,6 +127,13 @@ const GATE_PROPERTIES: Record<string, { cost: number; pins: number }> = {
   XNOR: { cost: 1, pins: 3 },
   DFF: { cost: 1, pins: 2 },
 };
+
+const ARSENAL_ZERO_FORBIDDEN_KEYS = new Set([
+  '__ARSENAL_TOTAL__',
+  '__ARSENAL_EACH__',
+  '__ARSENAL_SHARED_TOTAL__',
+  '__ARSENAL_SHARED_EACH__',
+]);
 
 // Truth tables for each gate
 const TRUTH_TABLES: Record<
@@ -472,6 +486,39 @@ export default function CreatePuzzleForm() {
       hideInternalStructure: piece.hideInternalStructure || false,
     }));
   }, [customPieces, selectedArsenalPieces]);
+
+  const gateLimitTargets = useMemo<GateLimitTarget[]>(() => {
+    const targets: GateLimitTarget[] = [];
+
+    for (const gateName of data.basic.gateSet) {
+      targets.push({
+        name: gateName,
+        category: 'basic',
+        cost: GATE_PROPERTIES[gateName]?.cost ?? 1,
+        pins: GATE_PROPERTIES[gateName]?.pins ?? 3,
+      });
+    }
+
+    for (const piece of customPieces) {
+      targets.push({
+        name: piece.name,
+        category: 'custom',
+        cost: piece.cost,
+        pins: piece.num_inputs + piece.num_outputs,
+      });
+    }
+
+    for (const piece of selectedArsenalPieces) {
+      targets.push({
+        name: piece.name,
+        category: 'shared-arsenal',
+        cost: piece.cost,
+        pins: piece.num_inputs + piece.num_outputs,
+      });
+    }
+
+    return targets;
+  }, [data.basic.gateSet, customPieces, selectedArsenalPieces]);
 
   // Initialize truth table when numInputs or numOutputs changes
   useEffect(() => {
@@ -1226,6 +1273,59 @@ export default function CreatePuzzleForm() {
       return;
     }
 
+    if (
+      data.basic.minGateCount !== null &&
+      data.basic.totalGateCount !== null &&
+      data.basic.minGateCount > data.basic.totalGateCount
+    ) {
+      alert("Minimum Gate Count cannot exceed Gate Limit");
+      return;
+    }
+
+    const basicGateNames = new Set(data.basic.gateSet);
+    const sharedArsenalNames = new Set(selectedArsenalPieces.map((piece) => piece.name));
+
+    for (const [gateName, rawMin] of Object.entries(data.basic.minGateQuotas)) {
+      const minValue = Number(rawMin);
+      if (!Number.isInteger(minValue) || minValue < 0) {
+        alert(`Invalid minimum limit for ${gateName}. Use a non-negative integer.`);
+        return;
+      }
+    }
+
+    for (const [gateName, rawMax] of Object.entries(data.basic.gateQuotas)) {
+      const maxValue = Number(rawMax);
+      if (!Number.isInteger(maxValue) || maxValue < 0) {
+        alert(`Invalid maximum limit for ${gateName}. Use a non-negative integer.`);
+        return;
+      }
+
+      if (
+        maxValue === 0 &&
+        (
+          basicGateNames.has(gateName) ||
+          sharedArsenalNames.has(gateName) ||
+          ARSENAL_ZERO_FORBIDDEN_KEYS.has(gateName)
+        )
+      ) {
+        alert(`Maximum limit for ${gateName} cannot be 0.`);
+        return;
+      }
+    }
+
+    const quotaNames = new Set([
+      ...Object.keys(data.basic.minGateQuotas),
+      ...Object.keys(data.basic.gateQuotas),
+    ]);
+    for (const gateName of quotaNames) {
+      const minValue = data.basic.minGateQuotas[gateName];
+      const maxValue = data.basic.gateQuotas[gateName];
+      if (minValue !== undefined && maxValue !== undefined && minValue > maxValue) {
+        alert(`Minimum limit for ${gateName} cannot exceed maximum limit.`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
@@ -1788,57 +1888,69 @@ export default function CreatePuzzleForm() {
               </div>
             )}
 
-            {data.basic.gateSet.length > 0 && (
+            {gateLimitTargets.length > 0 && (
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-2">
-                  Per-Gate Limits (optional)
+                  Per-Component Limits (optional)
                 </label>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Basic gates and shared arsenal pieces must have max limits of at least 1. Custom pieces can use max = 0.
+                </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {data.basic.gateSet.map((gate) => (
-                    <div key={gate} className="border p-2 rounded-lg bg-secondary/50">
+                  {gateLimitTargets.map((target) => (
+                    <div key={`${target.category}-${target.name}`} className="border p-2 rounded-lg bg-secondary/50">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex-1">
-                          <label className="text-[11px] font-semibold text-foreground">{gate}</label>
+                          <label className="text-[11px] font-semibold text-foreground">{target.name}</label>
                           <div className="text-[10px] text-muted-foreground">
-                            cost {GATE_PROPERTIES[gate]?.cost ?? 1} · pins {GATE_PROPERTIES[gate]?.pins ?? 3}
+                            cost {target.cost} · pins {target.pins}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {target.category === 'basic'
+                              ? 'Basic gate'
+                              : target.category === 'custom'
+                                ? 'Custom piece'
+                                : 'Shared arsenal piece'}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setViewingTruthTableFor(gate)}
-                          className="p-1 text-foreground/40 hover:text-foreground/70 transition-opacity"
-                          title="View Truth Table"
-                        >
-                          <Info size={14} />
-                        </button>
+                        {target.category === 'basic' && (
+                          <button
+                            type="button"
+                            onClick={() => setViewingTruthTableFor(target.name)}
+                            className="p-1 text-foreground/40 hover:text-foreground/70 transition-opacity"
+                            title="View Truth Table"
+                          >
+                            <Info size={14} />
+                          </button>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <input
                           type="number"
-                          min="1"
-                          value={data.basic.gateQuotas[gate] ?? ""}
+                          min={target.category === 'custom' ? '0' : '1'}
+                          value={data.basic.gateQuotas[target.name] ?? ""}
                           onChange={(e) => {
                             const newQuotas = { ...data.basic.gateQuotas };
                             if (e.target.value) {
-                              newQuotas[gate] = parseInt(e.target.value);
+                              newQuotas[target.name] = parseInt(e.target.value, 10);
                             } else {
-                              delete newQuotas[gate];
+                              delete newQuotas[target.name];
                             }
                             handleBasicChange("gateQuotas", newQuotas);
                           }}
                           className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                          placeholder="Max count"
+                          placeholder={target.category === 'custom' ? 'Max count (0 allowed)' : 'Max count'}
                         />
                         <input
                           type="number"
-                          min="1"
-                          value={data.basic.minGateQuotas[gate] ?? ""}
+                          min="0"
+                          value={data.basic.minGateQuotas[target.name] ?? ""}
                           onChange={(e) => {
                             const newMinQuotas = { ...data.basic.minGateQuotas };
                             if (e.target.value) {
-                              newMinQuotas[gate] = parseInt(e.target.value);
+                              newMinQuotas[target.name] = parseInt(e.target.value, 10);
                             } else {
-                              delete newMinQuotas[gate];
+                              delete newMinQuotas[target.name];
                             }
                             handleBasicChange("minGateQuotas", newMinQuotas);
                           }}

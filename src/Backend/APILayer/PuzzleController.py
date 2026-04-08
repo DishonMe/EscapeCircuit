@@ -657,6 +657,31 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 # Get min/max cycles if set
                 min_cycles = puzzle_config.get('min_cycles')
                 max_cycles = puzzle_config.get('max_cycles')
+
+                custom_piece_names = {
+                    str(piece.get('name')).strip()
+                    for piece in (config_data.get('custom_pieces', []) or [])
+                    if isinstance(piece, dict) and str(piece.get('name', '')).strip()
+                }
+
+                shared_arsenal_piece_names = set()
+                allowed_shared_ids = solving_service._normalize_id_set(
+                    puzzle_config.get('allowed_arsenal_component_ids')
+                )
+                for component_id in allowed_shared_ids:
+                    try:
+                        component = solving_service.circuit_repo.get_by_id(component_id)
+                    except Exception:
+                        component = None
+                    if component and getattr(component, 'name', None):
+                        shared_arsenal_piece_names.add(str(component.name))
+
+                arsenal_zero_forbidden_keys = {
+                    solving_service.ARSENAL_TOTAL_KEY,
+                    solving_service.ARSENAL_EACH_KEY,
+                    solving_service.ARSENAL_SHARED_TOTAL_KEY,
+                    solving_service.ARSENAL_SHARED_EACH_KEY,
+                }
                 
                 # Validate all test cases can be evaluated
                 for i, test_case in enumerate(test_cases):
@@ -666,34 +691,91 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     if tc_kind == 'gate_limit':
                         # Gate limit constraint (per-gate limit - can be min, max, or both)
                         gate_name = test_case.get('gate_name')
-                        min_gate_limit = test_case.get('min_gate_limit')
-                        gate_limit = test_case.get('gate_limit')
+                        min_gate_limit = solving_service._to_optional_int(test_case.get('min_gate_limit'))
+                        gate_limit = solving_service._to_optional_int(test_case.get('gate_limit'))
                         
                         print(f"\n[Test Case {i}] Gate Limit Constraint")
                         print(f"  Gate: {gate_name}, Min Count: {min_gate_limit}, Max Count: {gate_limit}")
                         
                         if not gate_name:
                             raise ValidationError(f"Gate limit test case {i} missing 'gate_name'")
-                        # At least one of min_gate_limit or gate_limit must be specified and valid
-                        if (min_gate_limit is None or min_gate_limit <= 0) and (gate_limit is None or gate_limit <= 0):
-                            raise ValidationError(f"Gate limit test case {i} must have either min_gate_limit or gate_limit specified and > 0")
+
+                        # At least one of min_gate_limit or gate_limit must be specified.
+                        if min_gate_limit is None and gate_limit is None:
+                            raise ValidationError(
+                                f"Gate limit test case {i} must have min_gate_limit and/or gate_limit specified"
+                            )
+
+                        if min_gate_limit is not None and min_gate_limit < 0:
+                            raise ValidationError(
+                                f"Gate limit test case {i}: min_gate_limit must be non-negative"
+                            )
+
+                        if gate_limit is not None and gate_limit < 0:
+                            raise ValidationError(
+                                f"Gate limit test case {i}: gate_limit must be non-negative"
+                            )
+
                         # If both are specified, min should not exceed max
                         if min_gate_limit is not None and gate_limit is not None and min_gate_limit > gate_limit:
                             raise ValidationError(f"Gate limit test case {i}: min_gate_limit ({min_gate_limit}) cannot exceed gate_limit ({gate_limit})")
+
+                        # Rule: basic and arsenal limits cannot use max=0.
+                        if gate_limit == 0:
+                            if gate_name in solving_service.BASIC_GATE_NAMES:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: basic gate '{gate_name}' cannot have gate_limit = 0"
+                                )
+                            if gate_name in shared_arsenal_piece_names:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: shared arsenal piece '{gate_name}' cannot have gate_limit = 0"
+                                )
+                            if gate_name in arsenal_zero_forbidden_keys:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: '{gate_name}' cannot have gate_limit = 0"
+                                )
+
+                        # Persist normalized numeric values for downstream checks.
+                        test_case['min_gate_limit'] = min_gate_limit
+                        test_case['gate_limit'] = gate_limit
                         
                         print(f"  ✓ Gate limit constraint valid")
                         
                     elif tc_kind == 'gate_count_limit':
                         # Total gate count constraint
-                        max_gate_count = test_case.get('max_gate_count')
+                        min_gate_count = solving_service._to_optional_int(test_case.get('min_gate_count'))
+                        max_gate_count = solving_service._to_optional_int(test_case.get('max_gate_count'))
                         
                         print(f"\n[Test Case {i}] Total Gate Count Limit")
+                        print(f"  Min Total Gates: {min_gate_count}")
                         print(f"  Max Total Gates: {max_gate_count}")
                         
-                        # Skip if not properly set (helps with frontend default values)
-                        if max_gate_count is None or max_gate_count <= 0:
+                        # Skip if not set (helps with frontend defaults).
+                        if min_gate_count is None and max_gate_count is None:
                             print(f"  - Skipping: max_gate_count not set or invalid")
                             continue
+
+                        if min_gate_count is not None and min_gate_count <= 0:
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: min_gate_count must be > 0"
+                            )
+
+                        if max_gate_count is not None and max_gate_count <= 0:
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: max_gate_count must be > 0"
+                            )
+
+                        if (
+                            min_gate_count is not None
+                            and max_gate_count is not None
+                            and min_gate_count > max_gate_count
+                        ):
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: min_gate_count ({min_gate_count}) cannot exceed max_gate_count ({max_gate_count})"
+                            )
+
+                        test_case['min_gate_count'] = min_gate_count
+                        test_case['max_gate_count'] = max_gate_count
                         
                         print(f"  ✓ Total gate count limit valid")
                     
@@ -927,14 +1009,15 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 
                 # Also set it in expanded_solution for python tests
                 expanded_solution['placedComponents'] = placed_components
-                
-                gate_counts = {}
-                total_gates = 0
-                for comp in placed_components:
-                    comp_type = comp.get("componentId") or comp.get("type")
-                    if comp_type and comp_type not in ("INPUT", "OUTPUT", "CONST"):
-                        gate_counts[comp_type] = gate_counts.get(comp_type, 0) + 1
-                        total_gates += 1
+
+                usage_context = solving_service._build_gate_usage_context(
+                    expanded_solution.get('circuit') or {},
+                    puzzle=None,
+                    explicit_custom_piece_names=custom_piece_names,
+                    explicit_shared_arsenal_piece_names=shared_arsenal_piece_names,
+                )
+                gate_counts = usage_context.get('per_gate_counts', {})
+                total_gates = int(usage_context.get('total_gate_count', 0))
                 
                 print(f"Sample solution has {total_gates} gates total: {gate_counts}")
                 print(f"Placed components: {len(placed_components)}")
@@ -947,27 +1030,26 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     
                     if tc_kind == 'gate_limit':
                         gate_name = test_case.get('gate_name')
-                        min_gate_limit = test_case.get('min_gate_limit')
-                        gate_limit = test_case.get('gate_limit')
+                        min_gate_limit = solving_service._to_optional_int(test_case.get('min_gate_limit'))
+                        gate_limit = solving_service._to_optional_int(test_case.get('gate_limit'))
                         actual_count = gate_counts.get(gate_name, 0)
                         
                         print(f"[Test Case {i}] Gate Limit for {gate_name}: min={min_gate_limit}, max={gate_limit}, actual={actual_count}")
-                        
-                        if min_gate_limit is not None and actual_count < min_gate_limit:
-                            raise ValidationError(
-                                f"Sample solution violates gate_limit constraint: {gate_name} has {actual_count} gates "
-                                f"but minimum required is {min_gate_limit}"
-                            )
-                        if gate_limit is not None and actual_count > gate_limit:
-                            raise ValidationError(
-                                f"Sample solution violates gate_limit constraint: {gate_name} has {actual_count} gates "
-                                f"but maximum allowed is {gate_limit}"
-                            )
+
+                        passes_limit, limit_error, _ = solving_service._evaluate_gate_limit_constraint(
+                            gate_name,
+                            min_gate_limit,
+                            gate_limit,
+                            usage_context,
+                        )
+                        if not passes_limit:
+                            raise ValidationError(f"Sample solution violates gate_limit constraint: {limit_error}")
+
                         print(f"  ✓ Gate limit constraint satisfied")
                     
                     elif tc_kind == 'gate_count_limit':
-                        min_gate_count = test_case.get('min_gate_count')
-                        max_gate_count = test_case.get('max_gate_count')
+                        min_gate_count = solving_service._to_optional_int(test_case.get('min_gate_count'))
+                        max_gate_count = solving_service._to_optional_int(test_case.get('max_gate_count'))
                         
                         print(f"[Test Case {i}] Total Gate Count: min={min_gate_count}, max={max_gate_count}, actual={total_gates}")
                         
@@ -1035,27 +1117,59 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                     # Remove gate_limit if invalid
                     if tc_kind == 'gate_limit':
                         gate_name = tc.get('gate_name')
-                        min_gate_limit = tc.get('min_gate_limit')
-                        gate_limit = tc.get('gate_limit')
-                        # At least one must be set and positive
-                        has_valid_min = min_gate_limit is not None and min_gate_limit > 0
-                        has_valid_max = gate_limit is not None and gate_limit > 0
-                        # At least one must be valid
-                        if not (has_valid_min or has_valid_max):
+                        min_gate_limit = solving_service._to_optional_int(tc.get('min_gate_limit'))
+                        gate_limit = solving_service._to_optional_int(tc.get('gate_limit'))
+
+                        if min_gate_limit is None and gate_limit is None:
                             print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
                             continue
+
+                        if min_gate_limit is not None and min_gate_limit < 0:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (negative min={min_gate_limit})")
+                            continue
+
+                        if gate_limit is not None and gate_limit < 0:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (negative max={gate_limit})")
+                            continue
+
+                        if min_gate_limit is not None and gate_limit is not None and min_gate_limit > gate_limit:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+
+                        if gate_limit == 0 and (
+                            gate_name in solving_service.BASIC_GATE_NAMES
+                            or gate_name in shared_arsenal_piece_names
+                            or gate_name in arsenal_zero_forbidden_keys
+                        ):
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+
+                        tc['min_gate_limit'] = min_gate_limit
+                        tc['gate_limit'] = gate_limit
                     
                     # Remove gate_count_limit if invalid
                     elif tc_kind == 'gate_count_limit':
-                        min_gate_count = tc.get('min_gate_count')
-                        max_gate_count = tc.get('max_gate_count')
-                        # At least one must be set and positive
-                        has_valid_min = min_gate_count is not None and min_gate_count > 0
-                        has_valid_max = max_gate_count is not None and max_gate_count > 0
-                        # At least one must be valid
-                        if not (has_valid_min or has_valid_max):
+                        min_gate_count = solving_service._to_optional_int(tc.get('min_gate_count'))
+                        max_gate_count = solving_service._to_optional_int(tc.get('max_gate_count'))
+
+                        if min_gate_count is None and max_gate_count is None:
                             print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
                             continue
+
+                        if min_gate_count is not None and min_gate_count <= 0:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        if max_gate_count is not None and max_gate_count <= 0:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        if min_gate_count is not None and max_gate_count is not None and min_gate_count > max_gate_count:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        tc['min_gate_count'] = min_gate_count
+                        tc['max_gate_count'] = max_gate_count
                     
                     valid_test_cases.append(tc)
                 

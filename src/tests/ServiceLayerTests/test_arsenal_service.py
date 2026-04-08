@@ -121,6 +121,40 @@ class TestArsenalServiceSaveArsenalPiece:
 
         assert result["id"] == 123
         self.mock_circuit_repo.count_user_components.assert_not_called()
+
+    def test_save_arsenal_piece_accepts_all_zero_truth_table(self):
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = User(
+            id=1,
+            username="creator",
+            role=UserRole.CREATOR,
+            xp=0,
+        )
+        self.mock_xp.calculate_level.return_value = 1
+        self.mock_circuit_repo.count_user_components.return_value = 0
+
+        payload = self._valid_payload()
+        payload["truth_table"] = {"0": "0", "1": "0"}
+
+        saved_circuit = Circuit(
+            id=124,
+            user_id=1,
+            name="my_piece",
+            cost=1,
+            structure_json="{}",
+            is_arsenal=True,
+            basic_gates='["AND"]',
+            truth_table='{"0": "0", "1": "0"}',
+            num_inputs=1,
+            num_outputs=1,
+        )
+        self.mock_circuit_repo.create.return_value = saved_circuit
+
+        result = self.service.save_arsenal_piece("valid_token", payload)
+
+        assert result["id"] == 124
+        assert result["truth_table"] == '{"0": "0", "1": "0"}'
+
     def test_save_arsenal_piece_invalid_inputs(self):
         user_id = 1
         token = "valid_token"
