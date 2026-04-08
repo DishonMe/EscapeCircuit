@@ -1326,7 +1326,10 @@ export const WorkstationGrid = ({
         </div>
         <div className="text-xs text-muted-foreground">
           {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan. Click/drag ports to
-          wire. While placing, press R to rotate. Use Copy/Paste buttons or Ctrl+C/Ctrl+V.
+          wire. 
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Use Shift+click to select multiple components. Copy/Paste with Ctrl+C/Ctrl+V.
         </div>
       </div>
 
@@ -1435,96 +1438,97 @@ export const WorkstationGrid = ({
           <div className="pointer-events-none absolute inset-0 z-[6] bg-slate-950/25" />
         ) : null}
 
-        {/* Trash */}
+        {/* Copy, Paste, Trash - Top Flush, Centered Horizontally */}
         <div
-          className="absolute right-16 top-3 z-30 flex items-center gap-2"
+          className="absolute left-1/2 top-3 z-30 -translate-x-1/2 flex flex-col items-center gap-3"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-10 px-3"
-            onClick={(e) => {
-              e.stopPropagation();
-              copySelectionToClipboard();
-            }}
-            disabled={!canCopySelection}
-            title="Copy selected components (Ctrl+C)"
-          >
-            Copy
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-10 px-3"
-            onClick={(e) => {
-              e.stopPropagation();
-              pasteFromClipboard();
-            }}
-            disabled={!canPasteSelection}
-            title="Paste copied components (Ctrl+V)"
-          >
-            Paste
-          </Button>
-        </div>
-
-        <button
-          type="button"
-          ref={trashRef}
-          className="absolute right-3 top-3 z-30 flex size-10 items-center justify-center rounded border border-border bg-secondary text-muted-foreground hover:bg-red-50 hover:text-red-600"
-          title={
-            wireDraft
-              ? 'Cancel wiring'
-              : selectedEntity.type !== 'none'
-                ? 'Delete selected'
-                : 'Clear Grid'
-          }
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (wireDraft) {
-              setWireDraft(null);
-              return;
-            }
-            if (selectedEntity.type === 'component') {
-              // Delete all selected components
-              for (const placedId of selectedEntity.placedIds) {
-                removeComponent(placedId);
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                copySelectionToClipboard();
+              }}
+              disabled={!canCopySelection}
+              title="Copy selected components (Ctrl+C)"
+            >
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                pasteFromClipboard();
+              }}
+              disabled={!canPasteSelection}
+              title="Paste copied components (Ctrl+V)"
+            >
+              Paste
+            </Button>
+            <button
+              type="button"
+              ref={trashRef}
+              className="flex size-8 items-center justify-center rounded border border-border bg-secondary text-muted-foreground hover:bg-red-50 hover:text-red-600"
+              title={
+                wireDraft
+                  ? 'Cancel wiring'
+                  : selectedEntity.type !== 'none'
+                    ? 'Delete selected'
+                    : 'Clear Grid'
               }
-              setSelectedEntity({ type: 'none' });
-              return;
-            }
-            if (selectedEntity.type === 'wire') {
-              removeWire(selectedEntity.wireId);
-              return;
-            }
-            // Clear all
-            if (confirm('Are you sure you want to clear the entire grid?')) {
-              onWiresChange([]);
-              onPlacedChange([]);
-            }
-          }}
-          aria-label={
-            wireDraft
-              ? 'Cancel wiring'
-              : selectedEntity.type !== 'none'
-                ? 'Delete selected'
-                : 'Clear Grid'
-          }
-        >
-          {/* simple inline icon */}
-          <svg
-            viewBox="0 0 24 24"
-            className="size-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M3 6h18" />
-            <path d="M8 6V4h8v2" />
-            <path d="M6 6l1 16h10l1-16" />
-          </svg>
-        </button>
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (wireDraft) {
+                  setWireDraft(null);
+                  return;
+                }
+                if (selectedEntity.type === 'component') {
+                  // Delete all selected components
+                  for (const placedId of selectedEntity.placedIds) {
+                    removeComponent(placedId);
+                  }
+                  setSelectedEntity({ type: 'none' });
+                  return;
+                }
+                if (selectedEntity.type === 'wire') {
+                  removeWire(selectedEntity.wireId);
+                  return;
+                }
+                // Clear all
+                if (confirm('Are you sure you want to clear the entire grid?')) {
+                  onWiresChange([]);
+                  onPlacedChange([]);
+                }
+              }}
+              aria-label={
+                wireDraft
+                  ? 'Cancel wiring'
+                  : selectedEntity.type !== 'none'
+                    ? 'Delete selected'
+                    : 'Clear Grid'
+              }
+            >
+              {/* simple inline icon */}
+              <svg
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M6 6l1 16h10l1-16" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
         {selectedWireOverlay}
 

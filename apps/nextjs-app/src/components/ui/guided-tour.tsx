@@ -38,7 +38,7 @@ export default function GuidedTour({ steps, ...props }: any) {
   }, []);
 
   useEffect(() => {
-    import("react-joyride").then((module) => {
+    import("react-joyride").then((module: any) => {
       const Component = module.default || (module as any).Joyride || module;
       setJoyrideComponent(() => Component);
     }).catch(err => console.error("Failed to load react-joyride", err));
