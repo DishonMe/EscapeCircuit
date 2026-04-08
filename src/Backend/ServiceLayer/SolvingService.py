@@ -1,5 +1,6 @@
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Set
 import json
+from collections import defaultdict
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
@@ -16,6 +17,15 @@ from Backend.DomainLayer.Enums import PuzzleStatus, PuzzleDifficulty, Medal
 
 
 class SolvingService:
+    BASIC_GATE_NAMES = {"AND", "OR", "NOT", "XOR", "NAND", "NOR", "XNOR", "DFF"}
+
+    ARSENAL_TOTAL_KEY = "__ARSENAL_TOTAL__"
+    ARSENAL_EACH_KEY = "__ARSENAL_EACH__"
+    ARSENAL_SHARED_TOTAL_KEY = "__ARSENAL_SHARED_TOTAL__"
+    ARSENAL_SHARED_EACH_KEY = "__ARSENAL_SHARED_EACH__"
+    CUSTOM_TOTAL_KEY = "__CUSTOM_TOTAL__"
+    CUSTOM_PIECE_PREFIX = "__CUSTOM_PIECE__:"
+
     def __init__(
         self,
         conn,
@@ -512,75 +522,346 @@ class SolvingService:
             return {"solved": False, "message": fail_msg, "details": details}
 
     # ---------- Helper: Centralized Evaluation ----------
+    @staticmethod
+    def _get_tc_field(tc: Any, field: str, default=None):
+        if isinstance(tc, dict):
+            return tc.get(field, default)
+        return getattr(tc, field, default)
+
+    @staticmethod
+    def _get_tc_kind(tc: Any) -> Optional[str]:
+        kind = SolvingService._get_tc_field(tc, "kind")
+        if kind is None:
+            return None
+        if hasattr(kind, "value"):
+            return str(kind.value)
+        return str(kind)
+
+    @staticmethod
+    def _to_optional_int(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _normalize_id_set(values: Any) -> Set[int]:
+        ids: Set[int] = set()
+        if not isinstance(values, (list, tuple, set)):
+            return ids
+        for value in values:
+            try:
+                ids.add(int(value))
+            except (TypeError, ValueError):
+                continue
+        return ids
+
+    @staticmethod
+    def _load_structure_dict(structure_input: Any) -> Dict[str, Any]:
+        if isinstance(structure_input, dict):
+            return structure_input
+        if isinstance(structure_input, str):
+            try:
+                loaded = json.loads(structure_input)
+                if isinstance(loaded, dict):
+                    return loaded
+            except Exception:
+                pass
+        return {}
+
+    def _build_gate_usage_context(
+        self,
+        structure_input: Any,
+        puzzle=None,
+        explicit_custom_piece_names: Optional[Set[str]] = None,
+        explicit_shared_arsenal_piece_names: Optional[Set[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Build a normalized gate-usage context used by both solve-time and create-time
+        validation. Supports both runtime numeric component IDs and create-form names.
+        """
+        structure = self._load_structure_dict(structure_input)
+
+        placed_components = structure.get("placedComponents")
+        if not isinstance(placed_components, list):
+            placed_components = structure.get("components")
+        if not isinstance(placed_components, list):
+            placed_components = structure.get("placed")
+        if not isinstance(placed_components, list):
+            placed_components = []
+
+        per_gate_counts: Dict[str, int] = defaultdict(int)
+        raw_component_counts: Dict[str, int] = defaultdict(int)
+        custom_piece_counts: Dict[str, int] = defaultdict(int)
+        private_arsenal_piece_counts: Dict[str, int] = defaultdict(int)
+        shared_arsenal_piece_counts: Dict[str, int] = defaultdict(int)
+
+        total_gate_count = 0
+        numeric_component_ids: Set[int] = set()
+
+        for comp in placed_components:
+            if not isinstance(comp, dict):
+                continue
+            comp_key_raw = comp.get("componentId") or comp.get("type")
+            if comp_key_raw is None:
+                continue
+
+            comp_key = str(comp_key_raw)
+            if not comp_key or comp_key in ("INPUT", "OUTPUT", "CONST"):
+                continue
+
+            total_gate_count += 1
+            raw_component_counts[comp_key] += 1
+            per_gate_counts[comp_key] += 1
+
+            if comp_key.isdigit():
+                numeric_component_ids.add(int(comp_key))
+
+        # Backward compatibility: if no placed-components schema is present,
+        # fall back to the logic engine's generic count extractor.
+        if total_gate_count == 0:
+            structure_json = structure_input if isinstance(structure_input, str) else json.dumps(structure)
+            try:
+                extracted_counts = self.logic_engine.extract_gate_counts(structure_json)
+            except Exception:
+                extracted_counts = {}
+
+            if isinstance(extracted_counts, dict):
+                for gate_name, count in extracted_counts.items():
+                    normalized_count = self._to_optional_int(count) or 0
+                    if normalized_count <= 0:
+                        continue
+                    key = str(gate_name)
+                    raw_component_counts[key] += normalized_count
+                    per_gate_counts[key] += normalized_count
+                    total_gate_count += normalized_count
+                    if key.isdigit():
+                        numeric_component_ids.add(int(key))
+
+        numeric_component_meta: Dict[int, Dict[str, Any]] = {}
+        for component_id in numeric_component_ids:
+            try:
+                piece = self.circuit_repo.get_by_id(component_id)
+            except Exception:
+                piece = None
+            if not piece:
+                continue
+
+            piece_name = str(getattr(piece, "name", component_id))
+            numeric_component_meta[component_id] = {
+                "name": piece_name,
+                "is_arsenal": bool(getattr(piece, "is_arsenal", False)),
+                "is_custom": getattr(piece, "puzzle_id", None) is not None,
+            }
+
+            # Allow name-based gate limits to match runtime numeric IDs.
+            per_gate_counts[piece_name] += raw_component_counts.get(str(component_id), 0)
+
+        shared_arsenal_ids = self._normalize_id_set(
+            getattr(puzzle, "allowed_arsenal_component_ids", None) if puzzle else None
+        )
+        custom_name_set = {str(x) for x in (explicit_custom_piece_names or set()) if str(x)}
+        shared_name_set = {
+            str(x) for x in (explicit_shared_arsenal_piece_names or set()) if str(x)
+        }
+
+        for comp in placed_components:
+            if not isinstance(comp, dict):
+                continue
+            comp_key_raw = comp.get("componentId") or comp.get("type")
+            if comp_key_raw is None:
+                continue
+
+            comp_key = str(comp_key_raw)
+            if not comp_key or comp_key in ("INPUT", "OUTPUT", "CONST"):
+                continue
+
+            if comp_key in self.BASIC_GATE_NAMES:
+                continue
+
+            if comp_key in custom_name_set:
+                custom_piece_counts[comp_key] += 1
+                continue
+
+            if comp_key in shared_name_set:
+                shared_arsenal_piece_counts[comp_key] += 1
+                continue
+
+            if comp_key.isdigit():
+                comp_id = int(comp_key)
+                meta = numeric_component_meta.get(comp_id)
+                if not meta:
+                    continue
+
+                canonical_name = meta.get("name") or comp_key
+
+                if meta.get("is_custom"):
+                    custom_piece_counts[canonical_name] += 1
+                    continue
+
+                if meta.get("is_arsenal"):
+                    if comp_id in shared_arsenal_ids:
+                        shared_arsenal_piece_counts[comp_key] += 1
+                    else:
+                        private_arsenal_piece_counts[comp_key] += 1
+
+        custom_total = sum(custom_piece_counts.values())
+        private_arsenal_total = sum(private_arsenal_piece_counts.values())
+        shared_arsenal_total = sum(shared_arsenal_piece_counts.values())
+
+        # Reserved aggregate keys are exposed through the regular per-gate map too.
+        per_gate_counts[self.CUSTOM_TOTAL_KEY] = custom_total
+        per_gate_counts[self.ARSENAL_TOTAL_KEY] = private_arsenal_total
+        per_gate_counts[self.ARSENAL_SHARED_TOTAL_KEY] = shared_arsenal_total
+
+        return {
+            "per_gate_counts": dict(per_gate_counts),
+            "raw_component_counts": dict(raw_component_counts),
+            "total_gate_count": total_gate_count,
+            "custom_piece_counts": dict(custom_piece_counts),
+            "private_arsenal_piece_counts": dict(private_arsenal_piece_counts),
+            "shared_arsenal_piece_counts": dict(shared_arsenal_piece_counts),
+        }
+
+    def _evaluate_gate_limit_constraint(
+        self,
+        gate_name: str,
+        min_gate_limit: Optional[int],
+        gate_limit: Optional[int],
+        usage_context: Dict[str, Any],
+    ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Evaluate one gate_limit rule against the normalized usage context.
+        """
+        per_gate_counts = usage_context.get("per_gate_counts", {})
+
+        def _build_standard_failure(actual_count: int) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+            if min_gate_limit is not None and actual_count < min_gate_limit:
+                return False, f"Insufficient {gate_name} gates: Used {actual_count} but minimum required is {min_gate_limit}", {
+                    "gate_name": gate_name,
+                    "min_limit": min_gate_limit,
+                    "actual": actual_count,
+                    "error_type": "gate_limit_insufficient",
+                }
+            if gate_limit is not None and actual_count > gate_limit:
+                return False, f"Gate limit exceeded: Used {actual_count} {gate_name} gates but limit is {gate_limit}", {
+                    "gate_name": gate_name,
+                    "limit": gate_limit,
+                    "actual": actual_count,
+                    "error_type": "gate_limit_exceeded",
+                }
+            return True, None, None
+
+        if gate_name == self.ARSENAL_EACH_KEY:
+            private_counts = usage_context.get("private_arsenal_piece_counts", {})
+            for piece_id, count in private_counts.items():
+                if min_gate_limit is not None and count < min_gate_limit:
+                    return False, (
+                        f"Insufficient private arsenal piece usage: Piece {piece_id} used {count} times "
+                        f"but minimum per piece is {min_gate_limit}"
+                    ), {
+                        "gate_name": gate_name,
+                        "piece_id": piece_id,
+                        "min_limit": min_gate_limit,
+                        "actual": count,
+                        "error_type": "gate_limit_insufficient",
+                    }
+                if gate_limit is not None and count > gate_limit:
+                    return False, (
+                        f"Private arsenal per-piece limit exceeded: Piece {piece_id} used {count} times "
+                        f"but limit per piece is {gate_limit}"
+                    ), {
+                        "gate_name": gate_name,
+                        "piece_id": piece_id,
+                        "limit": gate_limit,
+                        "actual": count,
+                        "error_type": "gate_limit_exceeded",
+                    }
+            return True, None, None
+
+        if gate_name == self.ARSENAL_SHARED_EACH_KEY:
+            shared_counts = usage_context.get("shared_arsenal_piece_counts", {})
+            for piece_id, count in shared_counts.items():
+                if min_gate_limit is not None and count < min_gate_limit:
+                    return False, (
+                        f"Insufficient shared arsenal piece usage: Piece {piece_id} used {count} times "
+                        f"but minimum per piece is {min_gate_limit}"
+                    ), {
+                        "gate_name": gate_name,
+                        "piece_id": piece_id,
+                        "min_limit": min_gate_limit,
+                        "actual": count,
+                        "error_type": "gate_limit_insufficient",
+                    }
+                if gate_limit is not None and count > gate_limit:
+                    return False, (
+                        f"Shared arsenal per-piece limit exceeded: Piece {piece_id} used {count} times "
+                        f"but limit per piece is {gate_limit}"
+                    ), {
+                        "gate_name": gate_name,
+                        "piece_id": piece_id,
+                        "limit": gate_limit,
+                        "actual": count,
+                        "error_type": "gate_limit_exceeded",
+                    }
+            return True, None, None
+
+        if gate_name.startswith(self.CUSTOM_PIECE_PREFIX):
+            custom_piece_name = gate_name[len(self.CUSTOM_PIECE_PREFIX):]
+            custom_counts = usage_context.get("custom_piece_counts", {})
+            actual_count = int(custom_counts.get(custom_piece_name, 0))
+            return _build_standard_failure(actual_count)
+
+        actual_count = int(per_gate_counts.get(gate_name, 0))
+        return _build_standard_failure(actual_count)
+
     def _evaluate_test_cases(self, circuit: Circuit, test_cases: List[Any], puzzle = None, expanded_solution = None):
         """
         Evaluates circuit against test cases, handling both Combinatorial (single step)
         and Sequential (streams over time/cycles) logic.
         Also validates gate limit constraints before testing logic.
         """
-        try:
-            structure = json.loads(circuit.structure_json)
-        except:
-            structure = {}
+        structure = self._load_structure_dict(circuit.structure_json)
 
         # --- GATE LIMIT VALIDATION (Check before logic tests) ---
-        # Extract actual gate counts from circuit
-        actual_gates = self.logic_engine.extract_gate_counts(circuit.structure_json)
+        usage_context = self._build_gate_usage_context(structure, puzzle=puzzle)
+        actual_gates = usage_context.get("per_gate_counts", {})
+        total_gates = int(usage_context.get("total_gate_count", 0))
         
         for i, tc in enumerate(test_cases):
-            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
+            tc_kind = self._get_tc_kind(tc)
             
             # Check per-gate limits (GATE_LIMIT test case)
             if tc_kind == "gate_limit":
-                gate_name = getattr(tc, "gate_name", None)
-                if gate_name is None and isinstance(tc, dict):
-                    gate_name = tc.get("gate_name")
-                
-                min_gate_limit = getattr(tc, "min_gate_limit", None)
-                if min_gate_limit is None and isinstance(tc, dict):
-                    min_gate_limit = tc.get("min_gate_limit")
-                
-                gate_limit = getattr(tc, "gate_limit", None)
-                if gate_limit is None and isinstance(tc, dict):
-                    gate_limit = tc.get("gate_limit")
+                gate_name = self._get_tc_field(tc, "gate_name")
+                min_gate_limit = self._to_optional_int(self._get_tc_field(tc, "min_gate_limit"))
+                gate_limit = self._to_optional_int(self._get_tc_field(tc, "gate_limit"))
                 
                 if gate_name:
-                    actual_count = actual_gates.get(gate_name, 0)
-                    # Check minimum gate limit
-                    if min_gate_limit is not None and actual_count < min_gate_limit:
-                        return False, f"Insufficient {gate_name} gates: Used {actual_count} but minimum required is {min_gate_limit}", [{
-                            "test_case_index": i,
-                            "gate_name": gate_name,
-                            "min_limit": min_gate_limit,
-                            "actual": actual_count,
-                            "error_type": "gate_limit_insufficient"
-                        }]
-                    # Check maximum gate limit
-                    if gate_limit is not None and actual_count > gate_limit:
-                        return False, f"Gate limit exceeded: Used {actual_count} {gate_name} gates but limit is {gate_limit}", [{
-                            "test_case_index": i,
-                            "gate_name": gate_name,
-                            "limit": gate_limit,
-                            "actual": actual_count,
-                            "error_type": "gate_limit_exceeded"
-                        }]
+                    passed_limit, error_message, error_detail = self._evaluate_gate_limit_constraint(
+                        gate_name,
+                        min_gate_limit,
+                        gate_limit,
+                        usage_context,
+                    )
+                    if not passed_limit:
+                        detail = {"test_case_index": i, "gate_name": gate_name}
+                        if error_detail:
+                            detail.update(error_detail)
+                        return False, error_message, [detail]
             
             # Check total gate count limit (GATE_COUNT_LIMIT test case)
             if tc_kind == "gate_count_limit":
                 # Try test case first, then fall back to puzzle's min_gate_count/total_gate_count for min/max
-                min_gate_count = getattr(tc, "min_gate_count", None)
-                if min_gate_count is None and isinstance(tc, dict):
-                    min_gate_count = tc.get("min_gate_count")
+                min_gate_count = self._to_optional_int(self._get_tc_field(tc, "min_gate_count"))
                 if min_gate_count is None and puzzle:
-                    min_gate_count = getattr(puzzle, "min_gate_count", None)
+                    min_gate_count = self._to_optional_int(getattr(puzzle, "min_gate_count", None))
                     
-                max_gate_count = getattr(tc, "max_gate_count", None)
-                if max_gate_count is None and isinstance(tc, dict):
-                    max_gate_count = tc.get("max_gate_count")
+                max_gate_count = self._to_optional_int(self._get_tc_field(tc, "max_gate_count"))
                 if max_gate_count is None and puzzle:
-                    max_gate_count = getattr(puzzle, "total_gate_count", None)
-                
-                total_gates = sum(actual_gates.values())
+                    max_gate_count = self._to_optional_int(getattr(puzzle, "total_gate_count", None))
                 
                 if min_gate_count is not None and total_gates < min_gate_count:
                     return False, f"Insufficient gates: Used {total_gates} gates but minimum is {min_gate_count}", [{
@@ -602,14 +883,12 @@ class SolvingService:
         
         # --- CHECK GLOBAL PUZZLE CONSTRAINTS (if not already checked via test cases) ---
         # Check if we need to validate global min/max gate count from puzzle object
-        if puzzle and not any(getattr(tc, 'kind', None) == 'gate_count_limit' for tc in (test_cases or [])):
+        if puzzle and not any(self._get_tc_kind(tc) == 'gate_count_limit' for tc in (test_cases or [])):
             # No gate_count_limit test case exists, so check the puzzle's global constraints
-            total_gates = sum(actual_gates.values())
-            min_gate_count = getattr(puzzle, "min_gate_count", None)
-            total_gate_count = getattr(puzzle, "total_gate_count", None)
+            min_gate_count = self._to_optional_int(getattr(puzzle, "min_gate_count", None))
+            total_gate_count = self._to_optional_int(getattr(puzzle, "total_gate_count", None))
             
-            # Ensure we only compare with actual numeric values (not Mock objects)
-            if isinstance(min_gate_count, int) and min_gate_count is not None and total_gates < min_gate_count:
+            if min_gate_count is not None and total_gates < min_gate_count:
                 return False, f"Insufficient gates: Used {total_gates} gates but minimum is {min_gate_count}", [{
                     "constraint_type": "global_min_gate_count",
                     "required_minimum": min_gate_count,
@@ -618,7 +897,7 @@ class SolvingService:
                     "error_type": "gate_count_insufficient"
                 }]
             
-            if isinstance(total_gate_count, int) and total_gate_count is not None and total_gates > total_gate_count:
+            if total_gate_count is not None and total_gates > total_gate_count:
                 return False, f"Total gate count exceeded: Used {total_gates} gates but maximum allowed is {total_gate_count}", [{
                     "constraint_type": "global_max_gate_count",
                     "required_maximum": total_gate_count,
@@ -656,7 +935,7 @@ class SolvingService:
             if input_stream is None and isinstance(tc, dict):
                 input_stream = tc.get("input_stream")
             
-            tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
+            tc_kind = self._get_tc_kind(tc)
             
             # Safely check if input_stream is iterable and not empty
             try:
@@ -691,7 +970,7 @@ class SolvingService:
                 actual_cycles = len(input_stream)
                 
                 # Check latency limits BEFORE simulation
-                tc_kind = getattr(tc, "kind", None) or (tc.get("kind") if isinstance(tc, dict) else None)
+                tc_kind = self._get_tc_kind(tc)
                 if tc_kind == "latency_limit":
                     min_cycles = getattr(tc, "min_cycles", None) or (tc.get("min_cycles") if isinstance(tc, dict) else None)
                     max_cycles = getattr(tc, "max_cycles", None) or (tc.get("max_cycles") if isinstance(tc, dict) else None)
