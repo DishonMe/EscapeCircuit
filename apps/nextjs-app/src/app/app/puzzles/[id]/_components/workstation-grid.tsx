@@ -134,6 +134,7 @@ export const WorkstationGrid = ({
   onDebuggerSequenceChange,
   onInspectComponent,
   isEditMode = false,
+  viewportClassName,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -165,6 +166,7 @@ export const WorkstationGrid = ({
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
+  viewportClassName?: string;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -859,12 +861,9 @@ export const WorkstationGrid = ({
 
     for (let i = 0; i < outputs.length; i++) {
       const id = `IO:OUT:${outputs[i]}`;
-      // Distribute along the bottom (Layout Update: Outputs to Bottom)
-      const colStep = gridCols / (outputs.length + 1);
-      // Center based on step
-      const col = (i + 1) * colStep - 0.5;
-      const row = gridRows + 0.5;
-      const anchor = toScreenCenter(row, col);
+      // Distribute along the right side (Layout Update: Outputs to Right)
+      const row = i * 1.6;
+      const anchor = toScreenCenter(row, gridCols); // just right of last col
       outputsPos[id] = { x: anchor.x, y: anchor.y };
     }
 
@@ -1301,7 +1300,7 @@ export const WorkstationGrid = ({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-1 flex-col gap-2 min-h-0">
       <div className="rounded-md border border-border bg-card p-3">
         <div className="mb-1 text-sm font-medium text-foreground">
           Working Area
@@ -1319,6 +1318,7 @@ export const WorkstationGrid = ({
           isPowerSurge && 'workstation-board-surge',
           boardFeedback === 'success' && 'workstation-board-success border-emerald-400',
           boardFeedback === 'failure' && 'workstation-board-failure border-red-400',
+          viewportClassName,
         )}
         onWheel={onWheel}
         onPointerDown={onPointerDownBackground}
@@ -1958,7 +1958,7 @@ export const WorkstationGrid = ({
                 {/* Lock Indicator (🔒 icon for locked components) */}
                 {p.isLocked && (
                   <div
-                    className="absolute top-0 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                    className="lock-indicator absolute -top-3 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
                     style={{
                       width: '24px',
                       height: '24px',
@@ -2182,7 +2182,7 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-50%, -140%)',
+                      transform: 'translate(-140%, -50%)',
                     }}
                   >
                     <div
@@ -2199,7 +2199,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(-50%, 0%)',
+                    transform: 'translate(0%, -50%)',
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -2300,39 +2300,42 @@ export const WorkstationGrid = ({
             }
           }
 
-          // Output indicator - positioned to the left of outputs
+          // Output indicator - positioned above outputs (mirroring IN indicator)
           if (outputs.length > 0) {
             const firstOutput = ioLayout.outputs[`IO:OUT:${outputs[0]}`];
             const lastOutput = ioLayout.outputs[`IO:OUT:${outputs[outputs.length - 1]}`];
-            
+
             if (firstOutput && lastOutput) {
-              const midX = (firstOutput.x + lastOutput.x) / 2;
-              const midY = firstOutput.y;
-              
-              // Calculate position and rotation
+              const midX = firstOutput.x;
+              const midY = (firstOutput.y + lastOutput.y) / 2;
+
+              // Calculate position and rotation — arrow always points toward the outputs
               let rotation = 0;
-              let posX = Math.max(50, Math.min(containerSize.w - 50, midX - 50));
-              let posY = midY - 40;
-              
-              // Determine arrow direction based on where outputs are
-              if (midY > containerSize.h) {
-                rotation = 90; // point down (outputs are off-screen below)
-                posY = containerSize.h - 24;
-              } else if (midY < 0) {
-                rotation = -90; // point up (outputs are off-screen above)
-                posY = 16;
-              } else if (midX < 100) {
-                rotation = 0; // point right (outputs are off-screen left)
-                posX = 16;
-              } else if (midX > containerSize.w - 50) {
-                rotation = 180; // point left (outputs are off-screen right)
+              let posX = midX - 30;
+              let posY = firstOutput.y - 60;
+
+              if (midX > containerSize.w) {
+                rotation = 0; // point right (outputs off-screen right)
                 posX = containerSize.w - 60;
+                posY = Math.max(16, Math.min(containerSize.h - 40, midY - 15));
+              } else if (midX < 0) {
+                rotation = 180; // point left (outputs off-screen left)
+                posX = 16;
+                posY = Math.max(16, Math.min(containerSize.h - 40, midY - 15));
+              } else if (midY < 80) {
+                rotation = -90; // point up (outputs off-screen top)
+                posY = 16;
+                posX = midX - 30;
+              } else if (midY > containerSize.h - 50) {
+                rotation = 90; // point down (outputs off-screen bottom)
+                posY = containerSize.h - 40;
+                posX = midX - 30;
               } else {
-                rotation = 0; // point right (outputs are on-screen, position to left)
-                posX = firstOutput.x - 90; // Position to the left of leftmost output
-                posY = midY - 15;
+                rotation = 90; // point down toward outputs
+                posY = firstOutput.y - 60;
+                posX = midX - 30;
               }
-              
+
               indicators.push({
                 id: 'outputs',
                 label: 'OUT',

@@ -755,7 +755,8 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
         <style>{`
           [data-preview-mode="true"] button[title*="Delete"],
           [data-preview-mode="true"] button[title*="Cancel wiring"],
-          [data-preview-mode="true"] button[title*="Clear Grid"] {
+          [data-preview-mode="true"] button[title*="Clear Grid"],
+          [data-preview-mode="true"] button[title*="Remove wire"] {
             display: none !important;
           }
           [data-preview-mode="true"] [role="button"],

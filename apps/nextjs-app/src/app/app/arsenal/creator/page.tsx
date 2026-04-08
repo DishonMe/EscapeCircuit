@@ -370,91 +370,64 @@ export default function ArsenalCreatorPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Header */}
-      <div className="flex justify-between items-start px-6 pt-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create Arsenal Piece</h1>
-          <p className="text-muted-foreground">Design custom logic circuits to save for reuse</p>
-        </div>
-        <Button variant="outline" onClick={() => router.push(paths.app.arsenal.root.getHref())}>
-          Back to Arsenal
-        </Button>
-      </div>
+    <div className="flex flex-col h-full gap-2">
+      {/* Header + Compact Config Bar */}
+      <div className="flex flex-wrap items-center gap-4 px-6 pt-3 pb-1">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Create Arsenal Piece</h1>
 
-      {/* Configuration Panel */}
-      <div className="px-6 flex gap-6">
-        {/* I/O Configuration */}
-        <div className="bg-card rounded-xl border border-border p-6 space-y-4 w-56">
-          <h2 className="font-semibold text-[13px] text-foreground">I/O Configuration</h2>
-
-          <div>
-            <label className="text-[13px] font-medium text-foreground block mb-2">Inputs</label>
-            <select
-              value={numInputs}
-              onChange={(e: any) => setNumInputs(parseInt(e.target.value))}
-              className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n} input{n !== 1 ? 's' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[13px] font-medium text-foreground block mb-2">Outputs</label>
-            <select
-              value={numOutputs}
-              onChange={(e: any) => setNumOutputs(parseInt(e.target.value))}
-              className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {[1, 2, 3].map((n) => (
-                <option key={n} value={n}>
-                  {n} output{n !== 1 ? 's' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
+          <span className="text-[12px] font-medium text-muted-foreground">Inputs</span>
+          <select
+            value={numInputs}
+            onChange={(e: any) => setNumInputs(parseInt(e.target.value))}
+            className="border border-border rounded bg-card text-foreground px-1.5 py-0.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
+          <select
+            value={numOutputs}
+            onChange={(e: any) => setNumOutputs(parseInt(e.target.value))}
+            className="border border-border rounded bg-card text-foreground px-1.5 py-0.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {[1, 2, 3].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Statistics */}
-        <div className="bg-card rounded-xl border border-border p-6 space-y-3 w-48">
-          <h2 className="font-semibold text-[13px] text-foreground">Piece Info</h2>
-          <div className="text-[13px] space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Components:</span>
-              <span className="font-medium">{placed.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Cost:</span>
-              <span className="font-medium">{currentCost}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Wires:</span>
-              <span className="font-medium">{wires.length}</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
+          <span className="text-muted-foreground">Components: <span className="font-medium text-foreground">{placed.length}</span></span>
+          <span className="text-muted-foreground">Cost: <span className="font-medium text-foreground">{currentCost}</span></span>
+          <span className="text-muted-foreground">Wires: <span className="font-medium text-foreground">{wires.length}</span></span>
+        </div>
+
+        <div className="flex items-center gap-2">
           <Button
             onClick={() => setShowDebugger(true)}
             variant="outline"
-            className="w-full mt-2"
+            size="sm"
           >
             Debug
           </Button>
           <Button
             onClick={() => setShowNameDialog(true)}
             disabled={placed.length === 0}
-            className="w-full mt-4"
+            size="sm"
           >
             Save Piece
           </Button>
         </div>
+
+        <Button variant="outline" size="sm" className="ml-auto" onClick={() => router.push(paths.app.arsenal.root.getHref())}>
+          Back to Arsenal
+        </Button>
       </div>
 
-      {/* Workstation - Main grid layout */}
-      <div className="flex-1 px-6 flex gap-4 min-h-0">
+      {/* Workstation - Main grid layout (stretches full remaining height) */}
+      <div className="flex-1 px-6 pb-3 flex gap-4 min-h-0">
         <WorkstationMenu
           basic={BASIC_COMPONENTS}
           custom={[]}
@@ -483,6 +456,7 @@ export default function ArsenalCreatorPage() {
           onPlacedChange={handlePlacedChange}
           onWiresChange={setWires}
           draggedPaletteComponentId={draggedPaletteComponentId}
+          viewportClassName="h-full"
         />
       </div>
 

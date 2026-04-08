@@ -2285,7 +2285,15 @@ export default function CreatePuzzleForm() {
               </div>
 
               {/* Workstation Grid */}
-              <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-hidden rounded-lg border border-border" data-initial-board="true">
+                <style>{`
+                  [data-initial-board="true"] .lock-indicator {
+                    width: 16px !important;
+                    height: 16px !important;
+                    font-size: 8px !important;
+                    border-width: 1px !important;
+                  }
+                `}</style>
                 <WorkstationGrid
                   puzzleId="initial-board"
                   inputs={data.basic.inputs}
