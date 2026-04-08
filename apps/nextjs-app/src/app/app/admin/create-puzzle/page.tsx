@@ -94,6 +94,30 @@ const availableGates = [
   "DFF",
 ];
 
+const CUSTOM_MIN_MAX_TARGETS = [
+  {
+    name: '__CUSTOM_TOTAL__',
+    label: 'All custom pieces (total usage)',
+    maxCanBeZero: true,
+  },
+] as const;
+
+const ARSENAL_MAX_ONLY_TARGETS = [
+  {
+    name: '__ARSENAL_TOTAL__',
+    label: 'All non-shared arsenal pieces (total usage)',
+    maxCanBeZero: false,
+  },
+  {
+    name: '__ARSENAL_EACH__',
+    label: 'Each non-shared arsenal piece (per piece)',
+    maxCanBeZero: false,
+  },
+] as const;
+
+const ADMIN_ZERO_ALLOWED_GATE_KEYS = new Set(['__CUSTOM_TOTAL__']);
+const ADMIN_ARSENAL_MAX_ONLY_KEYS = new Set(['__ARSENAL_TOTAL__', '__ARSENAL_EACH__']);
+
 // Convert LaTeX to Markdown for preview rendering
 const latexToMarkdown = (latex: string): string => {
   let markdown = latex;
@@ -760,26 +784,38 @@ export default function CreatePuzzleForm() {
       return;
     }
 
-    for (const [gateName, minValue] of Object.entries(data.basic.minGateQuotas)) {
-      if (Number(minValue) < 0) {
+    const sanitizedMinGateQuotas = Object.fromEntries(
+      Object.entries(data.basic.minGateQuotas).filter(
+        ([gateName]) => !ADMIN_ARSENAL_MAX_ONLY_KEYS.has(gateName)
+      )
+    ) as Record<string, number>;
+
+    for (const [gateName, minValue] of Object.entries(sanitizedMinGateQuotas)) {
+      const numericMin = Number(minValue);
+      if (!Number.isInteger(numericMin) || numericMin < 0) {
         alert(`Invalid minimum limit for ${gateName}. Use a non-negative integer.`);
         return;
       }
     }
 
     for (const [gateName, maxValue] of Object.entries(data.basic.gateQuotas)) {
-      if (Number(maxValue) <= 0) {
+      const numericMax = Number(maxValue);
+      if (!Number.isInteger(numericMax) || numericMax < 0) {
+        alert(`Invalid maximum limit for ${gateName}. Use a non-negative integer.`);
+        return;
+      }
+      if (numericMax === 0 && !ADMIN_ZERO_ALLOWED_GATE_KEYS.has(gateName)) {
         alert(`Maximum limit for ${gateName} must be greater than 0.`);
         return;
       }
     }
 
     const quotaNames = new Set([
-      ...Object.keys(data.basic.minGateQuotas),
+      ...Object.keys(sanitizedMinGateQuotas),
       ...Object.keys(data.basic.gateQuotas),
     ]);
     for (const gateName of quotaNames) {
-      const minValue = data.basic.minGateQuotas[gateName];
+      const minValue = sanitizedMinGateQuotas[gateName];
       const maxValue = data.basic.gateQuotas[gateName];
       if (minValue !== undefined && maxValue !== undefined && minValue > maxValue) {
         alert(`Minimum limit for ${gateName} cannot exceed maximum limit.`);
@@ -812,7 +848,7 @@ export default function CreatePuzzleForm() {
       
       // ADD: Convert gate quotas to gate_limit test cases
       const gateQuotasEntries = Object.entries(data.basic.gateQuotas);
-      const minGateQuotasEntries = Object.entries(data.basic.minGateQuotas);
+      const minGateQuotasEntries = Object.entries(sanitizedMinGateQuotas);
       
       // Create test cases for maximum gate limits
       if (gateQuotasEntries.length > 0) {
@@ -1133,50 +1169,138 @@ export default function CreatePuzzleForm() {
             </div>
 
             {data.basic.gateSet.length > 0 && (
-              <div>
+              <div className="space-y-4">
                 <label className="block text-[13px] font-medium text-foreground mb-2">
                   Per-Gate Limits (optional)
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {data.basic.gateSet.map((gate) => (
-                    <div key={gate} className="border p-2 rounded-lg bg-secondary/50">
-                      <label className="text-[11px] font-semibold text-foreground">{gate}</label>
-                      <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Ordered by category. Basic and custom limits support min/max. Non-shared arsenal limits are max-only.
+                </p>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                    1) Specific Gates (min/max)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {data.basic.gateSet.map((gate) => (
+                      <div key={gate} className="border p-2 rounded-lg bg-secondary/50">
+                        <label className="text-[11px] font-semibold text-foreground">{gate}</label>
+                        <div className="text-[10px] text-muted-foreground mb-1">Category: Basic gate</div>
+                        <div className="space-y-1">
+                          <input
+                            type="number"
+                            min="1"
+                            value={data.basic.gateQuotas[gate] ?? ""}
+                            onChange={(e) => {
+                              const newQuotas = { ...data.basic.gateQuotas };
+                              if (e.target.value) {
+                                newQuotas[gate] = parseInt(e.target.value, 10);
+                              } else {
+                                delete newQuotas[gate];
+                              }
+                              handleBasicChange("gateQuotas", newQuotas);
+                            }}
+                            className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder="Max count"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            value={data.basic.minGateQuotas[gate] ?? ""}
+                            onChange={(e) => {
+                              const newMinQuotas = { ...data.basic.minGateQuotas };
+                              if (e.target.value) {
+                                newMinQuotas[gate] = parseInt(e.target.value, 10);
+                              } else {
+                                delete newMinQuotas[gate];
+                              }
+                              handleBasicChange("minGateQuotas", newMinQuotas);
+                            }}
+                            className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder="Min count"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                    2) Custom (min/max)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {CUSTOM_MIN_MAX_TARGETS.map((target) => (
+                      <div key={target.name} className="border p-2 rounded-lg bg-secondary/50">
+                        <label className="text-[11px] font-semibold text-foreground">{target.name}</label>
+                        <div className="text-[10px] text-muted-foreground mb-1">Category: {target.label}</div>
+                        <div className="space-y-1">
+                          <input
+                            type="number"
+                            min={target.maxCanBeZero ? '0' : '1'}
+                            value={data.basic.gateQuotas[target.name] ?? ""}
+                            onChange={(e) => {
+                              const newQuotas = { ...data.basic.gateQuotas };
+                              if (e.target.value) {
+                                newQuotas[target.name] = parseInt(e.target.value, 10);
+                              } else {
+                                delete newQuotas[target.name];
+                              }
+                              handleBasicChange("gateQuotas", newQuotas);
+                            }}
+                            className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder={target.maxCanBeZero ? 'Max count (0 allowed)' : 'Max count'}
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            value={data.basic.minGateQuotas[target.name] ?? ""}
+                            onChange={(e) => {
+                              const newMinQuotas = { ...data.basic.minGateQuotas };
+                              if (e.target.value) {
+                                newMinQuotas[target.name] = parseInt(e.target.value, 10);
+                              } else {
+                                delete newMinQuotas[target.name];
+                              }
+                              handleBasicChange("minGateQuotas", newMinQuotas);
+                            }}
+                            className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder="Min count"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                    3) Non-Shared Arsenal (max only)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {ARSENAL_MAX_ONLY_TARGETS.map((target) => (
+                      <div key={target.name} className="border p-2 rounded-lg bg-secondary/50">
+                        <label className="text-[11px] font-semibold text-foreground">{target.name}</label>
+                        <div className="text-[10px] text-muted-foreground mb-1">Category: {target.label}</div>
                         <input
                           type="number"
                           min="1"
-                          value={data.basic.gateQuotas[gate] ?? ""}
+                          value={data.basic.gateQuotas[target.name] ?? ""}
                           onChange={(e) => {
                             const newQuotas = { ...data.basic.gateQuotas };
                             if (e.target.value) {
-                              newQuotas[gate] = parseInt(e.target.value);
+                              newQuotas[target.name] = parseInt(e.target.value, 10);
                             } else {
-                              delete newQuotas[gate];
+                              delete newQuotas[target.name];
                             }
                             handleBasicChange("gateQuotas", newQuotas);
                           }}
                           className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                           placeholder="Max count"
                         />
-                        <input
-                          type="number"
-                          min="1"
-                          value={data.basic.minGateQuotas[gate] ?? ""}
-                          onChange={(e) => {
-                            const newMinQuotas = { ...data.basic.minGateQuotas };
-                            if (e.target.value) {
-                              newMinQuotas[gate] = parseInt(e.target.value);
-                            } else {
-                              delete newMinQuotas[gate];
-                            }
-                            handleBasicChange("minGateQuotas", newMinQuotas);
-                          }}
-                          className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                          placeholder="Min count"
-                        />
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

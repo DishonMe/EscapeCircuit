@@ -6332,6 +6332,41 @@ class TestSolvingServiceGateLimitBuckets:
         assert "Gate limit exceeded" in msg
         assert details[0]["error_type"] == "gate_limit_exceeded"
 
+    def test_custom_total_limit_supports_min_and_max_constraints(self):
+        service, mock_circuit_repo = self._make_service()
+
+        custom_piece = Mock()
+        custom_piece.is_arsenal = True
+        custom_piece.puzzle_id = 77
+        custom_piece.name = "CustomMux"
+        mock_circuit_repo.get_by_id.side_effect = lambda cid: {400: custom_piece}.get(cid)
+
+        puzzle = Mock()
+        puzzle.allowed_arsenal_component_ids = []
+        puzzle.riddle_base_name = None
+
+        circuit = self._make_circuit(["400", "400"])
+
+        max_tc = {
+            "kind": "gate_limit",
+            "gate_name": "__CUSTOM_TOTAL__",
+            "gate_limit": 1,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [max_tc], puzzle)
+        assert passed is False
+        assert "Gate limit exceeded" in msg
+        assert details[0]["error_type"] == "gate_limit_exceeded"
+
+        min_tc = {
+            "kind": "gate_limit",
+            "gate_name": "__CUSTOM_TOTAL__",
+            "min_gate_limit": 3,
+        }
+        passed, msg, details = service._evaluate_test_cases(circuit, [min_tc], puzzle)
+        assert passed is False
+        assert "Insufficient __CUSTOM_TOTAL__ gates" in msg
+        assert details[0]["error_type"] == "gate_limit_insufficient"
+
     def test_shared_arsenal_each_limit_is_checked_separately_from_private_each_limit(self):
         service, mock_circuit_repo = self._make_service()
 
