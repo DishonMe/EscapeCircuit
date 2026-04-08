@@ -400,6 +400,9 @@ export default function CreatePuzzleForm() {
   const [viewingTruthTableFor, setViewingTruthTableFor] = useState<string | null>(null);
   const [viewingCustomPieceTruthTable, setViewingCustomPieceTruthTable] = useState<number | null>(null);
 
+  // State for solution structure guide modal
+  const [guideModal, setGuideModal] = useState<'basic' | 'solution' | 'python-tests' | null>(null);
+
   // State for custom pieces form
   const [customPieceForm, setCustomPieceForm] = useState({
     name: "",
@@ -1897,7 +1900,17 @@ export default function CreatePuzzleForm() {
               </div>
 
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">Outputs *</label>
+                <label className="flex items-center gap-2 text-[13px] font-medium text-foreground mb-2">
+                  Outputs *
+                  <button
+                    type="button"
+                    onClick={() => setGuideModal('basic')}
+                    className="p-0.5 text-foreground/40 hover:text-foreground/70 transition-opacity flex-shrink-0"
+                    title="View puzzle structure guide"
+                  >
+                    <Info size={16} />
+                  </button>
+                </label>
                 <div className="space-y-2">
                   {data.basic.outputs.map((output, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -2257,7 +2270,7 @@ export default function CreatePuzzleForm() {
               <div className="border-r p-3 overflow-y-auto bg-secondary/50">
                 <div className="text-[13px] font-semibold text-foreground mb-3">Available Components</div>
                 {data.basic.gateSet.length === 0 && customPieces.length === 0 && selectedArsenalPieces.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab</p>
+                  <p className="text-[11px] text-muted-foreground">Select gates in "Basic Info" tab, create pieces in "Custom Pieces" tab, or select Arsenal pieces in "Basic Info" tab</p>
                 ) : (
                   <div className="space-y-2">
                     {/* Basic Gates */}
@@ -2280,6 +2293,58 @@ export default function CreatePuzzleForm() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Custom Pieces */}
+                    {customPieces.length > 0 && data.basic.gateSet.length > 0 && 
+                      <div className="my-2 pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold text-muted-foreground mb-2">Custom Pieces</div>
+                        {customPieces.map((piece) => (
+                          <div
+                            key={`initial-custom-${piece.name}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              setInitialBoardDraggedPaletteComponentId(piece.name);
+                            }}
+                            onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
+                            className="flex items-center gap-2 p-2 border border-border/60 bg-amber-50/30 rounded-lg cursor-move hover:bg-amber-50/60 transition"
+                          >
+                            <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
+                            <div className="flex-1" />
+                            <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                              cost {piece.cost} · pins {piece.numInputs + piece.numOutputs}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    }
+
+                    {/* Arsenal Pieces */}
+                    {selectedArsenalPieces.length > 0 && 
+                      <div className="my-2 pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold text-muted-foreground mb-2">Arsenal Pieces</div>
+                        {selectedArsenalPieces.map((piece) => (
+                          <div
+                            key={`initial-arsenal-${piece.name}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              setInitialBoardDraggedPaletteComponentId(piece.name);
+                            }}
+                            onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
+                            className="flex items-center gap-2 p-2 border border-border/60 bg-blue-50/30 rounded-lg cursor-move hover:bg-blue-50/60 transition"
+                          >
+                            <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
+                            <div className="flex-1" />
+                            <div className="text-[10px] text-muted-foreground flex-shrink-0">
+                              cost {piece.cost} · pins {piece.num_inputs + piece.num_outputs}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    }
                   </div>
                 )}
               </div>
@@ -2477,7 +2542,20 @@ export default function CreatePuzzleForm() {
 
             {/* Fallback: Manual JSON Input */}
             <details className="rounded-xl border border-border bg-secondary/50 p-4">
-              <summary className="cursor-pointer font-semibold text-foreground">OR: Paste Pre-Built Solution JSON</summary>
+              <summary className="flex items-center gap-2 cursor-pointer font-semibold text-foreground">
+                <span>OR: Paste Pre-Built Solution JSON</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGuideModal('solution');
+                  }}
+                  className="p-0.5 text-foreground/40 hover:text-foreground/70 transition-opacity flex-shrink-0"
+                  title="View solution structure guide"
+                >
+                  <Info size={16} />
+                </button>
+              </summary>
               <div className="mt-4 space-y-3">
                 <p className="text-[13px] text-foreground">
                   If you have a solution from another source, paste its JSON here:
@@ -2516,7 +2594,17 @@ export default function CreatePuzzleForm() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-[13px] font-medium text-foreground">Python Tests File (optional)</label>
+                <label className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                  <span>Python Tests File (optional)</span>
+                  <button
+                    type="button"
+                    onClick={() => setGuideModal('python-tests')}
+                    className="p-0.5 text-foreground/40 hover:text-foreground/70 transition-opacity flex-shrink-0"
+                    title="View Python tests structure guide"
+                  >
+                    <Info size={16} />
+                  </button>
+                </label>
                 <input
                   type="file"
                   accept=".py"
@@ -2851,6 +2939,87 @@ def run_tests(solution):
           </div>
         </div>
       )}
+
+      {/* Solution Structure Guide Modal */}
+      <Dialog
+        open={guideModal !== null}
+        onOpenChange={(open) => !open && setGuideModal(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {guideModal === 'basic' && 'Puzzle Configuration Guide'}
+              {guideModal === 'solution' && 'Solution Structure Guide'}
+              {guideModal === 'python-tests' && 'Python Tests Format Guide'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-[13px] text-foreground">
+            {guideModal === 'basic' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold mb-2">Puzzle Configuration Format</p>
+                  <ul className="list-disc list-inside space-y-1 text-[13px]">
+                    <li>Define your puzzle's input and output signals</li>
+                    <li>Inputs are the data sources (e.g., A, B, signal1)</li>
+                    <li>Outputs are the result signals (e.g., sum, carry, result)</li>
+                    <li>Both must contain at least one entry each</li>
+                    <li>Names should be descriptive and unique</li>
+                  </ul>
+                </div>
+                <div className="bg-secondary/50 p-3 rounded-lg">
+                  <p className="font-semibold text-[12px] mb-1">Example:</p>
+                  <p className="text-[11px] font-mono">Inputs: ["A", "B", "carry_in"]</p>
+                  <p className="text-[11px] font-mono">Outputs: ["sum", "carry_out"]</p>
+                </div>
+              </div>
+            )}
+            {guideModal === 'solution' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold mb-2">Solution JSON Structure</p>
+                  <ul className="list-disc list-inside space-y-1 text-[13px]">
+                    <li><strong>totalCost:</strong> Integer representing total gate cost</li>
+                    <li><strong>eval_map:</strong> Maps input combinations to expected outputs</li>
+                    <li><strong>circuit:</strong> Contains placed components and wires</li>
+                    <li>Each input combination must map to correct outputs</li>
+                    <li>Wires connect component outputs to component inputs</li>
+                  </ul>
+                </div>
+                <div className="bg-secondary/50 p-3 rounded-lg">
+                  <p className="font-semibold text-[12px] mb-1">Structure:</p>
+                  <p className="text-[11px] font-mono leading-relaxed">{`{
+  "totalCost": 5,
+  "eval_map": {{"a":1,"b":1}: {"out":1}},
+  "circuit": {"placed": [], "wires": []}
+}`}</p>
+                </div>
+              </div>
+            )}
+            {guideModal === 'python-tests' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold mb-2">Python Tests Format</p>
+                  <ul className="list-disc list-inside space-y-1 text-[13px]">
+                    <li><strong>REQUIRED:</strong> Define a <code className="bg-black/20 px-1 rounded text-[11px]">run_tests(solution)</code> function</li>
+                    <li>Create individual test functions to validate the solution</li>
+                    <li>Call all test functions from <code className="bg-black/20 px-1 rounded text-[11px]">run_tests()</code></li>
+                    <li>Use <code className="bg-black/20 px-1 rounded text-[11px]">raise Exception()</code> to fail a test</li>
+                    <li>Silent pass (no exception) means test passes</li>
+                    <li>Solution dict contains: placedComponents, wires, totalCost, etc.</li>
+                  </ul>
+                </div>
+                <div className="bg-secondary/50 p-3 rounded-lg">
+                  <p className="font-semibold text-[12px] mb-1">Example:</p>
+                  <p className="text-[11px] font-mono leading-relaxed">{`def run_tests(solution):
+  components = solution.get('placedComponents')
+  if len(components) < 2:
+    raise Exception("Need 2+ gates")`}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Truth Table Dialog */}
       <Dialog

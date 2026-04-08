@@ -509,11 +509,17 @@ export const WorkstationGrid = ({
   }, [STORAGE_KEY, gridCols, gridRows]);
 
   const componentRects = useMemo(() => {
-    return placed.map((p) => {
-      const def = catalog[p.componentId];
-      const size = rotatedSize(def.size, p.rotation);
-      return { placedId: p.id, origin: p.origin, size };
-    });
+    return placed
+      .map((p) => {
+        const def = catalog[p.componentId];
+        if (!def) {
+          console.warn(`Component definition missing for ID: ${p.componentId}`);
+          return null;
+        }
+        const size = rotatedSize(def.size, p.rotation);
+        return { placedId: p.id, origin: p.origin, size };
+      })
+      .filter((item) => item !== null) as Array<{ placedId: string; origin: { row: number; col: number }; size: { w: number; h: number } }>;
   }, [catalog, placed]);
 
   const placedById = useMemo(() => {
@@ -537,6 +543,10 @@ export const WorkstationGrid = ({
 
     for (const p of placed) {
       const def = catalog[p.componentId];
+      if (!def) {
+        console.warn(`Component definition missing for ID: ${p.componentId}`);
+        continue;
+      }
       const baseSize = def.size;
       for (const port of def.ports) {
         const rot = rotateOffset(port.offset, baseSize, p.rotation);
@@ -1732,6 +1742,13 @@ export const WorkstationGrid = ({
           {/* Components */}
           {placed.map((p, placedIndex) => {
             const def = catalog[p.componentId];
+            
+            // Safety check: skip rendering if component definition is missing from catalog
+            if (!def) {
+              console.warn(`Component definition missing for ID: ${p.componentId}`);
+              return null;
+            }
+            
             const size = rotatedSize(def.size, p.rotation);
 
             const isDragging = draggedComponent && draggedComponent.placedIds.includes(p.id);
