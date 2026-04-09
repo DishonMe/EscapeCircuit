@@ -41,6 +41,8 @@ class AuditActionType(str, Enum):
     REMOVE_CREATOR = "remove_creator"
     DELETE_PUZZLE = "delete_puzzle"
     UNPUBLISH_PUZZLE = "unpublish_puzzle"
+    DELETE_USER = "delete_user"
+    UPDATE_PUZZLE_LIMITS = "update_puzzle_limits"
 
 
 class GateType(str, Enum):

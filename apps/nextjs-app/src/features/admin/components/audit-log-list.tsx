@@ -17,6 +17,8 @@ const actionTypeLabels: Record<string, string> = {
   remove_creator: 'Removed Creator',
   delete_puzzle: 'Deleted Puzzle',
   unpublish_puzzle: 'Unpublished Puzzle',
+  delete_user: 'Deleted User',
+  update_puzzle_limits: 'Updated Puzzle Limits',
 };
 
 const actionTypeColors: Record<string, string> = {
@@ -24,6 +26,8 @@ const actionTypeColors: Record<string, string> = {
   remove_creator: 'bg-orange-50/50 text-orange-700',
   delete_puzzle: 'bg-red-50/50 text-red-700',
   unpublish_puzzle: 'bg-amber-50/50 text-amber-700',
+  delete_user: 'bg-rose-50/60 text-rose-700',
+  update_puzzle_limits: 'bg-emerald-50/60 text-emerald-700',
 };
 
 export const AuditLogList = () => {

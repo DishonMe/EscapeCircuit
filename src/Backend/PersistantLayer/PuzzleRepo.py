@@ -1027,6 +1027,8 @@ class PuzzleRepo:
         try:
             creator_budget = row["creator_budget"]
             creator_budget = int(creator_budget) if creator_budget is not None else None
+            if creator_budget is not None and creator_budget < 0:
+                creator_budget = None
         except (IndexError, KeyError, TypeError, ValueError):
             creator_budget = None
         # Safely read allowed_arsenal_component_ids — may be missing in old DBs

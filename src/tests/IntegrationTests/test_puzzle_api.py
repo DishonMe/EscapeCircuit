@@ -69,6 +69,21 @@ class TestPuzzleCreate:
         assert resp.status_code == 400
         assert "2000 characters" in resp.json()["detail"]
 
+    def test_create_puzzle_accepts_zero_creator_budget(self, client, conn):
+        token = _register_creator(client, conn, "zero_creator_budget_creator")
+        resp = client.post("/puzzles", json={
+            "name": "Zero Creator Budget Puzzle",
+            "description": "A puzzle where creator solution cost is zero",
+            "budget": 10,
+            "creator_budget": 0,
+            "default_gate_set": ["AND"],
+            "difficulty": "EASY",
+        }, headers=auth_header(token))
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body.get("creator_budget") == 0
+        assert body.get("creatorBudget") == 0
+
     def test_create_puzzle_no_auth(self, client):
         resp = client.post("/puzzles", json={
             "name": "X", "description": "Y", "budget": 10,
@@ -270,6 +285,92 @@ class TestPuzzleBrowse:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data) == 2
+
+    def test_my_puzzles_handles_legacy_zero_creator_budget_row(self, client, conn):
+        token = _register_creator(client, conn, "legacy_zero_creator_budget")
+        me = client.get("/users/me", headers=auth_header(token)).json()
+
+        conn.execute(
+            """
+            INSERT INTO puzzles(
+                name, creator_user_id, description, instructions, status, budget, creator_budget,
+                time_limit_seconds, difficulty, default_gate_set, rating_count,
+                avg_difficulty, avg_fun, avg_clearness,
+                min_gate_count, total_gate_count, min_cycles, max_cycles, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                "Legacy Creator Budget Zero",
+                int(me["id"]),
+                "desc",
+                "",
+                "unpublished",
+                10,
+                0,
+                None,
+                "EASY",
+                '["AND"]',
+                0,
+                0.0,
+                0.0,
+                0.0,
+                None,
+                None,
+                None,
+                None,
+            ),
+        )
+        conn.commit()
+
+        resp = client.get("/puzzles/my-puzzles/list", headers=auth_header(token))
+        assert resp.status_code == 200, resp.text
+
+        items = resp.json().get("data", [])
+        puzzle = next((p for p in items if p.get("name") == "Legacy Creator Budget Zero"), None)
+        assert puzzle is not None
+        assert puzzle.get("creator_budget") == 0
+        assert puzzle.get("creatorBudget") == 0
+
+    def test_my_puzzles_validation_error_returns_400_not_401(self, client, conn):
+        token = _register_creator(client, conn, "invalid_budget_relation")
+        me = client.get("/users/me", headers=auth_header(token)).json()
+
+        conn.execute(
+            """
+            INSERT INTO puzzles(
+                name, creator_user_id, description, instructions, status, budget, creator_budget,
+                time_limit_seconds, difficulty, default_gate_set, rating_count,
+                avg_difficulty, avg_fun, avg_clearness,
+                min_gate_count, total_gate_count, min_cycles, max_cycles, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                "Invalid Creator Budget Relation",
+                int(me["id"]),
+                "desc",
+                "",
+                "unpublished",
+                5,
+                10,
+                None,
+                "EASY",
+                '["AND"]',
+                0,
+                0.0,
+                0.0,
+                0.0,
+                None,
+                None,
+                None,
+                None,
+            ),
+        )
+        conn.commit()
+
+        resp = client.get("/puzzles/my-puzzles/list", headers=auth_header(token))
+        assert resp.status_code == 400, resp.text
+        detail = resp.json().get("detail", "").lower()
+        assert "creator_budget" in detail or "budget" in detail
 
     def test_search_puzzles(self, client):
         token = register_and_login(client)

@@ -10,9 +10,10 @@ import os
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.User import User
-from Backend.DomainLayer.Enums import UserRole
+from Backend.DomainLayer.Enums import UserRole, AuditActionType
 
 from Backend.PersistantLayer.UserRepo import UserRepo
+from Backend.PersistantLayer.AuditLogRepo import AuditLogRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 
@@ -23,10 +24,17 @@ class UserService:
     UserService internally uses AuthService + UserRepo + XPService.
     """
 
-    def __init__(self, user_repo: UserRepo, auth_service: AuthService, xp_service: XPService):
+    def __init__(
+        self,
+        user_repo: UserRepo,
+        auth_service: AuthService,
+        xp_service: XPService,
+        audit_log_repo: Optional[AuditLogRepo] = None,
+    ):
         self.user_repo = user_repo
         self.auth = auth_service
         self.xp = xp_service
+        self.audit_log = audit_log_repo
 
     def register(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
@@ -366,10 +374,25 @@ class UserService:
         if not target:
             raise ValidationError("user not found")
 
+        target_username = target.username
+        target_role = target.role.value
+
         deleted = self.user_repo.delete(target_user_id)
         self.user_repo.conn.commit()
         if not deleted:
             raise ValidationError("user not found")
+
+        if self.audit_log is not None:
+            self.audit_log.create(
+                admin_user_id=admin_id,
+                action_type=AuditActionType.DELETE_USER.value,
+                target_user_id=target_user_id,
+                details={
+                    "target_username": target_username,
+                    "previous_role": target_role,
+                },
+            )
+
         return {"ok": True}
 
     def set_role(self, session_token: str, payload: Dict[str, Any]) -> dict:

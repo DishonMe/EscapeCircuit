@@ -504,10 +504,9 @@ class TestPuzzleCreatorBudget:
         with pytest.raises(ValidationError):
             Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=-1)
 
-    def test_creator_budget_zero_is_invalid(self):
-        # Zero makes no sense as creator cost — must be positive when set
-        with pytest.raises(ValidationError):
-            Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=0)
+    def test_creator_budget_zero_is_valid(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=0)
+        assert puzzle.creator_budget == 0
 
     def test_creator_budget_one_valid(self):
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=5, creator_budget=1)

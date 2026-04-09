@@ -224,6 +224,16 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     test_cases = config.get('test_cases', [])
     basic_circuits = config.get('basic_circuits', []) or puzzle_data.get('basic_circuits', [])
     custom_pieces = config.get('custom_pieces', []) or puzzle_data.get('custom_pieces', [])
+
+    raw_creator_budget = puzzle_data.get('creator_budget')
+    creator_budget = None
+    if raw_creator_budget is not None:
+        try:
+            parsed_creator_budget = int(raw_creator_budget)
+            if parsed_creator_budget >= 0:
+                creator_budget = parsed_creator_budget
+        except (TypeError, ValueError):
+            creator_budget = None
     
     # Extract initial_board if present (pre-placed locked components)
     initial_board_json = None
@@ -266,7 +276,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             description,
             instructions_text,
             puzzle_data.get('budget', 0),
-            puzzle_data.get('creator_budget'),
+            creator_budget,
             puzzle_data.get('time_limit_seconds'),
             gates_json,
             difficulty,
@@ -304,7 +314,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             instructions_text,
             status,
             puzzle_data.get('budget', 0),
-            puzzle_data.get('creator_budget'),
+            creator_budget,
             puzzle_data.get('time_limit_seconds'),
             difficulty,
             gates_json,
@@ -508,6 +518,16 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
     """
     puzzle_data = config_data.get('puzzle', {})
     gates_json = json.dumps(puzzle_data.get('default_gate_set', []))
+
+    raw_creator_budget = puzzle_data.get('creator_budget')
+    creator_budget = None
+    if raw_creator_budget is not None:
+        try:
+            parsed_creator_budget = int(raw_creator_budget)
+            if parsed_creator_budget >= 0:
+                creator_budget = parsed_creator_budget
+        except (TypeError, ValueError):
+            creator_budget = None
     
     # Difficulty mapping for seed puzzles
     SEED_DIFFICULTY = {
@@ -546,7 +566,7 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
             instructions_text,
             status,
             puzzle_data.get('budget', 0),
-            puzzle_data.get('creator_budget'),
+            creator_budget,
             puzzle_data.get('time_limit_seconds'),
             difficulty,
             gates_json,

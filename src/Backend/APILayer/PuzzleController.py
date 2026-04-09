@@ -232,9 +232,17 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
     budget = puzzle_config.get('budget', 0) or 0
     creator_budget = puzzle_config.get('creator_budget')
     if creator_budget is not None:
+        try:
+            creator_budget = int(creator_budget)
+        except (TypeError, ValueError):
+            raise ValidationError("creator_budget must be an integer when set")
+
         if creator_budget < 0:
             raise ValidationError("creator_budget cannot be negative")
-        if budget > 0 and budget <= creator_budget:
+
+        puzzle_config['creator_budget'] = creator_budget
+
+        if creator_budget is not None and budget > 0 and budget <= creator_budget:
             raise ValidationError(
                 f"budget ({budget}) must be greater than creator_budget ({creator_budget})"
             )
@@ -248,6 +256,12 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
+
+    def _validation_error_to_http_status(err: ValidationError) -> int:
+        detail = str(err).strip().lower()
+        if detail == "unauthorized":
+            return 401
+        return 400
 
     def _inject_rating_metrics(puzzle_dict: dict) -> dict:
         """Inject rating_metrics into a puzzle dict if rating_service is available."""
@@ -371,7 +385,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
 
             return result
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/my-puzzles/list")
     def list_my_puzzles(
@@ -396,14 +410,14 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 order_direction=order_direction
             )
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/search")
     def search(q: str, token: str = Depends(verify_token)):
         try:
             return puzzle_service.search(token, q)
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/{puzzle_id}")
     def get_one(puzzle_id: int, token: str = Depends(verify_token)):
@@ -683,11 +697,17 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 # Extract creator_budget from solution totalCost if not already set in config
                 solution_total_cost = solution_data.get('totalCost')
                 if solution_total_cost is not None:
+                    try:
+                        normalized_solution_total_cost = int(solution_total_cost)
+                    except (TypeError, ValueError):
+                        raise ValidationError("Sample solution totalCost must be an integer when provided")
+
                     config_creator_budget = puzzle_config.get('creator_budget')
                     if config_creator_budget is None:
-                        # Auto-set creator_budget from solution cost
-                        puzzle_config['creator_budget'] = int(solution_total_cost)
-                        config_data.setdefault('puzzle', {})['creator_budget'] = int(solution_total_cost)
+                        # Auto-set creator_budget from solution cost (including 0-cost solutions).
+                        puzzle_config['creator_budget'] = normalized_solution_total_cost
+                        config_data.setdefault('puzzle', {})['creator_budget'] = normalized_solution_total_cost
+
                     # Validate budget > creator_budget now that we have the solution cost
                     effective_creator_budget = puzzle_config.get('creator_budget')
                     if effective_creator_budget is not None:

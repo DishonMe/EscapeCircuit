@@ -143,6 +143,44 @@ class TestAuditLog:
         actions = [e["action_type"] for e in entries]
         assert "delete_puzzle" in actions
 
+    def test_audit_log_records_user_delete(self, client, conn):
+        admin_token = make_admin(client, conn, "audit_admin_delete_user")
+        user_token = register_and_login(client, "audit_user_to_delete")
+        user_info = get_user_info(client, user_token)
+        user_id = int(user_info["id"])
+
+        resp = client.delete(f"/users/{user_id}", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+
+        resp = client.get("/admin/audit-log", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        entries = resp.json()
+        assert any(
+            e["action_type"] == "delete_user" and e.get("target_user_id") == user_id
+            for e in entries
+        )
+
+    def test_audit_log_records_creator_limit_updates(self, client, conn):
+        admin_token = make_admin(client, conn, "audit_admin_limits")
+        creator_token = make_creator(client, conn, "audit_creator_limits")
+        creator_info = get_user_info(client, creator_token)
+        creator_id = int(creator_info["id"])
+
+        resp = client.patch(
+            f"/admin/users/{creator_id}/puzzle-limits",
+            json={"max_published": 11, "max_unpublished": 9},
+            headers=auth_header(admin_token),
+        )
+        assert resp.status_code == 200
+
+        resp = client.get("/admin/audit-log", headers=auth_header(admin_token))
+        assert resp.status_code == 200
+        entries = resp.json()
+        assert any(
+            e["action_type"] == "update_puzzle_limits" and e.get("target_user_id") == creator_id
+            for e in entries
+        )
+
     def test_non_admin_cannot_access_audit_log(self, client):
         user_token = register_and_login(client, "nonadmin")
         resp = client.get("/admin/audit-log", headers=auth_header(user_token))

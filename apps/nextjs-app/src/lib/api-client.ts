@@ -56,6 +56,23 @@ function getTokenFromCookieString(cookieString: string): string | undefined {
   return match ? match[1] : undefined;
 }
 
+function isAuthenticationFailure(status: number, message: string): boolean {
+  if (status !== 401) return false;
+
+  const normalizedMessage = (message || '').trim().toLowerCase();
+  if (!normalizedMessage) return true;
+
+  return (
+    normalizedMessage === 'unauthorized' ||
+    normalizedMessage.includes('missing authorization header') ||
+    normalizedMessage.includes('invalid authorization header') ||
+    normalizedMessage.includes('invalid token') ||
+    normalizedMessage.includes('token expired') ||
+    normalizedMessage.includes('session expired') ||
+    normalizedMessage.includes('not authenticated')
+  );
+}
+
 async function fetchApi<T>(
   url: string,
   options: RequestOptions = {},
@@ -116,8 +133,8 @@ async function fetchApi<T>(
           message = response.statusText || 'An error occurred';
         }
         
-        // Handle 401 Unauthorized - session expired or token invalidated
-        if (response.status === 401 && typeof window !== 'undefined') {
+        // Only force logout for true auth failures, not generic backend validation issues.
+        if (typeof window !== 'undefined' && isAuthenticationFailure(response.status, message)) {
           // Clear the invalid token
           Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
 
@@ -131,7 +148,7 @@ async function fetchApi<T>(
           }
 
           // Stop further processing
-          throw new Error('Session expired - redirecting to login');
+          throw new Error('Unauthorized - redirecting to login');
         }
         
         if (typeof window !== 'undefined' && !suppressErrorNotification) {
