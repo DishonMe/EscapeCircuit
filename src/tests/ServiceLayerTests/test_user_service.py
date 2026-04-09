@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from Backend.ServiceLayer.UserService import UserService
 from Backend.DomainLayer.User import User
-from Backend.DomainLayer.Enums import UserRole
+from Backend.DomainLayer.Enums import UserRole, AuditActionType
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
@@ -423,7 +423,13 @@ class TestUserServiceDeleteUser:
         self.mock_user_repo.conn = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_xp = Mock(spec=XPService)
-        self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)
+        self.mock_audit_log = Mock()
+        self.service = UserService(
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_xp,
+            audit_log_repo=self.mock_audit_log,
+        )
 
     def test_delete_user_success(self):
         admin_user = User(id=1, username="admin", role=UserRole.ADMIN)
@@ -437,6 +443,12 @@ class TestUserServiceDeleteUser:
 
         assert result["ok"] is True
         self.mock_user_repo.delete.assert_called_once_with(2)
+        self.mock_audit_log.create.assert_called_once()
+        audit_call = self.mock_audit_log.create.call_args[1]
+        assert audit_call["admin_user_id"] == 1
+        assert audit_call["action_type"] == AuditActionType.DELETE_USER.value
+        assert audit_call["target_user_id"] == 2
+        assert audit_call["details"]["target_username"] == "target"
 
     def test_delete_user_non_admin(self):
         solver_user = User(id=1, username="solver", role=UserRole.SOLVER)

@@ -14,6 +14,8 @@ export const getAuditLogQueryOptions = (limit: number = 100) => {
   return queryOptions({
     queryKey: ['admin-audit-log', limit],
     queryFn: () => getAuditLog(limit),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 };
 

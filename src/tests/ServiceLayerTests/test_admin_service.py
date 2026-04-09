@@ -464,10 +464,10 @@ class TestAdminServiceUpdatePuzzleLimits:
             mock_user_repo, mock_puzzle_repo, mock_solve_repo,
             mock_rating_repo, mock_audit_log, mock_notification_repo, mock_auth,
         )
-        return service, mock_user_repo
+        return service, mock_user_repo, mock_audit_log
 
     def test_update_limits_target_not_found(self):
-        service, mock_user_repo = self._make_service()
+        service, mock_user_repo, _ = self._make_service()
         admin = Mock(spec=User); admin.role = UserRole.ADMIN
         service.auth.require_user_id.return_value = 1
         mock_user_repo.get_by_id.side_effect = [admin, None]
@@ -476,7 +476,7 @@ class TestAdminServiceUpdatePuzzleLimits:
             service.update_creator_puzzle_limits("token", 99, 10, 5)
 
     def test_update_limits_non_creator_raises(self):
-        service, mock_user_repo = self._make_service()
+        service, mock_user_repo, _ = self._make_service()
         admin = Mock(spec=User); admin.role = UserRole.ADMIN
         target = Mock(spec=User); target.role = UserRole.SOLVER
         service.auth.require_user_id.return_value = 1
@@ -486,9 +486,12 @@ class TestAdminServiceUpdatePuzzleLimits:
             service.update_creator_puzzle_limits("token", 2, 10, 5)
 
     def test_update_limits_negative_raises(self):
-        service, mock_user_repo = self._make_service()
+        service, mock_user_repo, _ = self._make_service()
         admin = Mock(spec=User); admin.role = UserRole.ADMIN
         target = Mock(spec=User); target.role = UserRole.CREATOR
+        target.max_published_puzzles = None
+        target.max_unpublished_puzzles = None
+        target.get_puzzle_capacity = Mock(return_value=(5, 5))
         service.auth.require_user_id.return_value = 1
         mock_user_repo.get_by_id.side_effect = [admin, target]
 
@@ -496,9 +499,12 @@ class TestAdminServiceUpdatePuzzleLimits:
             service.update_creator_puzzle_limits("token", 2, -1, 5)
 
     def test_update_limits_success(self):
-        service, mock_user_repo = self._make_service()
+        service, mock_user_repo, mock_audit_log = self._make_service()
         admin = Mock(spec=User); admin.role = UserRole.ADMIN
         target = Mock(spec=User); target.role = UserRole.CREATOR
+        target.max_published_puzzles = 7
+        target.max_unpublished_puzzles = 4
+        target.get_puzzle_capacity = Mock(return_value=(7, 4))
 
         updated_user = Mock(spec=User)
         updated_user.max_published_puzzles = 10
@@ -513,11 +519,22 @@ class TestAdminServiceUpdatePuzzleLimits:
         assert result["max_published_override"] == 10
         assert result["max_unpublished_override"] == 5
         mock_user_repo.update_puzzle_limits.assert_called_once_with(2, 10, 5)
+        mock_audit_log.create.assert_called_once()
+        audit_call = mock_audit_log.create.call_args[1]
+        assert audit_call["admin_user_id"] == 1
+        assert audit_call["action_type"] == AuditActionType.UPDATE_PUZZLE_LIMITS.value
+        assert audit_call["target_user_id"] == 2
+        assert audit_call["details"]["previous_max_published_override"] == 7
+        assert audit_call["details"]["new_max_published_override"] == 10
+        assert audit_call["details"]["new_effective_max_unpublished"] == 5
 
     def test_update_limits_with_none_reverts_to_default(self):
-        service, mock_user_repo = self._make_service()
+        service, mock_user_repo, mock_audit_log = self._make_service()
         admin = Mock(spec=User); admin.role = UserRole.ADMIN
         target = Mock(spec=User); target.role = UserRole.CREATOR
+        target.max_published_puzzles = 9
+        target.max_unpublished_puzzles = 6
+        target.get_puzzle_capacity = Mock(return_value=(9, 6))
 
         updated_user = Mock(spec=User)
         updated_user.get_puzzle_capacity = Mock(return_value=(5, 5))
@@ -528,6 +545,7 @@ class TestAdminServiceUpdatePuzzleLimits:
         result = service.update_creator_puzzle_limits("token", 2, None, None)
         assert result["ok"] is True
         mock_user_repo.update_puzzle_limits.assert_called_once_with(2, None, None)
+        mock_audit_log.create.assert_called_once()
 
 
 # ============================================================================

@@ -17,7 +17,7 @@ import type { PlacedGridComponent, ComponentDef } from './workstation-grid';
 import { CircuitComponent, CircuitSolution } from '@/types/api';
 import { cn } from '@/utils/cn';
 import { LogicNode, type LogicNodeDefinition } from './node';
-import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
+import { useMyArsenal } from '@/features/arsenal/api';
 
 type ArsenalCircuit = {
   id: string;
@@ -350,7 +350,8 @@ const DraggableItem = ({
 export const WorkstationMenu = ({
   basic,
   custom,
-  arsenal,
+  sharedArsenal,
+  solverArsenal,
   componentDefs,
   allowArsenal,
   filteredBasicTypes,
@@ -361,7 +362,8 @@ export const WorkstationMenu = ({
 }: {
   basic: CircuitComponent[];
   custom: CircuitComponent[];
-  arsenal: CircuitComponent[];
+  sharedArsenal: CircuitComponent[];
+  solverArsenal: CircuitComponent[];
   componentDefs?: Record<string, LogicNodeDefinition>;
   allowArsenal: boolean;
   filteredBasicTypes: string[];
@@ -393,6 +395,31 @@ export const WorkstationMenu = ({
     );
   }, [allowArsenal, loadedArsenal, filteredBasicTypes]);
 
+  const getUsedBasicTypes = (component: CircuitComponent): string[] => {
+    const directUsedTypes = (component as any).used_basic_types;
+    if (Array.isArray(directUsedTypes)) {
+      return directUsedTypes.map((gate) => String(gate));
+    }
+
+    const basicGatesRaw = (component as any).basic_gates;
+    if (Array.isArray(basicGatesRaw)) {
+      return basicGatesRaw.map((gate) => String(gate));
+    }
+
+    if (typeof basicGatesRaw === 'string' && basicGatesRaw.trim()) {
+      try {
+        const parsed = JSON.parse(basicGatesRaw);
+        if (Array.isArray(parsed)) {
+          return parsed.map((gate) => String(gate));
+        }
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  };
+
   const handleInfoClick = (componentId: string, component: CircuitComponent, category: 'basic' | 'custom' | 'arsenal' = 'basic') => {
     // Show circuit preview ONLY for arsenal pieces
     if (category === 'arsenal') {
@@ -400,7 +427,7 @@ export const WorkstationMenu = ({
       const arsenalCircuit: ArsenalCircuit = {
         id: component.id,
         name: component.type,
-        usedBasicTypes: [],
+        usedBasicTypes: getUsedBasicTypes(component),
         solution: (component as any).solution || { structure: {} },
         description: (component as any).description,
       };
@@ -437,6 +464,14 @@ export const WorkstationMenu = ({
   const truthTable = viewingTruthTableFor
     ? TRUTH_TABLES[viewingTruthTableFor]
     : null;
+
+  const knownPreviewArsenalComponents = useMemo(() => {
+    const byId = new Map<string, CircuitComponent>();
+    for (const component of [...sharedArsenal, ...solverArsenal]) {
+      byId.set(String(component.id), component);
+    }
+    return Array.from(byId.values());
+  }, [sharedArsenal, solverArsenal]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -486,15 +521,40 @@ export const WorkstationMenu = ({
         </Category>
       ) : null}
 
-      {/* Arsenal Category (user's saved pieces) */}
-      {allowArsenal && arsenal.length ? (
-        <Category title="Arsenal">
+      {/* Creator-shared arsenal pieces for this puzzle */}
+      {sharedArsenal.length ? (
+        <Category title="Shared Arsenal">
+          <div className="text-[11px] text-foreground/80 mb-2">
+            Components explicitly shared by the puzzle creator
+          </div>
+          <div className="flex flex-col gap-2">
+            {sharedArsenal.map((c) => (
+              <DraggableItem
+                key={c.id}
+                component={c}
+                node={componentDefs?.[c.id] ?? getFallbackNodeDefinition(c)}
+                inPalette
+                isSelected={selectedComponentId === c.id}
+                onSelect={onSelectComponent}
+                onInfoClick={() => handleInfoClick(c.id, c, 'arsenal')}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                category="arsenal"
+              />
+            ))}
+          </div>
+        </Category>
+      ) : null}
+
+      {/* Solver personal arsenal pieces (when allowed) */}
+      {allowArsenal ? (
+        <Category title="Your Arsenal">
           <div className="text-[11px] text-foreground/80 mb-2">
             Your personal circuit pieces
           </div>
-          {arsenal.length > 0 ? (
+          {solverArsenal.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {arsenal.map((c) => (
+              {solverArsenal.map((c) => (
                 <DraggableItem
                   key={c.id}
                   component={c}
@@ -511,7 +571,7 @@ export const WorkstationMenu = ({
             </div>
           ) : (
             <div className="text-[11px] text-foreground/70 opacity-80">
-              No arsenal pieces yet. Create one in your arsenal workspace.
+              No personal arsenal pieces available.
             </div>
           )}
         </Category>
@@ -605,7 +665,10 @@ export const WorkstationMenu = ({
             </DialogDescription>
           </DialogHeader>
           {viewingCircuitPreviewFor && (
-            <CircuitPreviewContent arsenalCircuit={viewingCircuitPreviewFor} />
+            <CircuitPreviewContent
+              arsenalCircuit={viewingCircuitPreviewFor}
+              knownArsenalComponents={knownPreviewArsenalComponents}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -613,7 +676,13 @@ export const WorkstationMenu = ({
   );
 };
 
-function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCircuit }) {
+function CircuitPreviewContent({
+  arsenalCircuit,
+  knownArsenalComponents = [],
+}: {
+  arsenalCircuit: ArsenalCircuit;
+  knownArsenalComponents?: CircuitComponent[];
+}) {
   const { data: myArsenal } = useMyArsenal();
 
   const parseStructure = (solution: any): {
@@ -644,13 +713,46 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
   const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
   const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
 
-  // Build map of arsenal pieces by ID for quick lookup
-  const arsenalMap = new Map<string, ArsenalPiece>();
+  // Build map of arsenal metadata by ID for quick lookup.
+  const arsenalMap = new Map<
+    string,
+    { name: string; cost: number; num_inputs: number; num_outputs: number }
+  >();
   if (myArsenal) {
     myArsenal.forEach((ap) => {
-      arsenalMap.set(String(ap.id), ap);
+      arsenalMap.set(String(ap.id), {
+        name: ap.name,
+        cost: ap.cost,
+        num_inputs: (ap as any).num_inputs ?? 0,
+        num_outputs: (ap as any).num_outputs ?? 0,
+      });
     });
   }
+  knownArsenalComponents.forEach((component) => {
+    const key = String(component.id);
+    if (!arsenalMap.has(key)) {
+      arsenalMap.set(key, {
+        name: component.type,
+        cost: component.cost,
+        num_inputs: (component as any).num_inputs ?? 0,
+        num_outputs: (component as any).num_outputs ?? 0,
+      });
+    }
+  });
+
+  // Normalize lookup key so preview can resolve IDs even when stored as numbers.
+  const getComponentKey = (componentId: string) => {
+    const numeric = Number(componentId);
+    if (Number.isFinite(numeric) && String(numeric) === componentId) {
+      return String(numeric);
+    }
+    return componentId;
+  };
+
+  const getCatalogLabel = (componentId: string) => {
+    const known = arsenalMap.get(getComponentKey(componentId));
+    return known?.name || componentId;
+  };
 
   // Build catalog with standard component definitions
   // Size formula: width=3, height=max(inputs, outputs)
@@ -667,11 +769,11 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
   // Add any custom arsenal pieces as components
   placed.forEach((comp) => {
     if (!catalog[comp.componentId]) {
-      const arsenalPiece = arsenalMap.get(comp.componentId);
-      if (arsenalPiece && (arsenalPiece as any).is_arsenal) {
+      const arsenalPiece = arsenalMap.get(getComponentKey(comp.componentId));
+      if (arsenalPiece) {
         // Arsenal piece sizing: width=3, height=max(inputs, outputs)
-        const numInputs = (arsenalPiece as any).num_inputs ?? 0;
-        const numOutputs = (arsenalPiece as any).num_outputs ?? 0;
+        const numInputs = arsenalPiece.num_inputs ?? 0;
+        const numOutputs = arsenalPiece.num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
         const size = { w: 3, h: Math.max(1, maxPorts) };
         
@@ -694,7 +796,7 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
         
         catalog[comp.componentId] = {
           id: comp.componentId,
-          label: arsenalPiece.name,
+          label: getCatalogLabel(comp.componentId),
           cost: arsenalPiece.cost,
           size,
           ports,
@@ -703,7 +805,7 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
         // Fallback for unknown components
         catalog[comp.componentId] = {
           id: comp.componentId,
-          label: comp.componentId,
+          label: getCatalogLabel(comp.componentId),
           cost: 1,
           size: { w: 3, h: 1 },
           ports: [
@@ -724,6 +826,13 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
       {arsenalCircuit.description && (
         <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
           <p className="text-sm text-foreground">{arsenalCircuit.description}</p>
+        </div>
+      )}
+
+      {arsenalCircuit.usedBasicTypes.length > 0 && (
+        <div className="bg-secondary/30 p-3 rounded-lg border border-border/60">
+          <p className="text-xs text-foreground/70 mb-1">Basic Gates Used</p>
+          <p className="text-sm text-foreground">{arsenalCircuit.usedBasicTypes.join(', ')}</p>
         </div>
       )}
 
@@ -756,7 +865,9 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
           [data-preview-mode="true"] button[title*="Delete"],
           [data-preview-mode="true"] button[title*="Cancel wiring"],
           [data-preview-mode="true"] button[title*="Clear Grid"],
-          [data-preview-mode="true"] button[title*="Remove wire"] {
+          [data-preview-mode="true"] button[title*="Remove wire"],
+          [data-preview-mode="true"] button[title*="Copy selected"],
+          [data-preview-mode="true"] button[title*="Paste copied"] {
             display: none !important;
           }
           [data-preview-mode="true"] [role="button"],
@@ -796,7 +907,7 @@ function CircuitPreviewContent({ arsenalCircuit }: { arsenalCircuit: ArsenalCirc
               .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
               .map((comp) => (
                 <div key={comp.componentId} className="flex items-center gap-2 text-xs">
-                  <span className="text-foreground/70">{comp.componentId}</span>
+                  <span className="text-foreground/70">{catalog[comp.componentId]?.label || comp.componentId}</span>
                 </div>
               ))}
           </div>

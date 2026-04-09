@@ -419,13 +419,20 @@ class AdminService:
 
         Pass None for either value to revert to the level-based default.
         """
-        self._require_admin(session_token)
+        admin_id = self._require_admin(session_token)
 
         target = self.user_repo.get_by_id(target_user_id)
         if not target:
             raise ValidationError("target user not found")
         if target.role not in (UserRole.CREATOR, UserRole.PENDING_CREATOR):
             raise ValidationError("target user is not a creator")
+
+        previous_max_published_override = getattr(target, "max_published_puzzles", None)
+        previous_max_unpublished_override = getattr(target, "max_unpublished_puzzles", None)
+        previous_effective_max_published = None
+        previous_effective_max_unpublished = None
+        if hasattr(target, "get_puzzle_capacity"):
+            previous_effective_max_published, previous_effective_max_unpublished = target.get_puzzle_capacity()
 
         if max_published is not None and max_published < 0:
             raise ValidationError("max_published cannot be negative")
@@ -437,6 +444,22 @@ class AdminService:
         # Re-fetch to return current effective values
         updated = self.user_repo.get_by_id(target_user_id)
         eff_published, eff_unpublished = updated.get_puzzle_capacity()
+
+        self.audit_log.create(
+            admin_user_id=admin_id,
+            action_type=AuditActionType.UPDATE_PUZZLE_LIMITS.value,
+            target_user_id=target_user_id,
+            details={
+                "previous_max_published_override": previous_max_published_override,
+                "previous_max_unpublished_override": previous_max_unpublished_override,
+                "new_max_published_override": max_published,
+                "new_max_unpublished_override": max_unpublished,
+                "previous_effective_max_published": previous_effective_max_published,
+                "previous_effective_max_unpublished": previous_effective_max_unpublished,
+                "new_effective_max_published": eff_published,
+                "new_effective_max_unpublished": eff_unpublished,
+            },
+        )
 
         return {
             "ok": True,

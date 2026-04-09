@@ -69,7 +69,12 @@ def _build_test_app(conn: sqlite3.Connection) -> FastAPI:
     xp_service = XPService(user_repo)
     auth_service = AuthService(user_repo)
     notification_service = NotificationService(notification_repo, auth_service)
-    user_service = UserService(user_repo, auth_service, xp_service)
+    user_service = UserService(
+        user_repo,
+        auth_service,
+        xp_service,
+        audit_log_repo=audit_log_repo,
+    )
     circuit_service = CircuitService(circuit_repo, user_repo, auth_service, logic_engine, xp_service)
     arsenal_service = ArsenalService(circuit_repo, user_repo, auth_service, logic_engine, xp_service)
     solving_service = SolvingService(

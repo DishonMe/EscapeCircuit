@@ -1,40 +1,40 @@
 {
   "totalCost": 1,
   "eval_map": {
-    "{\"input_0\":0}": {
-      "output_0": 1
+    "{\"input_0\":1}": {
+      "output_0": 0
     }
   },
   "circuit": {
     "placed": [
       {
-        "id": "NOT:1775682936410",
-        "componentId": "NOT",
+        "id": "n:1775765631077",
+        "componentId": "n",
         "origin": {
-          "row": 6,
-          "col": 15
+          "row": 2,
+          "col": 8
         },
         "rotation": 0
       }
     ],
     "wires": [
       {
-        "id": "wire:1775682938173",
+        "id": "wire:1775765632694",
         "from": {
           "componentId": "IO:IN:input_0",
           "pinIndex": 0,
           "portId": "P0"
         },
         "to": {
-          "componentId": "NOT:1775682936410",
+          "componentId": "n:1775765631077",
           "pinIndex": 0,
           "portId": "IN0"
         }
       },
       {
-        "id": "wire:1775682944906",
+        "id": "wire:1775765635840",
         "from": {
-          "componentId": "NOT:1775682936410",
+          "componentId": "n:1775765631077",
           "pinIndex": 1,
           "portId": "OUT0"
         },

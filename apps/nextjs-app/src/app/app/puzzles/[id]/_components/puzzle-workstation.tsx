@@ -63,6 +63,14 @@ const BASIC_COMPONENTS: CircuitComponent[] = [
 const EMPTY_STRINGS: string[] = [];
 const EMPTY_COMPONENTS: CircuitComponent[] = [];
 
+const dedupeComponentsById = (components: CircuitComponent[]): CircuitComponent[] => {
+  const byId = new Map<string, CircuitComponent>();
+  for (const component of components) {
+    byId.set(String(component.id), component);
+  }
+  return Array.from(byId.values());
+};
+
 type PostCheckState =
   | { open: false }
   | {
@@ -537,24 +545,44 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return puzzle?.customComponents ?? EMPTY_COMPONENTS;
   }, [puzzle?.customComponents]);
 
-  const arsenalComponents = useMemo(() => {
-    // Arsenal pieces only show if allowArsenal is true
+  const sharedArsenalComponents = useMemo(() => {
+    if (Array.isArray(puzzle?.sharedArsenalComponents)) {
+      return dedupeComponentsById(puzzle.sharedArsenalComponents);
+    }
+
+    const mergedArsenal = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
+    if (!mergedArsenal.length || allowedArsenalComponentIds.size === 0) {
+      return EMPTY_COMPONENTS;
+    }
+
+    const fallbackShared = mergedArsenal.filter((component) =>
+      allowedArsenalComponentIds.has(String(component.id))
+    );
+    return dedupeComponentsById(fallbackShared);
+  }, [puzzle?.sharedArsenalComponents, puzzle?.arsenalComponents, allowedArsenalComponentIds]);
+
+  const solverArsenalComponents = useMemo(() => {
     if (!allowArsenal) {
       return EMPTY_COMPONENTS;
     }
-    const allArsenalComponents = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
 
-    // If allowedArsenalComponentIds is specified and not empty, filter to only those components
-    if (allowedArsenalComponentIds.size > 0) {
-      const filtered = allArsenalComponents.filter((component) =>
-        allowedArsenalComponentIds.has(String(component.id))
-      );
-      return filtered;
+    const sharedIds = new Set(sharedArsenalComponents.map((component) => String(component.id)));
+
+    if (Array.isArray(puzzle?.solverArsenalComponents)) {
+      const deduped = dedupeComponentsById(puzzle.solverArsenalComponents);
+      return deduped.filter((component) => !sharedIds.has(String(component.id)));
     }
 
-    // If no specific components are selected, allow all
-    return allArsenalComponents;
-  }, [puzzle?.arsenalComponents, allowArsenal, allowedArsenalComponentIds]);
+    const mergedArsenal = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
+    const fallbackSolver = mergedArsenal.filter(
+      (component) => !sharedIds.has(String(component.id))
+    );
+    return dedupeComponentsById(fallbackSolver);
+  }, [allowArsenal, puzzle?.solverArsenalComponents, puzzle?.arsenalComponents, sharedArsenalComponents]);
+
+  const arsenalComponents = useMemo(() => {
+    return dedupeComponentsById([...sharedArsenalComponents, ...solverArsenalComponents]);
+  }, [sharedArsenalComponents, solverArsenalComponents]);
 
   const specialComponents = useMemo(() => {
     // For backward compatibility with componentCatalog
@@ -1835,22 +1863,23 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         <div className="workstation-component-menu">
           <WorkstationMenu
             basic={visibleBasics}
-          custom={customComponents}
-          arsenal={arsenalComponents}
-          componentDefs={uiCatalog}
-          allowArsenal={allowArsenal}
-          filteredBasicTypes={filteredBasicTypes}
-          selectedComponentId={
-            selectedComponent.mode === 'placing'
-              ? selectedComponent.componentId
-              : undefined
-          }
-          onSelectComponent={(componentId) =>
-            setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
-          }
-          onDragStart={setDraggedPaletteComponentId}
-          onDragEnd={() => setDraggedPaletteComponentId(null)}
-        />
+            custom={customComponents}
+            sharedArsenal={sharedArsenalComponents}
+            solverArsenal={solverArsenalComponents}
+            componentDefs={uiCatalog}
+            allowArsenal={allowArsenal}
+            filteredBasicTypes={filteredBasicTypes}
+            selectedComponentId={
+              selectedComponent.mode === 'placing'
+                ? selectedComponent.componentId
+                : undefined
+            }
+            onSelectComponent={(componentId) =>
+              setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
+            }
+            onDragStart={setDraggedPaletteComponentId}
+            onDragEnd={() => setDraggedPaletteComponentId(null)}
+          />
         </div>
 
         <div className="workstation-grid">
@@ -2116,7 +2145,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 <WorkstationMenu
                   basic={visibleBasics}
                   custom={customComponents}
-                  arsenal={arsenalComponents}
+                  sharedArsenal={sharedArsenalComponents}
+                  solverArsenal={solverArsenalComponents}
                   componentDefs={uiCatalog}
                   allowArsenal={allowArsenal}
                   filteredBasicTypes={filteredBasicTypes}

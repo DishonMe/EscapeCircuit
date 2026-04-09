@@ -87,7 +87,12 @@ def create_app() -> FastAPI:
     notification_service = NotificationService(notification_repo, auth_service)
 
     # User Service
-    user_service = UserService(user_repo, auth_service, xp_service)
+    user_service = UserService(
+        user_repo,
+        auth_service,
+        xp_service,
+        audit_log_repo=audit_log_repo,
+    )
 
     # Circuit Service
     circuit_service = CircuitService(

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, Union, List
 import re
+import sqlite3
 from Backend import settings
 
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -132,6 +133,49 @@ def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instruc
     )
 
 
+def _count_non_io_gates_in_solution(solution_data: dict) -> int:
+    """Count placed gate-like components in a sample solution.
+
+    IO endpoints are ignored. A solution with only wires and no placed gates
+    is considered empty.
+    """
+    if not isinstance(solution_data, dict):
+        return 0
+
+    circuit_data = solution_data.get('circuit')
+    if not isinstance(circuit_data, dict):
+        return 0
+
+    placed_components = (
+        circuit_data.get('placedComponents')
+        or circuit_data.get('placed')
+        or []
+    )
+    if not isinstance(placed_components, list):
+        return 0
+
+    gate_count = 0
+    for component in placed_components:
+        if not isinstance(component, dict):
+            continue
+
+        component_id = component.get('componentId')
+        if component_id is None:
+            component_id = component.get('type')
+        if component_id is None:
+            continue
+
+        component_name = str(component_id).strip()
+        if not component_name:
+            continue
+        if component_name.upper().startswith('IO:'):
+            continue
+
+        gate_count += 1
+
+    return gate_count
+
+
 def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
     puzzle_config = config_data.get('puzzle', {})
     if not puzzle_config:
@@ -167,15 +211,38 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
         raise ValidationError("Puzzle must have 'inputs' list")
     if not puzzle_config.get('outputs') or not isinstance(puzzle_config['outputs'], list):
         raise ValidationError("Puzzle must have 'outputs' list")
-    if not puzzle_config.get('default_gate_set'):
-        raise ValidationError("Puzzle must have 'default_gate_set'")
+    default_gate_set = puzzle_config.get('default_gate_set') or []
+    if not isinstance(default_gate_set, list):
+        raise ValidationError("Puzzle 'default_gate_set' must be a list")
+
+    custom_pieces = config_data.get('custom_pieces') or []
+    if not isinstance(custom_pieces, list):
+        custom_pieces = []
+
+    allowed_shared_ids = puzzle_config.get('allowed_arsenal_component_ids') or []
+    if not isinstance(allowed_shared_ids, list):
+        allowed_shared_ids = []
+
+    if not default_gate_set and not custom_pieces and not allowed_shared_ids:
+        raise ValidationError(
+            "Puzzle must include at least one available component source "
+            "(default_gate_set, custom_pieces, or allowed_arsenal_component_ids)"
+        )
 
     budget = puzzle_config.get('budget', 0) or 0
     creator_budget = puzzle_config.get('creator_budget')
     if creator_budget is not None:
+        try:
+            creator_budget = int(creator_budget)
+        except (TypeError, ValueError):
+            raise ValidationError("creator_budget must be an integer when set")
+
         if creator_budget < 0:
             raise ValidationError("creator_budget cannot be negative")
-        if budget > 0 and budget <= creator_budget:
+
+        puzzle_config['creator_budget'] = creator_budget
+
+        if creator_budget is not None and budget > 0 and budget <= creator_budget:
             raise ValidationError(
                 f"budget ({budget}) must be greater than creator_budget ({creator_budget})"
             )
@@ -189,6 +256,12 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
 
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
+
+    def _validation_error_to_http_status(err: ValidationError) -> int:
+        detail = str(err).strip().lower()
+        if detail == "unauthorized":
+            return 401
+        return 400
 
     def _inject_rating_metrics(puzzle_dict: dict) -> dict:
         """Inject rating_metrics into a puzzle dict if rating_service is available."""
@@ -312,7 +385,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
 
             return result
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/my-puzzles/list")
     def list_my_puzzles(
@@ -337,14 +410,14 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 order_direction=order_direction
             )
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/search")
     def search(q: str, token: str = Depends(verify_token)):
         try:
             return puzzle_service.search(token, q)
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/{puzzle_id}")
     def get_one(puzzle_id: int, token: str = Depends(verify_token)):
@@ -616,14 +689,25 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 if not isinstance(solution_data.get('eval_map'), dict):
                     raise ValidationError("Sample solution must have 'eval_map' field")
 
+                if _count_non_io_gates_in_solution(solution_data) == 0:
+                    raise ValidationError(
+                        "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
+                    )
+
                 # Extract creator_budget from solution totalCost if not already set in config
                 solution_total_cost = solution_data.get('totalCost')
                 if solution_total_cost is not None:
+                    try:
+                        normalized_solution_total_cost = int(solution_total_cost)
+                    except (TypeError, ValueError):
+                        raise ValidationError("Sample solution totalCost must be an integer when provided")
+
                     config_creator_budget = puzzle_config.get('creator_budget')
                     if config_creator_budget is None:
-                        # Auto-set creator_budget from solution cost
-                        puzzle_config['creator_budget'] = int(solution_total_cost)
-                        config_data.setdefault('puzzle', {})['creator_budget'] = int(solution_total_cost)
+                        # Auto-set creator_budget from solution cost (including 0-cost solutions).
+                        puzzle_config['creator_budget'] = normalized_solution_total_cost
+                        config_data.setdefault('puzzle', {})['creator_budget'] = normalized_solution_total_cost
+
                     # Validate budget > creator_budget now that we have the solution cost
                     effective_creator_budget = puzzle_config.get('creator_budget')
                     if effective_creator_budget is not None:
@@ -1323,7 +1407,10 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             )
             
             circuit_repo = CircuitRepo(puzzle_service.repo.conn)
-            custom_piece = circuit_repo.create(custom_piece)
+            try:
+                custom_piece = circuit_repo.create(custom_piece)
+            except sqlite3.IntegrityError:
+                raise ValidationError("Custom piece name already exists in this puzzle")
             
             return custom_piece.to_dict()
         except ValidationError as e:

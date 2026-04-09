@@ -69,8 +69,8 @@ class Puzzle:
         if self.budget < 0:
             raise ValidationError("Puzzle.budget cannot be negative")
         if self.creator_budget is not None:
-            if self.creator_budget < 1:
-                raise ValidationError("Puzzle.creator_budget must be >= 1 when set")
+            if self.creator_budget < 0:
+                raise ValidationError("Puzzle.creator_budget must be >= 0 when set")
             if self.budget > 0 and self.budget <= self.creator_budget:
                 raise ValidationError(
                     f"Puzzle.budget ({self.budget}) must be greater than creator_budget ({self.creator_budget})"
@@ -224,8 +224,8 @@ class Puzzle:
             self.creator_budget = None
         else:
             v = int(value)
-            if v < 1:
-                raise ValidationError("Puzzle.creator_budget must be >= 1 when set")
+            if v < 0:
+                raise ValidationError("Puzzle.creator_budget must be >= 0 when set")
             if self.budget > 0 and self.budget <= v:
                 raise ValidationError(
                     f"Puzzle.budget ({self.budget}) must be greater than creator_budget ({v})"

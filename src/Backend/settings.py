@@ -70,7 +70,7 @@ ARSENAL_MIN_OUTPUTS: int = 1
 
 # ── Puzzle custom pieces constraints ───────────────────────────────────────────
 # Limits for custom pieces created by puzzle creators for specific puzzles
-PUZZLE_CUSTOM_PIECES_MAX_COUNT: int = 3  # Max custom pieces per puzzle
+PUZZLE_CUSTOM_PIECES_MAX_COUNT: int = 10  # Max custom pieces per puzzle
 PUZZLE_CUSTOM_PIECES_MAX_INPUTS: int = 5
 PUZZLE_CUSTOM_PIECES_MAX_OUTPUTS: int = 3
 PUZZLE_CUSTOM_PIECES_MIN_INPUTS: int = 1
