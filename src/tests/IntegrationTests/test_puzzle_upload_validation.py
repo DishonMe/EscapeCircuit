@@ -234,3 +234,44 @@ class TestPuzzleFormUploadValidation:
         assert "already exists" in resp.json()["detail"]
         assert copy_guard.calls == 0
         assert insert_guard.calls == 0
+
+    def test_create_puzzle_form_rejects_empty_sample_solution_without_creating_files(self, client, conn, monkeypatch):
+        token = register_and_login(client, "upload_creator_empty_solution")
+        me = client.get("/users/me", headers=auth_header(token)).json()
+        _make_creator(conn, me["id"])
+
+        upload_conn = sqlite3.connect(":memory:", check_same_thread=False)
+        upload_conn.row_factory = sqlite3.Row
+        PuzzleRepo(upload_conn)
+        monkeypatch.setattr(puzzle_controller_module, "get_db_conn", lambda: upload_conn)
+
+        copy_guard = _CopyGuard()
+        insert_guard = _InsertGuard()
+        monkeypatch.setattr(puzzle_controller_module.shutil, "copy2", copy_guard)
+        monkeypatch.setattr(puzzle_controller_module, "insert_riddle", insert_guard)
+
+        files = _multipart_payload(
+            _base_config(name="Upload Empty Solution"),
+            "short instructions",
+            {
+                "eval_map": {
+                    '{"A":0,"B":0}': {"out": 0},
+                },
+                "circuit": {
+                    "placedComponents": [],
+                    "wires": [
+                        {
+                            "from": {"componentId": "IO:IN:A", "pinIndex": 0},
+                            "to": {"componentId": "IO:OUT:out", "pinIndex": 0},
+                        }
+                    ],
+                },
+            },
+        )
+
+        resp = client.post("/puzzles/create-puzzle-form", files=files, headers=auth_header(token))
+
+        assert resp.status_code == 400
+        assert "at least one gate" in resp.json()["detail"]
+        assert copy_guard.calls == 0
+        assert insert_guard.calls == 0

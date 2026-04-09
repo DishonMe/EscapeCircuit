@@ -686,9 +686,81 @@ class PuzzleRepo:
             for r in rows
         ]
 
+    @staticmethod
+    def _normalize_component_ids(raw_ids) -> List[int]:
+        if not isinstance(raw_ids, list):
+            return []
+
+        normalized: List[int] = []
+        for raw_id in raw_ids:
+            try:
+                normalized.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+        return normalized
+
+    def _table_exists(self, table_name: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    def _cleanup_circuits_for_deleted_puzzle(self, puzzle_id: int, shared_component_ids: List[int]) -> None:
+        """Clean up puzzle-linked circuits before deleting the puzzle row.
+
+        - Shared arsenal pieces listed on the puzzle are detached (puzzle_id=NULL).
+        - All remaining puzzle-linked circuits are deleted.
+        """
+        if not self._table_exists("circuits"):
+            return
+
+        puzzle_id = int(puzzle_id)
+        if not shared_component_ids:
+            self.conn.execute("DELETE FROM circuits WHERE puzzle_id=?", (puzzle_id,))
+            return
+
+        placeholders = ",".join("?" * len(shared_component_ids))
+        params = [puzzle_id, *shared_component_ids]
+
+        # Detach shared arsenal pieces so they survive puzzle deletion.
+        self.conn.execute(
+            f"UPDATE circuits SET puzzle_id=NULL WHERE puzzle_id=? AND id IN ({placeholders})",
+            params,
+        )
+
+        # Delete all other puzzle-specific pieces.
+        self.conn.execute(
+            f"DELETE FROM circuits WHERE puzzle_id=? AND id NOT IN ({placeholders})",
+            params,
+        )
+
     def delete(self, puzzle_id: int) -> bool:
-        """Delete a puzzle and its test cases (FK cascade handles test_cases).
-        Returns True if a row was actually deleted."""
+        """Delete a puzzle and related data.
+
+        - FK cascade handles puzzle_test_cases/saved_puzzles.
+        - Puzzle-linked custom pieces are removed from circuits.
+        - Puzzle-linked shared arsenal pieces (listed in allowed_arsenal_component_ids)
+          are detached from the puzzle (puzzle_id=NULL) but kept.
+
+        Returns True if a row was actually deleted.
+        """
+        row = self.conn.execute(
+            "SELECT allowed_arsenal_component_ids FROM puzzles WHERE id=?",
+            (int(puzzle_id),),
+        ).fetchone()
+        if not row:
+            return False
+
+        allowed_ids_json = row["allowed_arsenal_component_ids"]
+        try:
+            raw_allowed_ids = json.loads(allowed_ids_json) if allowed_ids_json else []
+        except (TypeError, ValueError):
+            raw_allowed_ids = []
+
+        shared_component_ids = self._normalize_component_ids(raw_allowed_ids)
+        self._cleanup_circuits_for_deleted_puzzle(int(puzzle_id), shared_component_ids)
+
         cur = self.conn.execute("DELETE FROM puzzles WHERE id=?", (int(puzzle_id),))
         return cur.rowcount > 0
 
@@ -837,11 +909,12 @@ class PuzzleRepo:
         """Delete multiple puzzles by IDs. Returns count deleted."""
         if not puzzle_ids:
             return 0
-        placeholders = ",".join("?" * len(puzzle_ids))
-        cur = self.conn.execute(
-            f"DELETE FROM puzzles WHERE id IN ({placeholders})", puzzle_ids
-        )
-        return cur.rowcount
+
+        deleted = 0
+        for puzzle_id in puzzle_ids:
+            if self.delete(int(puzzle_id)):
+                deleted += 1
+        return deleted
 
     def track_user_deletion(self, puzzle_name: str) -> None:
         """Track that a puzzle was deleted by a user."""

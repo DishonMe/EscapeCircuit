@@ -76,6 +76,49 @@ def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instruc
     )
 
 
+def _count_non_io_gates_in_solution(solution_data: dict) -> int:
+    """Count placed gate-like components in a sample solution.
+
+    IO endpoints are ignored. A solution with only wires and no placed gates
+    is considered empty.
+    """
+    if not isinstance(solution_data, dict):
+        return 0
+
+    circuit_data = solution_data.get('circuit')
+    if not isinstance(circuit_data, dict):
+        return 0
+
+    placed_components = (
+        circuit_data.get('placedComponents')
+        or circuit_data.get('placed')
+        or []
+    )
+    if not isinstance(placed_components, list):
+        return 0
+
+    gate_count = 0
+    for component in placed_components:
+        if not isinstance(component, dict):
+            continue
+
+        component_id = component.get('componentId')
+        if component_id is None:
+            component_id = component.get('type')
+        if component_id is None:
+            continue
+
+        component_name = str(component_id).strip()
+        if not component_name:
+            continue
+        if component_name.upper().startswith('IO:'):
+            continue
+
+        gate_count += 1
+
+    return gate_count
+
+
 def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
     puzzle_config = config_data.get('puzzle', {})
     if not puzzle_config:
@@ -332,6 +375,11 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 
                 if not isinstance(solution_data.get('eval_map'), dict):
                     raise ValidationError("Sample solution must have 'eval_map' field")
+
+                if _count_non_io_gates_in_solution(solution_data) == 0:
+                    raise ValidationError(
+                        "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
+                    )
                 
                 puzzle_inputs = puzzle_config.get('inputs', [])
                 puzzle_outputs = puzzle_config.get('outputs', [])
@@ -475,6 +523,11 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 
                 if not isinstance(solution_data.get('eval_map'), dict):
                     raise ValidationError("Sample solution must have 'eval_map' field")
+
+                if _count_non_io_gates_in_solution(solution_data) == 0:
+                    raise ValidationError(
+                        "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
+                    )
                 
                 puzzle_inputs = puzzle_config.get('inputs', [])
                 puzzle_outputs = puzzle_config.get('outputs', [])

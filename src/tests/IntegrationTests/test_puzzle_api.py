@@ -165,6 +165,95 @@ class TestPuzzleDelete:
         resp = client.get(f"/puzzles/{pid}", headers=auth_header(token))
         assert resp.status_code == 404
 
+    def test_delete_puzzle_removes_custom_piece_and_preserves_shared_piece_used_by_another_puzzle(self, client, conn):
+        token = _register_creator(client, conn, "creator_delete_cleanup")
+
+        shared_resp = client.post(
+            "/arsenal",
+            json={
+                "name": "shared-piece-across-puzzles",
+                "num_inputs": 1,
+                "num_outputs": 1,
+                "structure_json": '{"placedComponents": [], "wires": []}',
+                "basic_gates": '["AND"]',
+                "truth_table": {"0": "0", "1": "1"},
+            },
+            headers=auth_header(token),
+        )
+        assert shared_resp.status_code == 200, shared_resp.text
+        shared_id = int(shared_resp.json()["id"])
+
+        create_payload_a = {
+            "name": "Puzzle Shared Delete A",
+            "description": "A",
+            "budget": 100,
+            "default_gate_set": ["AND", "OR", "NOT"],
+            "difficulty": "EASY",
+            "allow_arsenal": False,
+            "allowed_arsenal_component_ids": [str(shared_id)],
+        }
+        create_a = client.post("/puzzles", json=create_payload_a, headers=auth_header(token))
+        assert create_a.status_code == 200, create_a.text
+        pid_a = int(create_a.json()["id"])
+
+        create_payload_b = {
+            "name": "Puzzle Shared Delete B",
+            "description": "B",
+            "budget": 100,
+            "default_gate_set": ["AND", "OR", "NOT"],
+            "difficulty": "EASY",
+            "allow_arsenal": False,
+            "allowed_arsenal_component_ids": [str(shared_id)],
+        }
+        create_b = client.post("/puzzles", json=create_payload_b, headers=auth_header(token))
+        assert create_b.status_code == 200, create_b.text
+        pid_b = int(create_b.json()["id"])
+
+        custom_resp = client.post(
+            f"/puzzles/{pid_a}/custom-pieces",
+            json={
+                "name": "only-for-puzzle-a",
+                "cost": 1,
+                "num_inputs": 1,
+                "num_outputs": 1,
+                "truth_table": {"0": "0", "1": "1"},
+            },
+            headers=auth_header(token),
+        )
+        assert custom_resp.status_code == 200, custom_resp.text
+        custom_piece_id = int(custom_resp.json()["id"])
+
+        before_a = client.get(f"/puzzles/{pid_a}", headers=auth_header(token))
+        before_b = client.get(f"/puzzles/{pid_b}", headers=auth_header(token))
+        assert before_a.status_code == 200, before_a.text
+        assert before_b.status_code == 200, before_b.text
+
+        shared_ids_a = {
+            int(component["id"]) for component in before_a.json().get("sharedArsenalComponents", [])
+        }
+        shared_ids_b = {
+            int(component["id"]) for component in before_b.json().get("sharedArsenalComponents", [])
+        }
+        assert shared_id in shared_ids_a
+        assert shared_id in shared_ids_b
+
+        deleted = client.delete(f"/puzzles/{pid_a}", headers=auth_header(token))
+        assert deleted.status_code == 200, deleted.text
+
+        custom_row = conn.execute("SELECT id FROM circuits WHERE id=?", (custom_piece_id,)).fetchone()
+        assert custom_row is None
+
+        shared_row = conn.execute("SELECT id, puzzle_id FROM circuits WHERE id=?", (shared_id,)).fetchone()
+        assert shared_row is not None
+        assert shared_row["puzzle_id"] is None
+
+        after_b = client.get(f"/puzzles/{pid_b}", headers=auth_header(token))
+        assert after_b.status_code == 200, after_b.text
+        shared_ids_b_after = {
+            int(component["id"]) for component in after_b.json().get("sharedArsenalComponents", [])
+        }
+        assert shared_id in shared_ids_b_after
+
 
 class TestPuzzleBrowse:
     def test_browse_published(self, client):
