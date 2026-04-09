@@ -264,21 +264,35 @@ class SolvingService:
         if not test_cases:
             raise ValidationError("This puzzle has no test cases configured. Please contact the puzzle creator.")
         
-        # Check if arsenal pieces are allowed in this puzzle
+        # Check if solver personal arsenal pieces are allowed in this puzzle.
+        # Creator-shared allowed arsenal components remain legal even when allow_arsenal is false.
         if not getattr(p, 'allow_arsenal', True):
-            # Check if solution contains any PERSONAL arsenal pieces (numeric componentIds that are NOT custom pieces)
+            allowed_shared_ids: Set[int] = set()
+            for raw_id in getattr(p, 'allowed_arsenal_component_ids', None) or []:
+                try:
+                    allowed_shared_ids.add(int(raw_id))
+                except (TypeError, ValueError):
+                    continue
+
             placed_components = solution_payload.get("placedComponents", []) or solution_payload.get("components", [])
             for placed in placed_components:
                 component_id = placed.get("componentId")
-                # If componentId is numeric, it might be an arsenal piece
-                if isinstance(component_id, int) or (isinstance(component_id, str) and component_id.isdigit()):
-                    # Check if this is a custom piece (puzzle-specific) or personal arsenal piece
-                    component = self.circuit_repo.get_by_id(int(component_id))
-                    
-                    # Custom pieces (with puzzle_id set) are always allowed
-                    # Only personal arsenal pieces (puzzle_id is None) are blocked
-                    if component and component.puzzle_id is None:
-                        raise ValidationError("Arsenal pieces are not allowed in this puzzle. Only basic gates (AND, OR, XOR, NOT, NAND, NOR, XNOR, DFF) are permitted.")
+                if not (isinstance(component_id, int) or (isinstance(component_id, str) and component_id.isdigit())):
+                    continue
+
+                component_id_int = int(component_id)
+                if component_id_int in allowed_shared_ids:
+                    continue
+
+                component = self.circuit_repo.get_by_id(component_id_int)
+
+                # Custom pieces (with puzzle_id set) are always allowed.
+                # Personal arsenal pieces (puzzle_id is None) are blocked unless explicitly shared.
+                if component and component.puzzle_id is None:
+                    raise ValidationError(
+                        "Arsenal pieces are not allowed in this puzzle. Only puzzle custom pieces, "
+                        "creator-shared arsenal pieces, and basic gates are permitted."
+                    )
         
         # Expand arsenal pieces in the solution
         expanded_solution = self._expand_arsenal_pieces(solution_payload)

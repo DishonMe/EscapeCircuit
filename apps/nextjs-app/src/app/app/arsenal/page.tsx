@@ -271,7 +271,6 @@ export default function ArsenalPage() {
           </div>
         </div>
       )}
-
       {/* Delete Confirmation Dialog */}
       {/* Using native window.confirm for delete confirmation */}
 
@@ -516,7 +515,9 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
           [data-preview-mode="true"] button[title*="Delete"],
           [data-preview-mode="true"] button[title*="Cancel wiring"],
           [data-preview-mode="true"] button[title*="Clear Grid"],
-          [data-preview-mode="true"] button[title*="Remove wire"] {
+          [data-preview-mode="true"] button[title*="Remove wire"],
+          [data-preview-mode="true"] button[title*="Copy selected"],
+          [data-preview-mode="true"] button[title*="Paste copied"] {
             display: none !important;
           }
           [data-preview-mode="true"] [role="button"],

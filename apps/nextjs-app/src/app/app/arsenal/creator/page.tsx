@@ -431,7 +431,8 @@ export default function ArsenalCreatorPage() {
         <WorkstationMenu
           basic={BASIC_COMPONENTS}
           custom={[]}
-          arsenal={arsenalComponents}
+          sharedArsenal={[]}
+          solverArsenal={arsenalComponents}
           allowArsenal={true}
           filteredBasicTypes={[]}
           selectedComponentId={

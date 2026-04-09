@@ -146,6 +146,8 @@ export type Puzzle = Entity<{
   specialComponents?: CircuitComponent[];  // Backward compatibility (all special components)
   customComponents?: CircuitComponent[];   // Custom pieces for this puzzle
   arsenalComponents?: CircuitComponent[];  // User's arsenal pieces
+  sharedArsenalComponents?: CircuitComponent[]; // Creator-shared arsenal pieces
+  solverArsenalComponents?: CircuitComponent[]; // Solver personal arsenal pieces
   rating: number;
   solvedCount: number;
   isPublic: boolean;

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, Union, List
 import re
+import sqlite3
 from Backend import settings
 
 from Backend.DomainLayer.Exceptions import ValidationError
@@ -167,8 +168,23 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
         raise ValidationError("Puzzle must have 'inputs' list")
     if not puzzle_config.get('outputs') or not isinstance(puzzle_config['outputs'], list):
         raise ValidationError("Puzzle must have 'outputs' list")
-    if not puzzle_config.get('default_gate_set'):
-        raise ValidationError("Puzzle must have 'default_gate_set'")
+    default_gate_set = puzzle_config.get('default_gate_set') or []
+    if not isinstance(default_gate_set, list):
+        raise ValidationError("Puzzle 'default_gate_set' must be a list")
+
+    custom_pieces = config_data.get('custom_pieces') or []
+    if not isinstance(custom_pieces, list):
+        custom_pieces = []
+
+    allowed_shared_ids = puzzle_config.get('allowed_arsenal_component_ids') or []
+    if not isinstance(allowed_shared_ids, list):
+        allowed_shared_ids = []
+
+    if not default_gate_set and not custom_pieces and not allowed_shared_ids:
+        raise ValidationError(
+            "Puzzle must include at least one available component source "
+            "(default_gate_set, custom_pieces, or allowed_arsenal_component_ids)"
+        )
 
     budget = puzzle_config.get('budget', 0) or 0
     creator_budget = puzzle_config.get('creator_budget')
@@ -1323,7 +1339,10 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             )
             
             circuit_repo = CircuitRepo(puzzle_service.repo.conn)
-            custom_piece = circuit_repo.create(custom_piece)
+            try:
+                custom_piece = circuit_repo.create(custom_piece)
+            except sqlite3.IntegrityError:
+                raise ValidationError("Custom piece name already exists in this puzzle")
             
             return custom_piece.to_dict()
         except ValidationError as e:

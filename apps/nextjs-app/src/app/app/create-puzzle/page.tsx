@@ -561,18 +561,18 @@ export default function CreatePuzzleForm() {
       maxCanBeZero: true,
     });
 
-    if (data.basic.allowArsenal) {
-      for (const piece of selectedArsenalPieces) {
-        targets.push({
-          name: piece.name,
-          category: 'shared-arsenal',
-          cost: piece.cost,
-          pins: piece.num_inputs + piece.num_outputs,
-          description: 'Shared arsenal piece',
-          maxCanBeZero: false,
-        });
-      }
+    for (const piece of selectedArsenalPieces) {
+      targets.push({
+        name: piece.name,
+        category: 'shared-arsenal',
+        cost: piece.cost,
+        pins: piece.num_inputs + piece.num_outputs,
+        description: 'Shared arsenal piece',
+        maxCanBeZero: false,
+      });
+    }
 
+    if (data.basic.allowArsenal) {
       targets.push({
         name: '__ARSENAL_TOTAL__',
         category: 'private-arsenal-total',
@@ -1326,8 +1326,12 @@ export default function CreatePuzzleForm() {
       alert(`Description must be at most ${MAX_PUZZLE_DESCRIPTION_LENGTH} characters`);
       return;
     }
-    if (data.basic.gateSet.length === 0) {
-      alert("Select at least one gate type");
+    if (
+      data.basic.gateSet.length === 0 &&
+      customPieces.length === 0 &&
+      selectedArsenalPieces.length === 0
+    ) {
+      alert("Add at least one available component source: gate type, custom piece, or shared arsenal piece");
       return;
     }
     if (data.basic.inputs.length === 0 || data.basic.outputs.length === 0) {
@@ -1914,17 +1918,17 @@ export default function CreatePuzzleForm() {
                 Allow Arsenal Pieces
               </label>
               <p className="text-[11px] text-muted-foreground mt-1">
-                If unchecked, solvers can only use basic gates. If checked, custom arsenal pieces are available.
+                If unchecked, solver personal arsenal is disabled. Creator-shared arsenal pieces selected below are still available.
               </p>
             </div>
 
-            {data.basic.allowArsenal && myArsenalData && myArsenalData.length > 0 && (
+            {myArsenalData && myArsenalData.length > 0 && (
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-2">
-                  Allowed Custom Components
+                  Creator Shared Arsenal Components
                 </label>
                 <p className="text-[11px] text-muted-foreground mb-3">
-                  Select which of your custom Arsenal components solvers can use. For each, choose how to display it: as a full circuit diagram or as a black-box description.
+                  Select your arsenal components that are explicitly shared with solvers for this puzzle. These shared components remain available even if solver personal arsenal is disabled.
                 </p>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-secondary/30">
                   {myArsenalData.map((piece) => {
@@ -2639,7 +2643,7 @@ export default function CreatePuzzleForm() {
                     ))}
                     
                     {/* Custom Pieces */}
-                    {customPieces.length > 0 && data.basic.gateSet.length > 0 && 
+                    {customPieces.length > 0 && 
                       <div className="my-2 pt-2 border-t border-border/50">
                         <div className="text-[11px] font-semibold text-muted-foreground mb-2">Custom Pieces</div>
                         {customPieces.map((piece) => (
@@ -2657,7 +2661,7 @@ export default function CreatePuzzleForm() {
                             <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
                             <div className="flex-1" />
                             <div className="text-[10px] text-muted-foreground flex-shrink-0">
-                              cost {piece.cost} · pins {piece.numInputs + piece.numOutputs}
+                              cost {piece.cost} · pins {piece.num_inputs + piece.num_outputs}
                             </div>
                           </div>
                         ))}
@@ -2799,16 +2803,10 @@ export default function CreatePuzzleForm() {
                     ))}
                     
                     {/* Custom Pieces */}
-                    {customPieces.length > 0 && data.basic.gateSet.length > 0 && 
+                    {customPieces.length > 0 && 
                       <div className="my-2 pt-2 border-t border-border/50">
                         <div className="text-[11px] font-semibold text-muted-foreground mb-2">Custom Pieces</div>
-                        {customPieces
-                          .filter(piece => {
-                            // Only show custom pieces that are in the allowed list for this puzzle
-                            const isAllowed = data.basic.allowedArsenalComponentIds.includes(String(piece.id || piece.name));
-                            return isAllowed;
-                          })
-                          .map((piece) => (
+                        {customPieces.map((piece) => (
                           <div
                             key={`custom-${piece.name}`}
                             draggable
@@ -2823,7 +2821,7 @@ export default function CreatePuzzleForm() {
                             <span className="font-medium text-[13px] text-foreground">{piece.name}</span>
                             <div className="flex-1" />
                             <div className="text-[10px] text-muted-foreground flex-shrink-0">
-                              cost {piece.cost} · pins {piece.numInputs + piece.numOutputs}
+                              cost {piece.cost} · pins {piece.num_inputs + piece.num_outputs}
                             </div>
                           </div>
                         ))}

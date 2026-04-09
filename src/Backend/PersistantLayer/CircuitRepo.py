@@ -11,6 +11,64 @@ class CircuitRepo:
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self._ensure_schema()
 
+    def _table_has_legacy_unique_constraint(self) -> bool:
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='circuits'"
+        ).fetchone()
+        if not row:
+            return False
+
+        create_sql = row[0] if not isinstance(row, sqlite3.Row) else row["sql"]
+        normalized = (create_sql or "").replace(" ", "").replace("\n", "").lower()
+        return "unique(user_id,name)" in normalized
+
+    def _migrate_legacy_unique_constraint(self) -> None:
+        """Rebuild circuits table to remove legacy UNIQUE(user_id, name) constraint."""
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS circuits_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            structure_json TEXT NOT NULL,
+            is_arsenal INTEGER NOT NULL DEFAULT 0,
+            basic_gates TEXT NOT NULL DEFAULT '[]',
+            truth_table TEXT NOT NULL DEFAULT '{}',
+            num_inputs INTEGER NOT NULL DEFAULT 0,
+            num_outputs INTEGER NOT NULL DEFAULT 0,
+            puzzle_id INTEGER,
+            description TEXT NOT NULL DEFAULT ''
+        );
+        """)
+
+        self.conn.execute("""
+            INSERT INTO circuits_new(
+                id, user_id, name, cost, structure_json, is_arsenal,
+                basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+            )
+            SELECT
+                id, user_id, name, cost, structure_json, is_arsenal,
+                basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+            FROM circuits
+        """)
+
+        self.conn.execute("DROP TABLE circuits")
+        self.conn.execute("ALTER TABLE circuits_new RENAME TO circuits")
+
+    def _ensure_name_uniqueness_indexes(self) -> None:
+        # Remove old partial indexes if they exist (legacy from previous migration logic).
+        self.conn.execute("DROP INDEX IF EXISTS idx_circuits_user_arsenal_name")
+        self.conn.execute("DROP INDEX IF EXISTS idx_circuits_user_puzzle_name")
+
+        # Single uniqueness rule:
+        # - custom pieces: unique per (user_id, puzzle_id, name)
+        # - puzzle_id=NULL rows (arsenal/other user circuits): coalesced to sentinel
+        #   so they are unique per (user_id, name)
+        self.conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_circuits_user_puzzle_or_null_name
+            ON circuits(user_id, COALESCE(puzzle_id, -1), name)
+        """)
+
     def _ensure_schema(self) -> None:
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS circuits (
@@ -25,8 +83,7 @@ class CircuitRepo:
             num_inputs INTEGER NOT NULL DEFAULT 0,
             num_outputs INTEGER NOT NULL DEFAULT 0,
             puzzle_id INTEGER,
-            description TEXT NOT NULL DEFAULT '',
-            UNIQUE(user_id, name)
+            description TEXT NOT NULL DEFAULT ''
         );
         """)
         
@@ -47,6 +104,11 @@ class CircuitRepo:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN puzzle_id INTEGER;")
             if "description" not in cols:
                 self.conn.execute("ALTER TABLE circuits ADD COLUMN description TEXT NOT NULL DEFAULT '';")
+
+            if self._table_has_legacy_unique_constraint():
+                self._migrate_legacy_unique_constraint()
+
+            self._ensure_name_uniqueness_indexes()
             self.conn.commit()
         except Exception:
             pass

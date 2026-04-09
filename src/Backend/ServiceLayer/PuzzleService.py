@@ -368,78 +368,65 @@ class PuzzleService:
                 else:
                     d["outputs"] = [str(first_tc.expected_output_stream)]
         
-        # Add custom pieces (always available) and arsenal pieces (separately)
-        custom_components = []
-        arsenal_components = []
-        
-        try:
-            # Custom pieces are ALWAYS available for this puzzle, regardless of allow_arsenal setting
-            # They are not filtered by gates - they're puzzle-specific components
-            custom_components = self.arsenal_service.get_custom_pieces_for_puzzle(puzzle_id)
-            print(f"🎯 DEBUG [PuzzleService.get] Puzzle {puzzle_id}:")
-            print(f"   - customComponents: {len(custom_components)} found")
-            
-            # Arsenal pieces only available if arsenal is enabled for this puzzle
-            if self.arsenal_service and getattr(p, 'allow_arsenal', True):
-                # Get list of allowed Arsenal component IDs from puzzle config
-                allowed_ids = getattr(p, 'allowed_arsenal_component_ids', None) or []
-                print(f"   - allowArsenal: True")
-                print(f"   - allowed_arsenal_component_ids = {allowed_ids}")
-                
-                if allowed_ids:
-                    # CRITICAL FIX: Fetch SPECIFIC Arsenal pieces by ID, not just the current user's arsenal
-                    # The creator selected specific pieces - we need to fetch those exact pieces by their IDs
-                    arsenal_components = self.arsenal_service.get_arsenal_pieces_by_ids(allowed_ids)
-                    print(f"✅ Fetched {len(arsenal_components)} arsenal pieces by IDs for puzzle {puzzle_id}")
+        # Add custom pieces and split arsenal into two buckets:
+        # 1) creator-shared (explicit allowed IDs) and 2) solver personal arsenal.
+        custom_components: List[dict] = []
+        shared_arsenal_components: List[dict] = []
+        solver_arsenal_components: List[dict] = []
+
+        def _dedupe_components(components: List[dict]) -> List[dict]:
+            deduped: List[dict] = []
+            seen: Set[str] = set()
+            for component in components or []:
+                component_id = component.get("id") if isinstance(component, dict) else None
+                if component_id is not None:
+                    key = str(component_id)
                 else:
-                    # If allow_arsenal is True but no specific pieces selected,
-                    # show the SOLVER's (current user's) arsenal pieces that use only allowed gates
-                    if user_id:
-                        print(f"   - No specific IDs selected; fetching all arsenal for solver (user {user_id})")
-                        # Get the allowed gates for this puzzle (convert from GateType enum to strings)
-                        allowed_gates_set = {g.value for g in p.default_gate_set} if p.default_gate_set else set()
-                        arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
-                            user_id, allowed_gates_set
-                        )
-                        print(f"✅ Fetched {len(arsenal_components)} arsenal pieces filtered by allowed gates: {allowed_gates_set}")
-                    else:
-                        print(f"   - No user_id found for solver")
-            else:
-                print(f"   - allowArsenal: False (no arsenal pieces available)")
-                
-            # Log the returned components to verify they have description
-            if arsenal_components:
-                print(f"\n📊 ARSENAL COMPONENTS RETURNED FROM SERVICE:")
-                for i, component in enumerate(arsenal_components):
-                    print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
-                    print(f"       - description present: {('description' in component)}")
-                    print(f"       - description value: '{component.get('description', 'MISSING')}'")
-                    print(f"       - keys: {list(component.keys())}")
-            
-            if custom_components:
-                print(f"\n📊 CUSTOM COMPONENTS RETURNED FROM SERVICE:")
-                for i, component in enumerate(custom_components):
-                    print(f"   [{i}] {component.get('id')} ({component.get('type')}):")
-                    print(f"       - keys: {list(component.keys())}")
-            
-            # For backward compatibility, also include both in specialComponents
-            d["specialComponents"] = custom_components + arsenal_components
-            # New separate fields for categorization
+                    key = json.dumps(component, sort_keys=True, default=str)
+                if key in seen:
+                    continue
+                seen.add(key)
+                deduped.append(component)
+            return deduped
+
+        try:
+            if self.arsenal_service:
+                # Custom pieces are always puzzle-specific and always available.
+                custom_components = self.arsenal_service.get_custom_pieces_for_puzzle(puzzle_id)
+
+                # Creator-shared arsenal components are always fetched from selected IDs,
+                # even when solver personal arsenal is disallowed.
+                allowed_ids = getattr(p, "allowed_arsenal_component_ids", None) or []
+                if allowed_ids:
+                    shared_arsenal_components = self.arsenal_service.get_arsenal_pieces_by_ids(allowed_ids)
+
+                # Solver personal arsenal is controlled by allow_arsenal.
+                if user_id and getattr(p, "allow_arsenal", True):
+                    allowed_gates_set = {g.value for g in p.default_gate_set} if p.default_gate_set else set()
+                    solver_arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
+                        user_id, allowed_gates_set
+                    )
+
+            shared_arsenal_components = _dedupe_components(shared_arsenal_components)
+            solver_arsenal_components = _dedupe_components(solver_arsenal_components)
+            merged_arsenal_components = _dedupe_components(
+                shared_arsenal_components + solver_arsenal_components
+            )
+
+            # Backward-compatible merged list + new split lists.
+            d["specialComponents"] = custom_components + merged_arsenal_components
             d["customComponents"] = custom_components
-            d["arsenalComponents"] = arsenal_components
-            
-            print(f"\n✅ FINAL DICT RETURNED TO API:")
-            print(f"   - customComponents count: {len(d['customComponents'])}")
-            print(f"   - arsenalComponents count: {len(d['arsenalComponents'])}")
-            
-        except Exception as e:
-            # If service fails, try to at least return custom pieces
-            print(f"❌ DEBUG: Error fetching arsenal/custom pieces for puzzle {puzzle_id}: {e}")
-            import traceback
-            traceback.print_exc()
+            d["arsenalComponents"] = merged_arsenal_components
+            d["sharedArsenalComponents"] = shared_arsenal_components
+            d["solverArsenalComponents"] = solver_arsenal_components
+
+        except Exception:
+            # Graceful fallback if component resolution fails.
             d["specialComponents"] = custom_components if custom_components else []
             d["customComponents"] = custom_components
-            d["arsenalComponents"] = arsenal_components
+            d["arsenalComponents"] = _dedupe_components(shared_arsenal_components + solver_arsenal_components)
+            d["sharedArsenalComponents"] = _dedupe_components(shared_arsenal_components)
+            d["solverArsenalComponents"] = _dedupe_components(solver_arsenal_components)
         
         return d
 

@@ -78,13 +78,67 @@ def test_delete_wrong_owner_false_branch(repo):
     assert repo.get_by_id(created.id) is not None
 
 
-def test_unique_user_name_constraint(repo):
+def test_unique_user_name_constraint_for_personal_arsenal(repo):
     repo.create(Circuit(id=0, user_id=5, name="same", cost=1, structure_json=structure_json("a")))
     with pytest.raises(sqlite3.IntegrityError):
         repo.create(Circuit(id=0, user_id=5, name="same", cost=2, structure_json=structure_json("b")))
 
     # different user_id allowed
     repo.create(Circuit(id=0, user_id=6, name="same", cost=2, structure_json=structure_json("c")))
+
+
+def test_custom_piece_name_can_repeat_across_different_puzzles(repo):
+    # Same user + same custom piece name is allowed when puzzle_id differs.
+    repo.create(
+        Circuit(
+            id=0,
+            user_id=5,
+            name="same_custom",
+            cost=1,
+            structure_json="",
+            puzzle_id=101,
+            is_arsenal=False,
+        )
+    )
+
+    repo.create(
+        Circuit(
+            id=0,
+            user_id=5,
+            name="same_custom",
+            cost=1,
+            structure_json="",
+            puzzle_id=102,
+            is_arsenal=False,
+        )
+    )
+
+
+def test_custom_piece_name_must_be_unique_within_same_puzzle(repo):
+    repo.create(
+        Circuit(
+            id=0,
+            user_id=5,
+            name="same_custom",
+            cost=1,
+            structure_json="",
+            puzzle_id=101,
+            is_arsenal=False,
+        )
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.create(
+            Circuit(
+                id=0,
+                user_id=5,
+                name="same_custom",
+                cost=2,
+                structure_json="",
+                puzzle_id=101,
+                is_arsenal=False,
+            )
+        )
 
 
 class TestCircuitArsenalOperations:
