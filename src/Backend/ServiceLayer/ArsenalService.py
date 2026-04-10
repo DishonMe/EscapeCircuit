@@ -119,10 +119,14 @@ class ArsenalService:
         # Now flatten basic gates with arsenal pieces for final storage
         basic_gates = self._flatten_used_arsenal_pieces(basic_gates, used_arsenal_piece_ids, user_id)
 
-        # Get or calculate truth table
-        truth_table = payload.get("truth_table")
-        if truth_table is None or (isinstance(truth_table, dict) and len(truth_table) == 0):
-            truth_table = self._calculate_truth_table(num_inputs, num_outputs, structure)
+        # Get or calculate truth table. Stateful pieces are structure-driven and
+        # should not persist a static truth table.
+        if self._is_stateful_structure(structure):
+            truth_table = {}
+        else:
+            truth_table = payload.get("truth_table")
+            if truth_table is None or (isinstance(truth_table, dict) and len(truth_table) == 0):
+                truth_table = self._calculate_truth_table(num_inputs, num_outputs, structure)
 
         if not isinstance(truth_table, dict):
             raise ValidationError("truth_table must be a dictionary")
@@ -346,6 +350,30 @@ class ArsenalService:
         basic = [g for g in used if g in basic_gate_values]
         return basic
 
+    def _is_stateful_structure(self, structure: dict) -> bool:
+        """Return True when structure includes stateful behavior (e.g. DFF)."""
+        if not isinstance(structure, dict):
+            return False
+
+        state_ports = structure.get("state")
+        if isinstance(state_ports, list) and len(state_ports) > 0:
+            return True
+
+        placed = (
+            structure.get("placedComponents")
+            or structure.get("components")
+            or structure.get("placed")
+            or []
+        )
+        if not isinstance(placed, list):
+            return False
+
+        for comp in placed:
+            if isinstance(comp, dict) and str(comp.get("componentId")) == "DFF":
+                return True
+
+        return False
+
     def _calculate_truth_table(
         self, num_inputs: int, num_outputs: int, structure: dict
     ) -> dict:
@@ -353,6 +381,10 @@ class ArsenalService:
         
         Uses the logic engine to evaluate the circuit for all possible input combinations.
         """
+        # Stateful pieces cannot be represented by a static truth table.
+        if self._is_stateful_structure(structure):
+            return {}
+
         # Check if structure already has truth_table
         if "truth_table" in structure:
             return structure["truth_table"]

@@ -1390,6 +1390,9 @@ class SolvingService:
                                 "truth_table": truth_table,
                                 "structure": self._load_structure_dict(getattr(arsenal_piece, "structure_json", "")),
                             }
+                            
+                            loaded_structure = piece_info["structure"]
+                            print(f"[ARSENAL EXPAND]     -> Structure loaded: type={type(loaded_structure).__name__}, keys={list(loaded_structure.keys()) if isinstance(loaded_structure, dict) else 'N/A'}")
 
                             # Register piece under multiple keys so both top-level
                             # and nested macro simulation can resolve it.
@@ -1630,6 +1633,7 @@ class SolvingService:
                 arsenal_info = arsenal_pieces[comp_id]
                 num_inputs = arsenal_info.get("num_inputs", 0)
                 num_outputs = arsenal_info.get("num_outputs", 0)
+                truth_table = arsenal_info.get("truth_table", {})
                 
                 print(f"[DEBUGGER] Evaluating arsenal piece {comp_id}: {num_inputs} inputs, {num_outputs} outputs")
                 
@@ -1652,31 +1656,50 @@ class SolvingService:
                 
                 print(f"[DEBUGGER]   Inputs: {gate_inputs}")
                 
-                # First, try macro evaluation using the internal structure
+                # First try macro evaluation if available
                 structure = arsenal_info.get("structure")
-                if structure:
+                if structure and isinstance(structure, dict):
                     try:
-                        print(f"[DEBUGGER]   Using macro evaluation for arsenal piece with structure")
-                        # Build inputs dict for macro piece (in0, in1, ...)
+                        print(f"[DEBUGGER]   Trying macro evaluation for arsenal piece")
+                        # Build inputs for macro
                         macro_inputs = {f"in{i}": int(gate_inputs[i]) for i in range(num_inputs)}
                         
-                        # Call logic engine simulate on the internal structure
-                        macro_outputs = self.logic_engine.simulate(structure, macro_inputs, arsenal_pieces)
+                        # Add any internal state from parent inputs (de-namespace)
+                        for input_key, input_val in inputs.items():
+                            if isinstance(input_key, str) and input_key.startswith(f"{comp_id}::"):
+                                internal_key = input_key[len(f"{comp_id}::"):]
+                                macro_inputs[internal_key] = input_val
                         
-                        # Extract output values
+                        # Normalize structure shape before evaluation. Stored arsenal
+                        # pieces may use 'placed' while the engine expects
+                        # 'placedComponents'/'components'.
+                        normalized_structure = {
+                            "placedComponents": (
+                                structure.get("placedComponents")
+                                or structure.get("components")
+                                or structure.get("placed")
+                                or []
+                            ),
+                            "wires": structure.get("wires", []),
+                        }
+                        # Preserve embedded arsenal registry when present.
+                        if isinstance(structure.get("_arsenal_pieces"), dict):
+                            normalized_structure["_arsenal_pieces"] = structure.get("_arsenal_pieces")
+
+                        # Evaluate the macro
+                        macro_outputs = self.logic_engine.simulate(normalized_structure, macro_inputs, arsenal_pieces)
+                        
+                        # Extract output values for this component
                         output_vals = []
                         for i in range(num_outputs):
                             out_val = macro_outputs.get(f"out{i}", 0)
                             output_vals.append(str(int(out_val)))
                         
-                        print(f"[DEBUGGER]   Macro evaluation outputs: {output_vals}")
+                        print(f"[DEBUGGER]   Macro outputs: {output_vals}")
                         gate_result_cache[comp_id] = output_vals
                         return output_vals
                     except Exception as e:
                         print(f"[DEBUGGER]   Macro evaluation failed: {str(e)}, falling back to truth table")
-                
-                # Fallback to truth table lookup
-                truth_table = arsenal_info.get("truth_table", {})
                 
                 # Try different key formats for the truth table lookup
                 try:
