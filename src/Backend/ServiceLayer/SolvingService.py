@@ -1021,11 +1021,12 @@ class SolvingService:
                     for k in actual_stream.keys():
                         actual_stream[k].append(step_result.get(k, 0))
                     
-                    # 4. Update the state for the NEXT cycle (Injecting the 'D' logic)
-                    # We take the values that were at the DFF inputs and save them
-                    for did in dff_ids:
-                        next_val = step_result.get(f"{did}_next")
-                        current_state[str(did)] = next_val if next_val is not None else 0
+                    # 4. Update state for the NEXT cycle.
+                    # This includes top-level DFFs and namespaced macro-internal DFF state keys.
+                    for out_key, out_val in step_result.items():
+                        if isinstance(out_key, str) and out_key.endswith("_next"):
+                            state_key = out_key[:-5]
+                            current_state[state_key] = int(out_val) if out_val is not None else 0
 
                 # 5. Final check of the output stream
                 if actual_stream != expected_stream:
@@ -1057,13 +1058,17 @@ class SolvingService:
                     try:
                         print(f"[VALIDATION] Test case {i}: inputs={inputs}, expected={expected}")
                         out = self.logic_engine.evaluate(circuit, inputs)
-                        print(f"[VALIDATION] Test case {i}: actual output={out}")
-                        if out != expected:
-                            print(f"[VALIDATION] MISMATCH! Expected {expected} but got {out}")
+                        visible_out = {
+                            k: v for k, v in out.items()
+                            if not str(k).endswith("_next")
+                        }
+                        print(f"[VALIDATION] Test case {i}: actual output={visible_out}")
+                        if visible_out != expected:
+                            print(f"[VALIDATION] MISMATCH! Expected {expected} but got {visible_out}")
                             return False, "Wrong output", [{
                                 "inputs": inputs,
                                 "expected": expected,
-                                "actual": out
+                                "actual": visible_out
                             }]
                         else:
                             print(f"[VALIDATION] Test case {i}: PASS")
@@ -1377,14 +1382,20 @@ class SolvingService:
                             
                             print(f"[ARSENAL EXPAND]     -> Truth table keys: {list(truth_table.keys())[:3]}...")  # Show first 3 keys
                             
-                            # Store the truth table and input/output info
-                            expanded["_arsenal_pieces"][placed_id] = {
+                            piece_info = {
                                 "id": piece_id,
                                 "name": arsenal_piece.name,
                                 "num_inputs": num_inputs_val,
                                 "num_outputs": num_outputs_val,
                                 "truth_table": truth_table,
+                                "structure": self._load_structure_dict(getattr(arsenal_piece, "structure_json", "")),
                             }
+
+                            # Register piece under multiple keys so both top-level
+                            # and nested macro simulation can resolve it.
+                            expanded["_arsenal_pieces"][placed_id] = piece_info
+                            expanded["_arsenal_pieces"][str(piece_id)] = piece_info
+                            expanded["_arsenal_pieces"][arsenal_piece.name] = piece_info
                             print(f"[ARSENAL EXPAND]     -> Stored arsenal piece {arsenal_piece.name}")
                         else:
                             print(f"[ARSENAL EXPAND]     -> Not a custom piece (no truth_table or inputs/outputs)")
@@ -1444,13 +1455,11 @@ class SolvingService:
         
         seq_length = lengths[0]
 
-        # Preserve DFF state between cycles for sequential behavior.
-        dff_ids = [
-            pc.get("id")
-            for pc in expanded_solution.get("placedComponents", [])
-            if pc.get("componentId") == "DFF" and pc.get("id")
-        ]
-        dff_state = {str(dff_id): 0 for dff_id in dff_ids}
+        # Preserve state between cycles for top-level and macro-internal DFFs.
+        dff_state: Dict[str, int] = {}
+        for pc in expanded_solution.get("placedComponents", []):
+            if pc.get("componentId") == "DFF" and pc.get("id"):
+                dff_state[str(pc.get("id"))] = 0
         
         # Simulate each step
         all_steps = []
@@ -1469,11 +1478,11 @@ class SolvingService:
 
             raw_outputs = result.get("puzzleOutputs", {}) or {}
 
-            # Advance DFF state from this cycle's computed next-state outputs.
-            for dff_id in dff_ids:
-                next_key = f"{dff_id}_next"
-                next_val = raw_outputs.get(next_key)
-                dff_state[str(dff_id)] = int(next_val) if next_val is not None else 0
+            # Advance all state outputs (top-level + macro-internal namespaced).
+            for out_key, out_val in raw_outputs.items():
+                if isinstance(out_key, str) and out_key.endswith("_next"):
+                    state_key = out_key[:-5]
+                    dff_state[state_key] = int(out_val) if out_val is not None else 0
 
             # Hide internal next-state wires from puzzle output display.
             result["puzzleOutputs"] = {
@@ -1512,7 +1521,11 @@ class SolvingService:
                         "truth_table": piece.truth_table if piece.truth_table else "{}",
                         "num_inputs": piece.num_inputs or 0,
                         "num_outputs": piece.num_outputs or 0,
+                        "structure": self._load_structure_dict(getattr(piece, "structure_json", "")),
+                        "id": piece.id,
+                        "name": piece_name,
                     }
+                    arsenal_pieces[str(piece.id)] = arsenal_pieces[piece_name]
                     print(f"[SOLVING_SERVICE]   Added to arsenal_pieces: {arsenal_pieces[piece_name]}")
             except Exception as e:
                 # If we can't fetch custom pieces, just continue with what we have

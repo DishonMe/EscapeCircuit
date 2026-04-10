@@ -72,15 +72,33 @@ class logicEngineService:
         raise ValidationError("logic engine format not supported")
 
     # ---------- Simulation Logic ----------
-    def simulate(self, data: Dict[str, Any], inputs: Dict[str, int], arsenal_pieces: Dict[str, Any] = None) -> Dict[str, int]:
+    def simulate(
+        self,
+        data: Dict[str, Any],
+        inputs: Dict[str, int],
+        arsenal_pieces: Dict[str, Any] = None,
+        active_macro_stack: Set[str] | None = None,
+    ) -> Dict[str, int]:
         """
         Simulates combinatorial circuit.
         data: parsed JSON containing 'placedComponents' and 'wires'.
         inputs: dict {"A": 0, "B": 1...}
         arsenal_pieces: dict mapping placed component ID -> arsenal piece metadata
         """
+        if active_macro_stack is None:
+            active_macro_stack = set()
+
         if arsenal_pieces is None:
             arsenal_pieces = {}
+
+        # Merge registry embedded in data with explicit call-time registry.
+        # Explicit values win so callers can override when needed.
+        registry_from_data = data.get("_arsenal_pieces", {}) if isinstance(data, dict) else {}
+        merged_arsenal_pieces = {}
+        if isinstance(registry_from_data, dict):
+            merged_arsenal_pieces.update(registry_from_data)
+        if isinstance(arsenal_pieces, dict):
+            merged_arsenal_pieces.update(arsenal_pieces)
         # 1. Build Graph
         # Nodes are (componentId, portId) -> value (0/1/None)
         # But wires connect (componentId, pinIndex)??
@@ -180,6 +198,8 @@ class logicEngineService:
                     root = find(pk)
                     net_values[root] = val
                 
+        macro_next_state_updates: Dict[str, int] = {}
+
         # Iteration
         for _ in range(MAX_ITER):
             changed = False
@@ -224,20 +244,44 @@ class logicEngineService:
                     
                     v0 = net_values.get(p0)
                     inputs_vals = [v0]
-                elif cid in arsenal_pieces or ctype in arsenal_pieces:
+                elif cid in merged_arsenal_pieces or ctype in merged_arsenal_pieces:
                     # Check if this is an arsenal/custom piece (by ID or by type/name)
-                    arsenal_info = arsenal_pieces.get(cid) or arsenal_pieces.get(ctype)
+                    arsenal_info = merged_arsenal_pieces.get(cid) or merged_arsenal_pieces.get(ctype)
                     if arsenal_info:
-                        print(f"[CUSTOM_PIECE_DEBUG] Found custom piece: cid={cid}, ctype={ctype}")
+                        macro_outputs = self._evaluate_macro_piece(
+                            cid=cid,
+                            ctype=ctype,
+                            arsenal_info=arsenal_info,
+                            parent=parent,
+                            find=find,
+                            net_values=net_values,
+                            inputs=inputs,
+                            registry=merged_arsenal_pieces,
+                            active_macro_stack=active_macro_stack,
+                        )
+
+                        if macro_outputs is not None:
+                            macro_values = macro_outputs.get("outputs", [])
+                            macro_next_state_updates.update(macro_outputs.get("next_state", {}))
+                            num_inputs = int(arsenal_info.get("num_inputs", 0) or 0)
+                            num_outputs = int(arsenal_info.get("num_outputs", 0) or 0)
+                            for out_idx in range(num_outputs):
+                                if out_idx >= len(macro_values):
+                                    break
+                                pk_out = f"{cid}#{num_inputs + out_idx}"
+                                if pk_out in parent:
+                                    root = find(pk_out)
+                                    new_out = int(macro_values[out_idx])
+                                    if net_values.get(root) != new_out:
+                                        net_values[root] = new_out
+                                        changed = True
+                            continue
+
                         try:
                             truth_table_str = arsenal_info.get("truth_table", "{}")
                             num_inputs = arsenal_info.get("num_inputs", 0)
                             num_outputs = arsenal_info.get("num_outputs", 0)
-                            print(f"[CUSTOM_PIECE_DEBUG] num_inputs={num_inputs}, num_outputs={num_outputs}")
-                            print(f"[CUSTOM_PIECE_DEBUG] truth_table_str type={type(truth_table_str)}, value={truth_table_str}")
-                            
                             truth_table = json.loads(truth_table_str) if isinstance(truth_table_str, str) else truth_table_str
-                            print(f"[CUSTOM_PIECE_DEBUG] truth_table keys={list(truth_table.keys()) if isinstance(truth_table, dict) else 'NOT_A_DICT'}")
                             
                             # Build input key for the truth table
                             # Truth table keys are binary strings like "00", "01", "10", "11"
@@ -245,22 +289,16 @@ class logicEngineService:
                             for i in range(num_inputs):
                                 pk = find(f"{cid}#{i}") if f"{cid}#{i}" in parent else None
                                 val = net_values.get(pk)
-                                print(f"[CUSTOM_PIECE_DEBUG] Input {i}: pk={pk}, val={val}")
                                 if val is None:
                                     break
                                 input_bits.append(str(int(val)))
                             
-                            print(f"[CUSTOM_PIECE_DEBUG] Collected input_bits={input_bits}, len={len(input_bits)}")
-                            
                             if len(input_bits) == num_inputs:
                                 # Look up in truth table using binary string key
                                 key = "".join(input_bits)  # e.g. "0011" for inputs 0,0,1,1
-                                print(f"[CUSTOM_PIECE_DEBUG] Looking up key={key} in truth_table")
                                 
                                 if key in truth_table:
-                                    print(f"[CUSTOM_PIECE_DEBUG] Key found in truth_table!")
                                     outputs = truth_table[key]
-                                    print(f"[CUSTOM_PIECE_DEBUG] outputs={outputs}, type={type(outputs)}")
                                     # Set all output pins based on the truth table
                                     if isinstance(outputs, dict):
                                         for out_idx in range(num_outputs):
@@ -268,7 +306,6 @@ class logicEngineService:
                                             if out_key in outputs:
                                                 new_out = outputs[out_key]
                                                 pk_out = f"{cid}#{num_inputs + out_idx}"
-                                                print(f"[CUSTOM_PIECE_DEBUG] Setting output {out_idx}: pk_out={pk_out}, new_out={new_out}")
                                                 if pk_out in parent:
                                                     root = find(pk_out)
                                                     if net_values.get(root) != new_out:
@@ -278,14 +315,11 @@ class logicEngineService:
                                         # Single output case (outputs is just a number)
                                         new_out = int(outputs)
                                         pk_out = f"{cid}#{num_inputs}"
-                                        print(f"[CUSTOM_PIECE_DEBUG] Setting single output: pk_out={pk_out}, new_out={new_out}")
                                         if pk_out in parent:
                                             root = find(pk_out)
                                             if net_values.get(root) != new_out:
                                                 net_values[root] = new_out
                                                 changed = True
-                                else:
-                                    print(f"[CUSTOM_PIECE_DEBUG] Key NOT found in truth_table. Keys available: {list(truth_table.keys())}")
                         except Exception as e:
                             # If truth table evaluation fails, skip this component
                             pass
@@ -354,8 +388,105 @@ class logicEngineService:
                         d_val = v
                 
                 results[f"{cid}_next"] = d_val
+
+        for state_key, next_value in macro_next_state_updates.items():
+            results[f"{state_key}_next"] = int(next_value)
                      
         return results
+
+    def _normalize_macro_structure(self, structure: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = dict(structure)
+        if "placedComponents" not in normalized and isinstance(normalized.get("placed"), list):
+            normalized["placedComponents"] = normalized.get("placed", [])
+        if "components" not in normalized and isinstance(normalized.get("placedComponents"), list):
+            normalized["components"] = normalized["placedComponents"]
+        if "wires" not in normalized or not isinstance(normalized.get("wires"), list):
+            normalized["wires"] = []
+        return normalized
+
+    def _evaluate_macro_piece(
+        self,
+        cid: str,
+        ctype: str,
+        arsenal_info: Dict[str, Any],
+        parent: Dict[str, str],
+        find,
+        net_values: Dict[str, int],
+        inputs: Dict[str, int],
+        registry: Dict[str, Any],
+        active_macro_stack: Set[str],
+    ) -> Dict[str, Any] | None:
+        num_inputs = int(arsenal_info.get("num_inputs", 0) or 0)
+        num_outputs = int(arsenal_info.get("num_outputs", 0) or 0)
+        if num_inputs <= 0 or num_outputs <= 0:
+            return None
+
+        structure = arsenal_info.get("structure") or arsenal_info.get("solution")
+        if isinstance(structure, str):
+            try:
+                structure = json.loads(structure)
+            except Exception:
+                return None
+        if not isinstance(structure, dict):
+            return None
+
+        macro_inputs: Dict[str, int] = {}
+        for i in range(num_inputs):
+            pin_key = f"{cid}#{i}"
+            if pin_key not in parent:
+                return None
+            root = find(pin_key)
+            value = net_values.get(root)
+            if value is None:
+                return None
+            macro_inputs[f"in{i}"] = int(value)
+
+        # Pass persisted nested state to this macro instance.
+        macro_state_prefix = f"{cid}::"
+        for input_key, input_val in inputs.items():
+            if isinstance(input_key, str) and input_key.startswith(macro_state_prefix):
+                nested_key = input_key[len(macro_state_prefix):]
+                try:
+                    macro_inputs[nested_key] = int(input_val)
+                except (TypeError, ValueError):
+                    continue
+
+        macro_key = str(arsenal_info.get("id") or arsenal_info.get("name") or ctype or cid)
+        if macro_key in active_macro_stack:
+            return None
+
+        macro_data = self._normalize_macro_structure(structure)
+        nested_registry = macro_data.get("_arsenal_pieces", {}) if isinstance(macro_data.get("_arsenal_pieces"), dict) else {}
+        combined_registry = dict(registry)
+        combined_registry.update(nested_registry)
+        macro_data["_arsenal_pieces"] = combined_registry
+
+        try:
+            macro_outputs = self.simulate(
+                macro_data,
+                macro_inputs,
+                combined_registry,
+                active_macro_stack=active_macro_stack | {macro_key},
+            )
+        except Exception:
+            return None
+
+        outputs = [int(macro_outputs.get(f"out{i}", 0)) for i in range(num_outputs)]
+
+        next_state: Dict[str, int] = {}
+        for output_key, output_value in macro_outputs.items():
+            if not isinstance(output_key, str) or not output_key.endswith("_next"):
+                continue
+            nested_state_key = output_key[:-5]
+            try:
+                next_state[f"{cid}::{nested_state_key}"] = int(output_value)
+            except (TypeError, ValueError):
+                next_state[f"{cid}::{nested_state_key}"] = 0
+
+        return {
+            "outputs": outputs,
+            "next_state": next_state,
+        }
 
     def _compute_gate(self, gtype: str, inputs: list) -> int | None:
         # None if any input is None (unknown/floating)

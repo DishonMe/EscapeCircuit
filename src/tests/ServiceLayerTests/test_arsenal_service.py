@@ -791,17 +791,32 @@ class TestArsenalServiceSaveAdvanced:
         self.mock_engine.extract_used_gates.return_value = ["AND", "DFF"]
         
         payload = {
-            "name": "bad_piece",
+            "name": "dff_piece",
             "num_inputs": 1,
             "num_outputs": 1,
             "structure_json": "{}",
             "basic_gates": '["AND", "DFF"]',
+            "truth_table": {"0": {"out0": 0}, "1": {"out0": 1}},
         }
-        
-        with pytest.raises(ValidationError) as exc_info:
-            self.service.save_arsenal_piece(token, payload)
-        
-        assert "DFF" in str(exc_info.value)
+
+        saved_circuit = Circuit(
+            id=321,
+            user_id=user_id,
+            name="dff_piece",
+            cost=2,
+            structure_json="{}",
+            is_arsenal=True,
+            basic_gates='["AND", "DFF"]',
+            truth_table='{"0": {"out0": 0}, "1": {"out0": 1}}',
+            num_inputs=1,
+            num_outputs=1,
+        )
+        self.mock_circuit_repo.create.return_value = saved_circuit
+
+        result = self.service.save_arsenal_piece(token, payload)
+
+        assert result["id"] == 321
+        assert "DFF" in result["basic_gates"]
 
     def test_save_arsenal_piece_invalid_structure_json(self):
         user_id = 1
