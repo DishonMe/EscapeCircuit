@@ -175,7 +175,7 @@ export const arsenalTourSteps: Step[] = [
   {
     target: '.tour-arsenal-preview',
     content:
-      'Preview the internal logic and truth table of your saved pieces.',
+      'Preview the internal logic of your saved pieces.',
     placement: 'top',
   },
   {

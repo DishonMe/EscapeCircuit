@@ -37,7 +37,7 @@ const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'NAND', type: 'NAND', cost: 1, pins: 3 },
   { id: 'NOR', type: 'NOR', cost: 1, pins: 3 },
   { id: 'XNOR', type: 'XNOR', cost: 1, pins: 3 },
-  // DFF intentionally excluded from arsenal creation
+  { id: 'DFF', type: 'DFF', cost: 1, pins: 2 },
 ];
 
 type SaveState =

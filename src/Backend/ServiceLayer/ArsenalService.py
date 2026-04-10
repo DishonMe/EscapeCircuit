@@ -97,7 +97,7 @@ class ArsenalService:
         if not isinstance(num_outputs, int) or num_outputs < self.MIN_OUTPUTS or num_outputs > self.MAX_OUTPUTS:
             raise ValidationError(f"Number of outputs must be between {self.MIN_OUTPUTS} and {self.MAX_OUTPUTS}. Adjust your circuit accordingly.")
 
-        # Extract and validate gates - no DFF allowed in arsenal pieces
+        # Extract and validate gates used by this arsenal piece
         # Use provided basic_gates if available, otherwise extract from structure
         basic_gates_str = payload.get("basic_gates", "")
         used_arsenal_piece_ids = payload.get("used_arsenal_pieces", [])
@@ -119,13 +119,14 @@ class ArsenalService:
         # Now flatten basic gates with arsenal pieces for final storage
         basic_gates = self._flatten_used_arsenal_pieces(basic_gates, used_arsenal_piece_ids, user_id)
 
-        if GateType.DFF.value in basic_gates:
-            raise ValidationError("DFF (Dynamic Flip-Flop) gates are not allowed in custom arsenal pieces. Design your circuit using other available gates.")
-
-        # Get or calculate truth table
-        truth_table = payload.get("truth_table")
-        if truth_table is None or (isinstance(truth_table, dict) and len(truth_table) == 0):
-            truth_table = self._calculate_truth_table(num_inputs, num_outputs, structure)
+        # Get or calculate truth table. Stateful pieces are structure-driven and
+        # should not persist a static truth table.
+        if self._is_stateful_structure(structure):
+            truth_table = {}
+        else:
+            truth_table = payload.get("truth_table")
+            if truth_table is None or (isinstance(truth_table, dict) and len(truth_table) == 0):
+                truth_table = self._calculate_truth_table(num_inputs, num_outputs, structure)
 
         if not isinstance(truth_table, dict):
             raise ValidationError("truth_table must be a dictionary")
@@ -344,10 +345,34 @@ class ArsenalService:
     def _extract_basic_gates(self, structure_json: str) -> List[str]:
         """Extract basic gates used in the circuit structure"""
         used = self.engine.extract_used_gates(structure_json)
-        # Only keep basic gates (no DFF, no other special gates)
-        basic_gate_values = {g.value for g in GateType if g != GateType.DFF}
+        # Keep only known built-in gate values, including DFF.
+        basic_gate_values = {g.value for g in GateType}
         basic = [g for g in used if g in basic_gate_values]
         return basic
+
+    def _is_stateful_structure(self, structure: dict) -> bool:
+        """Return True when structure includes stateful behavior (e.g. DFF)."""
+        if not isinstance(structure, dict):
+            return False
+
+        state_ports = structure.get("state")
+        if isinstance(state_ports, list) and len(state_ports) > 0:
+            return True
+
+        placed = (
+            structure.get("placedComponents")
+            or structure.get("components")
+            or structure.get("placed")
+            or []
+        )
+        if not isinstance(placed, list):
+            return False
+
+        for comp in placed:
+            if isinstance(comp, dict) and str(comp.get("componentId")) == "DFF":
+                return True
+
+        return False
 
     def _calculate_truth_table(
         self, num_inputs: int, num_outputs: int, structure: dict
@@ -356,6 +381,10 @@ class ArsenalService:
         
         Uses the logic engine to evaluate the circuit for all possible input combinations.
         """
+        # Stateful pieces cannot be represented by a static truth table.
+        if self._is_stateful_structure(structure):
+            return {}
+
         # Check if structure already has truth_table
         if "truth_table" in structure:
             return structure["truth_table"]
