@@ -174,16 +174,34 @@ class logicEngineService:
         # Limit iterations to avoid infinite loops (oscillations)
         MAX_ITER = 50 
         
+        # Build set of DFF component IDs (for state handling)
+        dff_ids = set()
+        for p in placed:
+            if p.get("componentId") == "DFF":
+                dff_ids.add(p["id"])
+        
         # Pre-set Inputs
         # Inputs are typically represented as components like "IO:IN:A"
         # Or wires connected to them.
+        # Also handle arsenal pieces which may use direct "in0", "in1" naming
+        # NOTE: Skip keys that match DFF IDs (those are state, not inputs)
         for input_name, val in inputs.items():
-            # In PuzzleWorkstation, inputs are "IO:IN:A". Port 0 usually.
+            # Skip DFF state keys (those are handled separately below)
+            if input_name in dff_ids:
+                continue
+                
+            # Try standard "IO:IN:X" format first (PuzzleWorkstation)
             comp_id = f"IO:IN:{input_name}"
             pk = f"{comp_id}#0"
             if pk in parent:
                 root = find(pk)
                 net_values[root] = val
+            else:
+                # Try direct component ID (arsenal pieces)
+                pk2 = f"{input_name}#0"
+                if pk2 in parent:
+                    root = find(pk2)
+                    net_values[root] = val
 
         # Pre-set State (DFF Outputs)
         for p in placed:
@@ -349,29 +367,29 @@ class logicEngineService:
                 break
                 
         # 3. Read Outputs
-        # Outputs are components "IO:OUT:S". Port 0.
+        # Outputs are components "IO:OUT:S". Port 0 for standard circuits.
+        # Arsenal pieces use direct "out0", "out1" naming.
         results = {}
-        # We need to know expected output names. 
-        # But we only return mapped outputs.
-        # Find all keys in parent that start with IO:OUT
-        
-        # We scan all pins or just construct from known outputs if we had them.
-        # We can scan the parent keys.
-        
-        # Or better: The test case inputs has keys, expected outputs has keys.
-        # We should try to read all "IO:OUT:*" signals.
         
         possible_roots = set(parent.keys())
         for pk in possible_roots:
+            # Handle standard "IO:OUT:Name" format
             if pk.startswith("IO:OUT:"):
-                # format: IO:OUT:Name#0
                 parts = pk.split("#")[0].split(":")
                 if len(parts) == 3:
                      name = parts[2]
                      root = find(pk)
-                     val = net_values.get(root, 0) # Default to 0 if floating?
-                     # Floating outputs usually 0 or X. Let's say 0 for safety.
+                     val = net_values.get(root, 0)
                      results[name] = val if val is not None else 0
+            # Handle direct "outN" format (arsenal pieces)
+            elif pk.startswith("IO:OUT") == False and "#" in pk:
+                comp_name, pin_idx = pk.split("#")
+                pin_idx = int(pin_idx)
+                # Collect outputs that look like "outX"
+                if comp_name.startswith("out"):
+                    root = find(pk)
+                    val = net_values.get(root, 0)
+                    results[comp_name] = val if val is not None else 0
 
         # 4. Capture Next State (DFF Inputs)
         for p in placed:

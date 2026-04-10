@@ -1630,7 +1630,6 @@ class SolvingService:
                 arsenal_info = arsenal_pieces[comp_id]
                 num_inputs = arsenal_info.get("num_inputs", 0)
                 num_outputs = arsenal_info.get("num_outputs", 0)
-                truth_table = arsenal_info.get("truth_table", {})
                 
                 print(f"[DEBUGGER] Evaluating arsenal piece {comp_id}: {num_inputs} inputs, {num_outputs} outputs")
                 
@@ -1652,6 +1651,32 @@ class SolvingService:
                 gate_inputs = [v if v is not None else 0 for v in gate_inputs]
                 
                 print(f"[DEBUGGER]   Inputs: {gate_inputs}")
+                
+                # First, try macro evaluation using the internal structure
+                structure = arsenal_info.get("structure")
+                if structure:
+                    try:
+                        print(f"[DEBUGGER]   Using macro evaluation for arsenal piece with structure")
+                        # Build inputs dict for macro piece (in0, in1, ...)
+                        macro_inputs = {f"in{i}": int(gate_inputs[i]) for i in range(num_inputs)}
+                        
+                        # Call logic engine simulate on the internal structure
+                        macro_outputs = self.logic_engine.simulate(structure, macro_inputs, arsenal_pieces)
+                        
+                        # Extract output values
+                        output_vals = []
+                        for i in range(num_outputs):
+                            out_val = macro_outputs.get(f"out{i}", 0)
+                            output_vals.append(str(int(out_val)))
+                        
+                        print(f"[DEBUGGER]   Macro evaluation outputs: {output_vals}")
+                        gate_result_cache[comp_id] = output_vals
+                        return output_vals
+                    except Exception as e:
+                        print(f"[DEBUGGER]   Macro evaluation failed: {str(e)}, falling back to truth table")
+                
+                # Fallback to truth table lookup
+                truth_table = arsenal_info.get("truth_table", {})
                 
                 # Try different key formats for the truth table lookup
                 try:
