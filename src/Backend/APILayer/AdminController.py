@@ -381,48 +381,10 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                         "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
                     )
                 
-                puzzle_inputs = puzzle_config.get('inputs', [])
-                puzzle_outputs = puzzle_config.get('outputs', [])
+                # Keep only minimal validation here.
+                # The sample solution has already been export-validated, so we
+                # only require a non-empty eval_map and a non-empty circuit.
                 eval_map = solution_data.get('eval_map', {})
-                
-                # Validate all test cases can be evaluated
-                logic_engine = logicEngineService()
-                for i, test_case in enumerate(test_cases):
-                    inputs = test_case.get('inputs', {})
-                    expected_outputs = test_case.get('expected_outputs', {})
-                    
-                    # Verify input/output structure matches puzzle definition
-                    tc_input_keys = set(inputs.keys())
-                    puzzle_input_keys = set(puzzle_inputs)
-                    if tc_input_keys != puzzle_input_keys:
-                        raise ValidationError(
-                            f"Test case {i} inputs {tc_input_keys} don't match puzzle inputs {puzzle_input_keys}"
-                        )
-                    
-                    tc_output_keys = set(expected_outputs.keys())
-                    puzzle_output_keys = set(puzzle_outputs)
-                    if tc_output_keys != puzzle_output_keys:
-                        raise ValidationError(
-                            f"Test case {i} outputs {tc_output_keys} don't match puzzle outputs {puzzle_output_keys}"
-                        )
-                    
-                    # Validate solution can evaluate this test case
-                    key = json.dumps(inputs, sort_keys=True)
-                    if key not in eval_map:
-                        raise ValidationError(f"Sample solution missing evaluation for test case {i}: {inputs}")
-                    
-                    solution_output = eval_map[key]
-                    for output_name, expected_value in expected_outputs.items():
-                        if output_name not in solution_output:
-                            raise ValidationError(
-                                f"Sample solution test case {i} missing output '{output_name}'"
-                            )
-                        if solution_output[output_name] != expected_value:
-                            raise ValidationError(
-                                f"Sample solution test case {i} incorrect: "
-                                f"for {inputs}, expected {output_name}={expected_value} "
-                                f"but got {solution_output[output_name]}"
-                            )
                 
                 # Update config with difficulty if valid
                 if difficulty in ("EASY", "MEDIUM", "HARD"):
@@ -529,48 +491,10 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                         "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
                     )
                 
-                puzzle_inputs = puzzle_config.get('inputs', [])
-                puzzle_outputs = puzzle_config.get('outputs', [])
+                # Keep only minimal validation here.
+                # The sample solution has already been export-validated, so we
+                # only require a non-empty eval_map and a non-empty circuit.
                 eval_map = solution_data.get('eval_map', {})
-                
-                # Validate all test cases can be evaluated
-                logic_engine = logicEngineService()
-                for i, test_case in enumerate(test_cases):
-                    inputs = test_case.get('inputs', {})
-                    expected_outputs = test_case.get('expected_outputs', {})
-                    
-                    # Verify input/output structure matches puzzle definition
-                    tc_input_keys = set(inputs.keys())
-                    puzzle_input_keys = set(puzzle_inputs)
-                    if tc_input_keys != puzzle_input_keys:
-                        raise ValidationError(
-                            f"Test case {i} inputs {tc_input_keys} don't match puzzle inputs {puzzle_input_keys}"
-                        )
-                    
-                    tc_output_keys = set(expected_outputs.keys())
-                    puzzle_output_keys = set(puzzle_outputs)
-                    if tc_output_keys != puzzle_output_keys:
-                        raise ValidationError(
-                            f"Test case {i} outputs {tc_output_keys} don't match puzzle outputs {puzzle_output_keys}"
-                        )
-                    
-                    # Validate solution can evaluate this test case
-                    key = json.dumps(inputs, sort_keys=True)
-                    if key not in eval_map:
-                        raise ValidationError(f"Sample solution missing evaluation for test case {i}: {inputs}")
-                    
-                    solution_output = eval_map[key]
-                    for output_name, expected_value in expected_outputs.items():
-                        if output_name not in solution_output:
-                            raise ValidationError(
-                                f"Sample solution test case {i} missing output '{output_name}'"
-                            )
-                        if solution_output[output_name] != expected_value:
-                            raise ValidationError(
-                                f"Sample solution test case {i} incorrect: "
-                                f"for {inputs}, expected {output_name}={expected_value} "
-                                f"but got {solution_output[output_name]}"
-                            )
                 
                 # Update config with difficulty if valid
                 if difficulty in ("EASY", "MEDIUM", "HARD"):

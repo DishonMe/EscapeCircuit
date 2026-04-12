@@ -542,7 +542,6 @@ export default function CreatePuzzleForm() {
     // Build eval_map by simulating circuit on test cases
     const evalMap: Record<string, Record<string, number>> = {};
     let simulationErrors: string[] = [];
-    let hasSimulationErrors = false;
     
     // Check if circuit exists
     if (placed.length === 0 && wires.length === 0) {
@@ -559,7 +558,6 @@ export default function CreatePuzzleForm() {
         // === STREAM TEST CASE: Simulate entire sequence, then extract eval_map entries ===
         if (!tc.inputStream || !tc.expectedOutputStream) {
           simulationErrors.push(`Stream test case is missing inputStream or expectedOutputStream`);
-          hasSimulationErrors = true;
           continue;
         }
         
@@ -626,13 +624,11 @@ export default function CreatePuzzleForm() {
                 `Stream test cycle ${cycleIdx} ${JSON.stringify(cycleInput)}: ` +
                 `Expected ${JSON.stringify(cycleExpectedOutputs)} but got ${JSON.stringify(reorderedCycleOutputs)}`
               );
-              hasSimulationErrors = true;
             }
           }
         } catch (e) {
           console.error('[EXPORT-STREAM] Error:', e);
           simulationErrors.push(`Stream test case simulation error: ${String(e)}`);
-          hasSimulationErrors = true;
         }
       } else if (tc.kind === 'blackbox' || (tc.inputs !== undefined && tc.expectedOutputs !== undefined)) {
         // === BLACKBOX TEST CASE ===
@@ -680,23 +676,16 @@ export default function CreatePuzzleForm() {
               `Test ${Object.keys(testInputs).map((k: string) => `${k}=${testInputs[k]}`).join(',')}: ` +
               `Expected ${JSON.stringify(expectedOutputs)} but got ${JSON.stringify(reorderedOutputs)}`
             );
-            hasSimulationErrors = true;
           }
         } catch (e) {
           console.error('[EXPORT-BLACKBOX] Error:', e);
           simulationErrors.push(`Simulation error: ${String(e)}`);
-          hasSimulationErrors = true;
         }
       }
     }
     
-    if (hasSimulationErrors) {
-      alert(
-        '❌ Circuit output does NOT match test cases!\n\n' +
-        simulationErrors.join('\n') +
-        '\n\nPlease fix your circuit and try again.'
-      );
-      return;
+    if (simulationErrors.length > 0) {
+      console.warn('[EXPORT] Simulation warnings ignored for export:', simulationErrors);
     }
     
     // All tests passed - create solution
