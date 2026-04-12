@@ -505,9 +505,11 @@ export default function CreatePuzzleForm() {
         id: piece.id,
         name: piece.name,
         cost: piece.cost,
-        num_inputs,
-        num_outputs,
+        // Prefer persisted metadata from backend; fallback to derived values.
+        num_inputs: Number(piece.num_inputs ?? num_inputs),
+        num_outputs: Number(piece.num_outputs ?? num_outputs),
         truth_table: piece.truth_table ? JSON.parse(piece.truth_table) : {},
+        structure_json: piece.structure_json,
         isArsenal: true,
         basic_gates: piece.basic_gates,
       };
@@ -525,6 +527,7 @@ export default function CreatePuzzleForm() {
       num_inputs: piece.num_inputs,
       num_outputs: piece.num_outputs,
       truth_table: piece.truth_table,
+      structure_json: piece.structure_json,
       hideInternalStructure: piece.hideInternalStructure || false,
     }));
   }, [customPieces, selectedArsenalPieces]);

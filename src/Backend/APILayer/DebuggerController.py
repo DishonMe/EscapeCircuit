@@ -34,17 +34,39 @@ def _safe_json_loads(value: Any, default: Any) -> Any:
     return default
 
 
-def _build_arsenal_registry(custom_pieces: List[Dict[str, Any]], circuit_repo: CircuitRepo | None) -> Dict[str, Dict[str, Any]]:
+def _build_arsenal_registry(
+    custom_pieces: List[Dict[str, Any]],
+    circuit_repo: CircuitRepo | None,
+    placed: List[Dict[str, Any]] | None = None,
+) -> Dict[str, Dict[str, Any]]:
     """
     Build logic-engine arsenal registry for simulation.
     If a piece arrives without structure, hydrate from shared arsenal circuits by name.
     """
     registry: Dict[str, Dict[str, Any]] = {}
+    builtin_ids = {"AND", "OR", "NOT", "XOR", "NAND", "NOR", "XNOR", "DFF", "BUF", "DELAY"}
 
-    for piece in custom_pieces:
-        piece_name = piece.get("name", "")
-        if not piece_name:
-            continue
+    # Names explicitly supplied by frontend.
+    piece_names = {str(p.get("name", "")).strip() for p in custom_pieces if p.get("name")}
+
+    # Fallback for admin/create flows that omit custom_pieces in debugger payload:
+    # infer non-basic component IDs from placed components.
+    if placed:
+        for comp in placed:
+            cid = str(comp.get("componentId", "")).strip()
+            if not cid or cid.startswith("IO:") or cid in builtin_ids:
+                continue
+            piece_names.add(cid)
+
+    # Build lookup for explicit frontend metadata when provided.
+    piece_by_name = {
+        str(p.get("name", "")).strip(): p
+        for p in custom_pieces
+        if p.get("name")
+    }
+
+    for piece_name in piece_names:
+        piece = piece_by_name.get(piece_name, {})
 
         truth_table = piece.get("truth_table", {})
         structure = piece.get("structure")
@@ -111,7 +133,7 @@ def build_debugger_router(logic_engine: logicEngineService, circuit_repo: Circui
                 print(f"[DEBUGGER_SIM]   Piece {i} truth_table: {piece.get('truth_table')}")
             
             # Convert/hydrate custom pieces to arsenal format for the logic engine.
-            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo)
+            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo, req.placed)
             for piece_name, piece_data in arsenal_pieces.items():
                 print(f"[DEBUGGER_SIM] Converting piece '{piece_name}' to arsenal format")
                 print(f"[DEBUGGER_SIM]   arsenalified: {piece_data}")
@@ -160,7 +182,7 @@ def build_debugger_router(logic_engine: logicEngineService, circuit_repo: Circui
             print(f"[DEBUGGER] Custom pieces: {len(req.custom_pieces)}")
             
             # Convert/hydrate custom pieces to arsenal format for the logic engine.
-            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo)
+            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo, req.placed)
             
             structure_json = json.dumps({
                 "placedComponents": req.placed,
@@ -187,7 +209,8 @@ def build_debugger_router(logic_engine: logicEngineService, circuit_repo: Circui
             
             print(f"[DEBUGGER] DFF IDs found: {dff_ids}")
             
-            # Simulate the sequence, maintaining state across cycles
+            # Simulate the sequence, maintaining state across cycles.
+            # Keep both top-level DFF IDs and macro-internal namespaced state keys.
             current_state = {str(did): 0 for did in dff_ids}
             cycle_outputs = {f"cycle_{i}": {} for i in range(len(req.input_stream))}
             
@@ -210,11 +233,14 @@ def build_debugger_router(logic_engine: logicEngineService, circuit_repo: Circui
                 print(f"[DEBUGGER]   Raw cycle outputs: {outputs}")
                 print(f"[DEBUGGER]   Filtered outputs (for eval_map): {filtered_outputs}")
                 
-                # Update state for next cycle (extract DFF next values)
-                for did in dff_ids:
-                    next_val = outputs.get(f"{did}_next")
-                    current_state[str(did)] = next_val if next_val is not None else 0
-                    print(f"[DEBUGGER]   DFF {did}_next = {next_val} -> state[{did}] = {current_state[str(did)]}")
+                # Update state for next cycle from every *_next output.
+                # This is required for shared/stateful macro pieces that emit
+                # namespaced state keys (e.g., "wonce:123::DFF1_next").
+                for out_key, out_val in outputs.items():
+                    if isinstance(out_key, str) and out_key.endswith("_next"):
+                        state_key = out_key[:-5]
+                        current_state[state_key] = int(out_val) if out_val is not None else 0
+                        print(f"[DEBUGGER]   {out_key} = {out_val} -> state[{state_key}] = {current_state[state_key]}")
             
             print(f"[DEBUGGER] Final cycle_outputs: {cycle_outputs}")
             return {"cycle_outputs": cycle_outputs}
