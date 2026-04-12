@@ -6,6 +6,7 @@ import json
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
 from Backend.ServiceLayer.logicEngineService import logicEngineService
+from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 
 
 class SimulateCircuitReq(BaseModel):
@@ -22,7 +23,75 @@ class SimulateSequenceReq(BaseModel):
     custom_pieces: List[Dict[str, Any]] = []
 
 
-def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
+def _safe_json_loads(value: Any, default: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return default
+    return default
+
+
+def _build_arsenal_registry(custom_pieces: List[Dict[str, Any]], circuit_repo: CircuitRepo | None) -> Dict[str, Dict[str, Any]]:
+    """
+    Build logic-engine arsenal registry for simulation.
+    If a piece arrives without structure, hydrate from shared arsenal circuits by name.
+    """
+    registry: Dict[str, Dict[str, Any]] = {}
+
+    for piece in custom_pieces:
+        piece_name = piece.get("name", "")
+        if not piece_name:
+            continue
+
+        truth_table = piece.get("truth_table", {})
+        structure = piece.get("structure")
+        if structure is None and "structure_json" in piece:
+            structure = _safe_json_loads(piece.get("structure_json"), None)
+
+        num_inputs = int(piece.get("num_inputs", 0) or 0)
+        num_outputs = int(piece.get("num_outputs", 0) or 0)
+
+        # Hydrate missing structure/metadata from shared arsenal piece in DB.
+        if circuit_repo is not None and (structure is None or num_inputs == 0 or num_outputs == 0):
+            try:
+                row = circuit_repo.conn.execute(
+                    """
+                    SELECT structure_json, truth_table, num_inputs, num_outputs
+                    FROM circuits
+                    WHERE is_arsenal=1 AND name=?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (piece_name,),
+                ).fetchone()
+                if row:
+                    if structure is None:
+                        structure = _safe_json_loads(row["structure_json"], None)
+                    if num_inputs == 0:
+                        num_inputs = int(row["num_inputs"] or 0)
+                    if num_outputs == 0:
+                        num_outputs = int(row["num_outputs"] or 0)
+                    if not truth_table:
+                        truth_table = _safe_json_loads(row["truth_table"], {})
+            except Exception:
+                # Keep best-effort behavior: fallback to request-provided metadata.
+                pass
+
+        registry[piece_name] = {
+            "truth_table": json.dumps(truth_table if isinstance(truth_table, dict) else {}),
+            "num_inputs": num_inputs,
+            "num_outputs": num_outputs,
+        }
+        if isinstance(structure, dict):
+            registry[piece_name]["structure"] = structure
+
+    return registry
+
+
+def build_debugger_router(logic_engine: logicEngineService, circuit_repo: CircuitRepo | None = None) -> APIRouter:
     router = APIRouter(prefix="/debugger", tags=["debugger"])
 
     @router.post("/simulate-circuit")
@@ -41,20 +110,11 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
                 print(f"[DEBUGGER_SIM]   Piece {i}: name={piece.get('name')}, num_inputs={piece.get('num_inputs')}, num_outputs={piece.get('num_outputs')}")
                 print(f"[DEBUGGER_SIM]   Piece {i} truth_table: {piece.get('truth_table')}")
             
-            # Convert custom pieces to arsenal format for the logic engine
-            arsenal_pieces = {}
-            for piece in req.custom_pieces:
-                piece_name = piece.get('name', '')
-                if piece_name:
-                    truth_table = piece.get('truth_table', {})
-                    print(f"[DEBUGGER_SIM] Converting piece '{piece_name}' to arsenal format")
-                    print(f"[DEBUGGER_SIM]   truth_table (before dump): {truth_table}")
-                    arsenal_pieces[piece_name] = {
-                        "truth_table": json.dumps(truth_table),
-                        "num_inputs": piece.get('num_inputs', 0),
-                        "num_outputs": piece.get('num_outputs', 0),
-                    }
-                    print(f"[DEBUGGER_SIM]   arsenalified: {arsenal_pieces[piece_name]}")
+            # Convert/hydrate custom pieces to arsenal format for the logic engine.
+            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo)
+            for piece_name, piece_data in arsenal_pieces.items():
+                print(f"[DEBUGGER_SIM] Converting piece '{piece_name}' to arsenal format")
+                print(f"[DEBUGGER_SIM]   arsenalified: {piece_data}")
             print(f"[DEBUGGER_SIM] Final arsenal_pieces keys: {list(arsenal_pieces.keys())}")
             
             # Convert placed/wires to structure_json format expected by logicEngineService
@@ -99,16 +159,8 @@ def build_debugger_router(logic_engine: logicEngineService) -> APIRouter:
             print(f"[DEBUGGER] Wires: {len(req.wires)}")
             print(f"[DEBUGGER] Custom pieces: {len(req.custom_pieces)}")
             
-            # Convert custom pieces to arsenal format for the logic engine
-            arsenal_pieces = {}
-            for piece in req.custom_pieces:
-                piece_name = piece.get('name', '')
-                if piece_name:
-                    arsenal_pieces[piece_name] = {
-                        "truth_table": json.dumps(piece.get('truth_table', {})),
-                        "num_inputs": piece.get('num_inputs', 0),
-                        "num_outputs": piece.get('num_outputs', 0),
-                    }
+            # Convert/hydrate custom pieces to arsenal format for the logic engine.
+            arsenal_pieces = _build_arsenal_registry(req.custom_pieces, circuit_repo)
             
             structure_json = json.dumps({
                 "placedComponents": req.placed,
