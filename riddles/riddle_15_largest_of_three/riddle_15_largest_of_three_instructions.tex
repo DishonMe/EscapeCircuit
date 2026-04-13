@@ -1,0 +1,44 @@
+# Largest of Three Challenge
+
+## The Challenge
+
+Design a logic circuit that reads **three binary input signals**, `X1`, `X2`, and `X3`, each of the same length, and produces a **binary output signal** `Y` that equals the largest of the three inputs. Each input signal represents a binary number with the most significant bit arriving first. Your circuit must output the entire sequence of the largest value.
+
+**Note:** The length of the input signals is not fixed; your circuit should work for any length, as long as all three inputs are the same length.
+
+### Example
+
+If the three inputs are of length three:
+
+```
+X1 = 110
+X2 = 101
+X3 = 111
+```
+
+`X3` (`111₂ = 7₁₀`) is strictly greater than both `X1` (`110₂ = 6₁₀`) and `X2` (`101₂ = 5₁₀`). Therefore, the output should be
+
+```
+Y  = 111
+```
+
+Another example where two inputs tie:
+
+```
+X1 = 0111
+X2 = 0111
+X3 = 0101
+```
+
+Here, `X1` and `X2` are both `7` and share the maximum value. `Y` should be `0111` (the bits of `X1` or `X2`).
+
+## Input/Output Specification
+
+- **Inputs:**
+  - `X1` – bit sequence (most significant bit arrives at `t=0`)
+  - `X2` – bit sequence (same length as `X1`)
+  - `X3` – bit sequence (same length as `X1`)
+- **Output:**
+  - `Y` – bit sequence that matches the bits of the largest input
+
+The circuit will be simulated for as many time steps as the length of the input signals. At each time step `t`, your circuit should produce one bit of `Y`.
