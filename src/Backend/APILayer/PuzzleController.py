@@ -224,6 +224,25 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 
+    def _inject_rating_metrics(payload: dict) -> None:
+        """Best-effort rating enrichment for puzzle payloads."""
+        if not rating_service or not isinstance(payload, dict):
+            return
+
+        puzzle_id = payload.get("id")
+        try:
+            puzzle_id = int(puzzle_id)
+        except (TypeError, ValueError):
+            return
+
+        try:
+            metrics = rating_service.get_puzzle_metrics(puzzle_id)
+            if isinstance(metrics, dict) and metrics:
+                payload.update(metrics)
+        except Exception:
+            # Ratings are non-critical for loading puzzle content.
+            pass
+
 
     @router.get("")
     def browse(
