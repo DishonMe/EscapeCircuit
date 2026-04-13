@@ -98,10 +98,54 @@ export function PageTourLauncher({
   const [tourInstanceId, setTourInstanceId] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  const normalizedSteps = (steps || []).map((step: any) => ({
-    ...step,
-    skipBeacon: true,
-  }));
+  const normalizedSteps = (steps || []).map((step: any) => {
+    const isDialogCloseStep =
+      typeof step.target === 'string' && step.target.includes('dialog-close-button');
+
+    return {
+      ...step,
+      skipBeacon: true,
+      // Open the instructions dialog before showing the close-button step
+      ...(isDialogCloseStep && {
+        after: () => {
+          const closeBtn = document.querySelector(step.target) as HTMLElement | null;
+          if (closeBtn) {
+            closeBtn.click();
+          }
+        },
+        before: () =>
+          new Promise<void>((resolve) => {
+            // If the dialog is already open, proceed immediately
+            if (document.querySelector(step.target)) {
+              resolve();
+              return;
+            }
+            // Click the instructions button to open the dialog
+            const instructionsBtn = (
+              document.querySelector('.puzzle-instructions-button') ??
+              document.querySelector('.workstation-instructions-button')
+            ) as HTMLElement | null;
+            if (instructionsBtn) {
+              instructionsBtn.click();
+            }
+            // Wait for the dialog close button to appear in the DOM, then
+            // allow the dialog open animation to finish before resolving
+            const observer = new MutationObserver(() => {
+              if (document.querySelector(step.target)) {
+                observer.disconnect();
+                setTimeout(resolve, 350);
+              }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            // Safety timeout so the tour doesn't hang forever
+            setTimeout(() => {
+              observer.disconnect();
+              resolve();
+            }, 2000);
+          }),
+      }),
+    };
+  });
 
   const handleStartTour = () => {
     setDialogOpen(false);
@@ -128,6 +172,9 @@ export function PageTourLauncher({
     typeof currentStep?.target === 'string' && currentStep.target.includes('instructions-button');
 
   const handleTourAdvanceClick = (event: MouseEvent) => {
+    // Ignore programmatic clicks (e.g. from the before hook opening the dialog)
+    if (!event.isTrusted) return;
+
     const target = event.target as HTMLElement;
     const isInstructionButtonClick =
       target.closest('.puzzle-instructions-button') || target.closest('.workstation-instructions-button');
@@ -197,13 +244,15 @@ export function PageTourLauncher({
         tourName={tourName}
         run={runTour}
         continuous
-        scrollToFirstStep={false}
-        skipScroll
+        scrollToFirstStep
         showSkipButton={false}
         showProgress={false}
         skipBeacon
-        callback={handleTourCallback}
+        onEvent={handleTourCallback}
         tooltipComponent={TourTooltip}
+        options={{
+          scrollOffset: 80,
+        }}
         styles={{
           options: {
             primaryColor: 'hsl(var(--foreground))',
