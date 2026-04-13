@@ -1,0 +1,212 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Sparkles, Star } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useNotifications } from '@/components/ui/notifications';
+
+import { useRatePuzzle } from '../api/rate-puzzle';
+import { useDeleteRating } from '../api/delete-rating';
+import { usePuzzleRatings } from '../api/get-puzzle-ratings';
+
+type RatingDialogProps = {
+  puzzleId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  startTime?: number;
+};
+
+const StarInput = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) => {
+  const [hover, setHover] = useState(0);
+
+  // This will show the hover number if you are hovering, 
+  // or the saved/existing value if you are not.
+  const displayValue = hover || value;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[13px] font-medium text-foreground">
+        {label}
+      </span>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className="transition-transform hover:scale-110 active:scale-95 focus:outline-none"
+            onMouseEnter={() => setHover(star)}
+            onMouseLeave={() => setHover(0)}
+            onClick={() => onChange(star)}
+          >
+            <Star
+              className={`size-7 transition-colors ${
+                star <= displayValue
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-muted-foreground/40'
+              }`}
+            />
+          </button>
+        ))}
+        <span className="ml-2 text-[13px] text-muted-foreground">
+          {displayValue > 0 ? `${displayValue}/5` : '—'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export const RatingDialog = ({
+  puzzleId,
+  open,
+  onOpenChange,
+  startTime,
+}: RatingDialogProps) => {
+  const notifications = useNotifications();
+
+  const ratingsQuery = usePuzzleRatings({
+    puzzleId,
+    config: { enabled: open },
+  });
+
+  const rateMutation = useRatePuzzle();
+  const deleteMutation = useDeleteRating();
+
+  const existingRating = ratingsQuery.data?.my_rating ?? null;
+
+  const [difficulty, setDifficulty] = useState(0);
+  const [fun, setFun] = useState(0);
+  const [clearness, setClearness] = useState(0);
+
+  // Populate from existing rating whenever dialog opens.
+  useEffect(() => {
+    if (!open) return;
+
+    if (existingRating) {
+      setDifficulty(existingRating.difficulty);
+      setFun(existingRating.fun);
+      setClearness(existingRating.clearness);
+    } else {
+      setDifficulty(0);
+      setFun(0);
+      setClearness(0);
+    }
+  }, [open, existingRating]);
+
+  const isValid = difficulty > 0 && fun > 0 && clearness > 0;
+
+  const handleSubmit = async () => {
+    if (!isValid) return;
+    try {
+      await rateMutation.mutateAsync({
+        puzzleId,
+        difficulty,
+        fun,
+        clearness,
+        mode: existingRating ? 'update' : 'create',
+        elapsed_seconds: startTime
+          ? Math.floor((Date.now() - startTime) / 1000)
+          : undefined,
+      });
+      notifications.addNotification({
+        type: 'success',
+        title: 'Rating submitted',
+        message: existingRating
+          ? 'Your rating has been updated.'
+          : 'Thanks for rating this puzzle!',
+      });
+      onOpenChange(false);
+    } catch (e: any) {
+      // Error notification handled automatically by API client
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteMutation.mutateAsync({ puzzleId });
+      notifications.addNotification({
+        type: 'info',
+        title: 'Rating removed',
+        message: 'Your rating has been deleted.',
+      });
+      onOpenChange(false);
+    } catch (e: any) {
+      // Error notification handled automatically by API client
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="size-5 text-amber-500 animate-[bounce_0.9s_ease-in-out_2]" />
+            {existingRating ? 'Update Your Rating' : 'Rate This Puzzle'}
+          </DialogTitle>
+          <DialogDescription>
+            Share your experience. Rate difficulty, fun, and clearness from 1 to
+            5 stars.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <StarInput
+            label="Difficulty"
+            value={difficulty}
+            onChange={setDifficulty}
+          />
+          <StarInput label="Fun" value={fun} onChange={setFun} />
+          <StarInput
+            label="Clearness"
+            value={clearness}
+            onChange={setClearness}
+          />
+        </div>
+
+        <DialogFooter className="flex gap-2">
+          {existingRating && (
+            <Button
+              variant="outline"
+              className="text-red-600 transition-all hover:scale-105 hover:bg-red-50 active:scale-95"
+              onClick={handleDelete}
+              isLoading={deleteMutation.isPending}
+            >
+              Remove Rating
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            className="transition-all hover:scale-105 active:scale-95"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="transition-all hover:scale-105 active:scale-95"
+            onClick={handleSubmit}
+            disabled={!isValid}
+            isLoading={rateMutation.isPending}
+          >
+            {existingRating ? 'Update' : 'Submit'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

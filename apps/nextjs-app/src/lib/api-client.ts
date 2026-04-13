@@ -56,6 +56,23 @@ function getTokenFromCookieString(cookieString: string): string | undefined {
   return match ? match[1] : undefined;
 }
 
+function isAuthenticationFailure(status: number, message: string): boolean {
+  if (status !== 401) return false;
+
+  const normalizedMessage = (message || '').trim().toLowerCase();
+  if (!normalizedMessage) return true;
+
+  return (
+    normalizedMessage === 'unauthorized' ||
+    normalizedMessage.includes('missing authorization header') ||
+    normalizedMessage.includes('invalid authorization header') ||
+    normalizedMessage.includes('invalid token') ||
+    normalizedMessage.includes('token expired') ||
+    normalizedMessage.includes('session expired') ||
+    normalizedMessage.includes('not authenticated')
+  );
+}
+
 async function fetchApi<T>(
   url: string,
   options: RequestOptions = {},
@@ -89,34 +106,72 @@ async function fetchApi<T>(
 
   const fullUrl = buildUrlWithParams(`${env.API_URL}${url}`, params);
 
-  const response = await fetch(fullUrl, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...headers,
-      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-    cache,
-    next,
-  });
-
-  if (!response.ok) {
-    const message = (await response.json()).message || response.statusText;
-    if (typeof window !== 'undefined' && !suppressErrorNotification) {
-      useNotifications.getState().addNotification({
-        type: 'error',
-        title: 'Error',
-        message,
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(fullUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...headers,
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include',
+        cache,
+        next,
       });
+
+      if (!response.ok) {
+        let message = '';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || errorData.detail || response.statusText;
+        } catch {
+          message = response.statusText || 'An error occurred';
+        }
+        
+        // Only force logout for true auth failures, not generic backend validation issues.
+        if (typeof window !== 'undefined' && isAuthenticationFailure(response.status, message)) {
+          // Clear the invalid token
+          Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+
+          // Avoid redirect loops on auth routes and preserve full current location.
+          const currentPath = window.location.pathname;
+          const onAuthRoute = currentPath.startsWith('/auth/');
+          if (!onAuthRoute) {
+            const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            const redirectUrl = `/auth/login?redirectTo=${encodeURIComponent(currentLocation)}&reason=session-expired`;
+            window.location.replace(redirectUrl);
+          }
+
+          // Stop further processing
+          throw new Error('Unauthorized - redirecting to login');
+        }
+        
+        if (typeof window !== 'undefined' && !suppressErrorNotification) {
+          useNotifications.getState().addNotification({
+            type: 'error',
+            title: message || response.statusText,
+          });
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (attempt < maxRetries && error instanceof TypeError && error.message.includes('fetch')) {
+        // Retry on network errors with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 1000));
+        continue;
+      }
+      throw error;
     }
-    throw new Error(message);
   }
 
-  return response.json();
+  throw new Error('Request failed after retries');
 }
 
 export const api = {

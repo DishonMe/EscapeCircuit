@@ -29,6 +29,9 @@ export const useDeleteUser = ({
       queryClient.invalidateQueries({
         queryKey: getUsersQueryOptions().queryKey,
       });
+      queryClient.invalidateQueries({
+        queryKey: ['admin-audit-log'],
+      });
       onSuccess?.(...args);
     },
     ...restConfig,

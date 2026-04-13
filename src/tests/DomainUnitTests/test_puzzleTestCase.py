@@ -391,7 +391,7 @@ class TestPuzzleTestCaseSerialization:
             expected_outputs={"r": 1}
         )
         d = test_case.to_dict()
-        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "created_at"}
+        assert set(d.keys()) == {"id", "puzzle_id", "kind", "inputs", "expected_outputs", "input_stream", "expected_output_stream", "gate_name", "min_gate_limit", "gate_limit", "max_gate_count", "min_cycles", "max_cycles", "min_gate_count", "created_at"}
 
 
 class TestPuzzleTestCaseEdgeCases:
@@ -505,3 +505,604 @@ class TestPuzzleTestCaseEdgeCases:
         )
         test_case.set_puzzle_id(42)
         assert test_case.get_puzzle_id() == 42
+
+class TestPuzzleTestCaseGateLimit:
+    """Tests for GATE_LIMIT test case kind"""
+    
+    def test_gate_limit_valid(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.GATE_LIMIT,
+            inputs={},
+            expected_outputs={},
+            gate_name="AND",
+            gate_limit=3
+        )
+        assert test_case.gate_name == "AND"
+        assert test_case.gate_limit == 3
+        assert test_case.kind == TestCaseKind.GATE_LIMIT
+
+    def test_gate_limit_positive_required(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.GATE_LIMIT,
+            inputs={},
+            expected_outputs={},
+            gate_name="XOR",
+            gate_limit=1
+        )
+        assert test_case.gate_limit == 1
+
+    def test_gate_limit_missing_gate_name(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.GATE_LIMIT,
+                inputs={},
+                expected_outputs={},
+                gate_name=None,
+                gate_limit=5
+            )
+        assert "GATE_LIMIT test case must have gate_name specified" in str(exc_info.value)
+
+    def test_gate_limit_missing_gate_limit(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.GATE_LIMIT,
+                inputs={},
+                expected_outputs={},
+                gate_name="AND",
+                gate_limit=None
+            )
+        assert "GATE_LIMIT test case must have min_gate_limit and/or gate_limit specified" in str(exc_info.value)
+
+    def test_gate_limit_negative(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.GATE_LIMIT,
+                inputs={},
+                expected_outputs={},
+                gate_name="OR",
+                gate_limit=-1
+            )
+        assert "must be non-negative integer" in str(exc_info.value)
+
+    def test_gate_limit_large_value(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.GATE_LIMIT,
+            inputs={},
+            expected_outputs={},
+            gate_name="AND",
+            gate_limit=1000
+        )
+        assert test_case.gate_limit == 1000
+
+
+class TestPuzzleTestCaseGateCountLimit:
+    """Tests for GATE_COUNT_LIMIT test case kind"""
+    
+    def test_gate_count_limit_valid_with_max_gate_count(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.GATE_COUNT_LIMIT,
+            inputs={},
+            expected_outputs={},
+            max_gate_count=5
+        )
+        assert test_case.max_gate_count == 5
+        assert test_case.kind == TestCaseKind.GATE_COUNT_LIMIT
+
+    def test_gate_count_limit_valid_without_max_gate_count(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.GATE_COUNT_LIMIT,
+            inputs={},
+            expected_outputs={},
+            max_gate_count=None
+        )
+        assert test_case.max_gate_count is None
+
+    def test_gate_count_limit_zero_invalid(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.GATE_COUNT_LIMIT,
+                inputs={},
+                expected_outputs={},
+                max_gate_count=0
+            )
+        assert "must be > 0" in str(exc_info.value)
+
+    def test_gate_count_limit_negative_invalid(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.GATE_COUNT_LIMIT,
+                inputs={},
+                expected_outputs={},
+                max_gate_count=-5
+            )
+        assert "must be > 0" in str(exc_info.value)
+
+
+class TestPuzzleTestCaseLatencyLimit:
+    """Tests for LATENCY_LIMIT test case kind"""
+    
+    def test_latency_limit_with_min_and_max(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.LATENCY_LIMIT,
+            inputs={},
+            expected_outputs={},
+            min_cycles=2,
+            max_cycles=5
+        )
+        assert test_case.min_cycles == 2
+        assert test_case.max_cycles == 5
+
+    def test_latency_limit_with_min_only(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.LATENCY_LIMIT,
+            inputs={},
+            expected_outputs={},
+            min_cycles=3,
+            max_cycles=None
+        )
+        assert test_case.min_cycles == 3
+        assert test_case.max_cycles is None
+
+    def test_latency_limit_with_max_only(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.LATENCY_LIMIT,
+            inputs={},
+            expected_outputs={},
+            min_cycles=None,
+            max_cycles=10
+        )
+        assert test_case.min_cycles is None
+        assert test_case.max_cycles == 10
+
+    def test_latency_limit_missing_both(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.LATENCY_LIMIT,
+                inputs={},
+                expected_outputs={},
+                min_cycles=None,
+                max_cycles=None
+            )
+        assert "min_cycles and/or max_cycles specified" in str(exc_info.value)
+
+    def test_latency_limit_min_zero(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.LATENCY_LIMIT,
+                inputs={},
+                expected_outputs={},
+                min_cycles=0,
+                max_cycles=5
+            )
+        assert "min_cycles must be >= 1" in str(exc_info.value)
+
+    def test_latency_limit_max_zero(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.LATENCY_LIMIT,
+                inputs={},
+                expected_outputs={},
+                min_cycles=2,
+                max_cycles=0
+            )
+        assert "max_cycles must be >= 1" in str(exc_info.value)
+
+    def test_latency_limit_min_greater_than_max(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.LATENCY_LIMIT,
+                inputs={},
+                expected_outputs={},
+                min_cycles=10,
+                max_cycles=5
+            )
+        assert "min_cycles cannot be greater than max_cycles" in str(exc_info.value)
+
+    def test_latency_limit_min_equals_max(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.LATENCY_LIMIT,
+            inputs={},
+            expected_outputs={},
+            min_cycles=5,
+            max_cycles=5
+        )
+        assert test_case.min_cycles == 5
+        assert test_case.max_cycles == 5
+
+
+class TestPuzzleTestCaseSequential:
+    """Tests for sequential test cases (input_stream and expected_output_stream)"""
+    
+    def test_sequential_valid(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.WHITEBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[{"clk": 0}, {"clk": 1}, {"clk": 0}],
+            expected_output_stream={"q": [0, 1, 0]}
+        )
+        assert len(test_case.input_stream) == 3
+        assert "q" in test_case.expected_output_stream
+
+    def test_sequential_empty_input_stream_invalid(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.WHITEBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[],
+                expected_output_stream={"q": [0, 1]}
+            )
+        assert "input_stream cannot be empty" in str(exc_info.value)
+
+    def test_sequential_empty_output_stream_invalid(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.WHITEBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"clk": 0}],
+                expected_output_stream={}
+            )
+        assert "expected_output_stream cannot be empty" in str(exc_info.value)
+
+    def test_sequential_invalid_input_value_in_dict(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.WHITEBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"clk": 2}],  # Invalid: must be 0 or 1
+                expected_output_stream={"q": [0]}
+            )
+        assert "must be 0/1" in str(exc_info.value)
+
+    def test_sequential_invalid_output_stream_value(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.WHITEBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"clk": 0}],
+                expected_output_stream={"q": [2]}  # Invalid: must be 0 or 1
+            )
+        assert "must contain only 0/1" in str(exc_info.value)
+
+    def test_sequential_multiple_input_signals(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.WHITEBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[
+                {"clk": 0, "reset": 1},
+                {"clk": 1, "reset": 0},
+                {"clk": 0, "reset": 0}
+            ],
+            expected_output_stream={"q": [0, 1, 1]}
+        )
+        assert test_case.input_stream[0] == {"clk": 0, "reset": 1}
+
+    def test_sequential_multiple_output_signals(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.WHITEBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[{"clk": 0}],
+            expected_output_stream={"q": [0], "q_not": [1]}
+        )
+        assert len(test_case.expected_output_stream) == 2
+
+
+class TestPuzzleTestCaseInputStreamValidation:
+    """Additional tests for input stream validation edge cases"""
+    
+    def test_input_stream_with_scalar_values(self):
+        """Input stream can contain scalar 0 or 1 values"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.WHITEBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1, 0, 1],
+            expected_output_stream={"out": [1, 0, 1, 0]}
+        )
+        assert test_case.input_stream == [0, 1, 0, 1]
+
+    def test_input_stream_scalar_invalid(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.WHITEBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[2],  # Invalid scalar
+                expected_output_stream={"out": [0]}
+            )
+        assert "must be 0/1" in str(exc_info.value)
+
+    def test_input_stream_mixed_dict_and_scalar_valid(self):
+        """Can mix dict and scalar values - but validation checks each"""
+        # This will pass because scalar 0 is valid
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.WHITEBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, {"a": 1}, 1],
+            expected_output_stream={"out": [1, 0, 1]}
+        )
+        assert len(test_case.input_stream) == 3
+
+
+class TestPuzzleTestCaseNegativeIDHandling:
+    """Tests for ID validation with negative values"""
+    
+    def test_negative_id_invalid(self):
+        with pytest.raises(ValidationError):
+            PuzzleTestCase(
+                id=-1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": 0},
+                expected_outputs={"r": 1}
+            )
+
+    def test_negative_puzzle_id_invalid(self):
+        with pytest.raises(ValidationError):
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=-1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": 0},
+                expected_outputs={"r": 1}
+            )
+
+    def test_set_puzzle_id_negative_invalid(self):
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": 1}
+        )
+        with pytest.raises(ValidationError):
+            test_case.set_puzzle_id(-5)
+
+
+class TestPuzzleTestCaseListInputsOutputs:
+    """Test list branches in inputs/outputs validation"""
+    
+    def test_input_with_list_values_valid(self):
+        """Test inputs with list values containing only 0/1"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": [0, 1, 0], "b": [1, 1]},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": [0, 1, 0], "b": [1, 1]}
+    
+    def test_output_with_list_values_valid(self):
+        """Test outputs with list values containing only 0/1"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": [0, 1], "s": [1, 0, 1]}
+        )
+        assert test_case.get_expected_outputs() == {"r": [0, 1], "s": [1, 0, 1]}
+    
+    def test_input_with_list_values_invalid(self):
+        """Test inputs with list containing invalid values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": [0, 1, 2]},
+                expected_outputs={"r": 1}
+            )
+        assert "Input 'a' list must contain only 0/1" in str(exc_info.value)
+    
+    def test_output_with_list_values_invalid(self):
+        """Test outputs with list containing invalid values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={"a": 0},
+                expected_outputs={"r": [0, 2, 1]}
+            )
+        assert "Output 'r' list must contain only 0/1" in str(exc_info.value)
+    
+    def test_mixed_scalar_and_list_inputs(self):
+        """Test mix of scalar and list values in inputs"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0, "b": [1, 0], "c": 1},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": 0, "b": [1, 0], "c": 1}
+    
+    def test_mixed_scalar_and_list_outputs(self):
+        """Test mix of scalar and list values in outputs"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": 0},
+            expected_outputs={"r": 1, "s": [0, 1], "t": 0}
+        )
+        assert test_case.get_expected_outputs() == {"r": 1, "s": [0, 1], "t": 0}
+    
+    def test_empty_list_in_input_allowed(self):
+        """Test empty list in input values - should be allowed"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={"a": []},
+            expected_outputs={"r": 1}
+        )
+        assert test_case.get_inputs() == {"a": []}
+
+
+class TestPuzzleTestCaseSequentialFormat:
+    """Test sequential test cases with input_stream and output_stream"""
+    
+    def test_sequential_with_input_output_streams(self):
+        """Test sequential format with input and output streams"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[{"a": 0, "b": 1}, {"a": 1, "b": 0}],
+            expected_output_stream={"r": [0, 1]}
+        )
+        assert len(test_case.input_stream) == 2
+        assert "r" in test_case.expected_output_stream
+    
+    def test_sequential_input_stream_scalar_values(self):
+        """Test input_stream with scalar values"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1, 0, 1],
+            expected_output_stream={"out": [1, 0, 1, 0]}
+        )
+        assert test_case.input_stream == [0, 1, 0, 1]
+    
+    def test_sequential_invalid_input_stream_value(self):
+        """Test sequential with invalid input_stream values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"a": 2}],
+                expected_output_stream={"r": [0]}
+            )
+        assert "Input stream value 'a' must be 0/1" in str(exc_info.value)
+    
+    def test_sequential_invalid_output_stream_value(self):
+        """Test sequential with invalid output_stream values"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[{"a": 0}],
+                expected_output_stream={"r": [0, 2, 1]}
+            )
+        assert "Output stream 'r' must contain only 0/1" in str(exc_info.value)
+    
+    def test_sequential_output_stream_scalar_values(self):
+        """Test output_stream with scalar values (not list)"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1, 0],
+            expected_output_stream={"out": 1}  # Single scalar value, not a list
+        )
+        assert test_case.expected_output_stream == {"out": 1}
+    
+    def test_sequential_mixed_scalar_and_list_output_stream(self):
+        """Test output_stream with both scalar and list values"""
+        test_case = PuzzleTestCase(
+            id=1,
+            puzzle_id=1,
+            kind=TestCaseKind.BLACKBOX,
+            inputs={},
+            expected_outputs={},
+            input_stream=[0, 1],
+            expected_output_stream={"out1": 1, "out2": [0, 1]}
+        )
+        assert test_case.expected_output_stream == {"out1": 1, "out2": [0, 1]}
+
+
+class TestPuzzleTestCaseNoFormat:
+    """Test error when neither format is provided"""
+    
+    def test_no_combinatorial_no_sequential(self):
+        """Test validation error when neither format is provided"""
+        with pytest.raises(ValidationError) as exc_info:
+            PuzzleTestCase(
+                id=1,
+                puzzle_id=1,
+                kind=TestCaseKind.BLACKBOX,
+                inputs={},
+                expected_outputs={},
+                input_stream=[],
+                expected_output_stream={}
+            )
+        assert "must have either inputs/expected_outputs or input_stream/expected_output_stream" in str(exc_info.value)

@@ -71,6 +71,56 @@ class TestLogicEngineSimulation:
         assert result["Out"] == 1
         assert result["dff1_next"] == 0
 
+    def test_simulate_macro_with_internal_dff_state(self):
+        macro_structure = {
+            "placedComponents": [
+                {"id": "IO:IN:in0", "componentId": "IO:IN:in0"},
+                {"id": "dff1", "componentId": "DFF"},
+                {"id": "IO:OUT:out0", "componentId": "IO:OUT:out0"},
+            ],
+            "wires": [
+                {"from": {"componentId": "IO:IN:in0", "pinIndex": 0}, "to": {"componentId": "dff1", "pinIndex": 0}},
+                {"from": {"componentId": "dff1", "pinIndex": 1}, "to": {"componentId": "IO:OUT:out0", "pinIndex": 0}},
+            ],
+        }
+
+        structure = {
+            "placedComponents": [
+                {"id": "IO:IN:In", "componentId": "IO:IN:In"},
+                {"id": "m1", "componentId": "MacroDff"},
+                {"id": "IO:OUT:Out", "componentId": "IO:OUT:Out"},
+            ],
+            "wires": [
+                {"from": {"componentId": "IO:IN:In", "pinIndex": 0}, "to": {"componentId": "m1", "pinIndex": 0}},
+                {"from": {"componentId": "m1", "pinIndex": 1}, "to": {"componentId": "IO:OUT:Out", "pinIndex": 0}},
+            ],
+            "_arsenal_pieces": {
+                "m1": {
+                    "id": 101,
+                    "name": "MacroDff",
+                    "num_inputs": 1,
+                    "num_outputs": 1,
+                    "structure": macro_structure,
+                },
+                "MacroDff": {
+                    "id": 101,
+                    "name": "MacroDff",
+                    "num_inputs": 1,
+                    "num_outputs": 1,
+                    "structure": macro_structure,
+                },
+            },
+        }
+        circuit = Circuit(id=1, user_id=1, name="MacroDffTest", structure_json=json.dumps(structure), cost=0)
+
+        first = self.service.evaluate(circuit, {"In": 1})
+        assert first["Out"] == 0
+        assert first["m1::dff1_next"] == 1
+
+        second = self.service.evaluate(circuit, {"In": 0, "m1::dff1": 1})
+        assert second["Out"] == 1
+        assert second["m1::dff1_next"] == 0
+
     def test_simulate_disconnected_components(self):
         structure = {
             "placedComponents": [

@@ -1,11 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Union, List
+import re
+import sqlite3
+from Backend import settings
 
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.DomainLayer.Puzzle import Puzzle
+from Backend.DomainLayer.Enums import PuzzleStatus
 from Backend.ServiceLayer.PuzzleService import PuzzleService
 from Backend.ServiceLayer.SolvingService import SolvingService
+from Backend.ServiceLayer.RatingService import RatingService
+from Backend.ServiceLayer.AdminService import AdminService
+from Backend.ServiceLayer.logicEngineService import logicEngineService
 from Backend.APILayer.auth_utils import verify_token
+from Backend.PersistantLayer._db import connect
+from insert_riddles import insert_riddle
+import shutil
+import tempfile
+import pathlib
+import json
+from fastapi import UploadFile, File, Form
 
 
 class CreatePuzzleReq(BaseModel):
@@ -13,18 +28,36 @@ class CreatePuzzleReq(BaseModel):
     title: str = "" # also accept title directly
     description: str = ""
     budget: int = 0
+    creator_budget: Optional[int] = None  # Creator's solution cost; must be < budget when both set
     time_limit_seconds: Optional[int] = None
     timeLimit: Optional[int] = None # alias
     default_gate_set: list[str] = []
+    difficulty: str = "EASY"
+    allow_arsenal: Optional[bool] = None
+    allowed_arsenal_component_ids: Optional[list[str]] = None
+    arsenal_component_display_modes: Optional[dict] = None
 
     def to_backend_dict(self):
         return {
             "name": self.title if self.title else self.name,
             "description": self.description,
             "budget": self.budget,
+            "creator_budget": self.creator_budget,
             "time_limit_seconds": self.timeLimit if self.timeLimit is not None else self.time_limit_seconds,
-            "default_gate_set": self.default_gate_set
+            "default_gate_set": self.default_gate_set,
+            "difficulty": self.difficulty,
+            "allow_arsenal": self.allow_arsenal,
+            "allowed_arsenal_component_ids": self.allowed_arsenal_component_ids,
+            "arsenal_component_display_modes": self.arsenal_component_display_modes,
         }
+
+
+class UpdatePuzzleReq(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    creator_comment: Optional[str] = None
+    allow_arsenal: Optional[bool] = None
 
 
 class AddTestCaseReq(BaseModel):
@@ -39,16 +72,182 @@ class SolveReq(BaseModel):
 
 class ValidateSolutionReq(BaseModel):
     solution: Dict[str, Any]
+    time_taken: int = 0
 
 
-def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService) -> APIRouter:
+class SimulateReq(BaseModel):
+    solution: Dict[str, Any]
+    inputs: Union[Dict[str, int], List[Dict[str, int]], Dict[str, List[int]]]
+    isSequence: Optional[bool] = None
+
+
+class CreateCustomPieceReq(BaseModel):
+    name: str
+    cost: int
+    num_inputs: int
+    num_outputs: int
+    truth_table: Dict[str, Any]
+
+
+def get_db_conn():
+    """Helper to get a fresh connection for the puzzle creation."""
+    current_file = pathlib.Path(__file__).resolve()
+    root_dir = current_file.parent.parent.parent.parent
+    db_path = root_dir / 'escape_circuit.db'
+    if not db_path.exists():
+        print(f"CRITICAL ERROR: Database file not found at {db_path}")
+    conn = connect(str(db_path))
+    return conn
+
+
+def get_next_puzzle_number(riddles_dir: pathlib.Path) -> int:
+    """Get the next puzzle number based on existing riddle_XX items."""
+    max_num = 0
+    if riddles_dir.exists():
+        for item in riddles_dir.iterdir():
+            match = re.match(r'riddle_(\d+)_', item.name)
+            if match:
+                num = int(match.group(1))
+                max_num = max(max_num, num)
+    return max_num + 1
+
+
+def sanitize_puzzle_name(name: str) -> str:
+    """Convert puzzle name to a valid filename component."""
+    # Replace spaces and special chars with underscores
+    sanitized = re.sub(r'[^\w\s-]', '', name)
+    sanitized = re.sub(r'[\s-]+', '_', sanitized)
+    return sanitized.lower()
+
+
+def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/. 
+    Returns: (config_path, instructions_path, solution_path, tests_path)        
+    """
+    riddle_dir = riddles_dir / riddle_base_name
+    return (
+        riddle_dir / f"{riddle_base_name}_config.json",
+        riddle_dir / f"{riddle_base_name}_instructions{instructions_ext}",      
+        riddle_dir / f"{riddle_base_name}_sample_solution.json",
+        riddle_dir / f"{riddle_base_name}_tests.py",
+    )
+
+
+def _count_non_io_gates_in_solution(solution_data: dict) -> int:
+    """Count placed gate-like components in a sample solution.
+
+    IO endpoints are ignored. A solution with only wires and no placed gates    
+    is considered empty.
+    """
+    if not isinstance(solution_data, dict):
+        return 0
+
+    circuit_data = solution_data.get('circuit')
+    if not isinstance(circuit_data, dict):
+        return 0
+
+    placed_components = (
+        circuit_data.get('placedComponents')
+        or circuit_data.get('placed')
+        or []
+    )
+    if not isinstance(placed_components, list):
+        return 0
+
+    gate_count = 0
+    for component in placed_components:
+        if not isinstance(component, dict):
+            continue
+
+        component_id = component.get('componentId')
+        if component_id is None:
+            component_id = component.get('type')
+        if component_id is None:
+            continue
+
+        component_name = str(component_id).strip()
+        if not component_name:
+            continue
+        if component_name.upper().startswith('IO:'):
+            continue
+
+        gate_count += 1
+
+    return gate_count
+
+
+def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
+    puzzle_config = config_data.get('puzzle', {})
+    if not puzzle_config:
+        raise ValidationError("Config missing 'puzzle' section")
+
+    puzzle_name = (puzzle_config.get('name') or '').strip()
+    if not puzzle_name:
+        raise ValidationError("Puzzle name is required")
+    if len(puzzle_name) > settings.PUZZLE_NAME_MAX_LENGTH:
+        raise ValidationError(
+            f"Puzzle name must be at most {settings.PUZZLE_NAME_MAX_LENGTH} characters."
+        )
+
+    description = puzzle_config.get('description', '') or ''
+    if len(description) > settings.PUZZLE_DESCRIPTION_MAX_LENGTH:
+        raise ValidationError(
+            f"Puzzle description must be at most {settings.PUZZLE_DESCRIPTION_MAX_LENGTH} characters."
+        )
+
+    if len(instructions_text.encode('utf-8')) > settings.PUZZLE_INSTRUCTIONS_MAX_BYTES:
+        raise ValidationError(
+            f"Puzzle instructions must be at most {settings.PUZZLE_INSTRUCTIONS_MAX_BYTES} bytes."
+        )
+
+    existing = conn.execute(
+        "SELECT 1 FROM puzzles WHERE LOWER(name) = LOWER(?) LIMIT 1",
+        (puzzle_name,),
+    ).fetchone()
+    if existing:
+        raise ValidationError("Puzzle name already exists. Please choose a unique name.")
+
+    if not puzzle_config.get('inputs') or not isinstance(puzzle_config['inputs'], list):
+        raise ValidationError("Puzzle must have 'inputs' list")
+    if not puzzle_config.get('outputs') or not isinstance(puzzle_config['outputs'], list):
+        raise ValidationError("Puzzle must have 'outputs' list")
+    if not puzzle_config.get('default_gate_set'):
+        raise ValidationError("Puzzle must have 'default_gate_set'")
+
+    test_cases = config_data.get('test_cases', [])
+    if not test_cases:
+        raise ValidationError("Puzzle must have at least one test case")
+
+    return puzzle_config
+
+
+def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
+
 
     @router.get("")
     def browse(
         limit: int = 50, 
         offset: int = 0, 
-        page: Optional[int] = None, 
+        page: Optional[int] = None,
+        search: Optional[str] = None,
+        creator: Optional[str] = Query(None),
+        creator_id: Optional[int] = None,
+        creator_experience_level: Optional[str] = None,
+        min_difficulty: Optional[float] = None,
+        max_difficulty: Optional[float] = None,
+        only_experienced_difficulty: bool = False,
+        min_clearness: Optional[float] = None,
+        max_clearness: Optional[float] = None,
+        only_experienced_clearness: bool = False,
+        min_fun: Optional[float] = None,
+        max_fun: Optional[float] = None,
+        only_experienced_fun: bool = False,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        order_only_experienced: bool = False,
         token: str = Depends(verify_token)
     ):
         try:
@@ -56,21 +255,165 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             if page is not None and page > 0:
                 offset = (page - 1) * limit
                 
-            return puzzle_service.browse(token, limit=limit, offset=offset)
+            result = puzzle_service.browse(
+                token, 
+                limit=limit, 
+                offset=offset,
+                search=search,
+                creator_id=creator_id,
+                creator_username=creator,
+                creator_experience_level=creator_experience_level,
+                min_difficulty=min_difficulty,
+                max_difficulty=max_difficulty,
+                only_experienced_difficulty=only_experienced_difficulty,
+                min_clearness=min_clearness,
+                max_clearness=max_clearness,
+                only_experienced_clearness=only_experienced_clearness,
+                min_fun=min_fun,
+                max_fun=max_fun,
+                only_experienced_fun=only_experienced_fun,
+                date_from=date_from,
+                date_to=date_to,
+                order_by=order_by,
+                order_direction=order_direction,
+                order_only_experienced=order_only_experienced
+            )
+
+            # Inject is_solved status per puzzle for the current user
+            try:
+                from Backend.ServiceLayer.AuthService import AuthService
+                user_id = puzzle_service.auth.require_user_id(token)
+                
+                # Get saved puzzles for this user
+                saved_puzzles = puzzle_service.repo.list_saved_puzzles(user_id)
+                saved_puzzle_ids = {int(p.id) for p in saved_puzzles}
+                
+                if puzzle_service.solve_repo:
+                    status_map = puzzle_service.solve_repo.get_solve_status_map(user_id)
+                    solved_counts = puzzle_service.solve_repo.get_solved_counts()
+                    for p in result.get("data", []):
+                        pid = p.get("id")
+                        try:
+                            pid = int(pid)
+                        except (TypeError, ValueError):
+                            pid = None
+                        # Per-user solved status
+                        if pid and pid in status_map:
+                            p["is_solved"] = True
+                            p["best_time"] = status_map[pid].get("best_time")
+                            p["total_xp"] = status_map[pid].get("total_xp", 0)
+                            p["best_medal"] = status_map[pid].get("best_medal", 0)
+                        else:
+                            p["is_solved"] = False
+                            p["best_medal"] = 0
+                        # Global solved count (all users)
+                        p["solvedCount"] = solved_counts.get(pid, 0) if pid else 0
+                        p["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
+                        # Can-rate flag (solved OR 5 min spent)
+                        if pid and rating_service:
+                            try:
+                                p["can_rate"] = rating_service._can_rate(user_id, pid)
+                            except Exception:
+                                p["can_rate"] = p.get("is_solved", False)
+                        else:
+                            p["can_rate"] = p.get("is_solved", False)
+                        # Inject user's rating (if exists)
+                        if pid and rating_service:
+                            try:
+                                user_rating = rating_service.rating_repo.get_by_puzzle_user(pid, user_id)
+                                if user_rating:
+                                    p["user_rating"] = user_rating.to_dict()
+                            except Exception:
+                                pass
+                        # Inject saved status
+                        p["is_saved"] = pid in saved_puzzle_ids if pid else False
+                        # Inject rating metrics
+                        _inject_rating_metrics(p)
+            except Exception:
+                pass  # gracefully degrade if solve_repo unavailable
+
+            return result
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
+
+    @router.get("/my-puzzles/list")
+    def list_my_puzzles(
+        limit: int = 50,
+        offset: int = 0,
+        page: Optional[int] = None,
+        search: Optional[str] = None,
+        order_by: str = "created_at",
+        order_direction: str = "DESC",
+        token: str = Depends(verify_token)
+    ):
+        try:
+            if page is not None and page > 0:
+                offset = (page - 1) * limit
+            
+            return puzzle_service.list_my_puzzles(
+                token,
+                limit=limit,
+                offset=offset,
+                search=search,
+                order_by=order_by,
+                order_direction=order_direction
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/search")
     def search(q: str, token: str = Depends(verify_token)):
         try:
             return puzzle_service.search(token, q)
         except ValidationError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=_validation_error_to_http_status(e), detail=str(e))
 
     @router.get("/{puzzle_id}")
     def get_one(puzzle_id: int, token: str = Depends(verify_token)):
         try:
-            return puzzle_service.get(token, puzzle_id)
+            result = puzzle_service.get(token, puzzle_id)
+            _inject_rating_metrics(result)
+            
+            # Log what we're about to return to the client
+            print(f"\n🌐 API ENDPOINT: GET /puzzles/{puzzle_id}")
+            print(f"   - arsenalComponents in result: {len(result.get('arsenalComponents', []))}")
+            if result.get('arsenalComponents'):
+                first = result['arsenalComponents'][0]
+                print(f"   - First arsenal component:")
+                print(f"     * id: {first.get('id')}")
+                print(f"     * type: {first.get('type')}")
+                print(f"     * description key present: {'description' in first}")
+                print(f"     * description value: '{first.get('description', 'MISSING')}'")
+                print(f"     * all keys: {list(first.keys())}")
+            print(f"   ✅ RETURNING TO CLIENT: {list(result.keys())}\n")
+
+            # Inject per-user solve status (same as browse does)
+            try:
+                user_id = puzzle_service.auth.require_user_id(token)
+                result["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
+                if puzzle_service.solve_repo:
+                    is_passed = puzzle_service.solve_repo.has_passed(user_id, puzzle_id)
+                    result["is_solved"] = is_passed
+                    if is_passed:
+                        status_map = puzzle_service.solve_repo.get_solve_status_map(user_id)
+                        info = status_map.get(puzzle_id, {})
+                        result["best_time"] = info.get("best_time")
+                        result["total_xp"] = info.get("total_xp", 0)
+                        result["best_medal"] = info.get("best_medal", 0)
+                    else:
+                        result["best_medal"] = 0
+                    # Can-rate flag (solved OR 5 min spent)
+                    if rating_service:
+                        try:
+                            result["can_rate"] = rating_service._can_rate(user_id, puzzle_id)
+                        except Exception:
+                            result["can_rate"] = is_passed
+                    else:
+                        result["can_rate"] = is_passed
+            except Exception:
+                pass
+
+            return result
         except ValidationError as e:
             print(f"DEBUG: Controller caught ValidationError: {e}")
             raise HTTPException(status_code=404, detail=str(e))
@@ -95,6 +438,32 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     def unpublish(puzzle_id: int, token: str = Depends(verify_token)):
         try:
             return puzzle_service.unpublish(token, puzzle_id)
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.delete("/{puzzle_id}")
+    def delete_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            return puzzle_service.delete_puzzle(token, puzzle_id)
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.patch("/{puzzle_id}")
+    def update_puzzle(puzzle_id: int, req: UpdatePuzzleReq, token: str = Depends(verify_token)):
+        try:
+            payload = {}
+            if req.name is not None:
+                payload["name"] = req.name
+            if req.description is not None:
+                payload["description"] = req.description
+            if req.instructions is not None:
+                payload["instructions"] = req.instructions
+            # Always include creator_comment if it was in the request (even if None for deletion)
+            if "creator_comment" in req.model_fields_set or req.creator_comment is not None:
+                payload["creator_comment"] = req.creator_comment
+            if req.allow_arsenal is not None:
+                payload["allow_arsenal"] = req.allow_arsenal
+            return puzzle_service.update_puzzle(token, puzzle_id, payload)
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
 
@@ -129,8 +498,721 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     @router.post("/{puzzle_id}/validate")
     def validate(puzzle_id: int, req: ValidateSolutionReq, token: str = Depends(verify_token)):
         try:
-            return solving_service.validate_solution(token, puzzle_id, req.solution)
+            return solving_service.validate_solution(token, puzzle_id, req.solution, time_taken=req.time_taken)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    @router.get("/{puzzle_id}/leaderboard")
+    def leaderboard(puzzle_id: int, type: str = "time", limit: int = 50, token: str = Depends(verify_token)):
+        try:
+            puzzle_service.auth.require_user_id(token)
+            if type == "cost":
+                entries = puzzle_service.solve_repo.get_leaderboard_by_cost(puzzle_id, limit=limit)
+            else:
+                entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
+            return {"data": entries}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/{puzzle_id}/simulate")
+    def simulate(puzzle_id: int, req: SimulateReq, token: str = Depends(verify_token)):
+        try:
+            # Determine if it's a sequence simulation
+            is_sequence = req.isSequence if req.isSequence is not None else (
+                isinstance(req.inputs, dict) and 
+                any(isinstance(v, list) for v in req.inputs.values())
+            )
+            return solving_service.simulate_solution(token, puzzle_id, req.solution, req.inputs, is_sequence=is_sequence)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ------------------------------------------------------------------ #
+    #  Create puzzle from form (available to admins and creators)
+    # ------------------------------------------------------------------ #
+    @router.post("/create-puzzle-form")
+    async def create_puzzle_form(
+        config_file: UploadFile = File(...),
+        instructions_file: UploadFile = File(...),
+        sample_solution_file: UploadFile = File(...),
+        python_tests_file: UploadFile | None = File(None),
+        difficulty: str = Form("EASY"),
+        token: str = Depends(verify_token),
+    ):
+        # Verify admin or creator
+        if not admin_service:
+            raise HTTPException(status_code=500, detail="Admin service not available")
+        
+        try:
+            user_id = admin_service._require_admin_or_creator(token)
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+        # Enforce unpublished puzzle capacity for non-admin creators.
+        # This endpoint bypasses PuzzleService.create_puzzle, so the check must
+        # be applied here as well.
+        user = puzzle_service.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=400, detail="user not found")
+        if not puzzle_service._is_admin(user.role):
+            _, max_unpublished = user.get_puzzle_capacity()
+            current_unpublished = puzzle_service._count_unpublished_puzzles(user_id)
+            if current_unpublished >= max_unpublished:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"You have reached the maximum limit of {max_unpublished} unpublished puzzles. "
+                        "Delete or publish existing puzzles to create room."
+                    ),
+                )
+
+        conn = get_db_conn()
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                current_file = pathlib.Path(__file__).resolve()
+                root_dir = current_file.parent.parent.parent.parent
+                riddles_dir = root_dir / 'riddles'
+                if not riddles_dir.exists():
+                    riddles_dir.mkdir(parents=True)
+
+                config_content = await config_file.read()
+                config_data = json.loads(config_content)
+                instructions_content = await instructions_file.read()
+                instructions_text = instructions_content.decode('utf-8')
+                _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+
+                puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
+                puzzle_num = get_next_puzzle_number(riddles_dir)
+                sanitized_name = sanitize_puzzle_name(puzzle_name)
+                riddle_base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}'
+
+                temp_path = pathlib.Path(temp_dir)
+
+                # Helper to save files to TEMP directory (for validation)
+                def save_file_to_temp(upload_file, file_type):
+                    base_name = f'riddle_{puzzle_num:02d}_{sanitized_name}_{file_type}'
+                    # Determine extension from original filename
+                    ext = pathlib.Path(upload_file.filename).suffix
+                    if not ext:
+                        # Default extensions
+                        if file_type == 'config':
+                            ext = '.json'
+                        elif file_type == 'instructions':
+                            ext = '.md'
+                        elif 'solution' in file_type:
+                            ext = '.json'
+                    dest_path = temp_path / (base_name + ext)
+                    with open(dest_path, "wb") as buffer:
+                        shutil.copyfileobj(upload_file.file, buffer)
+                    return str(dest_path)
+
+                solution_content = await sample_solution_file.read()
+                
+                # Read Python tests file if provided
+                tests_content = None
+                if python_tests_file:
+                    tests_content = await python_tests_file.read()
+
+                config_path = temp_path / f'{riddle_base_name}_config.json'
+                instructions_path = temp_path / f'{riddle_base_name}_instructions{pathlib.Path(instructions_file.filename or "").suffix or ".tex"}'
+                solution_path = temp_path / f'{riddle_base_name}_sample_solution.json'
+                tests_path = temp_path / f'{riddle_base_name}_tests.py' if tests_content else None
+
+                config_path.write_bytes(config_content)
+                instructions_path.write_bytes(instructions_content)
+                solution_path.write_bytes(solution_content)
+                if tests_content and tests_path:
+                    tests_path.write_bytes(tests_content)
+
+                # ========== VALIDATION PHASE (in-memory with temp files) ==========
+                with open(config_path, 'r', encoding='utf-8') as cf:
+                    config_data = json.load(cf)
+                puzzle_config = _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+                test_cases = config_data.get('test_cases', [])
+                
+                # Load and validate sample solution using logic engine
+                with open(solution_path, 'r', encoding='utf-8') as sf:
+                    solution_data = json.load(sf)
+                
+                if not isinstance(solution_data.get('eval_map'), dict):
+                    raise ValidationError("Sample solution must have 'eval_map' field")
+
+                if _count_non_io_gates_in_solution(solution_data) == 0:
+                    raise ValidationError(
+                        "Sample solution cannot be empty. It must include at least one gate; wires alone are not enough."
+                    )
+
+                # Extract creator_budget from solution totalCost if not already set in config
+                solution_total_cost = solution_data.get('totalCost')
+                if solution_total_cost is not None:
+                    try:
+                        normalized_solution_total_cost = int(solution_total_cost)
+                    except (TypeError, ValueError):
+                        raise ValidationError("Sample solution totalCost must be an integer when provided")
+
+                    config_creator_budget = puzzle_config.get('creator_budget')
+                    if config_creator_budget is None:
+                        # Auto-set creator_budget from solution cost (including 0-cost solutions).
+                        puzzle_config['creator_budget'] = normalized_solution_total_cost
+                        config_data.setdefault('puzzle', {})['creator_budget'] = normalized_solution_total_cost
+
+                    # Validate budget > creator_budget now that we have the solution cost
+                    effective_creator_budget = puzzle_config.get('creator_budget')
+                    if effective_creator_budget is not None:
+                        puzzle_budget = puzzle_config.get('budget', 0) or 0
+                        if puzzle_budget > 0 and puzzle_budget <= effective_creator_budget:
+                            raise ValidationError(
+                                f"budget ({puzzle_budget}) must be greater than creator_budget "
+                                f"({effective_creator_budget}). Raise the budget or lower the creator's solution cost."
+                            )
+                
+                # Check if solution has circuit structure for actual simulation
+                solution_circuit_data = solution_data.get('circuit')
+                
+                puzzle_inputs = puzzle_config.get('inputs', [])
+                puzzle_outputs = puzzle_config.get('outputs', [])
+                eval_map = solution_data.get('eval_map', {})
+                
+                # Debug: Log eval_map structure
+                print(f"\n=== VALIDATION DEBUG ===")
+                print(f"Puzzle Inputs: {puzzle_inputs}")
+                print(f"Puzzle Outputs: {puzzle_outputs}")
+                print(f"Eval Map Keys Available: {list(eval_map.keys())}")
+                print(f"Number of test cases: {len(test_cases)}")
+                print(f"Solution has circuit data: {solution_circuit_data is not None}")
+                
+                # For puzzle creation, we trust that the creator tested their circuit in the debugger.
+                # The eval_map provides the expected outputs that users' solutions will be validated against.
+                # Actual circuit correctness is verified when users solve the puzzle and their solution
+                # output must match the eval_map (which is what matters for grading).
+                
+                # Get min/max cycles if set
+                min_cycles = puzzle_config.get('min_cycles')
+                max_cycles = puzzle_config.get('max_cycles')
+
+                custom_piece_names = {
+                    str(piece.get('name')).strip()
+                    for piece in (config_data.get('custom_pieces', []) or [])
+                    if isinstance(piece, dict) and str(piece.get('name', '')).strip()
+                }
+
+                shared_arsenal_piece_names = set()
+                allowed_shared_ids = solving_service._normalize_id_set(
+                    puzzle_config.get('allowed_arsenal_component_ids')
+                )
+                for component_id in allowed_shared_ids:
+                    try:
+                        component = solving_service.circuit_repo.get_by_id(component_id)
+                    except Exception:
+                        component = None
+                    if component and getattr(component, 'name', None):
+                        shared_arsenal_piece_names.add(str(component.name))
+
+                arsenal_zero_forbidden_keys = {
+                    solving_service.ARSENAL_TOTAL_KEY,
+                    solving_service.ARSENAL_EACH_KEY,
+                    solving_service.ARSENAL_SHARED_TOTAL_KEY,
+                    solving_service.ARSENAL_SHARED_EACH_KEY,
+                }
+                
+                # Validate all test cases can be evaluated
+                for i, test_case in enumerate(test_cases):
+                    # Get test case kind
+                    tc_kind = test_case.get('kind', 'blackbox')
+                    
+                    if tc_kind == 'gate_limit':
+                        # Gate limit constraint (per-gate limit - can be min, max, or both)
+                        gate_name = test_case.get('gate_name')
+                        min_gate_limit = solving_service._to_optional_int(test_case.get('min_gate_limit'))
+                        gate_limit = solving_service._to_optional_int(test_case.get('gate_limit'))
+                        
+                        print(f"\n[Test Case {i}] Gate Limit Constraint")
+                        print(f"  Gate: {gate_name}, Min Count: {min_gate_limit}, Max Count: {gate_limit}")
+                        
+                        if not gate_name:
+                            raise ValidationError(f"Gate limit test case {i} missing 'gate_name'")
+
+                        # At least one of min_gate_limit or gate_limit must be specified.
+                        if min_gate_limit is None and gate_limit is None:
+                            raise ValidationError(
+                                f"Gate limit test case {i} must have min_gate_limit and/or gate_limit specified"
+                            )
+
+                        if min_gate_limit is not None and min_gate_limit < 0:
+                            raise ValidationError(
+                                f"Gate limit test case {i}: min_gate_limit must be non-negative"
+                            )
+
+                        if gate_limit is not None and gate_limit < 0:
+                            raise ValidationError(
+                                f"Gate limit test case {i}: gate_limit must be non-negative"
+                            )
+
+                        # If both are specified, min should not exceed max
+                        if min_gate_limit is not None and gate_limit is not None and min_gate_limit > gate_limit:
+                            raise ValidationError(f"Gate limit test case {i}: min_gate_limit ({min_gate_limit}) cannot exceed gate_limit ({gate_limit})")
+
+                        # Rule: basic and arsenal limits cannot use max=0.
+                        if gate_limit == 0:
+                            if gate_name in solving_service.BASIC_GATE_NAMES:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: basic gate '{gate_name}' cannot have gate_limit = 0"
+                                )
+                            if gate_name in shared_arsenal_piece_names:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: shared arsenal piece '{gate_name}' cannot have gate_limit = 0"
+                                )
+                            if gate_name in arsenal_zero_forbidden_keys:
+                                raise ValidationError(
+                                    f"Gate limit test case {i}: '{gate_name}' cannot have gate_limit = 0"
+                                )
+
+                        # Persist normalized numeric values for downstream checks.
+                        test_case['min_gate_limit'] = min_gate_limit
+                        test_case['gate_limit'] = gate_limit
+                        
+                        print(f"  ✓ Gate limit constraint valid")
+                        
+                    elif tc_kind == 'gate_count_limit':
+                        # Total gate count constraint
+                        min_gate_count = solving_service._to_optional_int(test_case.get('min_gate_count'))
+                        max_gate_count = solving_service._to_optional_int(test_case.get('max_gate_count'))
+                        
+                        print(f"\n[Test Case {i}] Total Gate Count Limit")
+                        print(f"  Min Total Gates: {min_gate_count}")
+                        print(f"  Max Total Gates: {max_gate_count}")
+                        
+                        # Skip if not set (helps with frontend defaults).
+                        if min_gate_count is None and max_gate_count is None:
+                            print(f"  - Skipping: max_gate_count not set or invalid")
+                            continue
+
+                        if min_gate_count is not None and min_gate_count <= 0:
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: min_gate_count must be > 0"
+                            )
+
+                        if max_gate_count is not None and max_gate_count <= 0:
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: max_gate_count must be > 0"
+                            )
+
+                        if (
+                            min_gate_count is not None
+                            and max_gate_count is not None
+                            and min_gate_count > max_gate_count
+                        ):
+                            raise ValidationError(
+                                f"Gate count limit test case {i}: min_gate_count ({min_gate_count}) cannot exceed max_gate_count ({max_gate_count})"
+                            )
+
+                        test_case['min_gate_count'] = min_gate_count
+                        test_case['max_gate_count'] = max_gate_count
+                        
+                        print(f"  ✓ Total gate count limit valid")
+                    
+                    elif tc_kind == 'stream':
+                        input_stream = test_case.get('input_stream', [])
+                        expected_output_stream = test_case.get('expected_output_stream', {})
+
+                        print(f"\n[Test Case {i}] Stream")
+                        print(f"  Input Stream Length: {len(input_stream)}")
+                        print(f"  Input Stream: {input_stream}")
+                        print(f"  Expected Output Stream: {expected_output_stream}")
+
+                        if not input_stream:
+                            raise ValidationError(f"Stream test case {i} has empty input_stream")
+                        if not expected_output_stream:
+                            raise ValidationError(f"Stream test case {i} has empty expected_output_stream")
+
+                        num_cycles = len(input_stream)
+
+                        if min_cycles is not None and num_cycles < min_cycles:
+                            raise ValidationError(
+                                f"Stream test case {i} has {num_cycles} cycles but minimum required is {min_cycles}"
+                            )
+                        if max_cycles is not None and num_cycles > max_cycles:
+                            raise ValidationError(
+                                f"Stream test case {i} has {num_cycles} cycles but maximum allowed is {max_cycles}"
+                            )
+
+                        if input_stream and isinstance(input_stream[0], dict):
+                            tc_input_keys = set(input_stream[0].keys())
+                            puzzle_input_keys = set(puzzle_inputs)
+                            if tc_input_keys != puzzle_input_keys:
+                                raise ValidationError(
+                                    f"Stream test case {i} inputs {tc_input_keys} don't match puzzle inputs {puzzle_input_keys}"
+                                )
+
+                        tc_output_keys = set(expected_output_stream.keys())
+                        puzzle_output_keys = set(puzzle_outputs)
+                        if tc_output_keys != puzzle_output_keys:
+                            raise ValidationError(
+                                f"Stream test case {i} outputs {tc_output_keys} don't match puzzle outputs {puzzle_output_keys}"
+                            )
+
+                        for output_name, output_values in expected_output_stream.items():
+                            if not isinstance(output_values, list):
+                                raise ValidationError(
+                                    f"Stream test case {i} output '{output_name}' must be a list"
+                                )
+                            if len(output_values) != num_cycles:
+                                raise ValidationError(
+                                    f"Stream test case {i} output '{output_name}' length {len(output_values)} "
+                                    f"doesn't match input stream length {num_cycles}"
+                                )
+
+                        print(f"  ✓ Test case {i} PASSED")
+                    elif tc_kind == 'blackbox':
+                        inputs = test_case.get('inputs', {})
+                        expected_outputs = test_case.get('expected_outputs', {})
+
+                        print(f"\n[Test Case {i}] Blackbox")
+                        print(f"  Inputs: {inputs}")
+                        print(f"  Expected Outputs: {expected_outputs}")
+
+                        tc_input_keys = set(inputs.keys())
+                        puzzle_input_keys = set(puzzle_inputs)
+                        if tc_input_keys != puzzle_input_keys:
+                            raise ValidationError(
+                                f"Test case {i} inputs {tc_input_keys} don't match puzzle inputs {puzzle_input_keys}"
+                            )
+
+                        tc_output_keys = set(expected_outputs.keys())
+                        puzzle_output_keys = set(puzzle_outputs)
+                        if tc_output_keys != puzzle_output_keys:
+                            raise ValidationError(
+                                f"Test case {i} outputs {tc_output_keys} don't match puzzle outputs {puzzle_output_keys}"
+                            )
+
+                        print(f"  ✓ Test case {i} PASSED")
+                    else:
+                        raise ValidationError(
+                            f"Test case {i} has unknown kind '{tc_kind}'. "
+                            f"Must be one of: blackbox, stream, gate_limit, gate_count_limit"
+                        )
+                
+                print(f"\n=== ✓ ALL {len(test_cases)} TEST CASES VALIDATED SUCCESSFULLY ===")
+
+                # Convert sample solution to expanded format for constraint validation
+                expanded_solution = solution_data.copy()
+                expanded_solution['circuit'] = solution_circuit_data or {}
+                expanded_solution['wires'] = solution_circuit_data.get("wires", []) if solution_circuit_data else []
+                
+                # Count gates in solution for gate constraint checks
+                # Handle both 'placed' and 'placedComponents' field names
+                placed_components = []
+                if solution_circuit_data:
+                    placed_components = solution_circuit_data.get("placedComponents") or solution_circuit_data.get("placed", [])
+                
+                # Also set it in expanded_solution for python tests
+                expanded_solution['placedComponents'] = placed_components
+
+                usage_context = solving_service._build_gate_usage_context(
+                    expanded_solution.get('circuit') or {},
+                    puzzle=None,
+                    explicit_custom_piece_names=custom_piece_names,
+                    explicit_shared_arsenal_piece_names=shared_arsenal_piece_names,
+                )
+                gate_counts = usage_context.get('per_gate_counts', {})
+                total_gates = int(usage_context.get('total_gate_count', 0))
+                
+                print(f"Sample solution has {total_gates} gates total: {gate_counts}")
+                print(f"Placed components: {len(placed_components)}")
+                for comp in placed_components:
+                    print(f"  - {comp.get('componentId')}: {comp.get('id')}")
+                
+                # Validate python tests against sample solution if present
+                if python_tests_file and tests_content:
+                    print(f"[Python Tests] Validating Python tests against sample solution...")
+                    # Decode the test content from bytes to string
+                    test_code_str = tests_content.decode('utf-8') if isinstance(tests_content, bytes) else tests_content
+                    python_tests_result, python_tests_error, python_tests_details = solving_service._validate_python_test_code(
+                        test_code_str,
+                        expanded_solution
+                    )
+                    if not python_tests_result:
+                        raise ValidationError(f"Sample solution fails Python tests: {python_tests_error}")
+                    print(f"  ✓ Python tests passed")
+                
+                print(f"✓ Sample solution satisfies ALL constraints\n")
+
+                
+                # IMPORTANT: Filter out invalid constraint test cases before saving
+                # This prevents PuzzleTestCase validation errors when loading the puzzle
+                valid_test_cases = []
+                for tc in test_cases:
+                    tc_kind = tc.get('kind', 'blackbox')
+                    
+                    # Remove gate_limit if invalid
+                    if tc_kind == 'gate_limit':
+                        gate_name = tc.get('gate_name')
+                        min_gate_limit = solving_service._to_optional_int(tc.get('min_gate_limit'))
+                        gate_limit = solving_service._to_optional_int(tc.get('gate_limit'))
+
+                        if min_gate_limit is None and gate_limit is None:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+
+                        if min_gate_limit is not None and min_gate_limit < 0:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (negative min={min_gate_limit})")
+                            continue
+
+                        if gate_limit is not None and gate_limit < 0:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (negative max={gate_limit})")
+                            continue
+
+                        if min_gate_limit is not None and gate_limit is not None and min_gate_limit > gate_limit:
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+
+                        if gate_limit == 0 and (
+                            gate_name in solving_service.BASIC_GATE_NAMES
+                            or gate_name in shared_arsenal_piece_names
+                            or gate_name in arsenal_zero_forbidden_keys
+                        ):
+                            print(f"[FILTER] Removing invalid gate_limit test case for {gate_name} (min={min_gate_limit}, max={gate_limit})")
+                            continue
+
+                        tc['min_gate_limit'] = min_gate_limit
+                        tc['gate_limit'] = gate_limit
+                    
+                    # Remove gate_count_limit if invalid
+                    elif tc_kind == 'gate_count_limit':
+                        min_gate_count = solving_service._to_optional_int(tc.get('min_gate_count'))
+                        max_gate_count = solving_service._to_optional_int(tc.get('max_gate_count'))
+
+                        if min_gate_count is None and max_gate_count is None:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        if min_gate_count is not None and min_gate_count <= 0:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        if max_gate_count is not None and max_gate_count <= 0:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        if min_gate_count is not None and max_gate_count is not None and min_gate_count > max_gate_count:
+                            print(f"[FILTER] Removing invalid gate_count_limit test case (min={min_gate_count}, max={max_gate_count})")
+                            continue
+
+                        tc['min_gate_count'] = min_gate_count
+                        tc['max_gate_count'] = max_gate_count
+                    
+                    valid_test_cases.append(tc)
+                
+                # Update test_cases in config to only include valid ones
+                config_data['test_cases'] = valid_test_cases
+                print(f"[FILTER] Keeping {len(valid_test_cases)} valid test cases (removed {len(test_cases) - len(valid_test_cases)})\n")
+                
+                # Update config with difficulty if valid
+                if difficulty in ("EASY", "MEDIUM", "HARD"):
+                    config_data.setdefault('puzzle', {})['difficulty'] = difficulty
+                
+                # IMPORTANT: Always write the filtered config to file (with or without difficulty)
+                with open(config_path, 'w', encoding='utf-8') as cf:
+                    json.dump(config_data, cf, indent=2)
+
+                # ========== ALL VALIDATION PASSED - NOW SAVE TO RIDDLES ==========
+                # Add riddle_base_name to config for later file lookups
+                config_data.setdefault('puzzle', {})['riddle_base_name'] = riddle_base_name
+                
+                instructions_ext = instructions_path.suffix or '.tex'
+                final_config_path, final_instructions_path, final_solution_path, final_tests_path = build_riddle_paths(
+                    riddles_dir,
+                    riddle_base_name,
+                    instructions_ext,
+                )
+                final_config_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Write config file with riddle_base_name included
+                with open(final_config_path, 'w', encoding='utf-8') as cf:
+                    json.dump(config_data, cf, indent=2)
+                
+                shutil.copy2(instructions_path, final_instructions_path)
+                shutil.copy2(solution_path, final_solution_path)
+                
+                # Save Python tests file if provided
+                if tests_content:
+                    final_tests_path.write_bytes(tests_content)
+
+                insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id, status='unpublished')
+
+                # Get the puzzle ID that was just created (most recent by puzzle_id)
+                puzzle_result = conn.execute("""
+                    SELECT id FROM puzzles WHERE name = ? ORDER BY id DESC LIMIT 1
+                """, (puzzle_name,)).fetchone()
+                
+                puzzle_id = puzzle_result[0] if puzzle_result else None
+                
+                # COMMIT all changes before returning
+                conn.commit()
+
+                return {"message": "Puzzle created successfully", "puzzle_id": puzzle_id}
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Error during puzzle creation: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------ #
+    #  Save/Bookmark puzzle
+    # ------------------------------------------------------------------ #
+    @router.post("/{puzzle_id}/save")
+    def toggle_save_puzzle(puzzle_id: int, token: str = Depends(verify_token)):
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            # Check if puzzle is already saved
+            saved = puzzle_service.repo.list_saved_puzzles(user_id)
+            is_saved = any(p.id == puzzle_id for p in saved)
+            
+            if is_saved:
+                # Remove from saved
+                puzzle_service.repo.remove_saved_puzzle(user_id, puzzle_id)
+                puzzle_service.repo.conn.commit()
+                return {"puzzle_id": puzzle_id, "is_saved": False}
+            else:
+                # Add to saved
+                from datetime import datetime
+                created_at = datetime.utcnow().isoformat()
+                puzzle_service.repo.save_for_later(user_id, puzzle_id, created_at)
+                puzzle_service.repo.conn.commit()
+                return {"puzzle_id": puzzle_id, "is_saved": True}
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ------------------------------------------------------------------ #
+    #  Puzzle custom pieces (special gates for a puzzle)
+    # ------------------------------------------------------------------ #
+    @router.post("/{puzzle_id}/custom-pieces")
+    def create_custom_piece(
+        puzzle_id: int,
+        req: CreateCustomPieceReq,
+        token: str = Depends(verify_token)
+    ):
+        """Create a custom piece for a puzzle"""
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            
+            # Verify user is the puzzle creator
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            if puzzle.creator_user_id != user_id:
+                raise ValidationError("Only puzzle creator can add custom pieces")
+            
+            # Validate inputs/outputs limits
+            if req.num_inputs < settings.PUZZLE_CUSTOM_PIECES_MIN_INPUTS or req.num_inputs > settings.PUZZLE_CUSTOM_PIECES_MAX_INPUTS:
+                raise ValidationError(
+                    f"Inputs must be between {settings.PUZZLE_CUSTOM_PIECES_MIN_INPUTS} and {settings.PUZZLE_CUSTOM_PIECES_MAX_INPUTS}"
+                )
+            if req.num_outputs < settings.PUZZLE_CUSTOM_PIECES_MIN_OUTPUTS or req.num_outputs > settings.PUZZLE_CUSTOM_PIECES_MAX_OUTPUTS:
+                raise ValidationError(
+                    f"Outputs must be between {settings.PUZZLE_CUSTOM_PIECES_MIN_OUTPUTS} and {settings.PUZZLE_CUSTOM_PIECES_MAX_OUTPUTS}"
+                )
+            
+            if req.cost < 0:
+                raise ValidationError("Cost must be non-negative")
+            
+            # Validate piece name
+            if not req.name or not req.name.strip():
+                raise ValidationError("Piece name is required")
+            
+            # Check current count of custom pieces
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            existing_pieces = circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+            if len(existing_pieces) >= settings.PUZZLE_CUSTOM_PIECES_MAX_COUNT:
+                raise ValidationError(
+                    f"Cannot add more than {settings.PUZZLE_CUSTOM_PIECES_MAX_COUNT} custom pieces per puzzle"
+                )
+            
+            # Create the custom piece
+            from Backend.DomainLayer.Circuit import Circuit
+            
+            custom_piece = Circuit(
+                id=0,
+                user_id=user_id,
+                name=req.name,
+                cost=req.cost,
+                structure_json="",  # Empty structure for custom puzzle pieces
+                is_arsenal=True,
+                basic_gates="",  # Empty basic gates
+                truth_table=json.dumps(req.truth_table),
+                num_inputs=req.num_inputs,
+                num_outputs=req.num_outputs,
+                puzzle_id=puzzle_id,
+            )
+            
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            try:
+                custom_piece = circuit_repo.create(custom_piece)
+            except sqlite3.IntegrityError:
+                raise ValidationError("Custom piece name already exists in this puzzle")
+            
+            return custom_piece.to_dict()
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.get("/{puzzle_id}/custom-pieces")
+    def list_custom_pieces(puzzle_id: int, token: str = Depends(verify_token)):
+        """Get all custom pieces for a puzzle"""
+        try:
+            puzzle_service.auth.require_user_id(token)
+            
+            # Verify puzzle exists
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            
+            # Get custom pieces for this puzzle
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            custom_pieces = circuit_repo.list_custom_pieces_by_puzzle(puzzle_id)
+            
+            return {"data": [p.to_dict() for p in custom_pieces]}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.delete("/{puzzle_id}/custom-pieces/{piece_id}")
+    def delete_custom_piece(puzzle_id: int, piece_id: int, token: str = Depends(verify_token)):
+        """Delete a custom piece"""
+        try:
+            user_id = puzzle_service.auth.require_user_id(token)
+            
+            # Verify user is the puzzle creator
+            puzzle = puzzle_service.repo.get_by_id(puzzle_id)
+            if not puzzle:
+                raise ValidationError("Puzzle not found")
+            if puzzle.creator_user_id != user_id:
+                raise ValidationError("Only puzzle creator can delete custom pieces")
+            
+            # Verify piece belongs to this puzzle and delete it
+            from Backend.PersistantLayer.CircuitRepo import CircuitRepo
+            circuit_repo = CircuitRepo(puzzle_service.repo.conn)
+            piece = circuit_repo.get_by_id(piece_id)
+            
+            if not piece or piece.puzzle_id != puzzle_id:
+                raise ValidationError("Custom piece not found")
+            
+            circuit_repo.delete(piece_id, user_id)
+            return {"message": "Custom piece deleted successfully"}
+        except ValidationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router

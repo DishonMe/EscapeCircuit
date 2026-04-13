@@ -7,20 +7,23 @@ from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
+from Backend.PersistantLayer._db import connect
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
+from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
+from Backend.PersistantLayer.ReplyRepo import ReplyRepo
+from Backend.PersistantLayer.EngagementRepo import EngagementRepo
+from Backend.PersistantLayer.ReportRepo import ReportRepo
 
 def init_db():
     # DB in project root (src/..)
     db_path = Path(current_dir).parent / "escape_circuit.db"
     print(f"Initializing DB at: {db_path}")
-    
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
+
+    conn = connect(str(db_path))
 
     print("Creating schemas...")
     UserRepo(conn)
@@ -28,7 +31,11 @@ def init_db():
     PuzzleRepo(conn)
     RatingRepo(conn)
     SolveRepo(conn)
-    
+    DiscussionRepo(conn)
+    ReplyRepo(conn)
+    EngagementRepo(conn)
+    ReportRepo(conn)
+
     conn.commit()
     conn.close()
     print("Database initialized successfully.")

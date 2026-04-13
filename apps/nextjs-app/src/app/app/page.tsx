@@ -1,12 +1,18 @@
-import { DashboardInfo } from './_components/dashboard-info';
+'use client';
 
-export const metadata = {
-  title: 'Dashboard',
-  description: 'Dashboard',
-};
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-const DashboardPage = async () => {
-  return <DashboardInfo />;
-};
+import { paths } from '@/config/paths';
 
-export default DashboardPage;
+export default function AppPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect to puzzles page
+    router.replace(paths.app.puzzles.getHref());
+  }, [router]);
+
+  return null;
+}
+

@@ -13,6 +13,13 @@ class Circuit:
     name: str
     cost: int
     structure_json: str
+    is_arsenal: bool = False
+    basic_gates: str = ""  # JSON list of basic gates used
+    truth_table: str = ""  # JSON dict of truth table
+    num_inputs: int = 0  # Number of inputs (for arsenal pieces)
+    num_outputs: int = 0  # Number of outputs (for arsenal pieces)
+    puzzle_id: int | None = None  # For puzzle-specific custom pieces
+    description: str = ""  # Description of the component (for Arsenal pieces)
 
     def __post_init__(self) -> None:
         if self.id < 0:
@@ -23,12 +30,37 @@ class Circuit:
             raise ValidationError("Circuit.name is required")
         if self.cost < 0:
             raise ValidationError("Circuit.cost cannot be negative")
-        if not self.structure_json or not self.structure_json.strip():
-            raise ValidationError("Circuit.structure_json is required")
-        try:
-            json.loads(self.structure_json)
-        except (json.JSONDecodeError, ValueError):
-            raise ValidationError("Circuit.structure_json must be valid JSON")
+        
+        # For puzzle-specific custom pieces (puzzle_id is set), structure_json can be empty
+        if self.puzzle_id is None:
+            if not self.structure_json or not self.structure_json.strip():
+                raise ValidationError("Circuit.structure_json is required")
+            try:
+                json.loads(self.structure_json)
+            except (json.JSONDecodeError, ValueError):
+                raise ValidationError("Circuit.structure_json must be valid JSON")
+        
+        # Validate arsenal-specific fields if it's an arsenal piece
+        if self.is_arsenal:
+            # For puzzle-specific custom pieces, basic_gates and structure_json can be empty
+            if self.puzzle_id is None:
+                if not self.basic_gates or not self.basic_gates.strip():
+                    raise ValidationError("Circuit.basic_gates is required for arsenal pieces")
+                try:
+                    gates = json.loads(self.basic_gates)
+                    if not isinstance(gates, list):
+                        raise ValidationError("Circuit.basic_gates must be a JSON list")
+                except (json.JSONDecodeError, ValueError):
+                    raise ValidationError("Circuit.basic_gates must be valid JSON")
+            
+            if not self.truth_table or not self.truth_table.strip():
+                raise ValidationError("Circuit.truth_table is required for arsenal pieces")
+            try:
+                tt = json.loads(self.truth_table)
+                if not isinstance(tt, dict):
+                    raise ValidationError("Circuit.truth_table must be a JSON dict")
+            except (json.JSONDecodeError, ValueError):
+                raise ValidationError("Circuit.truth_table must be valid JSON")
 
     def get_list_of_gates(self) -> list:
         structure = json.loads(self.structure_json)
@@ -72,6 +104,51 @@ class Circuit:
             "name": self.name,
             "cost": self.cost,
             "structure_json": self.structure_json,
+            "is_arsenal": self.is_arsenal,
+            "basic_gates": self.basic_gates,
+            "truth_table": self.truth_table,
+            "num_inputs": self.num_inputs,
+            "num_outputs": self.num_outputs,
+            "puzzle_id": self.puzzle_id,
+            "description": self.description,
+        }
+
+    def to_circuit_component(self) -> dict:
+        """Convert arsenal piece or custom piece to CircuitComponent format for display/placement"""
+        total_pins = self.num_inputs + self.num_outputs
+        
+        # Parse basic_gates to get list of gate types
+        used_basic_types = []
+        if self.basic_gates:
+            try:
+                gates = json.loads(self.basic_gates)
+                used_basic_types = gates if isinstance(gates, list) else []
+            except (json.JSONDecodeError, ValueError):
+                used_basic_types = []
+        
+        # Parse solution from structure_json
+        solution = None
+        try:
+            structure = json.loads(self.structure_json) if self.structure_json else {}
+            solution = structure
+        except (json.JSONDecodeError, ValueError):
+            solution = None
+        
+        return {
+            "id": str(self.id),  # Use circuit ID as component ID for placement
+            "type": self.name,  # Use circuit name as the type/label
+            "cost": int(self.cost),
+            "pins": total_pins,
+            "basic_gates": self.basic_gates,
+            "truth_table": self.truth_table,
+            "is_arsenal": True,
+            "num_inputs": self.num_inputs,
+            "num_outputs": self.num_outputs,
+            "puzzle_id": self.puzzle_id,  # Non-null indicates custom piece, null indicates arsenal piece
+            "used_basic_types": used_basic_types,  # Array of gate types
+            "solution": solution,  # The component's internal structure
+            "hide_internal_structure": False,  # Default: show internal structure (can be customized later)
+            "description": self.description,  # Component description from database
         }
 
     @staticmethod
@@ -82,6 +159,12 @@ class Circuit:
             name=d["name"],
             cost=d["cost"],
             structure_json=d["structure_json"],
+            is_arsenal=d.get("is_arsenal", False),
+            basic_gates=d.get("basic_gates", ""),
+            truth_table=d.get("truth_table", ""),
+            num_inputs=d.get("num_inputs", 0),
+            num_outputs=d.get("num_outputs", 0),
+            puzzle_id=d.get("puzzle_id"),
         )
 
     # --- getters ---

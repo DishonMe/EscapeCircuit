@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'katex', '@radix-ui/react-icons'],
+  },
   webpack: (config) => {
     // Avoid hot reload loops when mocked-db.json changes
     const existingIgnored = config.watchOptions?.ignored;

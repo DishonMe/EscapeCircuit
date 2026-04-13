@@ -1,6 +1,17 @@
 @echo off
 echo Starting EscapeCircuit (Backend and Frontend)...
 echo.
+
+:: Kill any stale Python/uvicorn processes that may be locking the database
+echo Cleaning up stale processes...
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM uvicorn.exe >nul 2>&1
+timeout /t 2 /nobreak >nul
+:: Note: Do NOT delete WAL/SHM files — SQLite recovers them automatically
+:: and deleting them can lose committed data
+echo Done.
+echo.
+
 echo Initializing database...
 python src\init_db.py
 if errorlevel 1 (
@@ -42,13 +53,9 @@ cd ..\..
 echo.
 echo Starting servers...
 echo Press Ctrl+C to stop both servers.
+echo.
 
-:: Use npx concurrently to run both commands in the same terminal
-:: -k: kill others if one fails
-:: --names: labels for output
-:: -c: colors for output
-call npx -y concurrently -k -n "API,WEB" -c "blue,magenta" ^
-  "pip install -r requirements.txt && cd src && python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8080" ^
-  "cd apps\nextjs-app && npm run dev"
+:: Use Python helper to load .env file and start servers with environment variables
+python init_env.py
 
 pause

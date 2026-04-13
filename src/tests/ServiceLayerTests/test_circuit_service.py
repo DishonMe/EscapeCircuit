@@ -14,10 +14,16 @@ class TestCircuitServiceCreation:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
         self.mock_repo.list_by_user.return_value = []
+        # Mock conn for SQL COUNT(*) capacity check
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
         self.mock_user_repo = Mock()  # UserRepo
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()  # Fix: add missing mock_engine
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -34,12 +40,18 @@ class TestCircuitServiceCreation:
 class TestCircuitServiceSaveCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
-        self.mock_repo.list_by_user.return_value = []  # Always return a real list for list_by_user
+        self.mock_repo.list_by_user.return_value = []
+        # Mock conn for SQL COUNT(*) capacity check
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor  # Always return a real list for list_by_user
         self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_engine.compute_cost.return_value = 0  # Ensure compute_cost returns int
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -185,10 +197,16 @@ class TestCircuitServiceListMyCircuits:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
         self.mock_repo.list_by_user.return_value = []
+        # Mock conn for SQL COUNT(*) capacity check
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
         self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -233,10 +251,16 @@ class TestCircuitServiceGetCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
         self.mock_repo.list_by_user.return_value = []
+        # Mock conn for SQL COUNT(*) capacity check
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
         self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -265,7 +289,7 @@ class TestCircuitServiceGetCircuit:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.get_circuit("valid_token", 999)
-        assert "circuit not found" in str(exc_info.value)
+        assert "not found" in str(exc_info.value).lower()
 
     def test_get_circuit_forbidden(self):
         self.mock_auth.require_user_id.return_value = 1
@@ -277,7 +301,7 @@ class TestCircuitServiceGetCircuit:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.get_circuit("valid_token", 1)
-        assert "forbidden" in str(exc_info.value)
+        assert "permission" in str(exc_info.value).lower()
 
     def test_get_circuit_unauthorized(self):
         self.mock_auth.require_user_id.side_effect = ValidationError("unauthorized")
@@ -290,10 +314,16 @@ class TestCircuitServiceDeleteCircuit:
     def setup_method(self):
         self.mock_repo = Mock(spec=CircuitRepo)
         self.mock_repo.list_by_user.return_value = []
+        # Mock conn for SQL COUNT(*) capacity check
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
         self.mock_user_repo = Mock()
         self.mock_auth = Mock(spec=AuthService)
         self.mock_engine = Mock()
         self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
         self.service = CircuitService(
             self.mock_repo,
             self.mock_user_repo,
@@ -317,7 +347,7 @@ class TestCircuitServiceDeleteCircuit:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.delete_circuit("valid_token", 999)
-        assert "circuit not found" in str(exc_info.value)
+        assert "not found" in str(exc_info.value).lower()
 
     def test_delete_circuit_unauthorized(self):
         self.mock_auth.require_user_id.side_effect = ValidationError("unauthorized")

@@ -2,13 +2,17 @@ import { useQuery, queryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
-import { Discussion } from '@/types/api';
+import { Discussion, Reply } from '@/types/api';
+
+type DiscussionWithReplies = Discussion & {
+  replies: (Reply & { children?: Reply[] })[];
+};
 
 export const getDiscussion = ({
   discussionId,
 }: {
   discussionId: string;
-}): Promise<{ data: Discussion }> => {
+}): Promise<DiscussionWithReplies> => {
   return api.get(`/discussions/${discussionId}`);
 };
 
@@ -16,6 +20,8 @@ export const getDiscussionQueryOptions = (discussionId: string) => {
   return queryOptions({
     queryKey: ['discussions', discussionId],
     queryFn: () => getDiscussion({ discussionId }),
+    refetchInterval: 1000 * 60, // poll every 60s; mutations already invalidate on success
+    refetchIntervalInBackground: false, // inactive tabs stop polling
   });
 };
 

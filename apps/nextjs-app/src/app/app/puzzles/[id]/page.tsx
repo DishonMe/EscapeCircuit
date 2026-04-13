@@ -23,6 +23,7 @@ const PuzzleSolvePage = async ({
   const queryClient = new QueryClient();
 
   await queryClient.prefetchQuery(getPuzzleQueryOptions({ id: params.id }));
+  
 
   const dehydratedState = dehydrate(queryClient);
 

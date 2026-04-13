@@ -11,6 +11,64 @@ class CircuitRepo:
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self._ensure_schema()
 
+    def _table_has_legacy_unique_constraint(self) -> bool:
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='circuits'"
+        ).fetchone()
+        if not row:
+            return False
+
+        create_sql = row[0] if not isinstance(row, sqlite3.Row) else row["sql"]
+        normalized = (create_sql or "").replace(" ", "").replace("\n", "").lower()
+        return "unique(user_id,name)" in normalized
+
+    def _migrate_legacy_unique_constraint(self) -> None:
+        """Rebuild circuits table to remove legacy UNIQUE(user_id, name) constraint."""
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS circuits_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            structure_json TEXT NOT NULL,
+            is_arsenal INTEGER NOT NULL DEFAULT 0,
+            basic_gates TEXT NOT NULL DEFAULT '[]',
+            truth_table TEXT NOT NULL DEFAULT '{}',
+            num_inputs INTEGER NOT NULL DEFAULT 0,
+            num_outputs INTEGER NOT NULL DEFAULT 0,
+            puzzle_id INTEGER,
+            description TEXT NOT NULL DEFAULT ''
+        );
+        """)
+
+        self.conn.execute("""
+            INSERT INTO circuits_new(
+                id, user_id, name, cost, structure_json, is_arsenal,
+                basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+            )
+            SELECT
+                id, user_id, name, cost, structure_json, is_arsenal,
+                basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+            FROM circuits
+        """)
+
+        self.conn.execute("DROP TABLE circuits")
+        self.conn.execute("ALTER TABLE circuits_new RENAME TO circuits")
+
+    def _ensure_name_uniqueness_indexes(self) -> None:
+        # Remove old partial indexes if they exist (legacy from previous migration logic).
+        self.conn.execute("DROP INDEX IF EXISTS idx_circuits_user_arsenal_name")
+        self.conn.execute("DROP INDEX IF EXISTS idx_circuits_user_puzzle_name")
+
+        # Single uniqueness rule:
+        # - custom pieces: unique per (user_id, puzzle_id, name)
+        # - puzzle_id=NULL rows (arsenal/other user circuits): coalesced to sentinel
+        #   so they are unique per (user_id, name)
+        self.conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_circuits_user_puzzle_or_null_name
+            ON circuits(user_id, COALESCE(puzzle_id, -1), name)
+        """)
+
     def _ensure_schema(self) -> None:
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS circuits (
@@ -19,28 +77,70 @@ class CircuitRepo:
             name TEXT NOT NULL,
             cost INTEGER NOT NULL,
             structure_json TEXT NOT NULL,
-            UNIQUE(user_id, name)
+            is_arsenal INTEGER NOT NULL DEFAULT 0,
+            basic_gates TEXT NOT NULL DEFAULT '[]',
+            truth_table TEXT NOT NULL DEFAULT '{}',
+            num_inputs INTEGER NOT NULL DEFAULT 0,
+            num_outputs INTEGER NOT NULL DEFAULT 0,
+            puzzle_id INTEGER,
+            description TEXT NOT NULL DEFAULT ''
         );
         """)
+        
+        # Migrate existing DBs that lack the new columns
+        try:
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(circuits);").fetchall()}
+            if "is_arsenal" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN is_arsenal INTEGER NOT NULL DEFAULT 0;")
+            if "basic_gates" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN basic_gates TEXT NOT NULL DEFAULT '[]';")
+            if "truth_table" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN truth_table TEXT NOT NULL DEFAULT '{}';")
+            if "num_inputs" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN num_inputs INTEGER NOT NULL DEFAULT 0;")
+            if "num_outputs" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN num_outputs INTEGER NOT NULL DEFAULT 0;")
+            if "puzzle_id" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN puzzle_id INTEGER;")
+            if "description" not in cols:
+                self.conn.execute("ALTER TABLE circuits ADD COLUMN description TEXT NOT NULL DEFAULT '';")
 
-    def create(self, circuit: Circuit) -> Circuit:
+            if self._table_has_legacy_unique_constraint():
+                self._migrate_legacy_unique_constraint()
+
+            self._ensure_name_uniqueness_indexes()
+            self.conn.commit()
+        except Exception:
+            pass
+
+    def create(self, circuit: Circuit, commit: bool = True) -> Circuit:
         cur = self.conn.execute("""
-            INSERT INTO circuits(user_id, name, cost, structure_json)
-            VALUES(?,?,?,?)
-        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json))
+            INSERT INTO circuits(user_id, name, cost, structure_json, is_arsenal, basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
+        """, (circuit.user_id, circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.description))
         circuit.id = int(cur.lastrowid)
+        if commit:
+            self.conn.commit()
         return circuit
 
     def get_by_id(self, circuit_id: int) -> Optional[Circuit]:
         row = self.conn.execute("SELECT * FROM circuits WHERE id=?", (circuit_id,)).fetchone()
         if not row:
             return None
+        
         return Circuit(
             id=int(row["id"]),
             user_id=int(row["user_id"]),
             name=row["name"],
             cost=int(row["cost"]),
             structure_json=row["structure_json"],
+            is_arsenal=bool(row["is_arsenal"]),
+            basic_gates=row["basic_gates"] or "",
+            truth_table=row["truth_table"] or "",
+            num_inputs=int(row["num_inputs"] or 0),
+            num_outputs=int(row["num_outputs"] or 0),
+            puzzle_id=int(row["puzzle_id"]) if row["puzzle_id"] else None,
+            description=row["description"] or "",
         )
 
     def list_by_user(self, user_id: int) -> List[Circuit]:
@@ -54,10 +154,82 @@ class CircuitRepo:
                 name=r["name"],
                 cost=int(r["cost"]),
                 structure_json=r["structure_json"],
+                is_arsenal=bool(r["is_arsenal"]),
+                basic_gates=r["basic_gates"] or "",
+                truth_table=r["truth_table"] or "",
+                num_inputs=int(r["num_inputs"] or 0),
+                num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
             )
             for r in rows
         ]
 
     def delete(self, circuit_id: int, user_id: int) -> bool:
         cur = self.conn.execute("DELETE FROM circuits WHERE id=? AND user_id=?", (circuit_id, user_id))
+        self.conn.commit()
         return cur.rowcount > 0
+
+    def list_arsenal_by_user(self, user_id: int) -> List[Circuit]:
+        """List only arsenal pieces for a user"""
+        rows = self.conn.execute("""
+            SELECT * FROM circuits WHERE user_id=? AND is_arsenal=1 ORDER BY id DESC
+        """, (user_id,)).fetchall()
+        return [
+            Circuit(
+                id=int(r["id"]),
+                user_id=int(r["user_id"]),
+                name=r["name"],
+                cost=int(r["cost"]),
+                structure_json=r["structure_json"],
+                is_arsenal=bool(r["is_arsenal"]),
+                basic_gates=r["basic_gates"] or "",
+                truth_table=r["truth_table"] or "",
+                num_inputs=int(r["num_inputs"] or 0),
+                num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
+            )
+            for r in rows
+        ]
+
+    def update(self, circuit: Circuit) -> bool:
+        """Update an existing circuit"""
+        cur = self.conn.execute("""
+            UPDATE circuits 
+            SET name=?, cost=?, structure_json=?, is_arsenal=?, basic_gates=?, truth_table=?, num_inputs=?, num_outputs=?, puzzle_id=?, description=?
+            WHERE id=? AND user_id=?
+        """, (circuit.name, circuit.cost, circuit.structure_json, int(circuit.is_arsenal), 
+              circuit.basic_gates, circuit.truth_table, circuit.num_inputs, circuit.num_outputs, circuit.puzzle_id, circuit.description, circuit.id, circuit.user_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def list_custom_pieces_by_puzzle(self, puzzle_id: int) -> List[Circuit]:
+        """List custom pieces for a specific puzzle"""
+        rows = self.conn.execute("""
+            SELECT * FROM circuits WHERE puzzle_id=? ORDER BY id DESC
+        """, (puzzle_id,)).fetchall()
+        return [
+            Circuit(
+                id=int(r["id"]),
+                user_id=int(r["user_id"]),
+                name=r["name"],
+                cost=int(r["cost"]),
+                structure_json=r["structure_json"],
+                is_arsenal=bool(r["is_arsenal"]),
+                basic_gates=r["basic_gates"] or "",
+                truth_table=r["truth_table"] or "",
+                num_inputs=int(r["num_inputs"] or 0),
+                num_outputs=int(r["num_outputs"] or 0),
+                puzzle_id=int(r["puzzle_id"]) if r["puzzle_id"] else None,
+                description=r["description"] or "",
+            )
+            for r in rows
+        ]
+
+    def count_user_components(self, user_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) FROM circuits WHERE user_id = ? AND is_arsenal = 1",
+            (int(user_id),),
+        ).fetchone()
+        return int(row[0]) if row else 0

@@ -1,9 +1,0 @@
-{
-    "puzzle": {
-        "name": "Test Puzzle",
-        "budget": 100,
-        "time_limit_seconds": 60,
-        "default_gate_set": []
-    },
-    "test_cases": []
-}

@@ -27,10 +27,14 @@ export const getUser = async (): Promise<User> => {
 const userQueryKey = ['user'];
 
 export const getUserQueryOptions = () => {
+  const hasToken = typeof window !== 'undefined'
+    ? !!Cookies.get(AUTH_TOKEN_COOKIE_NAME)
+    : false;
   return queryOptions({
     queryKey: userQueryKey,
     queryFn: getUser,
     retry: false,
+    enabled: hasToken,
   });
 };
 
@@ -74,7 +78,8 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   return useMutation({
     mutationFn: logout,
     onSettled: () => {
-      queryClient.removeQueries({ queryKey: userQueryKey });
+      // Clear ALL cached queries so the next user gets fresh data
+      queryClient.removeQueries();
       Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
       onSuccess?.();
     },
@@ -92,7 +97,7 @@ export const loginInputSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginInputSchema>;
 const loginWithEmailAndPassword = (data: LoginInput): Promise<AuthResponse> => {
-  return api.post('/users/login', data);
+  return api.post('/users/login', data, { suppressErrorNotification: true });
 };
 
 export const registerInputSchema = z.object({
@@ -106,5 +111,70 @@ export type RegisterInput = z.infer<typeof registerInputSchema>;
 const registerWithEmailAndPassword = (
   data: RegisterInput,
 ): Promise<AuthResponse> => {
-  return api.post('/users/register', data);
+  return api.post('/users/register', data, { suppressErrorNotification: true });
+};
+
+// --- Google Login ---
+
+const loginWithGoogle = (token: string): Promise<any> => {
+  return api.post('/users/google-login', { token }, { suppressErrorNotification: true });
+};
+
+const completeGoogleRegistration = (data: {
+  token: string;
+  username: string;
+  password: string;
+}): Promise<AuthResponse> => {
+  return api.post('/users/google-complete-registration', data, { suppressErrorNotification: true });
+};
+
+export const useGoogleLogin = ({
+  onSuccess,
+  onError,
+  onNeedsPassword,
+}: {
+  onSuccess?: () => void;
+  onError?: (error: any) => void;
+  onNeedsPassword?: (data: { email: string; name: string; token: string }) => void;
+}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: loginWithGoogle,
+    onSuccess: (data) => {
+      // Check if this is an incomplete registration requiring password setup
+      if (data.requires_password) {
+        onNeedsPassword?.(data);
+        return;
+      }
+
+      // Normal successful login
+      queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      onSuccess?.();
+    },
+    onError: (error) => {
+      onError?.(error);
+    },
+  });
+};
+
+export const useCompleteGoogleRegistration = ({
+  onSuccess,
+  onError,
+}: {
+  onSuccess?: () => void;
+  onError?: (error: any) => void;
+}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: completeGoogleRegistration,
+    onSuccess: (data) => {
+      queryClient.setQueryData(userQueryKey, data.user);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      onSuccess?.();
+    },
+    onError: (error) => {
+      onError?.(error);
+    },
+  });
 };

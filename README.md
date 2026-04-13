@@ -95,9 +95,11 @@ EscapeCircuit/
 │   └── seed_admin.py                  # Create admin user
 │
 ├── riddles/                            # Puzzle definitions & tests
-│   ├── riddle_01_binary_adder_*       # Sample puzzles
-│   ├── test.py                        # Puzzle validation tests
-│   └── solution.json                  # Expected solutions
+│   ├── riddle_01_binary_adder          # Sample
+│       ├── riddle_01_binary_adder_config.json
+│       ├── riddle_01_binary_adder_instructions.tex
+│       ├── riddle_01_binary_adder_sample_solution.json
+│   ├── riddle_02_half_adder            # etc..
 │
 ├── docs/                               # Documentation
 │   ├── FEATURES.md                    # Feature overview
@@ -113,6 +115,16 @@ Copy `.env.example` to `.env` in `apps/nextjs-app` and adjust:
 
 - `NEXT_PUBLIC_API_URL` — API base (default `http://localhost:8080/api`)
 - `NEXT_PUBLIC_URL` — app origin (default `http://localhost:3000`)
+
+## Seeded Puzzles
+
+- Binary Adder Quiz: Full-adder logic with restricted gates.
+- Half Adder Quiz: Two-bit sum/carry combinational challenge.
+- Sequential Binary Adder Quiz: Bit-stream addition across cycles.
+- Palindrome Detector: Detect palindromic 4-bit patterns.
+- 2-Bit Comparator: Compute GT/EQ/LT for two 2-bit values.
+- Full Adder Circuit1: Alternate full-adder implementation challenge.
+- Twice 2 Bits in 3 Bits: Decode write-once 3-bit memory snapshots.
 
 ## Documentation
 

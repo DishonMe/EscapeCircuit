@@ -4,15 +4,17 @@ import { AdminGuard } from './_components/admin-guard';
 import { Users } from './_components/users';
 
 export const metadata = {
-  title: 'Users',
-  description: 'Users',
+  title: 'Admin Panel',
+  description: 'Admin Panel - Manage users, puzzles, and view audit log',
 };
 
 const UsersPage = () => {
   return (
-    <ContentLayout title="Users">
+    <ContentLayout title="Admin Panel">
       <AdminGuard>
-        <Users />
+        <div className="space-y-4 text-foreground">
+          <Users />
+        </div>
       </AdminGuard>
     </ContentLayout>
   );

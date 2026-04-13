@@ -33,8 +33,8 @@ export const CreatorCommentDialog = ({
           <DialogDescription>Notes from the puzzle creator.</DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto text-sm text-gray-700">
-          <div className="font-medium text-gray-900">Creator comment</div>
+        <div className="max-h-[60vh] overflow-y-auto text-[13px] text-muted-foreground">
+          <div className="font-medium text-foreground">Creator comment</div>
           <div className="mt-1 whitespace-pre-wrap">
             {puzzle?.creatorComment}
           </div>
@@ -47,7 +47,7 @@ export const CreatorCommentDialog = ({
           {showLink && puzzle ? (
             <Link
               href={`/app/puzzles/${puzzle.id}`}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
             >
               Go to puzzle
             </Link>

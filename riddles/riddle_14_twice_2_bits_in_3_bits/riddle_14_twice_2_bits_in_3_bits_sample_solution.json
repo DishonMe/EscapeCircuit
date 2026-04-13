@@ -1,0 +1,1139 @@
+{
+  "totalCost": 37,
+  "eval_map": {
+    "{\"LSB - in\":0,\"MSB - in\":0}": {
+      "MSB - out": 0,
+      "LSB - out": 0
+    },
+    "{\"LSB - in\":1,\"MSB - in\":0}": {
+      "MSB - out": 0,
+      "LSB - out": 0
+    },
+    "{\"LSB - in\":1,\"MSB - in\":1}": {
+      "MSB - out": 0,
+      "LSB - out": 0
+    },
+    "{\"LSB - in\":0,\"MSB - in\":1}": {
+      "MSB - out": 0,
+      "LSB - out": 0
+    }
+  },
+  "circuit": {
+    "placed": [
+      {
+        "id": "OR:1775996519249",
+        "componentId": "OR",
+        "origin": {
+          "row": 7,
+          "col": 22
+        },
+        "rotation": 0
+      },
+      {
+        "id": "OR:1775996536864",
+        "componentId": "OR",
+        "origin": {
+          "row": 7,
+          "col": 26
+        },
+        "rotation": 0
+      },
+      {
+        "id": "NOT:1775996630129",
+        "componentId": "NOT",
+        "origin": {
+          "row": 6,
+          "col": 26
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775996714141",
+        "componentId": "AND",
+        "origin": {
+          "row": 0,
+          "col": 5
+        },
+        "rotation": 0
+      },
+      {
+        "id": "NOT:1775996728092",
+        "componentId": "NOT",
+        "origin": {
+          "row": 3,
+          "col": 2
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775996737394",
+        "componentId": "AND",
+        "origin": {
+          "row": 2,
+          "col": 5
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775996750232",
+        "componentId": "AND",
+        "origin": {
+          "row": 4,
+          "col": 5
+        },
+        "rotation": 0
+      },
+      {
+        "id": "NOT:1775996752569",
+        "componentId": "NOT",
+        "origin": {
+          "row": 1,
+          "col": 0
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775996812114",
+        "componentId": "XOR",
+        "origin": {
+          "row": 6,
+          "col": 0
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997045855",
+        "componentId": "AND",
+        "origin": {
+          "row": 6,
+          "col": 4
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775997131210",
+        "componentId": "XOR",
+        "origin": {
+          "row": 6,
+          "col": 7
+        },
+        "rotation": 0
+      },
+      {
+        "id": "NOT:1775997138521",
+        "componentId": "NOT",
+        "origin": {
+          "row": 8,
+          "col": 0
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997172320",
+        "componentId": "AND",
+        "origin": {
+          "row": 8,
+          "col": 4
+        },
+        "rotation": 0
+      },
+      {
+        "id": "NOT:1775997176755",
+        "componentId": "NOT",
+        "origin": {
+          "row": 8,
+          "col": 17
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775997214897",
+        "componentId": "XOR",
+        "origin": {
+          "row": 9,
+          "col": 8
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997301689",
+        "componentId": "AND",
+        "origin": {
+          "row": 11,
+          "col": 4
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775997385895",
+        "componentId": "XOR",
+        "origin": {
+          "row": 12,
+          "col": 8
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997410828",
+        "componentId": "AND",
+        "origin": {
+          "row": 14,
+          "col": 3
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775997504522",
+        "componentId": "XOR",
+        "origin": {
+          "row": 14,
+          "col": 8
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1775997555800",
+        "componentId": "XOR",
+        "origin": {
+          "row": 16,
+          "col": 8
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997740865",
+        "componentId": "AND",
+        "origin": {
+          "row": 0,
+          "col": 11
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997742412",
+        "componentId": "AND",
+        "origin": {
+          "row": 2,
+          "col": 11
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997748510",
+        "componentId": "AND",
+        "origin": {
+          "row": 4,
+          "col": 11
+        },
+        "rotation": 0
+      },
+      {
+        "id": "OR:1775997812892",
+        "componentId": "OR",
+        "origin": {
+          "row": 0,
+          "col": 17
+        },
+        "rotation": 0
+      },
+      {
+        "id": "OR:1775997818482",
+        "componentId": "OR",
+        "origin": {
+          "row": 2,
+          "col": 17
+        },
+        "rotation": 0
+      },
+      {
+        "id": "OR:1775997820807",
+        "componentId": "OR",
+        "origin": {
+          "row": 4,
+          "col": 17
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997839937",
+        "componentId": "AND",
+        "origin": {
+          "row": 12,
+          "col": 12
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997853342",
+        "componentId": "AND",
+        "origin": {
+          "row": 15,
+          "col": 13
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1775997858243",
+        "componentId": "AND",
+        "origin": {
+          "row": 18,
+          "col": 14
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1776011323555",
+        "componentId": "XOR",
+        "origin": {
+          "row": 14,
+          "col": 27
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1776011326769",
+        "componentId": "XOR",
+        "origin": {
+          "row": 16,
+          "col": 27
+        },
+        "rotation": 0
+      },
+      {
+        "id": "wonce:1776014992020",
+        "componentId": "wonce",
+        "origin": {
+          "row": 11,
+          "col": 21
+        },
+        "rotation": 0
+      },
+      {
+        "id": "wonce:1776015087080",
+        "componentId": "wonce",
+        "origin": {
+          "row": 13,
+          "col": 21
+        },
+        "rotation": 0
+      },
+      {
+        "id": "wonce:1776015151643",
+        "componentId": "wonce",
+        "origin": {
+          "row": 15,
+          "col": 20
+        },
+        "rotation": 0
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire:1775996538669",
+        "from": {
+          "componentId": "OR:1775996519249",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996633073",
+        "from": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "NOT:1775996630129",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996715791",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1775996714141",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996716634",
+        "from": {
+          "componentId": "IO:IN:LSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1775996714141",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775996729864",
+        "from": {
+          "componentId": "IO:IN:LSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "NOT:1775996728092",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996738872",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1775996737394",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996740158",
+        "from": {
+          "componentId": "NOT:1775996728092",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775996737394",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775996754645",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "NOT:1775996752569",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996756416",
+        "from": {
+          "componentId": "NOT:1775996752569",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775996750232",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996758326",
+        "from": {
+          "componentId": "IO:IN:LSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1775996750232",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775996813901",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XOR:1775996812114",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775996815785",
+        "from": {
+          "componentId": "IO:IN:LSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XOR:1775996812114",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997054645",
+        "from": {
+          "componentId": "XOR:1775996812114",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997045855",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997132909",
+        "from": {
+          "componentId": "AND:1775997045855",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997131210",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997139998",
+        "from": {
+          "componentId": "XOR:1775996812114",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "NOT:1775997138521",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997184821",
+        "from": {
+          "componentId": "NOT:1775997176755",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997172320",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997186919",
+        "from": {
+          "componentId": "NOT:1775997138521",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997172320",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997199872",
+        "from": {
+          "componentId": "AND:1775997172320",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997131210",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997222750",
+        "from": {
+          "componentId": "XOR:1775997131210",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997214897",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997304565",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:1775997301689",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997379086",
+        "from": {
+          "componentId": "AND:1775997301689",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997214897",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997387220",
+        "from": {
+          "componentId": "XOR:1775997214897",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997385895",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997422762",
+        "from": {
+          "componentId": "NOT:1775996752569",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997410828",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997430299",
+        "from": {
+          "componentId": "AND:1775997410828",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997385895",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997507029",
+        "from": {
+          "componentId": "XOR:1775997385895",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997504522",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997536781",
+        "from": {
+          "componentId": "IO:IN:MSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XOR:1775997504522",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997627620",
+        "from": {
+          "componentId": "XOR:1775997385895",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1775997555800",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997662371",
+        "from": {
+          "componentId": "IO:IN:LSB - in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XOR:1775997555800",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997751670",
+        "from": {
+          "componentId": "NOT:1775996630129",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997740865",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997754514",
+        "from": {
+          "componentId": "NOT:1775996630129",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997742412",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997761967",
+        "from": {
+          "componentId": "NOT:1775996630129",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997748510",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997776869",
+        "from": {
+          "componentId": "AND:1775996714141",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997740865",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997778523",
+        "from": {
+          "componentId": "AND:1775996737394",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997742412",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997780012",
+        "from": {
+          "componentId": "AND:1775996750232",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997748510",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997825426",
+        "from": {
+          "componentId": "AND:1775997740865",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997812892",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997827312",
+        "from": {
+          "componentId": "AND:1775997742412",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997818482",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997830161",
+        "from": {
+          "componentId": "AND:1775997748510",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997820807",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997880590",
+        "from": {
+          "componentId": "XOR:1775997385895",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997839937",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997917958",
+        "from": {
+          "componentId": "XOR:1775997504522",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997853342",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997919697",
+        "from": {
+          "componentId": "XOR:1775997555800",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997858243",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775997926791",
+        "from": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997839937",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997935790",
+        "from": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997853342",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775997940178",
+        "from": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997858243",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1775998001583",
+        "from": {
+          "componentId": "AND:1775997839937",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997812892",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775998004440",
+        "from": {
+          "componentId": "AND:1775997853342",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997818482",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1775998007858",
+        "from": {
+          "componentId": "AND:1775997858243",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775997820807",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776011354764",
+        "from": {
+          "componentId": "XOR:1776011323555",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:MSB - out",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      },
+      {
+        "id": "wire:1776011357312",
+        "from": {
+          "componentId": "XOR:1776011326769",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:LSB - out",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      },
+      {
+        "id": "wire:1776015014492",
+        "from": {
+          "componentId": "OR:1775997812892",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "wonce:1776014992020",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015036975",
+        "from": {
+          "componentId": "wonce:1776014992020",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997045855",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015041569",
+        "from": {
+          "componentId": "wonce:1776014992020",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775996519249",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015056669",
+        "from": {
+          "componentId": "wonce:1776014992020",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1776011326769",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015064330",
+        "from": {
+          "componentId": "wonce:1776014992020",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1776011323555",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015096604",
+        "from": {
+          "componentId": "OR:1775997818482",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "wonce:1776015087080",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015111959",
+        "from": {
+          "componentId": "wonce:1776015087080",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "NOT:1775997176755",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015123944",
+        "from": {
+          "componentId": "wonce:1776015087080",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997410828",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015131720",
+        "from": {
+          "componentId": "wonce:1776015087080",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775996519249",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015141065",
+        "from": {
+          "componentId": "wonce:1776015087080",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1776011323555",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015161000",
+        "from": {
+          "componentId": "OR:1775997820807",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "wonce:1776015151643",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776015170679",
+        "from": {
+          "componentId": "wonce:1776015151643",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1776011326769",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015185526",
+        "from": {
+          "componentId": "wonce:1776015151643",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1775997301689",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776015193239",
+        "from": {
+          "componentId": "wonce:1776015151643",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "OR:1775996536864",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      }
+    ]
+  }
+}

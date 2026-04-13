@@ -1,0 +1,36 @@
+\section*{wonce Instructions}
+
+\subsection*{Objective}
+Build a memory circuit that stores 2 bits and outputs the previous cycle's input with a delay of one cycle.
+
+\subsection*{What You Are Building}
+Each cycle gives you two input streams, \texttt{MSB - in} and \texttt{LSB - in}.  
+Your circuit must remember these bits and show them on the outputs one cycle later.
+
+\subsection*{Wonce}
+A shared Arsenal piece named \texttt{wonce} is available.  
+It stores a single bit, and once it becomes \texttt{1}, it stays \texttt{1} forever.  
+You may use at most three \texttt{wonce} pieces.
+
+\subsection*{Outputs}
+The circuit must produce two output streams:
+\begin{itemize}
+  \item \texttt{MSB - out}
+  \item \texttt{LSB - out}
+\end{itemize}
+
+These outputs should match the previous cycle's input values.  
+The first cycle is a ghost cycle, so both outputs should start at \texttt{0}.
+
+\subsection*{Puzzle Goal}
+Store the incoming 2-bit value and read it back one cycle later.
+
+\subsection*{Constraints}
+\begin{itemize}
+  \item Use at most three \texttt{wonce} pieces.
+  \item Can not use raw DFF gates in the solver circuit.
+  \item The circuit will be tested over two cycles per case.
+\end{itemize}
+
+\subsection*{Evaluation}
+Your solution must match the expected output streams for every test case.

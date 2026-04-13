@@ -74,7 +74,7 @@ export const RegisterForm = ({
         <div className="text-sm">
           <NextLink
             href={paths.auth.login.getHref(redirectTo)}
-            className="font-medium text-blue-600 hover:text-blue-500"
+            className="font-medium text-foreground underline underline-offset-4 hover:text-foreground/80"
           >
             Log In
           </NextLink>

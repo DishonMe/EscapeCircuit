@@ -478,3 +478,85 @@ class TestPuzzleSetters:
         puzzle = Puzzle(id=1, name="Test", creator_user_id=1)
         puzzle.set_avg_clearness(4.2)
         assert puzzle.avg_clearness == 4.2
+
+
+class TestPuzzleCreatorBudget:
+    """Tests for creator_budget field validation and behaviour."""
+
+    def test_creator_budget_none_by_default(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100)
+        assert puzzle.creator_budget is None
+
+    def test_create_puzzle_with_valid_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=5)
+        assert puzzle.creator_budget == 5
+
+    def test_creator_budget_must_be_less_than_budget(self):
+        with pytest.raises(ValidationError) as exc_info:
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=10, creator_budget=10)
+        assert "creator_budget" in str(exc_info.value).lower() or "budget" in str(exc_info.value).lower()
+
+    def test_creator_budget_greater_than_budget_raises(self):
+        with pytest.raises(ValidationError):
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=10, creator_budget=15)
+
+    def test_creator_budget_negative_raises(self):
+        with pytest.raises(ValidationError):
+            Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=-1)
+
+    def test_creator_budget_zero_is_valid(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=100, creator_budget=0)
+        assert puzzle.creator_budget == 0
+
+    def test_creator_budget_one_valid(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=5, creator_budget=1)
+        assert puzzle.creator_budget == 1
+
+    def test_get_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50, creator_budget=8)
+        assert puzzle.get_creator_budget() == 8
+
+    def test_get_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50)
+        assert puzzle.get_creator_budget() is None
+
+    def test_set_creator_budget_valid(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50)
+        puzzle.set_creator_budget(10)
+        assert puzzle.creator_budget == 10
+
+    def test_set_creator_budget_none_clears_it(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50, creator_budget=10)
+        puzzle.set_creator_budget(None)
+        assert puzzle.creator_budget is None
+
+    def test_set_creator_budget_exceeds_budget_raises(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=10)
+        with pytest.raises(ValidationError):
+            puzzle.set_creator_budget(10)  # must be strictly less than budget
+
+    def test_to_dict_includes_creator_budget(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50, creator_budget=8)
+        d = puzzle.to_dict()
+        assert d.get("creator_budget") == 8 or d.get("creatorBudget") == 8
+
+    def test_to_dict_creator_budget_none(self):
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=1, budget=50)
+        d = puzzle.to_dict()
+        assert d.get("creator_budget") is None or d.get("creatorBudget") is None
+
+    def test_from_dict_reads_creator_budget(self):
+        d = {"id": 1, "name": "Test", "creator_user_id": 1, "budget": 50, "creator_budget": 8}
+        puzzle = Puzzle.from_dict(d)
+        assert puzzle.creator_budget == 8
+
+    def test_from_dict_reads_camel_case_creator_budget(self):
+        d = {"id": 1, "name": "Test", "creator_user_id": 1, "budget": 50, "creatorBudget": 8}
+        puzzle = Puzzle.from_dict(d)
+        assert puzzle.creator_budget == 8
+
+    def test_roundtrip_with_creator_budget(self):
+        original = Puzzle(id=1, name="Roundtrip", creator_user_id=1, budget=100, creator_budget=7)
+        d = original.to_dict()
+        restored = Puzzle.from_dict(d)
+        assert restored.creator_budget == original.creator_budget

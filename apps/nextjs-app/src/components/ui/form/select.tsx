@@ -26,7 +26,7 @@ export const Select = (props: SelectFieldProps) => {
     <FieldWrapper label={label} error={error}>
       <select
         className={cn(
-          'mt-1 block w-full rounded-md border-gray-600 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm',
+          'mt-1 block w-full rounded-lg border border-border bg-transparent py-2 pl-3 pr-10 text-[13px] focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors',
           className,
         )}
         defaultValue={defaultValue}

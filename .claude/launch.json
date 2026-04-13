@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "./venv/bin/python3",
+      "runtimeArgs": ["-m", "uvicorn", "Backend.main:app", "--reload", "--host", "127.0.0.1", "--port", "8080", "--app-dir", "src"],
+      "port": 8080,
+      "autoPort": false
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && cd apps/nextjs-app && npm run dev -- --hostname 127.0.0.1"],
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}
