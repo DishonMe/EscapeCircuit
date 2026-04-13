@@ -11,19 +11,33 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+DEFAULT_GOOGLE_CLIENT_ID = "your_google_client_id_here"
+
 def load_env_file(env_path: str = "apps/nextjs-app/.env"):
     """Load environment variables from .env file and extract GOOGLE_CLIENT_ID"""
-    if not os.path.exists(env_path):
-        print(f"ERROR: {env_path} file not found!")
-        print("\nSetup required:")
-        print("1. Edit apps/nextjs-app/.env")
-        print("2. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID with your actual Google Client ID")
-        print("3. See HOWTORUN.md for more details")
-        return False
-    
+    env_file = Path(env_path)
+    example_file = env_file.with_name(".env.example")
+
+    if not env_file.exists():
+        if example_file.exists():
+            env_file.write_text(example_file.read_text(encoding="utf-8"), encoding="utf-8")
+            print(f"Created {env_path} from {example_file.name}.")
+        else:
+            env_file.parent.mkdir(parents=True, exist_ok=True)
+            env_file.write_text(
+                "NEXT_PUBLIC_API_URL=http://localhost:8080/api\n"
+                "NEXT_PUBLIC_ENABLE_API_MOCKING=false\n"
+                "NEXT_PUBLIC_MOCK_API_PORT=8080\n"
+                "NEXT_PUBLIC_URL=http://localhost:3000\n",
+                encoding="utf-8",
+            )
+            print(f"Created {env_path} with default frontend settings.")
+
     google_client_id = None
+    found_google_client_id = False
     
-    with open(env_path, 'r') as f:
+    with env_file.open('r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             # Skip comments and empty lines
@@ -43,14 +57,24 @@ def load_env_file(env_path: str = "apps/nextjs-app/.env"):
                 
                 # Look for NEXT_PUBLIC_GOOGLE_CLIENT_ID and set GOOGLE_CLIENT_ID for backend
                 if key == "NEXT_PUBLIC_GOOGLE_CLIENT_ID":
+                    found_google_client_id = True
                     google_client_id = value
                     os.environ["GOOGLE_CLIENT_ID"] = value
+                    os.environ["NEXT_PUBLIC_GOOGLE_CLIENT_ID"] = value
                     print(f"Loaded: GOOGLE_CLIENT_ID from NEXT_PUBLIC_GOOGLE_CLIENT_ID")
     
     if not google_client_id:
-        print(f"ERROR: NEXT_PUBLIC_GOOGLE_CLIENT_ID not found in {env_path}!")
-        print("Edit the file and set your Google Client ID")
-        return False
+        google_client_id = DEFAULT_GOOGLE_CLIENT_ID
+        os.environ["GOOGLE_CLIENT_ID"] = google_client_id
+        os.environ["NEXT_PUBLIC_GOOGLE_CLIENT_ID"] = google_client_id
+        if not found_google_client_id:
+            existing_text = env_file.read_text(encoding='utf-8')
+            with env_file.open('a', encoding='utf-8') as f:
+                if existing_text and not existing_text.endswith('\n'):
+                    f.write('\n')
+                f.write('NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here\n')
+            print(f"Added placeholder NEXT_PUBLIC_GOOGLE_CLIENT_ID to {env_path}.")
+        print("Google OAuth is not configured; continuing with login disabled.")
     
     return True
 
