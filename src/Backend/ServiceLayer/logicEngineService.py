@@ -455,9 +455,12 @@ class logicEngineService:
                 return None
             root = find(pin_key)
             value = net_values.get(root)
-            if value is None:
-                return None
-            macro_inputs[f"in{i}"] = int(value)
+            # For stateful macros in feedback topologies (e.g., wonce),
+            # the D input can be temporarily unresolved while the Q output
+            # should still be readable from preserved state. Using 0 for
+            # unresolved macro inputs lets the iterative solver converge
+            # instead of deadlocking macro evaluation for the whole cycle.
+            macro_inputs[f"in{i}"] = int(value) if value is not None else 0
 
         # Pass persisted nested state to this macro instance.
         macro_state_prefix = f"{cid}::"

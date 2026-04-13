@@ -208,7 +208,7 @@ def create_app() -> FastAPI:
     app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service, admin_service))
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router(admin_service))
-    app.include_router(build_debugger_router(logic_engine))
+    app.include_router(build_debugger_router(logic_engine, circuit_repo))
 
     # Discussion & Reply routers
     disc_router, reply_router, puzzle_disc_router, report_router = build_discussion_router(
