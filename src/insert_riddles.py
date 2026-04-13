@@ -126,6 +126,34 @@ def normalize_truth_table(truth_table):
     
     return normalized
 
+def resolve_shared_arsenal_ids(raw_ids, shared_piece_ids_by_name, conn, creator_id):
+    resolved_ids = []
+    for raw_id in raw_ids or []:
+        if raw_id is None:
+            continue
+        if isinstance(raw_id, int):
+            resolved_ids.append(raw_id)
+            continue
+        raw_text = str(raw_id).strip()
+        if not raw_text:
+            continue
+        if raw_text.isdigit():
+            resolved_ids.append(int(raw_text))
+            continue
+
+        if raw_text in shared_piece_ids_by_name:
+            resolved_ids.append(int(shared_piece_ids_by_name[raw_text]))
+            continue
+
+        row = conn.execute(
+            "SELECT id FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1 ORDER BY id DESC LIMIT 1",
+            (int(creator_id), raw_text),
+        ).fetchone()
+        if row:
+            resolved_ids.append(int(row[0]))
+
+    return resolved_ids
+
 def iter_riddle_config_paths(riddles_dir):
     """Yield all riddle config file paths from nested or legacy layouts."""
     if not os.path.exists(riddles_dir):
@@ -211,6 +239,60 @@ def get_or_create_admin(conn):
 def insert_riddle(conn, config_path, instructions_path, creator_id, status='published'):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
+
+    c = conn.cursor()
+
+    shared_arsenal_pieces = config.get('shared_arsenal_pieces') or []
+    if not isinstance(shared_arsenal_pieces, list):
+        shared_arsenal_pieces = []
+
+    shared_piece_ids_by_name = {}
+    if shared_arsenal_pieces:
+        for shared_piece in shared_arsenal_pieces:
+            if not isinstance(shared_piece, dict):
+                continue
+            name = (shared_piece.get('name') or '').strip()
+            if not name:
+                continue
+
+            existing_shared = conn.execute(
+                "SELECT id FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1",
+                (int(creator_id), name),
+            ).fetchone()
+            if existing_shared:
+                conn.execute(
+                    "DELETE FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1",
+                    (int(creator_id), name),
+                )
+
+            structure = shared_piece.get('structure') or shared_piece.get('structure_json') or {
+                "placedComponents": [],
+                "wires": [],
+            }
+            structure_json = structure if isinstance(structure, str) else json.dumps(structure)
+            basic_gates = shared_piece.get('basic_gates', shared_piece.get('basicGates', []))
+            truth_table = normalize_truth_table(shared_piece.get('truth_table', {}))
+
+            c.execute(
+                """
+                INSERT INTO circuits(
+                    user_id, name, cost, structure_json, is_arsenal,
+                    basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, NULL, ?)
+                """,
+                (
+                    int(creator_id),
+                    name,
+                    int(shared_piece.get('cost', shared_piece.get('value', 0)) or 0),
+                    structure_json,
+                    json.dumps(basic_gates if isinstance(basic_gates, list) else []),
+                    json.dumps(truth_table),
+                    int(shared_piece.get('num_inputs', 0) or 0),
+                    int(shared_piece.get('num_outputs', 0) or 0),
+                    (shared_piece.get('description') or '').strip(),
+                ),
+            )
+            shared_piece_ids_by_name[name] = c.lastrowid
     
     instructions_text = ""
     if os.path.exists(instructions_path):
@@ -250,14 +332,20 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         "Sequential Adder": "MEDIUM",
         "Palindrome Detector": "EASY",
         "2-Bit Comparator": "HARD",
+        "Twice 2 bits in 3 bits": "HARD",
     }
     difficulty = puzzle_data.get('difficulty', SEED_DIFFICULTY.get(puzzle_data['name'], 'EASY'))
     
     # Get description from config file or use instructions_text as fallback
     description = puzzle_data.get('description', instructions_text)
     
-    c = conn.cursor()
-    
+    allowed_arsenal_component_ids = resolve_shared_arsenal_ids(
+        puzzle_data.get('allowed_arsenal_component_ids') or [],
+        shared_piece_ids_by_name,
+        conn,
+        creator_id,
+    )
+
     # Check if puzzle already exists by name — preserve its ID for solve_attempts
     existing = c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],)).fetchone()
     
@@ -287,7 +375,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
             1 if puzzle_data.get('allow_arsenal', True) else 0,
-            json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
+            json.dumps(allowed_arsenal_component_ids) if allowed_arsenal_component_ids else None,
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('riddle_base_name'),
             initial_board_json,
@@ -324,7 +412,7 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('min_cycles'),
             puzzle_data.get('max_cycles'),
             1 if puzzle_data.get('allow_arsenal', True) else 0,
-            json.dumps(puzzle_data.get('allowed_arsenal_component_ids')) if puzzle_data.get('allowed_arsenal_component_ids') else None,
+            json.dumps(allowed_arsenal_component_ids) if allowed_arsenal_component_ids else None,
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
@@ -495,6 +583,14 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                     int(num_outputs or 0),
                     puzzle_id,
                 ),
+            )
+
+    if allowed_arsenal_component_ids and puzzle_data.get('allowed_arsenal_component_ids'):
+        resolved_allowed_ids = allowed_arsenal_component_ids
+        if existing:
+            c.execute(
+                "UPDATE puzzles SET allowed_arsenal_component_ids=? WHERE id=?",
+                (json.dumps(resolved_allowed_ids), puzzle_id),
             )
         
     conn.commit()
