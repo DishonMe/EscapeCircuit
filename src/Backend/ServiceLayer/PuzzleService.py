@@ -107,6 +107,40 @@ class PuzzleService:
         
         return p_dict
 
+    def _load_io_from_riddle_config(self, puzzle) -> tuple[list[str] | None, list[str] | None]:
+        """Best-effort I/O fallback from riddles/<base>/<base>_config.json."""
+        riddle_base_name = str(getattr(puzzle, "riddle_base_name", "") or "").strip()
+        if not riddle_base_name:
+            return None, None
+
+        try:
+            current_file = pathlib.Path(__file__).resolve()
+            root_dir = current_file.parent.parent.parent.parent
+            config_path = (
+                root_dir
+                / "riddles"
+                / riddle_base_name
+                / f"{riddle_base_name}_config.json"
+            )
+            if not config_path.exists():
+                return None, None
+
+            with open(config_path, "r", encoding="utf-8") as config_file:
+                config_data = json.load(config_file)
+
+            puzzle_config = config_data.get("puzzle", {})
+            if not isinstance(puzzle_config, dict):
+                return None, None
+
+            raw_inputs = puzzle_config.get("inputs")
+            raw_outputs = puzzle_config.get("outputs")
+
+            inputs = [str(label) for label in raw_inputs] if isinstance(raw_inputs, list) else None
+            outputs = [str(label) for label in raw_outputs] if isinstance(raw_outputs, list) else None
+            return inputs, outputs
+        except Exception:
+            return None, None
+
     def browse(
         self,
         session_token: str,
@@ -318,9 +352,12 @@ class PuzzleService:
         else:
             d["medalDistribution"] = {"none": 0, "bronze": 0, "silver": 0, "gold": 0}
         
-        # Populate inputs/outputs from test cases if not present
-        # This is needed because Puzzle model doesn't store them, but Frontend needs them.
+        # Populate inputs/outputs from test cases if present.
+        # This is needed because Puzzle model doesn't store them directly.
         tcs = self.repo.list_test_cases(puzzle_id)
+        resolved_inputs: list[str] = []
+        resolved_outputs: list[str] = []
+
         if tcs:
             # Return all test cases as array for frontend display
             test_cases_data = []
@@ -340,33 +377,42 @@ class PuzzleService:
                     "outputs": outputs,
                 }
                 test_cases_data.append(tc_obj)
+
+                # Extract the first usable input/output names from any test case,
+                # not only from the first one (which may be a non-I/O constraint case).
+                if not resolved_inputs:
+                    if tc.inputs:
+                        resolved_inputs = [str(key) for key in tc.inputs.keys()]
+                    elif tc.input_stream and isinstance(tc.input_stream, list) and len(tc.input_stream) > 0:
+                        first_input = tc.input_stream[0]
+                        if isinstance(first_input, dict):
+                            resolved_inputs = [str(key) for key in first_input.keys()]
+                        elif isinstance(first_input, (str, int, float)):
+                            resolved_inputs = [str(first_input)]
+
+                if not resolved_outputs:
+                    if tc.expected_outputs:
+                        resolved_outputs = [str(key) for key in tc.expected_outputs.keys()]
+                    elif tc.expected_output_stream:
+                        if isinstance(tc.expected_output_stream, dict):
+                            resolved_outputs = [str(key) for key in tc.expected_output_stream.keys()]
+                        elif isinstance(tc.expected_output_stream, (str, int, float)):
+                            resolved_outputs = [str(tc.expected_output_stream)]
             
             d["test_cases"] = test_cases_data if test_cases_data else []
-            
-            # For backward compatibility, also extract input/output array from first test case
-            first_tc = tcs[0]
-            if first_tc.inputs:
-                d["inputs"] = list(first_tc.inputs.keys()) if first_tc.inputs else []
-            elif first_tc.input_stream and isinstance(first_tc.input_stream, list) and len(first_tc.input_stream) > 0:
-                # For stream test cases, get input names from first frame.
-                first_input = first_tc.input_stream[0]
-                if isinstance(first_input, dict):
-                    d["inputs"] = list(first_input.keys())
-                elif isinstance(first_input, (str, int)):
-                    d["inputs"] = [str(first_input)]
-                else:
-                    d["inputs"] = [str(first_input)]
-            
-            if first_tc.expected_outputs:
-                d["outputs"] = list(first_tc.expected_outputs.keys()) if first_tc.expected_outputs else []
-            elif first_tc.expected_output_stream:
-                if isinstance(first_tc.expected_output_stream, dict):
-                    # For stream outputs, dict keys are output names.
-                    d["outputs"] = list(first_tc.expected_output_stream.keys()) if first_tc.expected_output_stream else []
-                elif isinstance(first_tc.expected_output_stream, (str, int)):
-                    d["outputs"] = [str(first_tc.expected_output_stream)]
-                else:
-                    d["outputs"] = [str(first_tc.expected_output_stream)]
+
+        d.setdefault("test_cases", [])
+        if resolved_inputs:
+            d["inputs"] = resolved_inputs
+        if resolved_outputs:
+            d["outputs"] = resolved_outputs
+
+        # Final fallback for puzzles with no test-case I/O (e.g., test_cases=[]).
+        cfg_inputs, cfg_outputs = self._load_io_from_riddle_config(p)
+        if not d.get("inputs") and cfg_inputs is not None:
+            d["inputs"] = cfg_inputs
+        if not d.get("outputs") and cfg_outputs is not None:
+            d["outputs"] = cfg_outputs
         
         # Add custom pieces and split arsenal into two buckets:
         # 1) creator-shared (explicit allowed IDs) and 2) solver personal arsenal.
