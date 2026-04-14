@@ -100,8 +100,19 @@ const inRect = (
   );
 };
 
-const parseDraggedComponentId = (e: ReactDragEvent) => {
-  return e.dataTransfer.getData('application/x-escapecircuit-component');
+const parseDraggedComponentId = (
+  e: ReactDragEvent,
+  fallbackComponentId?: string | null,
+) => {
+  const customType = e.dataTransfer
+    .getData('application/x-escapecircuit-component')
+    .trim();
+  if (customType) return customType;
+
+  const plainText = e.dataTransfer.getData('text/plain').trim();
+  if (plainText) return plainText;
+
+  return (fallbackComponentId ?? '').trim();
 };
 
 export const WorkstationGrid = ({
@@ -1382,7 +1393,10 @@ export const WorkstationGrid = ({
         onDrop={(e) => {
           e.preventDefault();
           setDropPreview(null);
-          const componentId = parseDraggedComponentId(e);
+          const componentId = parseDraggedComponentId(
+            e,
+            draggedPaletteComponentId,
+          );
           if (!componentId) return;
           const el = containerRef.current;
           if (!el) return;

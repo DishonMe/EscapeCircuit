@@ -1,0 +1,41 @@
+\section*{De Bruijn Sequence Generator Challenge}
+
+\subsection*{Objective}
+Design a sequential circuit that generates a 16-bit binary sequence on output $Y$ with no external inputs.
+
+\subsection*{What You Must Generate}
+Your output stream must be a valid De Bruijn sequence of order $4$.
+This means that in the cyclic output, every 4-bit pattern from $0000$ to $1111$ appears exactly once as a consecutive window.
+
+\subsection*{Prefer-One Construction Rule}
+Your generator should follow the prefer-one construction:
+\begin{enumerate}
+  \item Start from state $0000$.
+  \item At each step, try appending bit $1$.
+  \item If that next 4-bit window was already seen, append bit $0$ instead.
+\end{enumerate}
+
+\subsection*{Interface}
+\begin{itemize}
+  \item Inputs: none
+  \item Output: $Y$
+\end{itemize}
+
+\subsection*{Simulation Notes}
+\begin{itemize}
+  \item The circuit is reset before validation (all DFF state starts at 0).
+  \item Validation samples exactly 16 cycles from output $Y$.
+\end{itemize}
+
+\subsection*{Example for Order 3}
+A valid 8-bit De Bruijn sequence is:
+\[
+00011101
+\]
+It contains all 3-bit windows exactly once (cyclically).
+
+\subsection*{Scoring}
+\begin{itemize}
+  \item PASS: output is a valid 16-bit order-4 De Bruijn sequence and follows prefer-one.
+  \item FAIL: otherwise.
+\end{itemize}

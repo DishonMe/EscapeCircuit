@@ -1,0 +1,54 @@
+\section*{Sequential 6-Bit Palindrome Detector Instructions}
+
+\subsection*{Objective}
+Design a sequential digital circuit that reads one input bit per clock cycle and determines whether each 6-bit word is a palindrome.
+
+\subsection*{Allowed Components}
+Use all basic logic gates, plus DFF for state:
+\begin{itemize}
+  \item AND
+  \item OR
+  \item NOT
+  \item XOR
+  \item NAND
+  \item NOR
+  \item XNOR
+  \item DFF
+\end{itemize}
+
+\subsection*{Inputs and Outputs}
+\begin{itemize}
+  \item Input: $X$ (serial bit stream, one bit each cycle)
+  \item Output: is_palindrome
+\end{itemize}
+
+\subsection*{Timing Model}
+Each test stream contains exactly 6 cycles and represents one word:
+\[
+b1,b2,b3,b4,b5,b6
+\]
+The circuit is reset before each stream (all DFF states start at 0).
+
+\subsection*{What Is a 6-Bit Palindrome?}
+A 6-bit word is a palindrome if:
+\[
+b1=b6, & b2=b5, & b3=b4
+\]
+
+
+\subsection*{Output Convention}
+\begin{itemize}
+  \item For cycles 1--5, output is_palindrome=0
+  \item On cycle 6, output 1 if all mirrored pairs matched, otherwise 0
+\end{itemize}
+
+\subsection*{Examples}
+\begin{itemize}
+  \item Input stream: \texttt{1,0,1,1,0,1} (word \texttt{101101}) \\
+  Expected output stream: \texttt{0,0,0,0,0,1}
+  \item Input stream: \texttt{1,1,0,1,0,0} (word \texttt{110100}) \\
+  Expected output stream: \texttt{0,0,0,0,0,0}
+\end{itemize}
+
+\subsection*{Hint}
+A common design is to store the first three bits using DFFs, accumulate any mismatch in a state bit, and output the negation of that mismatch bit on cycle 6.
