@@ -329,6 +329,7 @@ const DraggableItem = ({
               'application/x-escapecircuit-component',
               component.id,
             );
+            e.dataTransfer.setData('text/plain', component.id);
             e.dataTransfer.effectAllowed = 'copy';
             onDragStart?.(component.id);
           }}

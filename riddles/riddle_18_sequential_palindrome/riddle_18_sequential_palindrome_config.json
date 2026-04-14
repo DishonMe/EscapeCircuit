@@ -1,0 +1,2216 @@
+{
+  "puzzle": {
+    "name": "sequential palindrome",
+    "description": "6 bit sequential is palindrome",
+    "budget": 30,
+    "creator_budget": 10,
+    "time_limit_seconds": 200,
+    "difficulty": "EASY",
+    "default_gate_set": [
+      "AND",
+      "OR",
+      "NOT",
+      "XOR",
+      "NAND",
+      "NOR",
+      "XNOR",
+      "DFF"
+    ],
+    "inputs": [
+      "X"
+    ],
+    "outputs": [
+      "is_palindrome"
+    ],
+    "min_cycles": null,
+    "max_cycles": null,
+    "min_gate_count": null,
+    "total_gate_count": null,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 20,
+      "cols": 40
+    },
+    "riddle_base_name": "riddle_17_sequential_palindrome"
+  },
+  "test_cases": [
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 1
+        },
+        {
+          "X": 0
+        }
+      ],
+      "expected_output_stream": {
+        "is_palindrome": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

@@ -1796,6 +1796,7 @@ def run_tests(solution):
                         onDragStart={(e) => {
                           e.dataTransfer.effectAllowed = 'copy';
                           e.dataTransfer.setData('application/x-escapecircuit-component', gateName);
+                          e.dataTransfer.setData('text/plain', gateName);
                           setDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setDraggedPaletteComponentId(null)}

@@ -1,0 +1,315 @@
+{
+  "totalCost": 10,
+  "eval_map": {
+    "{\"X\":0}": {
+      "is_palindrome": 1
+    },
+    "{\"X\":1}": {
+      "is_palindrome": 0
+    }
+  },
+  "circuit": {
+    "placed": [
+      {
+        "id": "DFF:1776158800621",
+        "componentId": "DFF",
+        "origin": {
+          "row": 0,
+          "col": 4
+        },
+        "rotation": 0
+      },
+      {
+        "id": "DFF:1776158803804",
+        "componentId": "DFF",
+        "origin": {
+          "row": 0,
+          "col": 7
+        },
+        "rotation": 0
+      },
+      {
+        "id": "DFF:1776158809858-0",
+        "componentId": "DFF",
+        "origin": {
+          "row": 0,
+          "col": 10
+        },
+        "rotation": 0
+      },
+      {
+        "id": "DFF:1776158809858-1",
+        "componentId": "DFF",
+        "origin": {
+          "row": 0,
+          "col": 13
+        },
+        "rotation": 0
+      },
+      {
+        "id": "DFF:1776158811337-0",
+        "componentId": "DFF",
+        "origin": {
+          "row": 0,
+          "col": 16
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XNOR:1776158838236",
+        "componentId": "XNOR",
+        "origin": {
+          "row": 4,
+          "col": 21
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XNOR:1776158840998",
+        "componentId": "XNOR",
+        "origin": {
+          "row": 6,
+          "col": 21
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XNOR:1776158843736",
+        "componentId": "XNOR",
+        "origin": {
+          "row": 8,
+          "col": 21
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1776158884790",
+        "componentId": "AND",
+        "origin": {
+          "row": 5,
+          "col": 26
+        },
+        "rotation": 0
+      },
+      {
+        "id": "AND:1776158888900",
+        "componentId": "AND",
+        "origin": {
+          "row": 7,
+          "col": 31
+        },
+        "rotation": 0
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire:1776158806167",
+        "from": {
+          "componentId": "DFF:1776158800621",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:1776158803804",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158806167:1776158809858-0",
+        "from": {
+          "componentId": "DFF:1776158809858-0",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:1776158809858-1",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158818456",
+        "from": {
+          "componentId": "DFF:1776158803804",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:1776158809858-0",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158820874",
+        "from": {
+          "componentId": "DFF:1776158809858-1",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:1776158811337-0",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158847747",
+        "from": {
+          "componentId": "IO:IN:X",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "DFF:1776158800621",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158851098",
+        "from": {
+          "componentId": "IO:IN:X",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158838236",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776158854113",
+        "from": {
+          "componentId": "DFF:1776158811337-0",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158838236",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158866492",
+        "from": {
+          "componentId": "DFF:1776158800621",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158840998",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776158872639",
+        "from": {
+          "componentId": "DFF:1776158809858-1",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158840998",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158876734",
+        "from": {
+          "componentId": "DFF:1776158809858-0",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158843736",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158880066",
+        "from": {
+          "componentId": "DFF:1776158803804",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XNOR:1776158843736",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776158891896",
+        "from": {
+          "componentId": "XNOR:1776158838236",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1776158884790",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158894225",
+        "from": {
+          "componentId": "XNOR:1776158840998",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1776158884790",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776158897050",
+        "from": {
+          "componentId": "XNOR:1776158843736",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1776158888900",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776158899442",
+        "from": {
+          "componentId": "AND:1776158884790",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "AND:1776158888900",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776158905704",
+        "from": {
+          "componentId": "AND:1776158888900",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:is_palindrome",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      }
+    ]
+  }
+}

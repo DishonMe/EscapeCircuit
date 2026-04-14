@@ -2622,6 +2622,7 @@ export default function CreatePuzzleForm() {
                         onDragStart={(e) => {
                           e.dataTransfer.effectAllowed = 'copy';
                           e.dataTransfer.setData('application/x-escapecircuit-component', gateName);
+                          e.dataTransfer.setData('text/plain', gateName);
                           setInitialBoardDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
@@ -2646,6 +2647,7 @@ export default function CreatePuzzleForm() {
                             onDragStart={(e) => {
                               e.dataTransfer.effectAllowed = 'copy';
                               e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              e.dataTransfer.setData('text/plain', piece.name);
                               setInitialBoardDraggedPaletteComponentId(piece.name);
                             }}
                             onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
@@ -2672,6 +2674,7 @@ export default function CreatePuzzleForm() {
                             onDragStart={(e) => {
                               e.dataTransfer.effectAllowed = 'copy';
                               e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              e.dataTransfer.setData('text/plain', piece.name);
                               setInitialBoardDraggedPaletteComponentId(piece.name);
                             }}
                             onDragEnd={() => setInitialBoardDraggedPaletteComponentId(null)}
@@ -2774,6 +2777,7 @@ export default function CreatePuzzleForm() {
                         onDragStart={(e) => {
                           e.dataTransfer.effectAllowed = 'copy';
                           e.dataTransfer.setData('application/x-escapecircuit-component', gateName);
+                          e.dataTransfer.setData('text/plain', gateName);
                           setDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setDraggedPaletteComponentId(null)}
@@ -2806,6 +2810,7 @@ export default function CreatePuzzleForm() {
                             onDragStart={(e) => {
                               e.dataTransfer.effectAllowed = 'copy';
                               e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              e.dataTransfer.setData('text/plain', piece.name);
                               setDraggedPaletteComponentId(piece.name);
                             }}
                             onDragEnd={() => setDraggedPaletteComponentId(null)}
@@ -2832,6 +2837,7 @@ export default function CreatePuzzleForm() {
                             onDragStart={(e) => {
                               e.dataTransfer.effectAllowed = 'copy';
                               e.dataTransfer.setData('application/x-escapecircuit-component', piece.name);
+                              e.dataTransfer.setData('text/plain', piece.name);
                               setDraggedPaletteComponentId(piece.name);
                             }}
                             onDragEnd={() => setDraggedPaletteComponentId(null)}
