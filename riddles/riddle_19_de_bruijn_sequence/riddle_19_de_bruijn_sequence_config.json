@@ -16,7 +16,9 @@
       "XNOR",
       "DFF"
     ],
-    "inputs": [],
+    "inputs": [
+      "X"
+    ],
     "outputs": [
       "Y"
     ],
