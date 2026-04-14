@@ -75,6 +75,68 @@ const arrayToBinaryString = (arr: number[]): string => {
   return arr.join(',');
 };
 
+const formatInputStreamForDisplay = (inputStream?: Array<Record<string, number>>): string => {
+  if (!inputStream || inputStream.length === 0) {
+    return '[]';
+  }
+
+  const inputNameMap: Record<string, true> = {};
+  inputStream.forEach((cycleInputs) => {
+    Object.keys(cycleInputs || {}).forEach((inputName) => {
+      inputNameMap[inputName] = true;
+    });
+  });
+
+  const inputNames = Object.keys(inputNameMap);
+  if (inputNames.length === 0) {
+    return `${inputStream.length} cycles`;
+  }
+
+  return inputNames
+    .map((inputName) => {
+      const values = inputStream.map((cycleInputs) => cycleInputs[inputName] ?? 0);
+      return `${inputName}: [${values.join(',')}]`;
+    })
+    .join('; ');
+};
+
+const canonicalizeValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalizeValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    return Object.keys(objectValue)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = canonicalizeValue(objectValue[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+};
+
+const getTestCaseComparisonSignature = (testCase: TestCase): string => {
+  const kind: 'blackbox' | 'stream' = testCase.kind === 'stream' ? 'stream' : 'blackbox';
+
+  const comparableCase =
+    kind === 'stream'
+      ? {
+          kind,
+          inputStream: testCase.inputStream || [],
+          expectedOutputStream: testCase.expectedOutputStream || {},
+        }
+      : {
+          kind,
+          inputs: testCase.inputs || {},
+          expectedOutputs: testCase.expectedOutputs || {},
+        };
+
+  return JSON.stringify(canonicalizeValue(comparableCase));
+};
+
 interface CreatePuzzleData {
   basic: BasicInfo;
   testCases: TestCase[];
@@ -425,6 +487,17 @@ export default function CreatePuzzleForm() {
       
     }
 
+    const newTestCaseSignature = getTestCaseComparisonSignature(initializedForm);
+    const hasDuplicateTestCase = data.testCases.some(
+      (existingTestCase) =>
+        getTestCaseComparisonSignature(existingTestCase) === newTestCaseSignature
+    );
+
+    if (hasDuplicateTestCase) {
+      alert('An identical test case already exists.');
+      return;
+    }
+
     setData((prev) => ({
       ...prev,
       testCases: [
@@ -438,7 +511,7 @@ export default function CreatePuzzleForm() {
     
     // Reset form
     setTestCaseForm({ 
-      kind: 'blackbox',
+      kind: initializedForm.kind || 'blackbox',
       inputs: {}, 
       expectedOutputs: {},
       inputStream: [],
@@ -1616,7 +1689,7 @@ export default function CreatePuzzleForm() {
                           </td>
                           <td className="border p-2 font-mono text-[11px]">
                             {tc.kind === 'stream' 
-                              ? `${tc.inputStream?.length || 0} cycles`
+                              ? formatInputStreamForDisplay(tc.inputStream)
                               : JSON.stringify(tc.inputs)
                             }
                           </td>
