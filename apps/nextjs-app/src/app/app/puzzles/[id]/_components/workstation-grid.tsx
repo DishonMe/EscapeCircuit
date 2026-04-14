@@ -271,21 +271,162 @@ export const WorkstationGrid = ({
       return;
     }
 
+    const copiedWithDefs: Array<{
+      comp: PlacedGridComponent;
+      def: ComponentDef;
+      size: { w: number; h: number };
+    }> = [];
+
+    for (const comp of clipboard.components) {
+      const def = catalog[comp.componentId];
+      if (!def) {
+        notifications.addNotification({
+          type: 'warning',
+          title: 'Cannot paste here',
+          message: 'One or more copied components are unavailable.',
+        });
+        return;
+      }
+      copiedWithDefs.push({
+        comp,
+        def,
+        size: rotatedSize(def.size, comp.rotation),
+      });
+    }
+
+    const minRow = Math.min(...copiedWithDefs.map(({ comp }) => comp.origin.row));
+    const minCol = Math.min(...copiedWithDefs.map(({ comp }) => comp.origin.col));
+    const maxRowExclusive = Math.max(
+      ...copiedWithDefs.map(({ comp, size }) => comp.origin.row + size.h),
+    );
+    const maxColExclusive = Math.max(
+      ...copiedWithDefs.map(({ comp, size }) => comp.origin.col + size.w),
+    );
+
+    const groupHeight = maxRowExclusive - minRow;
+    const groupWidth = maxColExclusive - minCol;
+
+    if (groupHeight > gridRows || groupWidth > gridCols) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Cannot paste here',
+        message: 'Copied block is larger than the board.',
+      });
+      return;
+    }
+
+    const existingOccupiedHoles = new Set<string>();
+    const existingOccupiedPortHoles = new Set<string>();
+
+    for (const existing of placed) {
+      const def = catalog[existing.componentId];
+      if (!def) continue;
+
+      const size = rotatedSize(def.size, existing.rotation);
+      for (let r = 0; r < size.h; r++) {
+        for (let c = 0; c < size.w; c++) {
+          existingOccupiedHoles.add(`r${existing.origin.row + r}c${existing.origin.col + c}`);
+        }
+      }
+
+      for (const port of def.ports) {
+        const rotOff = rotateOffset(port.offset, def.size, existing.rotation);
+        const row = existing.origin.row + rotOff.row;
+        const col = existing.origin.col + rotOff.col;
+        existingOccupiedPortHoles.add(`r${row}c${col}`);
+      }
+    }
+
+    const relativeLayout = copiedWithDefs.map((item) => ({
+      ...item,
+      rowOffset: item.comp.origin.row - minRow,
+      colOffset: item.comp.origin.col - minCol,
+    }));
+
+    const isValidAnchor = (anchorRow: number, anchorCol: number) => {
+      const groupOccupiedHoles = new Set<string>();
+      const groupOccupiedPortHoles = new Set<string>();
+
+      for (const item of relativeLayout) {
+        const row = anchorRow + item.rowOffset;
+        const col = anchorCol + item.colOffset;
+
+        if (row < 0 || col < 0) return false;
+        if (row + item.size.h > gridRows) return false;
+        if (col + item.size.w > gridCols) return false;
+
+        for (let r = 0; r < item.size.h; r++) {
+          for (let c = 0; c < item.size.w; c++) {
+            const key = `r${row + r}c${col + c}`;
+            if (existingOccupiedHoles.has(key) || groupOccupiedHoles.has(key)) {
+              return false;
+            }
+            groupOccupiedHoles.add(key);
+          }
+        }
+
+        for (const port of item.def.ports) {
+          const rotOff = rotateOffset(port.offset, item.def.size, item.comp.rotation);
+          const key = `r${row + rotOff.row}c${col + rotOff.col}`;
+          if (existingOccupiedPortHoles.has(key) || groupOccupiedPortHoles.has(key)) {
+            return false;
+          }
+          groupOccupiedPortHoles.add(key);
+        }
+      }
+
+      return true;
+    };
+
+    const maxAnchorRow = gridRows - groupHeight;
+    const maxAnchorCol = gridCols - groupWidth;
+
+    const preferredAnchor = {
+      row: clamp(minRow + 2, 0, maxAnchorRow),
+      col: clamp(minCol + 2, 0, maxAnchorCol),
+    };
+
+    let chosenAnchor: HoleCoord | null = null;
+
+    if (isValidAnchor(preferredAnchor.row, preferredAnchor.col)) {
+      chosenAnchor = preferredAnchor;
+    } else {
+      for (let row = 0; row <= maxAnchorRow && !chosenAnchor; row++) {
+        for (let col = 0; col <= maxAnchorCol; col++) {
+          if (row === preferredAnchor.row && col === preferredAnchor.col) continue;
+          if (isValidAnchor(row, col)) {
+            chosenAnchor = { row, col };
+            break;
+          }
+        }
+      }
+    }
+
+    if (!chosenAnchor) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Cannot paste here',
+        message: 'No free rectangle is large enough for this copied block.',
+      });
+      return;
+    }
+
     const idMap = new Map<string, string>();
     const newComponents: PlacedGridComponent[] = [];
     const newWires: Wire[] = [];
+    const pasteStamp = Date.now();
 
-    clipboard.components.forEach((comp, idx) => {
-      const newId = `${comp.componentId}:${Date.now()}-${idx}`;
-      idMap.set(comp.id, newId);
+    relativeLayout.forEach((item, idx) => {
+      const newId = `${item.comp.componentId}:${pasteStamp}-${idx}`;
+      idMap.set(item.comp.id, newId);
       newComponents.push({
         id: newId,
-        componentId: comp.componentId,
+        componentId: item.comp.componentId,
         origin: {
-          row: clamp(comp.origin.row + 2, 0, gridRows - 1),
-          col: clamp(comp.origin.col + 2, 0, gridCols - 1),
+          row: chosenAnchor.row + item.rowOffset,
+          col: chosenAnchor.col + item.colOffset,
         },
-        rotation: comp.rotation,
+        rotation: item.comp.rotation,
       });
     });
 
@@ -294,7 +435,7 @@ export const WorkstationGrid = ({
       const newToId = idMap.get(wire.to.componentId);
       if (newFromId && newToId) {
         newWires.push({
-          id: `${wire.id}:${Date.now()}-${idx}`,
+          id: `${wire.id}:${pasteStamp}-${idx}`,
           from: { ...wire.from, componentId: newFromId },
           to: { ...wire.to, componentId: newToId },
         });
@@ -307,7 +448,18 @@ export const WorkstationGrid = ({
       type: 'component',
       placedIds: Array.from(idMap.values()),
     });
-  }, [clipboard, gridRows, gridCols, onPlacedChange, onWiresChange, placed, wires]);
+    setClipboard(null);
+  }, [
+    clipboard,
+    catalog,
+    gridRows,
+    gridCols,
+    notifications,
+    onPlacedChange,
+    onWiresChange,
+    placed,
+    wires,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
