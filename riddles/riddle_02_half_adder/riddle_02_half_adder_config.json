@@ -12,7 +12,8 @@
     "total_gate_count": null,
     "min_cycles": null,
     "max_cycles": null,
-    "allow_arsenal": true
+    "allow_arsenal": true,
+    "riddle_base_name": "riddle_02_half_adder"
   },
   "test_cases": [
     {
