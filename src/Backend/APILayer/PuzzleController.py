@@ -230,6 +230,7 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             return
 
         puzzle_id = puzzle_payload.get("id")
+
         try:
             puzzle_id = int(puzzle_id)
         except (TypeError, ValueError):

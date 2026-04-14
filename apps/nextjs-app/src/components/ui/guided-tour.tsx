@@ -50,7 +50,6 @@ export default function GuidedTour({ steps, ...props }: any) {
   const fixedSteps = steps?.map((step: any) => ({
     ...step,
     skipBeacon: step.skipBeacon ?? (props.skipBeacon ?? true),
-    disableScrolling: true,
   })) || [];
 
   const mergedStyles = {
@@ -67,8 +66,6 @@ export default function GuidedTour({ steps, ...props }: any) {
       steps={fixedSteps}
       run={props.run && active}
       skipBeacon={true}
-      disableScrolling={true}
-      scrollToFirstStep={false}
       styles={mergedStyles}
     />
   );

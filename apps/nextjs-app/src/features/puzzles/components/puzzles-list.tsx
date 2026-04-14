@@ -74,7 +74,7 @@ export const PuzzlesList = () => {
     {
       target: '.dialog-close-button',
       content: 'Use the Close button to exit the instructions and return to the puzzle list.',
-      placement: 'left',
+      placement: 'bottom',
     },
     {
       target: '.puzzle-card-action',

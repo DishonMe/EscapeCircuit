@@ -1,0 +1,87 @@
+{
+  "totalCost": 2,
+  "eval_map": {
+    "{\"in\":0}": {
+      "out": 0
+    },
+    "{\"in\":1}": {
+      "out": 1
+    }
+  },
+  "circuit": {
+    "placed": [
+      {
+        "id": "DFF:1776105454105",
+        "componentId": "DFF",
+        "origin": {
+          "row": 3,
+          "col": 6
+        },
+        "rotation": 0
+      },
+      {
+        "id": "XOR:1776105466606",
+        "componentId": "XOR",
+        "origin": {
+          "row": 0,
+          "col": 6
+        },
+        "rotation": 0
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire:1776105468241",
+        "from": {
+          "componentId": "IO:IN:in",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "XOR:1776105466606",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776105472279",
+        "from": {
+          "componentId": "DFF:1776105454105",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "XOR:1776105466606",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:1776105474277",
+        "from": {
+          "componentId": "XOR:1776105466606",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:1776105454105",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:1776105479266",
+        "from": {
+          "componentId": "XOR:1776105466606",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:out",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      }
+    ]
+  }
+}
