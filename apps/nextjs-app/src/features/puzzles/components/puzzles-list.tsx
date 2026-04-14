@@ -471,48 +471,41 @@ export const PuzzlesList = () => {
             return (
             <div
               key={puzzle.id}
-              className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all hover:shadow-card ${
+              className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-2 hover:scale-[1.02] hover:bg-secondary/20 ${
                 puzzle.is_solved
-                  ? 'border-emerald-200/60 hover:border-emerald-300/60'
-                  : 'border-border hover:border-foreground/20'
+                  ? 'border-emerald-200/60 hover:border-emerald-500/80 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                  : 'border-border hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(6,182,212,0.6)]'
               }`}
             >
-            {/* Solved checkmark overlay */}
-            {puzzle.is_solved && (
-              <div className="absolute -right-2 -top-2 z-10 flex size-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
-                <CheckCircle2 className="size-5" />
+            {/* Status Badge - Direct child of card wrapper, positioned to outer edge */}
+            {puzzle.is_solved ? (
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-[11px] font-medium z-10">
+                <CheckCircle2 className="size-3.5" />
+                <span>Solved</span>
+                {puzzle.best_medal && puzzle.best_medal >= 1 && (
+                  <span className="ml-1">
+                    {puzzle.best_medal >= 3 ? '🥇' : puzzle.best_medal === 2 ? '🥈' : '🥉'}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-secondary text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium z-10">
+                <Medal className="size-3.5" />
+                <span>Unsolved</span>
               </div>
             )}
 
-          {/* Title & Creator with status badge */}
-            <div className="mb-3 flex flex-wrap items-start gap-2">
-              <div className="flex-1">
-                <h3 className="mb-1 text-[15px] font-medium text-foreground">{puzzle.title}</h3>
-                <p className="text-[13px] text-muted-foreground">
-                  by{' '}
-                  {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
+          {/* Title & Creator & Description - Properly Aligned */}
+            <div className="mb-3 w-full">
+              <h3 className="mb-1 text-base font-medium text-foreground text-left pr-16 tracking-tight text-balance leading-tight">{puzzle.title}</h3>
+              <p className="block w-full text-center mt-1 mb-3 text-[13px] text-muted-foreground">
+                by{' '}
+                {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
+              </p>
+              {puzzle.description && (
+                <p className="text-[13px] text-muted-foreground text-left">
+                  {puzzle.description}
                 </p>
-                {puzzle.description && (
-                  <p className="mt-2 text-[13px] text-muted-foreground line-clamp-2">
-                    {puzzle.description}
-                  </p>
-                )}
-              </div>
-              {puzzle.is_solved ? (
-                <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-[11px] font-medium">
-                  <CheckCircle2 className="size-3.5" />
-                  <span>Solved</span>
-                  {puzzle.best_medal && puzzle.best_medal >= 1 && (
-                    <span className="ml-1">
-                      {puzzle.best_medal >= 3 ? '🥇' : puzzle.best_medal === 2 ? '🥈' : '🥉'}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 bg-secondary text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium">
-                  <Medal className="size-3.5" />
-                  <span>Unsolved</span>
-                </div>
               )}
             </div>
 

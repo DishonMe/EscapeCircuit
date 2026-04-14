@@ -45,7 +45,7 @@ import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
-import { Bug, ChevronDown, StepBack, StepForward } from 'lucide-react';
+import { Bug, ChevronDown, StepBack, StepForward, ArrowRight, Trash2 } from 'lucide-react';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { workstationTourSteps } from '@/config/tourSteps';
 
@@ -1953,37 +1953,78 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 <div className="text-[11px] text-muted-foreground/60">No wires yet.</div>
               ) : (
                 <ul className="space-y-1.5">
-                  {wires.map((w) => (
-                    <li
-                      key={w.id}
-                      className="group flex items-center justify-between gap-2 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5"
-                    >
-                      <span className="truncate text-[11px] text-foreground">
-                        {w.from.componentId} ({w.from.portId}) →{' '}
-                        {w.to.componentId} ({w.to.portId})
-                      </span>
-                      <button
-                        type="button"
-                        className="hidden rounded-sm px-1.5 py-0.5 text-muted-foreground transition-all group-hover:block hover:scale-105 hover:bg-red-100 hover:text-red-700"
-                        onClick={() =>
-                          setWires((prev) => prev.filter((x) => x.id !== w.id))
-                        }
-                        title="Delete wire"
+                  {wires.map((w) => {
+                    // Helper function to format wire node names with proper numbering
+                    const formatWireNode = (componentId: string): string => {
+                      if (componentId.startsWith('IO:IN:')) {
+                        const name = componentId.replace('IO:IN:', '');
+                        return `Input '${name}'`;
+                      }
+                      if (componentId.startsWith('IO:OUT:')) {
+                        const name = componentId.replace('IO:OUT:', '');
+                        return `Output '${name}'`;
+                      }
+                      
+                      // For placed components, find the component and add numbering if multiple exist
+                      const placedComponent = placed.find(p => p.id === componentId);
+                      if (!placedComponent) return componentId;
+                      
+                      // Count how many gates of the same type appear before this one
+                      const countBefore = placed
+                        .slice(0, placed.indexOf(placedComponent))
+                        .filter(comp => comp.componentId === placedComponent.componentId).length;
+                      const gateNumber = countBefore + 1;
+                      
+                      // Count total gates of this type
+                      const totalCount = placed.filter(
+                        comp => comp.componentId === placedComponent.componentId
+                      ).length;
+                      
+                      // Extract gate type from ID (e.g., "NOT:1234567" -> "NOT")
+                      const parts = placedComponent.componentId.split(':');
+                      const gateType = parts[0] || placedComponent.componentId;
+                      
+                      // Only show number if there are multiple gates of this type
+                      return totalCount > 1 ? `${gateType} Gate ${gateNumber}` : `${gateType} Gate`;
+                    };
+
+                    const fromLabel = formatWireNode(w.from.componentId);
+                    const toLabel = formatWireNode(w.to.componentId);
+
+                    return (
+                      <li
+                        key={w.id}
+                        className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:bg-secondary/70 hover:border-border"
                       >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="size-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          {/* From Badge */}
+                          <div className="flex-shrink-0 inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-1 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                            {fromLabel}
+                          </div>
+                          
+                          {/* Arrow Icon */}
+                          <ArrowRight size={12} className="text-muted-foreground flex-shrink-0" />
+                          
+                          {/* To Badge */}
+                          <div className="flex-shrink-0 inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+                            {toLabel}
+                          </div>
+                        </div>
+                        
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          className="hidden rounded-sm p-0.5 text-muted-foreground transition-all group-hover:flex items-center justify-center hover:scale-110 hover:bg-red-100 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
+                          onClick={() =>
+                            setWires((prev) => prev.filter((x) => x.id !== w.id))
+                          }
+                          title="Delete wire"
                         >
-                          <path d="M3 6h18" />
-                          <path d="M8 6V4h8v2" />
-                          <path d="M6 6l1 16h10l1-16" />
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
+                          <Trash2 size={12} />
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

@@ -2242,7 +2242,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(-100%, -50%)',
+                    transform: 'translate(-100%, calc(-50% + 20px))',
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -2312,7 +2312,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(0%, -50%)',
+                    transform: 'translate(0%, calc(-50% + 20px))',
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();

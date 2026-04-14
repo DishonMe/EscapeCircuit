@@ -1,7 +1,7 @@
 {
   "puzzle": {
     "name": "De Bruijn Sequence Generator (Order 4)",
-    "description": "Generate a 16-bit De Bruijn sequence autonomously using sequential logic.",
+    "description": "Generate a 16-bit De Bruijn sequence autonomously using sequential logic",
     "budget": 40,
     "creator_budget": 15,
     "time_limit_seconds": 240,
