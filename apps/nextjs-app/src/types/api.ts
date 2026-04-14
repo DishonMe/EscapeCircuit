@@ -152,6 +152,8 @@ export type Puzzle = Entity<{
   solvedCount: number;
   isPublic: boolean;
   solution?: CircuitSolution;
+  creator_solution?: Record<string, any> | null;
+  creatorSolution?: Record<string, any> | null;
   status?: 'draft' | 'published' | 'unpublished'; // Puzzle publication status
   isPublished?: boolean; // Alias for frontend compat
   is_hall_of_fame?: boolean;
