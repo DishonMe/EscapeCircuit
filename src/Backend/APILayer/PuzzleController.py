@@ -224,6 +224,64 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 
+    def _inject_rating_metrics(puzzle_payload: dict) -> None:
+        """Safely enrich a puzzle payload with aggregated rating metrics."""
+        if not isinstance(puzzle_payload, dict) or not rating_service:
+            return
+
+        puzzle_id = puzzle_payload.get("id")
+        try:
+            puzzle_id = int(puzzle_id)
+        except (TypeError, ValueError):
+            return
+
+        try:
+            metrics = rating_service.get_puzzle_metrics(puzzle_id)
+        except Exception:
+            return
+
+        if not isinstance(metrics, dict):
+            return
+
+        count = metrics.get("count")
+        if isinstance(count, int):
+            puzzle_payload["rating_count"] = count
+
+        avg_difficulty = metrics.get("avg_difficulty")
+        if isinstance(avg_difficulty, (int, float)):
+            puzzle_payload["avg_difficulty"] = float(avg_difficulty)
+            puzzle_payload["rating"] = float(avg_difficulty)
+
+        avg_fun = metrics.get("avg_fun")
+        if isinstance(avg_fun, (int, float)):
+            puzzle_payload["avg_fun"] = float(avg_fun)
+
+        avg_clearness = metrics.get("avg_clearness")
+        if isinstance(avg_clearness, (int, float)):
+            puzzle_payload["avg_clearness"] = float(avg_clearness)
+
+        experienced_metrics = metrics.get("experienced_metrics")
+        if isinstance(experienced_metrics, dict):
+            exp_count = experienced_metrics.get("count")
+            if isinstance(exp_count, int):
+                puzzle_payload["rating_count_exp"] = exp_count
+
+            exp_avg_difficulty = experienced_metrics.get("experienced_avg_difficulty")
+            if isinstance(exp_avg_difficulty, (int, float)):
+                puzzle_payload["avg_difficulty_exp"] = float(exp_avg_difficulty)
+
+            exp_avg_fun = experienced_metrics.get("experienced_avg_fun")
+            if isinstance(exp_avg_fun, (int, float)):
+                puzzle_payload["avg_fun_exp"] = float(exp_avg_fun)
+
+            exp_avg_clearness = experienced_metrics.get("experienced_avg_clearness")
+            if isinstance(exp_avg_clearness, (int, float)):
+                puzzle_payload["avg_clearness_exp"] = float(exp_avg_clearness)
+
+        rating_distribution = metrics.get("rating_distribution")
+        if isinstance(rating_distribution, dict):
+            puzzle_payload["rating_distribution"] = rating_distribution
+
 
     @router.get("")
     def browse(
