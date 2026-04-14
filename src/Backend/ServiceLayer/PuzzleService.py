@@ -141,6 +141,292 @@ class PuzzleService:
         except Exception:
             return None, None
 
+    def _load_creator_solution(self, puzzle: Any) -> dict | None:
+        riddles_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "riddles"
+        if not riddles_dir.exists():
+            return None
+
+        def _read_solution(path: pathlib.Path) -> dict | None:
+            if not path.exists() or not path.is_file():
+                return None
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                return payload if isinstance(payload, dict) else None
+            except Exception:
+                return None
+
+        def _matches_puzzle_name(config_path: pathlib.Path, target_name: str) -> bool:
+            try:
+                config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+                config_name = str(
+                    (config_payload.get("puzzle") or {}).get("name") or ""
+                ).strip()
+                if not config_name:
+                    return False
+                if config_name.lower() == target_name.lower():
+                    return True
+                return self._sanitize_puzzle_name(config_name) == self._sanitize_puzzle_name(target_name)
+            except Exception:
+                return False
+
+        riddle_base_name = str(getattr(puzzle, "riddle_base_name", "") or "").strip()
+
+        # Primary location (current layout): riddles/<base>/<base>_sample_solution.json
+        if riddle_base_name:
+            primary_path = riddles_dir / riddle_base_name / f"{riddle_base_name}_sample_solution.json"
+            payload = _read_solution(primary_path)
+            if payload is not None:
+                return payload
+
+            # Legacy flat layout fallback: riddles/<base>_sample_solution.json
+            legacy_flat_path = riddles_dir / f"{riddle_base_name}_sample_solution.json"
+            payload = _read_solution(legacy_flat_path)
+            if payload is not None:
+                return payload
+
+        # Fallback for older rows missing riddle_base_name:
+        # try ID/name-derived patterns used by some historical imports.
+        puzzle_id = getattr(puzzle, "id", None)
+        # find matching config by puzzle name and return its sibling sample solution.
+        puzzle_name = str(getattr(puzzle, "name", "") or "").strip()
+        if puzzle_name:
+            slug = self._sanitize_puzzle_name(puzzle_name)
+
+            base_candidates = []
+            try:
+                numeric_id = int(puzzle_id)
+                base_candidates.extend(
+                    [
+                        f"riddle_{numeric_id}_{slug}",
+                        f"riddle_{numeric_id:02d}_{slug}",
+                    ]
+                )
+            except Exception:
+                pass
+
+            for base_name in base_candidates:
+                nested_candidate = riddles_dir / base_name / f"{base_name}_sample_solution.json"
+                payload = _read_solution(nested_candidate)
+                if payload is not None:
+                    return payload
+
+                flat_candidate = riddles_dir / f"{base_name}_sample_solution.json"
+                payload = _read_solution(flat_candidate)
+                if payload is not None:
+                    return payload
+
+            for config_path in riddles_dir.rglob("*_config.json"):
+                if not _matches_puzzle_name(config_path, puzzle_name):
+                    continue
+
+                base_name = config_path.name.replace("_config.json", "")
+                candidate_solution = config_path.with_name(f"{base_name}_sample_solution.json")
+                payload = _read_solution(candidate_solution)
+                if payload is not None:
+                    return payload
+
+        return None
+
+    @staticmethod
+    def _as_object(value: Any) -> Dict[str, Any] | None:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, dict) else None
+            except Exception:
+                return None
+        return None
+
+    def _normalize_creator_solution_payload(self, payload: Dict[str, Any] | None) -> Dict[str, Any] | None:
+        if not isinstance(payload, dict):
+            return None
+
+        def _has_circuit_shape(value: Dict[str, Any] | None) -> bool:
+            if not isinstance(value, dict):
+                return False
+            return any(
+                [
+                    isinstance(value.get("placed"), (list, dict)),
+                    isinstance(value.get("placedComponents"), list),
+                    isinstance(value.get("placed_components"), list),
+                    isinstance(value.get("components"), list),
+                    isinstance(value.get("wires"), (list, dict)),
+                    isinstance(value.get("wire_list"), list),
+                    isinstance(value.get("connections"), list),
+                ]
+            )
+
+        candidates = [
+            payload,
+            self._as_object(payload.get("circuit")),
+            self._as_object(payload.get("solution")),
+            self._as_object(payload.get("structure")),
+        ]
+        circuit = next((c for c in candidates if _has_circuit_shape(c)), payload)
+
+        placed_raw: List[Any]
+        if isinstance(circuit.get("placed"), list):
+            placed_raw = circuit.get("placed")
+        elif isinstance(circuit.get("placedComponents"), list):
+            placed_raw = circuit.get("placedComponents")
+        elif isinstance(circuit.get("placed_components"), list):
+            placed_raw = circuit.get("placed_components")
+        elif isinstance(circuit.get("components"), list):
+            placed_raw = circuit.get("components")
+        elif isinstance(circuit.get("placed"), dict):
+            placed_raw = list(circuit.get("placed").values())
+        else:
+            placed_raw = []
+
+        wires_raw: List[Any]
+        if isinstance(circuit.get("wires"), list):
+            wires_raw = circuit.get("wires")
+        elif isinstance(circuit.get("wire_list"), list):
+            wires_raw = circuit.get("wire_list")
+        elif isinstance(circuit.get("connections"), list):
+            wires_raw = circuit.get("connections")
+        elif isinstance(circuit.get("wires"), dict):
+            wires_raw = list(circuit.get("wires").values())
+        else:
+            wires_raw = []
+
+        normalized_placed: List[Dict[str, Any]] = []
+        for i, comp in enumerate(placed_raw):
+            comp_obj = self._as_object(comp)
+            if not comp_obj:
+                continue
+
+            component_id = str(
+                comp_obj.get("componentId")
+                or comp_obj.get("type")
+                or comp_obj.get("gateType")
+                or comp_obj.get("name")
+                or ""
+            ).strip()
+            if not component_id:
+                continue
+
+            origin = self._as_object(comp_obj.get("origin")) or {}
+            position = self._as_object(comp_obj.get("position")) or {}
+
+            row_raw = origin.get("row", origin.get("y", position.get("row", position.get("y", comp_obj.get("row", comp_obj.get("y"))))))
+            col_raw = origin.get("col", origin.get("x", position.get("col", position.get("x", comp_obj.get("col", comp_obj.get("x"))))))
+
+            has_explicit_position = row_raw is not None or col_raw is not None
+            if has_explicit_position:
+                try:
+                    row = max(0, int(row_raw if row_raw is not None else 0))
+                except Exception:
+                    row = 0
+                try:
+                    col = max(0, int(col_raw if col_raw is not None else 0))
+                except Exception:
+                    col = 0
+            else:
+                # Spread components so legacy files without coordinates are still viewable.
+                row = (i % 6) * 2
+                col = (i // 6) * 4 + 2
+
+            try:
+                rotation = 90 if int(comp_obj.get("rotation", 0)) == 90 else 0
+            except Exception:
+                rotation = 0
+
+            normalized_placed.append(
+                {
+                    "id": str(comp_obj.get("id") or f"{component_id}:{i}"),
+                    "componentId": component_id,
+                    "origin": {"row": row, "col": col},
+                    "rotation": rotation,
+                }
+            )
+
+        normalized_wires: List[Dict[str, Any]] = []
+        for i, wire in enumerate(wires_raw):
+            wire_obj = self._as_object(wire)
+            if not wire_obj:
+                continue
+
+            from_obj = self._as_object(wire_obj.get("from")) or self._as_object(wire_obj.get("source")) or {}
+            to_obj = self._as_object(wire_obj.get("to")) or self._as_object(wire_obj.get("target")) or {}
+
+            from_component_id = str(
+                from_obj.get("componentId")
+                or from_obj.get("ownerId")
+                or from_obj.get("id")
+                or wire_obj.get("fromComponentId")
+                or ""
+            ).strip()
+            to_component_id = str(
+                to_obj.get("componentId")
+                or to_obj.get("ownerId")
+                or to_obj.get("id")
+                or wire_obj.get("toComponentId")
+                or ""
+            ).strip()
+
+            if not from_component_id or not to_component_id:
+                continue
+
+            try:
+                from_pin = int(from_obj.get("pinIndex", wire_obj.get("fromPinIndex", 0)) or 0)
+            except Exception:
+                from_pin = 0
+            try:
+                to_pin = int(to_obj.get("pinIndex", wire_obj.get("toPinIndex", 0)) or 0)
+            except Exception:
+                to_pin = 0
+
+            normalized_wires.append(
+                {
+                    "id": str(wire_obj.get("id") or f"wire:{i}"),
+                    "from": {
+                        "componentId": from_component_id,
+                        "pinIndex": from_pin,
+                        "portId": str(from_obj.get("portId") or from_obj.get("pin") or f"P{from_pin}"),
+                    },
+                    "to": {
+                        "componentId": to_component_id,
+                        "pinIndex": to_pin,
+                        "portId": str(to_obj.get("portId") or to_obj.get("pin") or f"P{to_pin}"),
+                    },
+                }
+            )
+
+        if not normalized_placed and not normalized_wires:
+            return None
+
+        total_cost_raw = (
+            payload.get("totalCost")
+            if isinstance(payload, dict)
+            else None
+        )
+        if total_cost_raw is None and isinstance(payload, dict):
+            total_cost_raw = payload.get("total_cost")
+        if total_cost_raw is None and isinstance(circuit, dict):
+            total_cost_raw = circuit.get("totalCost", circuit.get("total_cost", 0))
+        try:
+            total_cost = int(total_cost_raw or 0)
+        except Exception:
+            total_cost = 0
+
+        normalized = {
+            "totalCost": total_cost,
+            "circuit": {
+                "placed": normalized_placed,
+                "placedComponents": normalized_placed,
+                "wires": normalized_wires,
+            },
+        }
+
+        eval_map = payload.get("eval_map") if isinstance(payload, dict) else None
+        if isinstance(eval_map, dict):
+            normalized["eval_map"] = eval_map
+
+        return normalized
+
     def browse(
         self,
         session_token: str,
@@ -282,8 +568,39 @@ class PuzzleService:
         if not p:
             print(f"DEBUG: PuzzleService.get id={puzzle_id} NOT FOUND in repo")
             raise ValidationError("puzzle not found")
+
+        current_user = self.user_repo.get_by_id(user_id)
+        is_admin = self._is_admin(current_user.role) if current_user else False
+        is_owner_or_admin = is_admin or p.creator_user_id == user_id
         
         d = self._enrich_puzzle(p.to_dict())
+
+        if is_owner_or_admin:
+            raw_creator_solution = self._load_creator_solution(p)
+            creator_solution = self._normalize_creator_solution_payload(
+                raw_creator_solution
+            )
+            d["creator_solution"] = creator_solution
+            d["creatorSolution"] = creator_solution
+
+            riddle_base_name = str(getattr(p, "riddle_base_name", "") or "").strip()
+            expected_path = None
+            if riddle_base_name:
+                expected_path = str(
+                    pathlib.Path(__file__).resolve().parent.parent.parent.parent
+                    / "riddles"
+                    / riddle_base_name
+                    / f"{riddle_base_name}_sample_solution.json"
+                )
+
+            meta = {
+                "available": creator_solution is not None,
+                "riddle_base_name": riddle_base_name or None,
+                "expected_path": expected_path,
+                "raw_found": raw_creator_solution is not None,
+            }
+            d["creator_solution_meta"] = meta
+            d["creatorSolutionMeta"] = meta
         
         # Add gate limits (allowed gates that player can use)
         # Get all available gates and filter to only those in default_gate_set

@@ -32,7 +32,8 @@
     "total_gate_count": null,
     "min_cycles": 3,
     "max_cycles": 3,
-    "allow_arsenal": true
+    "allow_arsenal": true,
+    "riddle_base_name": "riddle_03_sequential_adder"
   },
   "test_cases": [
     {

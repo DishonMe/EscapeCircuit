@@ -12,7 +12,8 @@
     "total_gate_count": null,
     "min_cycles": null,
     "max_cycles": null,
-    "allow_arsenal": true
+    "allow_arsenal": true,
+    "riddle_base_name": "riddle_04_palindrome"
   },
   "test_cases": [
     { "kind": "blackbox", "inputs": {"b1": 0, "b2": 0, "b3": 0, "b4": 0}, "expected_outputs": {"is_palindrome": 1} },
