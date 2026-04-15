@@ -32,6 +32,18 @@
     --input: 218 28% 86%;
     --ring: 224 62% 44%;
 
+    --difficulty-easy-bg: 145 64% 93%;
+    --difficulty-easy-fg: 147 58% 31%;
+    --difficulty-easy-border: 146 36% 80%;
+
+    --difficulty-medium-bg: 43 95% 92%;
+    --difficulty-medium-fg: 34 76% 36%;
+    --difficulty-medium-border: 40 46% 80%;
+
+    --difficulty-hard-bg: 1 88% 93%;
+    --difficulty-hard-fg: 0 67% 38%;
+    --difficulty-hard-border: 0 44% 80%;
+
     --radius: 0.625rem;
   }
 
@@ -63,6 +75,18 @@
     --border: 222 17% 25%;
     --input: 222 17% 25%;
     --ring: 214 88% 67%;
+
+    --difficulty-easy-bg: 153 48% 20%;
+    --difficulty-easy-fg: 151 64% 83%;
+    --difficulty-easy-border: 152 42% 31%;
+
+    --difficulty-medium-bg: 35 56% 21%;
+    --difficulty-medium-fg: 42 82% 82%;
+    --difficulty-medium-border: 35 44% 32%;
+
+    --difficulty-hard-bg: 2 56% 22%;
+    --difficulty-hard-fg: 2 82% 86%;
+    --difficulty-hard-border: 2 44% 33%;
   }
 
   :root[data-palette='ruby'] {
@@ -464,6 +488,29 @@
     --input: 206 8% 26%;
     --ring: 190 74% 58%;
   }
+
+  :root[data-palette='midnight'],
+  :root[data-palette='forest-night'],
+  :root[data-palette='volcanic'],
+  :root[data-palette='deep-ocean'],
+  :root[data-palette='night-sky'],
+  :root[data-palette='ember-night'],
+  :root[data-palette='violet-noir'],
+  :root[data-palette='evergreen-dark'],
+  :root[data-palette='graphite'],
+  :root[data-palette='ink'] {
+    --difficulty-easy-bg: 153 48% 20%;
+    --difficulty-easy-fg: 151 64% 83%;
+    --difficulty-easy-border: 152 42% 31%;
+
+    --difficulty-medium-bg: 35 56% 21%;
+    --difficulty-medium-fg: 42 82% 82%;
+    --difficulty-medium-border: 35 44% 32%;
+
+    --difficulty-hard-bg: 2 56% 22%;
+    --difficulty-hard-fg: 2 82% 86%;
+    --difficulty-hard-border: 2 44% 33%;
+  }
 }
 
 @layer base {
@@ -472,6 +519,26 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .difficulty-badge--easy {
+    color: hsl(var(--difficulty-easy-fg));
+    background-color: hsl(var(--difficulty-easy-bg));
+    border-color: hsl(var(--difficulty-easy-border));
+  }
+
+  .difficulty-badge--medium {
+    color: hsl(var(--difficulty-medium-fg));
+    background-color: hsl(var(--difficulty-medium-bg));
+    border-color: hsl(var(--difficulty-medium-border));
+  }
+
+  .difficulty-badge--hard {
+    color: hsl(var(--difficulty-hard-fg));
+    background-color: hsl(var(--difficulty-hard-bg));
+    border-color: hsl(var(--difficulty-hard-border));
   }
 }
 

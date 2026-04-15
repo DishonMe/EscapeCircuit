@@ -174,11 +174,11 @@ export const PuzzlesList = () => {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
       case 'easy':
-        return 'text-emerald-600 bg-emerald-50 border-emerald-200/60';
+        return 'difficulty-badge difficulty-badge--easy';
       case 'medium':
-        return 'text-amber-600 bg-amber-50 border-amber-200/60';
+        return 'difficulty-badge difficulty-badge--medium';
       case 'hard':
-        return 'text-red-600 bg-red-50 border-red-200/60';
+        return 'difficulty-badge difficulty-badge--hard';
       default:
         return 'text-muted-foreground bg-secondary border-border';
     }
