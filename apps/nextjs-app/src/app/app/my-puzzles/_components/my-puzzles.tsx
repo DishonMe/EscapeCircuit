@@ -346,7 +346,7 @@ export const MyPuzzles = () => {
                         <button
                           onClick={() => handleUnpublish(puzzle.id)}
                           disabled={unpublishMutation.isPending}
-                          className="flex-1 rounded-lg border border-amber-300/60 bg-amber-50/50 px-3 py-2 text-center text-[13px] font-medium text-amber-700 hover:bg-amber-100/50 transition-colors disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-red-600 bg-red-600 px-3 py-2 text-center text-[13px] font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
                         >
                           {unpublishMutation.isPending ? 'Unpublishing...' : 'Unpublish'}
                         </button>
@@ -354,7 +354,7 @@ export const MyPuzzles = () => {
                         <button
                           onClick={() => handlePublish(puzzle.id)}
                           disabled={publishMutation.isPending}
-                          className="flex-1 rounded-lg border border-emerald-300/60 bg-emerald-50/50 px-3 py-2 text-center text-[13px] font-medium text-emerald-700 hover:bg-emerald-100/50 transition-colors disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-center text-[13px] font-medium text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
                         >
                           {publishMutation.isPending ? 'Publishing...' : 'Publish'}
                         </button>
