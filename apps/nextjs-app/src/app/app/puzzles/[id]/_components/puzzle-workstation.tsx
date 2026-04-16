@@ -48,6 +48,7 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { Bug, ChevronDown, StepBack, StepForward, ArrowRight, Trash2 } from 'lucide-react';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { workstationTourSteps } from '@/config/tourSteps';
+import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -831,8 +832,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     };
   }, [inputs, outputs, wires]);
 
-  const STATE_KEY = `escapecircuit.workstation.state.v2:${puzzleId}`;
-
   const buildHoleState = useCallback(() => {
     const holes: Record<
       string,
@@ -926,44 +925,118 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     applyParsedStateRef.current = applyParsedState;
   }, [applyParsedState]);
 
-  // Load state from localStorage
-  useEffect(() => {
-    let cancelled = false;
+  // Draft persistence via scoped TTL cache (see plan issue #231).
+  const { storageKey, loadDraft, saveDraft, clearDraft } =
+    useWorkstationDraft(puzzleId);
+  const didHydrateRef = useRef(false);
+  const hydratedKeyRef = useRef<string | null>(null);
+  // Mirror the current storageKey in a ref so the save/flush effects can read
+  // it WITHOUT listing it as a dep — critical to avoid writing a previous
+  // scope's `placed`/`wires` under a freshly-changed storageKey in the same
+  // commit as the load effect.
+  const storageKeyRef = useRef<string | null>(storageKey);
+  storageKeyRef.current = storageKey;
 
-    const loadState = async () => {
-      // Load from localStorage
-      if (cancelled) return;
-      try {
-        const raw = window.localStorage.getItem(STATE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        applyParsedStateRef.current(parsed);
-      } catch {
-        // ignore
+  // Mirror placed/wires in refs so the flush handler always has the latest
+  // values without re-registering listeners on every edit.
+  const placedRef = useRef(placed);
+  placedRef.current = placed;
+  const wiresRef = useRef(wires);
+  wiresRef.current = wires;
+
+  // Set synchronously in checkSolution when res.solved === true. Gates both the
+  // save effect and the pagehide flush so neither can re-create the draft that
+  // was just cleared on solve. Reset in onSolveAgain's reset branch.
+  const solvedRef = useRef(false);
+
+  // Load effect: rehydrates whenever the effective storageKey changes
+  // (puzzleId change, auth transition, user swap).
+  useEffect(() => {
+    if (storageKey === null) return;
+    if (hydratedKeyRef.current === storageKey) return;
+
+    didHydrateRef.current = false;
+    // Scope change means we're looking at a different puzzle/user — the prior
+    // solved-gate no longer applies.
+    solvedRef.current = false;
+    const draft = loadDraft();
+    if (draft) {
+      applyParsedStateRef.current(draft);
+      // Sync the flush refs synchronously. Without this, in React 18 concurrent
+      // rendering the re-render from setPlaced/setWires can be time-sliced,
+      // leaving placedRef/wiresRef holding the PREVIOUS scope's values while
+      // hydratedKeyRef already points to the new scope — a flush in that window
+      // would write previous-scope state under the new key.
+      placedRef.current = draft.placed;
+      wiresRef.current = draft.wires;
+    } else {
+      // No draft under the new scope — reset the board so we don't leak the
+      // previous scope's state into this one.
+      setPlaced([]);
+      setWires([]);
+      placedRef.current = [];
+      wiresRef.current = [];
+    }
+    hydratedKeyRef.current = storageKey;
+    didHydrateRef.current = true;
+  }, [storageKey, loadDraft]);
+
+  // Save effect: writes the current board under the hydrated scope.
+  // Intentionally omits `storageKey` from deps — it's read via storageKeyRef.
+  // The effect fires on placed/wires changes, which (after an in-place scope
+  // change) only happen on the render AFTER the load effect's setPlaced/setWires
+  // have committed — so placed/wires always correspond to storageKeyRef.current.
+  useEffect(() => {
+    const key = storageKeyRef.current;
+    if (key === null) return;
+    if (!didHydrateRef.current || hydratedKeyRef.current !== key) return;
+    // Post-solve: suppress writes so the winning board can't re-populate the
+    // key that checkSolution just cleared. Reset in onSolveAgain.
+    if (solvedRef.current) return;
+
+    if (placed.length === 0 && wires.length === 0) {
+      clearDraft();
+    } else {
+      saveDraft({ placed, wires });
+    }
+  }, [placed, wires, saveDraft, clearDraft]);
+
+  // Lifecycle flush for tab-close / visibility-hidden. Reads the latest values
+  // via refs so listeners are installed once and kept stable.
+  useEffect(() => {
+    const flush = () => {
+      const key = storageKeyRef.current;
+      if (key === null) return;
+      if (!didHydrateRef.current || hydratedKeyRef.current !== key) return;
+      // Post-solve: the draft was just cleared in checkSolution; don't let a
+      // tab-close / tab-switch re-create it from the still-resident winning state.
+      if (solvedRef.current) return;
+      const currentPlaced = placedRef.current;
+      const currentWires = wiresRef.current;
+      if (currentPlaced.length === 0 && currentWires.length === 0) {
+        clearDraft();
+      } else {
+        saveDraft({ placed: currentPlaced, wires: currentWires });
       }
     };
 
-    loadState();
-    return () => { cancelled = true; };
-  }, [STATE_KEY, puzzleId]);
+    const onPageHide = () => flush();
+    const onVisibilityChange = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      ) {
+        flush();
+      }
+    };
 
-  // Save to localStorage (immediate)
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        STATE_KEY,
-        JSON.stringify({
-          grid: { rows: 10, cols: 14 },
-          placed,
-          wires,
-          holes: buildHoleState(),
-        }),
-      );
-    } catch {
-      // ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STATE_KEY, placed, wires]);
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [saveDraft, clearDraft]);
 
   const ratingMinAttemptSeconds = puzzle?.rating_min_attempt_seconds;
   const hasAttemptedMinTime = ratingMinAttemptSeconds != null
@@ -1451,6 +1524,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       setBoardFeedback(res.solved ? 'success' : 'failure');
       if (res.solved) {
+        // Synchronously suppress any subsequent save/flush before clearing,
+        // so a tab-close in the post-solve window can't re-save the winning board.
+        solvedRef.current = true;
+        clearDraft();
         const isFirstSolve = Boolean(
           (res as any).is_first_solve ??
             (res as any).first_solve ??
@@ -1547,14 +1624,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     // For "Try again" after a failed check, keep the user's board.
     // For "Solve again" after success, start from a clean board.
     if (shouldResetBoard) {
-      try {
-        window.localStorage.removeItem(STATE_KEY);
-      } catch {
-        // ignore
-      }
+      clearDraft();
       setPlaced([]);
       setWires([]);
       setIsSolved(false);
+      // Re-enable save/flush for the fresh attempt.
+      solvedRef.current = false;
       startTime.current = Date.now();
     }
 
