@@ -1481,6 +1481,34 @@ export const WorkstationGrid = ({
     );
   };
 
+  // Calculate highlighted wire IDs based on selected component
+  // Note: Wire highlighting is disabled for puzzle INPUT nodes
+  const highlightedWireIds = useMemo(() => {
+    const highlighted = new Set<string>();
+
+    if (selectedEntity.type === 'component') {
+      const selectedIds = new Set(selectedEntity.placedIds);
+      
+      // Disable highlighting if any selected component is a puzzle INPUT node
+      const hasInputNode = Array.from(selectedIds).some(id => id.startsWith('IO:IN:'));
+      if (hasInputNode) {
+        return highlighted; // Return empty set for INPUT nodes
+      }
+
+      // For selected components: highlight all wires directly connected
+      for (const wire of wires) {
+        if (selectedIds.has(wire.from.componentId) || selectedIds.has(wire.to.componentId)) {
+          highlighted.add(wire.id);
+        }
+      }
+    } else if (selectedEntity.type === 'wire') {
+      // For selected wires: just highlight that wire (already handled in wire rendering)
+      highlighted.add(selectedEntity.wireId);
+    }
+
+    return highlighted;
+  }, [selectedEntity, wires]);
+
   return (
     <div className="flex flex-1 flex-col gap-2 min-h-0">
       <div className="rounded-md border border-border bg-card p-3">
@@ -1736,21 +1764,26 @@ export const WorkstationGrid = ({
             const isRecentlyConnected = recentlyConnectedWireId === w.id;
             const isHighSignal = activeWireIdsSet.has(w.id);
             const isDeleteWarn = hoveredDeleteWireId === w.id;
+            const isHighlighted = highlightedWireIds.has(w.id);
             const wirePath = getCurvedWirePath(a, b);
             const isSurgePowered = isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
 
-            // Visual Feature: Dynamic Wire Coloring
+            // Visual Feature: Dynamic Wire Coloring with Highlight Support
             const strokeColor = isSelected
               ? '#2563eb'
               : isDeleteWarn
                 ? '#ef4444'
+              : isHighlighted
+                ? '#3b82f6'  // Bright blue for highlighted wires
               : isHighSignal
                 ? '#fde047'
               : isRecentlyConnected
                 ? '#60a5fa'
                 : getWireColor(w.id);
 
-            const flowColor = isHighSignal
+            const flowColor = isHighlighted
+              ? '#60a5fa'  // Flow color for highlighted wires
+              : isHighSignal
               ? '#fef08a'
               : isRecentlyConnected
                 ? '#bfdbfe'
@@ -1763,18 +1796,20 @@ export const WorkstationGrid = ({
               <g key={w.id}>
                 <path
                   className={cn(
-                    'pointer-events-auto cursor-pointer transition-all duration-300',
+                    'pointer-events-auto cursor-pointer transition-all duration-200',
                     isRecentlyConnected && 'animate-pulse',
                     isRecentlyConnected && 'workstation-wire-snap',
                   )}
                   d={wirePath}
                   fill="none"
                   stroke={strokeColor}
-                  strokeWidth={isPowerSurge ? 4.2 : isSelected ? 3 : isRecentlyConnected ? 4 : 2}
+                  strokeWidth={isPowerSurge ? 4.2 : isSelected ? 3 : isHighlighted ? 4 : isRecentlyConnected ? 4 : 2}
                   strokeDasharray={isWireLocked ? '6,3' : undefined}
                   style={{
                     filter: isDeleteWarn
                       ? 'drop-shadow(0 0 8px rgba(239,68,68,0.85))'
+                      : isHighlighted
+                      ? 'drop-shadow(0 0 8px rgba(59,130,246,0.8))'
                       : isSurgePowered
                       ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
                       : isHighSignal
@@ -1812,16 +1847,18 @@ export const WorkstationGrid = ({
                   d={wirePath}
                   fill="none"
                   stroke={flowColor}
-                  strokeWidth={isPowerSurge ? 3.2 : isHighSignal ? 2.4 : 1.4}
-                  strokeDasharray={isHighSignal ? '9 7' : '7 9'}
+                  strokeWidth={isPowerSurge ? 3.2 : isHighlighted ? 3 : isHighSignal ? 2.4 : 1.4}
+                  strokeDasharray={isHighlighted ? '5 5' : isHighSignal ? '9 7' : '7 9'}
                   className={cn(
-                    'pointer-events-none workstation-wire-flow',
-                    (isHighSignal || isPowerSurge) && 'workstation-wire-flow-fast',
+                    'pointer-events-none workstation-wire-flow transition-all duration-200',
+                    (isHighSignal || isPowerSurge || isHighlighted) && 'workstation-wire-flow-fast',
                   )}
                   style={{
-                    opacity: isPowerSurge ? 1 : isHighSignal ? 0.95 : 0.45,
+                    opacity: isPowerSurge ? 1 : isHighlighted ? 0.85 : isHighSignal ? 0.95 : 0.45,
                     filter: isPowerSurge
                       ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
+                      : isHighlighted
+                      ? 'drop-shadow(0 0 6px rgba(59,130,246,0.7))'
                       : isHighSignal
                       ? 'drop-shadow(0 0 8px rgba(250,204,21,0.8))'
                       : 'drop-shadow(0 0 4px rgba(96,165,250,0.45))',
@@ -2357,7 +2394,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(-100%, -50%)',
+                    transform: 'translate(-100%, calc(-50% + 20px))',
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -2427,7 +2464,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(0%, -50%)',
+                    transform: 'translate(0%, calc(-50% + 20px))',
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
