@@ -373,7 +373,7 @@ export default function ArsenalCreatorPage() {
     <div className="flex flex-col h-full gap-2">
       {/* Header + Compact Config Bar */}
       <div className="flex flex-wrap items-center gap-4 px-6 pt-3 pb-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Create Arsenal Piece</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Create Arsenal Piece 🛠️</h1>
 
         <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
           <span className="text-[12px] font-medium text-muted-foreground">Inputs</span>

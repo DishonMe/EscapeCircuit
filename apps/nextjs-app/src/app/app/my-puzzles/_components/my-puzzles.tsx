@@ -151,7 +151,7 @@ export const MyPuzzles = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
-            My Created Puzzles
+            My Created Puzzles 🗂️
           </h1>
           <p className="text-[13px] text-muted-foreground">
             Create, manage, and publish your circuit puzzles

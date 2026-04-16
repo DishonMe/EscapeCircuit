@@ -15,7 +15,7 @@ export const DashboardInfo = () => {
   return (
     <>
       <h1 className="text-xl font-semibold tracking-tight text-foreground">
-        Welcome <span className="font-semibold">{user.data.username}</span>
+        Welcome back <span className="font-semibold">{user.data.username}</span> 👋
       </h1>
       <h4 className="my-3 text-[13px] text-muted-foreground">
         Your role is : <span className="font-medium text-foreground">{user.data.role}</span>

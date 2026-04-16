@@ -61,7 +61,7 @@ export const CreateDiscussion = ({ onSuccess }: CreateDiscussionProps) => {
       </NextLink>
 
       <div className="rounded-xl border border-border bg-card p-6">
-        <h1 className="mb-6 text-xl font-semibold text-foreground">New Discussion</h1>
+        <h1 className="mb-6 text-xl font-semibold text-foreground">New Discussion 💬</h1>
 
         <Form
           id="create-discussion"

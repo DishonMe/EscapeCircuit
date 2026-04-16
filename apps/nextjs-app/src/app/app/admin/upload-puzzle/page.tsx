@@ -142,7 +142,7 @@ export default function UploadPuzzlePage() {
   return (
     <div className="p-8 max-w-4xl mx-auto text-foreground">
       <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Upload New Puzzle</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Upload New Puzzle 📤</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setShowInfo(!showInfo)}

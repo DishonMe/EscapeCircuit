@@ -155,7 +155,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
 
           <div className="flex-1">
             <h1 className="mb-2 text-xl font-semibold text-foreground">
-              {discussion.title}
+              💬 {discussion.title}
             </h1>
 
             <div className="mb-4 flex items-center gap-2 text-[13px] text-muted-foreground">

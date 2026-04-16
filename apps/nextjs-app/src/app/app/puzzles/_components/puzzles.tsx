@@ -45,7 +45,7 @@ export const Puzzles = () => {
           {/* Content */}
           <div className="flex flex-col items-center justify-center text-center relative z-10">
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight font-mono text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-500 mb-4">
-              Circuit Puzzles
+              Circuit Puzzles 🧩
             </h1>
             <p className="text-muted-foreground text-[13px]">
               Browse and solve challenging circuit design puzzles

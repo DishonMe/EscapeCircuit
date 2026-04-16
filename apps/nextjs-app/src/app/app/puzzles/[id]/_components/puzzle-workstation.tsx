@@ -1801,7 +1801,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                {puzzle.title}
+                🧩 {puzzle.title}
               </h1>
               {isSolved && (
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
