@@ -35,7 +35,7 @@ const NotificationsPage = () => {
   return (
     <div className="max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notifications</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notifications 🔔</h1>
         <p className="mt-2 text-[13px] text-muted-foreground">
           View and filter your creator notifications
         </p>
@@ -144,7 +144,7 @@ const NotificationsPage = () => {
       ) : !notifications || notifications.length === 0 ? (
         <div className="rounded-xl border border-border bg-secondary/50 p-8 text-center">
           <p className="text-[13px] text-muted-foreground">
-            No notifications yet. Your creator notifications will appear here.
+            No notifications yet. 🔔 Your creator notifications will appear here.
           </p>
         </div>
       ) : (

@@ -20,8 +20,8 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const hasShownNotificationRef = useRef(false);
   const isLoginPage = pathname === paths.auth.login.getHref();
   const title = isLoginPage
-    ? 'Log in to your account'
-    : 'Register your account';
+    ? 'Log in to your account 🔐'
+    : 'Register your account ✍️';
 
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');

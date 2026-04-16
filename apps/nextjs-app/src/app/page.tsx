@@ -61,7 +61,7 @@ const HomePage = () => {
         <div className="max-w-2xl text-center">
           <img className="mx-auto mb-8 h-24 w-auto" src="/logo.svg" alt="" />
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Wire your way out
+            Wire your way out ⚡
           </h1>
           <p className="mt-4 text-base text-muted-foreground sm:text-lg">
             Create and solve logic-circuit puzzles, compete on the leaderboard,

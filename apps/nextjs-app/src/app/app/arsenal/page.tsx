@@ -167,7 +167,7 @@ export default function ArsenalPage() {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal 🧰</h1>
             <div className="flex items-center gap-1 text-foreground/85">
               <span>
                 {isAdmin

@@ -963,7 +963,7 @@ export default function CreatePuzzleForm() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto text-foreground">
-      <h1 className="text-3xl font-semibold mb-6">Create New Puzzle</h1>
+      <h1 className="text-3xl font-semibold mb-6">Create New Puzzle 🧩</h1>
 
       {/* Tabs */}
       <div className="flex border-b mb-6">

@@ -127,7 +127,7 @@ export const DiscussionsList = () => {
             ? 'No bookmarked discussions yet.'
             : searchInput
             ? 'No discussions match your search.'
-            : 'No discussions found. Start the conversation!'}
+            : 'No discussions found. Start the conversation 💬'}
         </div>
       ) : (
         <div className="space-y-2">

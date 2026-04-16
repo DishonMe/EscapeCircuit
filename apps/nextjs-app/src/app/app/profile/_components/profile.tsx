@@ -209,7 +209,7 @@ export const Profile = () => {
                 {initials}
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">👤 {displayName}</h1>
                 <p className="text-sm text-muted-foreground">Circuit Operator Profile</p>
               </div>
             </div>
