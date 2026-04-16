@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent } from 'react';
-import { Filter, X, AlertTriangle } from 'lucide-react';
+import { Filter, X, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -28,6 +28,7 @@ function useDebouncedValue<T>(value: T, delay: number = 400): T {
 export const AdminPuzzlesList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<AdminPuzzleFilters>({});
+  const activeFilterCount = Object.values(filters).filter((v) => v).length;
 
   // Debounce text inputs so the API isn't called on every keystroke
   const debouncedFilters = useDebouncedValue(filters);
@@ -195,15 +196,14 @@ export const AdminPuzzlesList = () => {
         >
           <Filter className="size-4" />
           Filters{' '}
-          {Object.values(filters).filter((v) => v).length > 0 &&
-            `(${Object.values(filters).filter((v) => v).length})`}
+          {activeFilterCount > 0 && `(${activeFilterCount})`}
         </Button>
-        {Object.values(filters).filter((v) => v).length > 0 && (
+        {activeFilterCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-foreground/75"
+            className="text-muted-foreground text-[13px]"
           >
             <X className="size-4" />
             Clear
@@ -213,17 +213,17 @@ export const AdminPuzzlesList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Name Search */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Name
               </label>
               <input
                 type="text"
                 placeholder="Search puzzle name..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -236,13 +236,13 @@ export const AdminPuzzlesList = () => {
 
             {/* Creator Username */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Creator
               </label>
               <input
                 type="text"
                 placeholder="Search by creator username..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.creatorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -255,11 +255,11 @@ export const AdminPuzzlesList = () => {
 
             {/* Status */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Status
               </label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.status || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -277,11 +277,11 @@ export const AdminPuzzlesList = () => {
 
             {/* Order By */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Order By
               </label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   setFilters({
@@ -300,22 +300,34 @@ export const AdminPuzzlesList = () => {
 
             {/* Direction */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Direction
               </label>
-              <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
-                value={filters.orderDirection || 'DESC'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentDirection = filters.orderDirection || 'DESC';
+                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
                   setFilters({
                     ...filters,
-                    orderDirection: e.target.value as any,
-                  })
-                }
+                    orderDirection: newDirection as any,
+                  });
+                }}
+                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
               >
-                <option className="text-foreground bg-card" value="DESC">Descending</option>
-                <option className="text-foreground bg-card" value="ASC">Ascending</option>
-              </select>
+                {(filters.orderDirection || 'DESC') === 'ASC' ? (
+                  <>
+                    <ArrowUp className="size-3 inline-block" />
+                    <span> Ascending</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDown className="size-3 inline-block" />
+                    <span> Descending</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>

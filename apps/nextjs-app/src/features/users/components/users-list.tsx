@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent } from 'react';
-import { Filter, X } from 'lucide-react';
+import { Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -28,6 +28,7 @@ function useDebouncedValue<T>(value: T, delay: number = 400): T {
 export const UsersList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<UserFilters>({});
+  const activeFilterCount = Object.values(filters).filter((v) => v).length;
 
   // Debounce text inputs so the API isn't called on every keystroke
   const debouncedFilters = useDebouncedValue(filters);
@@ -163,14 +164,14 @@ export const UsersList = () => {
           className="gap-2"
         >
           <Filter className="size-4" />
-          Filters {Object.values(filters).filter((v) => v).length > 0 && `(${Object.values(filters).filter((v) => v).length})`}
+          Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
         </Button>
-        {Object.values(filters).filter((v) => v).length > 0 && (
+        {activeFilterCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-foreground/75"
+            className="text-muted-foreground text-[13px]"
           >
             <X className="size-4" />
             Clear
@@ -180,15 +181,15 @@ export const UsersList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Username Search */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">Username</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Username</label>
               <input
                 type="text"
                 placeholder="Search username..."
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.usernameSearch || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, usernameSearch: e.target.value || undefined })}
               />
@@ -196,9 +197,9 @@ export const UsersList = () => {
 
             {/* Role */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">Role</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Role</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.role || ''}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, role: (e.target.value || undefined) as any })}
               >
@@ -212,9 +213,9 @@ export const UsersList = () => {
 
             {/* Experience Level */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">Experience</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.experienceLevel || 'all'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any })}
               >
@@ -226,9 +227,9 @@ export const UsersList = () => {
 
             {/* Order By */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">Order By</label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
               <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.orderBy || 'created_at'}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
               >
@@ -241,15 +242,29 @@ export const UsersList = () => {
 
             {/* Direction */}
             <div>
-              <label className="text-[13px] font-medium text-foreground">Direction</label>
-              <select
-                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.orderDirection || 'ASC'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentDirection = filters.orderDirection || 'ASC';
+                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
+                  setFilters({ ...filters, orderDirection: newDirection as any });
+                }}
+                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
               >
-                <option className="text-foreground bg-card" value="ASC">Ascending</option>
-                <option className="text-foreground bg-card" value="DESC">Descending</option>
-              </select>
+                {(filters.orderDirection || 'ASC') === 'ASC' ? (
+                  <>
+                    <ArrowUp className="size-3 inline-block" />
+                    <span> Ascending</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDown className="size-3 inline-block" />
+                    <span> Descending</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
