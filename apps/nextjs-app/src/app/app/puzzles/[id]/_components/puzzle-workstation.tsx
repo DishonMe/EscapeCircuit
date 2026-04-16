@@ -1989,6 +1989,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           onDebuggerSequenceChange={onInlineSequenceChange}
           onInspectComponent={setInspectingPlacedId}
           arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+          disableZoomPersistence
         />
         </div>
 
@@ -2293,6 +2294,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   boardRows={puzzle.board_rows ?? 15}
                   boardCols={puzzle.board_cols ?? 30}
                   onInspectComponent={setInspectingSandboxPlacedId}
+                  disableZoomPersistence
                 />
               </div>
             </div>

@@ -146,6 +146,7 @@ export const WorkstationGrid = ({
   onInspectComponent,
   isEditMode = false,
   viewportClassName,
+  disableZoomPersistence = false,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -178,6 +179,7 @@ export const WorkstationGrid = ({
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
   viewportClassName?: string;
+  disableZoomPersistence?: boolean;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -544,9 +546,12 @@ export const WorkstationGrid = ({
   const previousWireIdsRef = useRef<string[]>(wires.map((wire) => wire.id));
 
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
+  const shouldPersistZoom = !disableZoomPersistence;
 
   // Load/save view state.
   useEffect(() => {
+    if (!shouldPersistZoom) return;
+
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       let hasSavedZoom = false;
@@ -576,15 +581,17 @@ export const WorkstationGrid = ({
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY, gridCols, gridRows]);
+  }, [STORAGE_KEY, gridCols, gridRows, shouldPersistZoom]);
 
   useEffect(() => {
+    if (!shouldPersistZoom) return;
+
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ zoom }));
     } catch {
       // ignore
     }
-  }, [STORAGE_KEY, zoom]);
+  }, [STORAGE_KEY, zoom, shouldPersistZoom]);
 
   useEffect(() => {
     const previousPlacedIds = previousPlacedIdsRef.current;
@@ -654,7 +661,7 @@ export const WorkstationGrid = ({
       return { x: panX, y: panY };
     };
 
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = shouldPersistZoom ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) {
       const fit = updateFit();
       setZoom(fit);
@@ -678,7 +685,7 @@ export const WorkstationGrid = ({
 
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY, gridCols, gridRows]);
+  }, [STORAGE_KEY, gridCols, gridRows, shouldPersistZoom]);
 
   const componentRects = useMemo(() => {
     return placed
