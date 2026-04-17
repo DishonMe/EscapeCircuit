@@ -59,6 +59,7 @@ export type SelectedComponentState =
 const DEFAULT_GRID_ROWS = 15;
 const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
+const PUZZLE_IO_Y_OFFSET_PX = 20;
 
 // Visual Feature: Dynamic Wire Coloring
 const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316']; 
@@ -836,6 +837,33 @@ export const WorkstationGrid = ({
     return occ;
   }, [allPorts]);
 
+  const staleLogicalPortHoleKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    for (const p of placed) {
+      const def = catalog[p.componentId];
+      if (!def) continue;
+
+      const visualOffsets = visualPortOffsetsByPlacedId.get(p.id);
+      if (!visualOffsets) continue;
+
+      for (const port of def.ports) {
+        const logicalOffset = rotateOffset(port.offset, def.size, p.rotation);
+        const visualOffset = visualOffsets.get(port.id) ?? logicalOffset;
+
+        if (
+          visualOffset.row !== logicalOffset.row ||
+          visualOffset.col !== logicalOffset.col
+        ) {
+          const key = `r${p.origin.row + logicalOffset.row}c${p.origin.col + logicalOffset.col}`;
+          keys.add(key);
+        }
+      }
+    }
+
+    return keys;
+  }, [catalog, placed, visualPortOffsetsByPlacedId]);
+
   const worldToScreen = (hole: HoleCoord) => {
     const x = pan.x + hole.col * CELL_PX * zoom;
     const y = pan.y + hole.row * CELL_PX * zoom;
@@ -982,10 +1010,12 @@ export const WorkstationGrid = ({
 
   const getPortScreenPoint = (port: PortAddress, ioLayout: IOLayout) => {
     if (port.ownerId.startsWith('IO:IN:')) {
-      return ioLayout.inputs[port.ownerId] ?? { x: 0, y: 0 };
+      const pt = ioLayout.inputs[port.ownerId] ?? { x: 0, y: 0 };
+      return { x: pt.x, y: pt.y + PUZZLE_IO_Y_OFFSET_PX };
     }
     if (port.ownerId.startsWith('IO:OUT:')) {
-      return ioLayout.outputs[port.ownerId] ?? { x: 0, y: 0 };
+      const pt = ioLayout.outputs[port.ownerId] ?? { x: 0, y: 0 };
+      return { x: pt.x, y: pt.y + PUZZLE_IO_Y_OFFSET_PX };
     }
 
     const placedInst = placedById[port.ownerId];
@@ -2030,6 +2060,7 @@ export const WorkstationGrid = ({
                   const key = `r${r}c${c}`;
                   const occ = occupiedHoles.get(key);
                   const portOcc = occupiedPortHoles.get(key);
+                  const showPortOcc = Boolean(portOcc) && !staleLogicalPortHoleKeys.has(key);
 
                   const left = c * CELL_PX;
                   const top = r * CELL_PX;
@@ -2050,7 +2081,7 @@ export const WorkstationGrid = ({
                       <button
                         className={cn(
                           'rounded-full transition-colors',
-                          portOcc
+                          showPortOcc
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-muted-foreground/50'
@@ -2423,9 +2454,16 @@ export const WorkstationGrid = ({
                   ? selectedComponent.rotation
                   : 0;
               const size = rotatedSize(def.size, rotation);
+              const previewVisualPortOffsets = getVisualPortOffsets(def, rotation);
               return (
                 <LogicNode
-                  node={def}
+                  node={{
+                    ...def,
+                    ports: def.ports.map((port) => ({
+                      ...port,
+                      offset: previewVisualPortOffsets.get(port.id) ?? port.offset,
+                    })),
+                  }}
                   className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
                   style={{
                     left: dropPreview.col * 18,
@@ -2487,7 +2525,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(-100%, calc(-50% + 20px))',
+                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -2557,7 +2595,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(0%, calc(-50% + 20px))',
+                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
