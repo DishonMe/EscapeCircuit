@@ -15,7 +15,7 @@ import { useAudio } from '@/hooks/useAudio';
 import { useSettings } from '@/context/settings-context';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
-import { LogicNode } from './node';
+import { LogicNode, type LogicNodeVisualStyle } from './node';
 
 export type HoleCoord = { row: number; col: number };
 
@@ -34,6 +34,7 @@ export type ComponentDef = {
   cost: number;
   size: { w: number; h: number };
   ports: PortDef[];
+  visualStyle?: LogicNodeVisualStyle;
 };
 
 export type PlacedGridComponent = {

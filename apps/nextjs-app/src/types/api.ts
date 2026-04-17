@@ -199,6 +199,13 @@ export type CircuitComponent = {
   is_arsenal?: boolean;
   used_basic_types?: string[];  // Array of basic gate types used in the component
   solution?: Record<string, any>;  // Component's internal structure/implementation
+  visual_style?: {
+    accentColor?: string;
+    roundness?: number;
+    borderStyle?: 'solid' | 'double' | 'etched';
+    edgeAddon?: 'none' | 'chip-legs';
+    surfaceStyle?: 'flat' | 'brushed' | 'gradient' | 'matte' | 'glass' | 'carbon';
+  };
   hide_internal_structure?: boolean;  // Whether internal structure should be hidden from player
   description?: string;  // Component description shown in inspection dialog
 };
