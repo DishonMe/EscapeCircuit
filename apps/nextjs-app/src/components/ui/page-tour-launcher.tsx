@@ -22,6 +22,10 @@ type PageTourLauncherProps = {
   steps: any[];
   side?: 'left' | 'right';
   buttonClassName?: string;
+  /** Disable Joyride's auto-scroll between steps. Use when every target is already visible. */
+  disableScrolling?: boolean;
+  /** Pixels of clearance between the top of the viewport and the target after scroll. */
+  scrollOffset?: number;
 };
 
 function TourTooltip({
@@ -92,6 +96,8 @@ export function PageTourLauncher({
   steps,
   side = 'right',
   buttonClassName,
+  disableScrolling = false,
+  scrollOffset = 140,
 }: PageTourLauncherProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [runTour, setRunTour] = useState(false);
@@ -151,14 +157,45 @@ export function PageTourLauncher({
     setDialogOpen(false);
     setCurrentStepIndex(0);
     setTourInstanceId((current) => current + 1);
-    setRunTour(true);
+    // Take the user to the top before the tour starts. When `disableScrolling`
+    // is set, the scroll-freeze effect kicks in once runTour=true, so we scroll
+    // FIRST (while scroll is still allowed) and then engage the tour after the
+    // smooth scroll has had time to land.
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+    window.setTimeout(() => setRunTour(true), 500);
   };
 
   const handleTourCallback = (data: any) => {
-    const { status, index } = data;
+    const { status, index, type, step } = data;
 
     if (typeof index === 'number') {
       setCurrentStepIndex(index);
+    }
+
+    // Center off-screen targets ourselves; skip scrolling when the target is already visible
+    // OR when the page has opted out of scrolling entirely (disableScrolling).
+    // Joyride's built-in scroll anchors to the top (scrollOffset), which over-scrolls on pages
+    // with a sticky header/toolbar — centering is what users actually expect.
+    if (
+      !disableScrolling &&
+      type === 'step:before' &&
+      typeof step?.target === 'string'
+    ) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(step.target) as HTMLElement | null;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const vh = window.innerHeight;
+        // Reserve clearance for fixed app nav + sticky toolbar
+        const topClearance = 120;
+        const bottomClearance = 40;
+        const inView = rect.top >= topClearance && rect.bottom <= vh - bottomClearance;
+        if (!inView) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      });
     }
 
     if (status === 'finished' || status === 'skipped') {
@@ -197,6 +234,117 @@ export function PageTourLauncher({
     window.addEventListener('click', handleTourAdvanceClick, true);
     return () => window.removeEventListener('click', handleTourAdvanceClick, true);
   }, [runTour, currentStepIndex, normalizedSteps]);
+
+  // When a page opts into `disableScrolling`, make sure NOTHING moves the scroll
+  // position for the duration of the tour: not Joyride, not focus changes, not the
+  // Radix dialog that opens for the dialog-close step.
+  //
+  // We do this proactively (no-op the programmatic scroll APIs) so the scroll never
+  // happens in the first place — a reactive "snap back" would render visibly laggy.
+  // User-initiated scrolls (wheel / touch / keys) go through the browser's native
+  // scroll pipeline, not these APIs, so they're unaffected.
+  useEffect(() => {
+    if (!runTour || !disableScrolling) return;
+
+    // 1. Patch focus() so any focus() call during the tour passes preventScroll:true.
+    const originalFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function patchedFocus(options) {
+      return originalFocus.call(this, { ...(options || {}), preventScroll: true });
+    };
+
+    // 2. Neutralise programmatic scroll methods on Window and Element.
+    const originalWindowScrollTo = window.scrollTo;
+    const originalWindowScrollBy = window.scrollBy;
+    const originalWindowScroll = window.scroll;
+    const originalElementScrollIntoView = Element.prototype.scrollIntoView;
+    const originalElementScrollTo = Element.prototype.scrollTo;
+    const originalElementScrollBy = Element.prototype.scrollBy;
+    const originalElementScroll = Element.prototype.scroll;
+
+    const noop = () => {};
+    (window as unknown as { scrollTo: typeof noop }).scrollTo = noop;
+    (window as unknown as { scrollBy: typeof noop }).scrollBy = noop;
+    (window as unknown as { scroll: typeof noop }).scroll = noop;
+    (Element.prototype as unknown as { scrollIntoView: typeof noop }).scrollIntoView = noop;
+    (Element.prototype as unknown as { scrollTo: typeof noop }).scrollTo = noop;
+    (Element.prototype as unknown as { scrollBy: typeof noop }).scrollBy = noop;
+    (Element.prototype as unknown as { scroll: typeof noop }).scroll = noop;
+
+    // 3. Intercept direct `scrollTop` / `scrollLeft` setter assignments on the
+    //    page's scrolling element — this is the path Joyride uses for its animated
+    //    scroll (it writes `scrollTop = n` inside a rAF loop). Overriding the
+    //    setter on the instance (not the prototype) keeps overflow:auto child
+    //    containers — e.g. scrollable content inside a dialog — fully functional.
+    const scrollEl =
+      (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+    const bodyEl = document.body;
+
+    const scrollTopProto = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      'scrollTop',
+    );
+    const scrollLeftProto = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      'scrollLeft',
+    );
+
+    const freeze = (el: HTMLElement) => {
+      if (!scrollTopProto?.get || !scrollLeftProto?.get) return;
+      Object.defineProperty(el, 'scrollTop', {
+        configurable: true,
+        get() {
+          return scrollTopProto.get!.call(this);
+        },
+        set() {
+          /* blocked during tour */
+        },
+      });
+      Object.defineProperty(el, 'scrollLeft', {
+        configurable: true,
+        get() {
+          return scrollLeftProto.get!.call(this);
+        },
+        set() {
+          /* blocked during tour */
+        },
+      });
+    };
+
+    const unfreeze = (el: HTMLElement) => {
+      // Deleting the instance-level property restores prototype access.
+      delete (el as unknown as { scrollTop?: number }).scrollTop;
+      delete (el as unknown as { scrollLeft?: number }).scrollLeft;
+    };
+
+    freeze(scrollEl);
+    if (bodyEl !== scrollEl) freeze(bodyEl);
+
+    return () => {
+      HTMLElement.prototype.focus = originalFocus;
+      (window as unknown as { scrollTo: typeof originalWindowScrollTo }).scrollTo =
+        originalWindowScrollTo;
+      (window as unknown as { scrollBy: typeof originalWindowScrollBy }).scrollBy =
+        originalWindowScrollBy;
+      (window as unknown as { scroll: typeof originalWindowScroll }).scroll =
+        originalWindowScroll;
+      (
+        Element.prototype as unknown as {
+          scrollIntoView: typeof originalElementScrollIntoView;
+        }
+      ).scrollIntoView = originalElementScrollIntoView;
+      (
+        Element.prototype as unknown as { scrollTo: typeof originalElementScrollTo }
+      ).scrollTo = originalElementScrollTo;
+      (
+        Element.prototype as unknown as { scrollBy: typeof originalElementScrollBy }
+      ).scrollBy = originalElementScrollBy;
+      (
+        Element.prototype as unknown as { scroll: typeof originalElementScroll }
+      ).scroll = originalElementScroll;
+      unfreeze(scrollEl);
+      if (bodyEl !== scrollEl) unfreeze(bodyEl);
+    };
+  }, [runTour, disableScrolling]);
 
   return (
     <>
@@ -244,15 +392,14 @@ export function PageTourLauncher({
         tourName={tourName}
         run={runTour}
         continuous
-        scrollToFirstStep
+        scrollToFirstStep={false}
+        disableScrolling={true}
+        scrollOffset={scrollOffset}
         showSkipButton={false}
         showProgress={false}
         skipBeacon
         onEvent={handleTourCallback}
         tooltipComponent={TourTooltip}
-        options={{
-          scrollOffset: 80,
-        }}
         styles={{
           options: {
             primaryColor: 'hsl(var(--foreground))',

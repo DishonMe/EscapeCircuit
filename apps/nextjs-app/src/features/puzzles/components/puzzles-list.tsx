@@ -1,22 +1,7 @@
 'use client';
 
-import {
-  Clock,
-  Star,
-  Circle,
-  Users,
-  Info,
-  MessageSquare,
-  Medal,
-  CheckCircle2,
-  Filter,
-  X,
-  Bookmark,
-  Trophy,
-  ArrowUp,
-  ArrowDown,
-} from 'lucide-react';
-import { useMemo, useState, ChangeEvent, useEffect } from 'react';
+import { Trophy } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,726 +13,308 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
-import { Link } from '@/components/ui/link';
-import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
-import { paths } from '@/config/paths';
-import type { Puzzle } from '@/types/api';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
+import { cn } from '@/utils/cn';
 
 import { usePuzzles, PuzzleFilters } from '../api/get-puzzles';
 import { useToggleSavePuzzle } from '../api/save-puzzle';
+import { useDebouncedValue } from '../hooks/use-debounced-value';
+import { useViewMode } from '../hooks/use-view-mode';
+
 import { CreatorCommentDialog } from './creator-comment-dialog';
+import { PuzzleCard } from './puzzle-card';
 import { PuzzleDetailsDialog } from './puzzle-details-dialog';
 import { PuzzleLeaderboard } from './puzzle-leaderboard';
-import { cn } from '@/utils/cn';
+import { PuzzleRow } from './puzzle-row';
+import { PuzzlesActiveFilters } from './puzzles-active-filters';
+import { PuzzlesEmpty } from './puzzles-empty';
+import { PuzzlesPagination } from './puzzles-pagination';
+import {
+  PuzzlesGallerySkeleton,
+  PuzzlesListSkeleton,
+} from './puzzles-skeleton';
+import { PuzzlesToolbar } from './puzzles-toolbar';
 
-function useDebouncedValue<T>(value: T, delay: number = 400): T {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debounced;
-}
+const tourSteps = [
+  {
+    target: '.puzzle-filters-button',
+    content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
+    disableBeacon: true,
+  },
+  {
+    target: '.puzzle-instructions-button',
+    content:
+      'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+  },
+  {
+    target: '.dialog-close-button',
+    content:
+      'Use the Close button to exit the instructions and return to the puzzle list.',
+    placement: 'bottom',
+  },
+  {
+    target: '.puzzle-card-action',
+    content: 'Click to start solving!',
+  },
+];
 
 export const PuzzlesList = () => {
+  // ── Dialog open-state ──────────────────────────────────────────────
   const [detailsPuzzleId, setDetailsPuzzleId] = useState<string | null>(null);
   const [commentPuzzleId, setCommentPuzzleId] = useState<string | null>(null);
-  const [leaderboardPuzzleId, setLeaderboardPuzzleId] = useState<string | null>(null);
+  const [leaderboardPuzzleId, setLeaderboardPuzzleId] = useState<string | null>(
+    null,
+  );
   const [ratingPuzzleId, setRatingPuzzleId] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<PuzzleFilters>({ page: 1, selectedDifficulties: [1, 2, 3] });
+
+  // ── Filter state ───────────────────────────────────────────────────
+  const [filters, setFilters] = useState<PuzzleFilters>({
+    page: 1,
+    selectedDifficulties: [1, 2, 3],
+  });
   const [creatorSearchInput, setCreatorSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState('');
 
-  const tourSteps = [
-    {
-      target: '.puzzle-filters-button',
-      content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
-      disableBeacon: true,
-    },
-    {
-      target: '.puzzle-instructions-button',
-      content: 'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
-    },
-    {
-      target: '.dialog-close-button',
-      content: 'Use the Close button to exit the instructions and return to the puzzle list.',
-      placement: 'bottom',
-    },
-    {
-      target: '.puzzle-card-action',
-      content: 'Click to start solving!',
-    }
-  ];
+  // ── View mode ──────────────────────────────────────────────────────
+  const [view, setView] = useViewMode();
 
-  const debouncedCreatorSearch = useDebouncedValue(creatorSearchInput, 400);
-
-  const getActiveFilterCount = () => {
-    let count = 0;
-    Object.entries(filters).forEach(([key, value]) => {
-      if (key === 'page' || !value) return;
-      if (key === 'selectedDifficulties') {
-        if (Array.isArray(value) && !(value.length === 3 && value.includes(1) && value.includes(2) && value.includes(3))) {
-          count++;
-        }
-        return;
-      }
-      if (value && value !== 1) count++;
-    });
-    return count;
-  };
+  // ── Debounced creator ──────────────────────────────────────────────
+  const debouncedCreator = useDebouncedValue(creatorSearchInput, 400);
 
   useEffect(() => {
     setFilters((prev) => {
-      const nextCreator = debouncedCreatorSearch.trim() || undefined;
-      if (prev.creator === nextCreator) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        creator: nextCreator,
-        page: 1,
-      };
+      const nextCreator = debouncedCreator.trim() || undefined;
+      if (prev.creator === nextCreator) return prev;
+      return { ...prev, creator: nextCreator, page: 1 };
     });
-  }, [debouncedCreatorSearch]);
+  }, [debouncedCreator]);
 
-  const puzzlesQuery = usePuzzles({
-    filters: {
-      page: filters.page || 1,
-      ...filters,
-    },
+  // ── Server query ───────────────────────────────────────────────────
+  const { data, isLoading, isFetching } = usePuzzles({
+    filters: { page: filters.page || 1, ...filters },
     config: {
-      // Keep prior page/filter results visible while the next request is in-flight.
       placeholderData: (previousData) => previousData,
     },
   });
 
-  const puzzles = puzzlesQuery.data?.data;
-  const meta = puzzlesQuery.data?.meta;
-  const isRefetching = puzzlesQuery.isFetching && !puzzlesQuery.isLoading;
-  const isBusyLoading = puzzlesQuery.isLoading || isRefetching;
-  const saveMutation = useToggleSavePuzzle({});
+  const isRefetching = isFetching && !isLoading;
+  const rawPuzzles = data?.data;
+  const meta = data?.meta;
 
-  // Filter puzzles based on medal filter (client-side, based on best_medal)
+  const puzzles = useMemo(() => rawPuzzles ?? [], [rawPuzzles]);
+
+  // ── Save mutation ──────────────────────────────────────────────────
+  const saveMutation = useToggleSavePuzzle({});
+  const savingPuzzleId = saveMutation.isPending
+    ? (saveMutation.variables?.puzzleId ?? null)
+    : null;
+
+  // ── Medal client-side filter ───────────────────────────────────────
   const filteredPuzzles = useMemo(() => {
-    if (!puzzles) return puzzles;
-    if (filters.medalFilter && filters.medalFilter !== 'all') {
-      return puzzles.filter((p) => {
-        const medal = p.best_medal ?? 0;
-        switch (filters.medalFilter) {
-          case 'unsolved':
-            return medal === 0 || !p.is_solved;
-          case 'bronze':
-            return medal === 1;
-          case 'silver':
-            return medal === 2;
-          case 'gold':
-            return medal === 3;
-          default:
-            return true;
-        }
-      });
+    if (!filters.medalFilter || filters.medalFilter === 'all') {
+      return puzzles;
     }
-    return puzzles;
+    return puzzles.filter((p) => {
+      const medal = p.best_medal ?? 0;
+      switch (filters.medalFilter) {
+        case 'unsolved':
+          return medal === 0 || !p.is_solved;
+        case 'bronze':
+          return medal === 1;
+        case 'silver':
+          return medal === 2;
+        case 'gold':
+          return medal === 3;
+        default:
+          return true;
+      }
+    });
   }, [puzzles, filters.medalFilter]);
 
-  const selectedPuzzle: Puzzle | undefined = useMemo(() => {
-    if (!detailsPuzzleId || !puzzles) return undefined;
-    return puzzles.find((p) => p.id === detailsPuzzleId);
-  }, [detailsPuzzleId, puzzles]);
+  // ── Active filter count ────────────────────────────────────────────
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (creatorSearchInput.trim()) count++;
 
-  const selectedCommentPuzzle: Puzzle | undefined = useMemo(() => {
-    if (!commentPuzzleId || !puzzles) return undefined;
-    return puzzles.find((p) => p.id === commentPuzzleId);
-  }, [commentPuzzleId, puzzles]);
-
-  const selectedLeaderboardPuzzle: Puzzle | undefined = useMemo(() => {
-    if (!leaderboardPuzzleId || !puzzles) return undefined;
-    return puzzles.find((p) => p.id === leaderboardPuzzleId);
-  }, [leaderboardPuzzleId, puzzles]);
-
-  const isEmpty = !filteredPuzzles || filteredPuzzles.length === 0;
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-        return 'difficulty-badge difficulty-badge--easy';
-      case 'medium':
-        return 'difficulty-badge difficulty-badge--medium';
-      case 'hard':
-        return 'difficulty-badge difficulty-badge--hard';
-      default:
-        return 'text-muted-foreground bg-secondary border-border';
+    const diff = filters.selectedDifficulties;
+    if (
+      diff &&
+      !(
+        diff.length === 3 &&
+        diff.includes(1) &&
+        diff.includes(2) &&
+        diff.includes(3)
+      )
+    ) {
+      count++;
     }
+
+    if (filters.minFun !== undefined) count++;
+    if (filters.maxFun !== undefined) count++;
+    if (filters.minClearness !== undefined) count++;
+    if (filters.maxClearness !== undefined) count++;
+    if (filters.medalFilter && filters.medalFilter !== 'all') count++;
+    if (filters.experienceLevel && filters.experienceLevel !== 'all') count++;
+
+    // Non-default order (default = created_at + ASC or no direction)
+    const isDefaultOrder =
+      (filters.orderBy === undefined || filters.orderBy === 'created_at') &&
+      (filters.orderDirection === undefined ||
+        filters.orderDirection === 'ASC');
+    if (!isDefaultOrder) count++;
+
+    if (filters.search && filters.search.trim()) count++;
+
+    return count;
+  }, [filters, creatorSearchInput]);
+
+  // ── Dialog puzzle lookups ──────────────────────────────────────────
+  const selectedPuzzle = useMemo(
+    () =>
+      detailsPuzzleId
+        ? puzzles.find((p) => p.id === detailsPuzzleId)
+        : undefined,
+    [detailsPuzzleId, puzzles],
+  );
+
+  const selectedCommentPuzzle = useMemo(
+    () =>
+      commentPuzzleId
+        ? puzzles.find((p) => p.id === commentPuzzleId)
+        : undefined,
+    [commentPuzzleId, puzzles],
+  );
+
+  const selectedLeaderboardPuzzle = useMemo(
+    () =>
+      leaderboardPuzzleId
+        ? puzzles.find((p) => p.id === leaderboardPuzzleId)
+        : undefined,
+    [leaderboardPuzzleId, puzzles],
+  );
+
+  // ── Handlers ───────────────────────────────────────────────────────
+  const handleClearFilters = () => {
+    setFilters({ page: 1, selectedDifficulties: [1, 2, 3] });
+    setCreatorSearchInput('');
+    setSearchInput('');
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <Star
-          key={i}
-          className={`size-3.5 ${i <= Math.floor(rating)
-              ? 'fill-yellow-500 text-yellow-500'
-              : 'text-muted-foreground/40'
-            }`}
-        />,
-      );
-    }
-    return stars;
+  const handleSave = (puzzleId: string) => {
+    saveMutation.mutate({ puzzleId });
   };
 
+  const handleRate = (puzzleId: string) => setRatingPuzzleId(puzzleId);
+  const handleInstructions = (puzzleId: string) => setDetailsPuzzleId(puzzleId);
+  const handleComment = (puzzleId: string) => setCommentPuzzleId(puzzleId);
+  const handleLeaderboard = (puzzleId: string) =>
+    setLeaderboardPuzzleId(puzzleId);
+
+  // ── Render ─────────────────────────────────────────────────────────
   return (
     <>
-      <PageTourLauncher
-        tourName="browse-puzzles"
-        pageTitle="Circuit Puzzles"
-        pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the ? button."
-        steps={tourSteps}
-        side="left"
+      <PuzzlesToolbar
+        filters={filters}
+        onFiltersChange={setFilters}
+        searchInput={searchInput}
+        onSearchInputChange={setSearchInput}
+        creatorInput={creatorSearchInput}
+        onCreatorInputChange={setCreatorSearchInput}
+        meta={meta}
+        view={view}
+        onViewChange={setView}
+        activeFilterCount={activeFilterCount}
+        onClearFilters={handleClearFilters}
+        isRefetching={isRefetching}
       />
-      <div className="space-y-6">
-      {/* Filter Controls */}
-      <div className="flex items-center justify-between gap-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className="gap-2 puzzle-filters-button"
-        >
-          <Filter className="size-4" />
-          Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
-        </Button>
-        {getActiveFilterCount() > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setFilters({ page: 1, selectedDifficulties: [1, 2, 3] });
-              setCreatorSearchInput('');
-            }}
-            className="text-muted-foreground text-[13px]"
+
+      <div className="mx-auto max-w-7xl px-4 pt-6">
+        <PuzzlesActiveFilters
+          filters={filters}
+          creatorInput={creatorSearchInput}
+          onFiltersChange={setFilters}
+          onClearCreator={() => setCreatorSearchInput('')}
+          onClearAll={handleClearFilters}
+        />
+
+        {/* Initial loading skeletons */}
+        {isLoading &&
+          !data &&
+          (view === 'gallery' ? (
+            <PuzzlesGallerySkeleton />
+          ) : (
+            <PuzzlesListSkeleton />
+          ))}
+
+        {/* Empty state */}
+        {!isLoading && filteredPuzzles.length === 0 && (
+          <PuzzlesEmpty
+            hasActiveFilters={activeFilterCount > 0}
+            onClearFilters={handleClearFilters}
+          />
+        )}
+
+        {/* Gallery view */}
+        {filteredPuzzles.length > 0 && view === 'gallery' && (
+          <div
+            className={cn(
+              'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3',
+              isRefetching && 'opacity-80 transition-opacity',
+            )}
           >
-            <X className="size-4" />
-            Clear
-          </Button>
+            {filteredPuzzles.map((puzzle) => (
+              <PuzzleCard
+                key={puzzle.id}
+                puzzle={puzzle}
+                onRate={handleRate}
+                onInstructions={handleInstructions}
+                onComment={handleComment}
+                onLeaderboard={handleLeaderboard}
+                onSave={handleSave}
+                savingPuzzleId={savingPuzzleId}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* List view */}
+        {filteredPuzzles.length > 0 && view === 'list' && (
+          <div
+            className={cn(
+              'divide-y divide-border overflow-hidden rounded-xl border border-border bg-card',
+              isRefetching && 'opacity-80 transition-opacity',
+            )}
+          >
+            {filteredPuzzles.map((puzzle) => (
+              <PuzzleRow
+                key={puzzle.id}
+                puzzle={puzzle}
+                onRate={handleRate}
+                onInstructions={handleInstructions}
+                onComment={handleComment}
+                onLeaderboard={handleLeaderboard}
+                onSave={handleSave}
+                savingPuzzleId={savingPuzzleId}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {meta && meta.totalPages > 1 && (
+          <PuzzlesPagination
+            page={filters.page ?? 1}
+            totalPages={meta.totalPages}
+            total={meta.total}
+            pageSize={9}
+            filteredCountOnPage={filteredPuzzles.length}
+            medalFilter={filters.medalFilter ?? 'all'}
+            onPageChange={(page) => setFilters({ ...filters, page })}
+          />
         )}
       </div>
 
-      {/* Filter Panel */}
-      {showFilters && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-          {/* Top Level: name, creator, difficulty, and all ratings */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7">
-            {/* Search Name */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Name</label>
-              <input
-                type="text"
-                placeholder="Puzzle name..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.search || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}
-              />
-            </div>
-
-            {/* Search Creator */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search Creator</label>
-              <input
-                type="text"
-                placeholder="Search by Creator..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={creatorSearchInput}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setCreatorSearchInput(e.target.value)}
-              />
-            </div>
-
-            {/* Difficulty */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Difficulty</label>
-              <div className="space-y-2">
-                {[
-                  { value: 1, label: 'Easy' },
-                  { value: 2, label: 'Medium' },
-                  { value: 3, label: 'Hard' },
-                ].map((difficulty) => (
-                  <div key={difficulty.value} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`difficulty-${difficulty.value}`}
-                      checked={(filters.selectedDifficulties || []).includes(difficulty.value)}
-                      onChange={(e) => {
-                        const selected = filters.selectedDifficulties || [1, 2, 3];
-                        const newSelected = e.target.checked
-                          ? [...selected, difficulty.value].sort()
-                          : selected.filter((d) => d !== difficulty.value);
-                        setFilters({
-                          ...filters,
-                          selectedDifficulties: newSelected.length > 0 ? newSelected : undefined,
-                          page: 1,
-                        });
-                      }}
-                      className="rounded border border-border"
-                    />
-                    <label
-                      htmlFor={`difficulty-${difficulty.value}`}
-                      className="text-[13px] cursor-pointer"
-                    >
-                      {difficulty.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Min Fun */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Fun Rating</label>
-              <input
-                type="number"
-                min="0"
-                max="5"
-                step="0.5"
-                placeholder="0-5"
-                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.minFun || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              />
-            </div>
-
-            {/* Min Clearness */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Clearness Rating</label>
-              <input
-                type="number"
-                min="0"
-                max="5"
-                step="0.5"
-                placeholder="0-5"
-                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.minClearness || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, minClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              />
-            </div>
-
-            {/* Max Fun */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Fun Rating</label>
-              <input
-                type="number"
-                min="0"
-                max="5"
-                step="0.5"
-                placeholder="0-5"
-                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.maxFun || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxFun: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              />
-            </div>
-
-            {/* Max Clearness */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Clearness Rating</label>
-              <input
-                type="number"
-                min="0"
-                max="5"
-                step="0.5"
-                placeholder="0-5"
-                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.maxClearness || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, maxClearness: e.target.value ? parseFloat(e.target.value) : undefined, page: 1 })}
-              />
-            </div>
-          </div>
-
-          {/* Bottom Level: order, direction, experience, medal */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Order By */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring puzzle-sort-dropdown"
-                value={filters.orderBy || 'created_at'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any, page: 1 })}
-              >
-                <option value="created_at">Newest</option>
-                <option value="difficulty">Difficulty</option>
-                <option value="fun">Fun</option>
-                <option value="clearness">Clearness</option>
-              </select>
-            </div>
-
-            {/* Direction */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const currentDirection = filters.orderDirection || 'ASC';
-                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
-                  setFilters({ ...filters, orderDirection: newDirection as any, page: 1 });
-                }}
-                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
-              >
-                {(filters.orderDirection || 'ASC') === 'ASC' ? (
-                  <>
-                    <ArrowUp className="size-3 inline-block" />
-                    <span> Ascending</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowDown className="size-3 inline-block" />
-                    <span> Descending</span>
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Experience Level */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience Level</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.experienceLevel || 'all'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any, page: 1 })}
-              >
-                <option value="all">All</option>
-                <option value="experienced">Experienced</option>
-                <option value="inexperienced">Inexperienced</option>
-              </select>
-            </div>
-
-            {/* Medal Filter */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Medal</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.medalFilter || 'all'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, medalFilter: e.target.value as any, page: 1 })}
-              >
-                <option value="all">All Puzzles</option>
-                <option value="unsolved">Unsolved</option>
-                <option value="bronze">Bronze 🥉</option>
-                <option value="silver">Silver 🥈</option>
-                <option value="gold">Gold 🥇</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Loading popup */}
-      {isBusyLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
-          <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-xl">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:0ms]" />
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:120ms]" />
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:240ms]" />
-            </div>
-            <p className="mt-3 text-center text-sm text-muted-foreground">Loading page...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!puzzlesQuery.isLoading && isEmpty && (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-          No puzzles available.
-        </div>
-      )}
-
-      {/* Puzzle Grid */}
-      {!puzzlesQuery.isLoading && !isEmpty && (
-        <div className="relative">
-          <div className={`grid grid-cols-1 gap-6 transition-opacity md:grid-cols-2 lg:grid-cols-3 ${isRefetching ? 'opacity-50' : 'opacity-100'}`}>
-          {filteredPuzzles!.map((puzzle) => {
-            return (
-            <div
-              key={puzzle.id}
-              className={`relative cursor-pointer rounded-xl border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-2 hover:scale-[1.02] hover:bg-secondary/20 ${
-                puzzle.is_solved
-                  ? 'border-emerald-200/60 hover:border-emerald-500/80 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]'
-                  : 'border-border hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(6,182,212,0.6)]'
-              }`}
-            >
-            {/* Status Badge - Direct child of card wrapper, positioned to outer edge */}
-            {puzzle.is_solved ? (
-              <div className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-[11px] font-medium z-10">
-                <CheckCircle2 className="size-3.5" />
-                <span>Solved</span>
-                {puzzle.best_medal && puzzle.best_medal >= 1 && (
-                  <span className="ml-1">
-                    {puzzle.best_medal >= 3 ? '🥇' : puzzle.best_medal === 2 ? '🥈' : '🥉'}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="absolute top-3 right-3 flex items-center gap-1 bg-secondary text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium z-10">
-                <Medal className="size-3.5" />
-                <span>Unsolved</span>
-              </div>
-            )}
-
-          {/* Title & Creator & Description - Properly Aligned */}
-            <div className="mb-3 w-full">
-              <h3 className="mb-1 text-base font-medium text-foreground text-left pr-16 tracking-tight text-balance leading-tight">{puzzle.title}</h3>
-              <p className="block w-full text-center mt-1 mb-3 text-[13px] text-muted-foreground">
-                by{' '}
-                {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
-              </p>
-              {puzzle.description && (
-                <p className="text-[13px] text-muted-foreground text-left">
-                  {puzzle.description}
-                </p>
-              )}
-            </div>
-
-            {/* Best Time (if solved) */}
-            {puzzle.is_solved && puzzle.best_time != null && (
-              <div className="mb-3 flex items-center gap-1 text-[13px] text-emerald-600">
-                <Clock className="size-3.5" />
-                <span>Best Time: {Math.floor(puzzle.best_time / 60)}:{String(puzzle.best_time % 60).padStart(2, '0')}</span>
-              </div>
-            )}
-
-            {/* XP Progress Bar */}
-            <div className="mb-3 rounded-lg bg-secondary/50 p-3">
-              <PuzzleXPBar
-                difficulty={puzzle.difficulty}
-                avgDifficulty={puzzle.avg_difficulty ?? 0}
-                currentXP={puzzle.total_xp ?? 0}
-              />
-            </div>
-
-            {/* Difficulty, plays, and save button row */}
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`rounded border px-2 py-1 text-xs ${getDifficultyColor(
-                    puzzle.difficulty,
-                  )}`}
-                >
-                  {puzzle.difficulty.charAt(0) +
-                    puzzle.difficulty.slice(1).toLowerCase()}
-                </span>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Users className="size-3.5" />
-                  <span className="text-[13px]">
-                    {puzzle.solvedCount || 0} solved
-                  </span>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  'text-[13px] flex items-center gap-2 puzzle-save-button',
-                  puzzle.is_saved && 'border-yellow-200/60 bg-yellow-50/50'
-                )}
-                onClick={() => saveMutation.mutate({ puzzleId: puzzle.id })}
-                isLoading={saveMutation.isPending}
-              >
-                {puzzle.is_saved ? '⭐' : '🔖'} {puzzle.is_saved ? 'Saved' : 'Save'}
-              </Button>
-            </div>
-
-            {/* Instructions and Comment buttons row */}
-            <div className={`mb-3 flex flex-wrap items-center ${puzzle.creatorComment ? 'gap-6' : 'justify-center'}`}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDetailsPuzzleId(puzzle.id)}
-                className={`text-[13px] flex items-center puzzle-instructions-button ${puzzle.creatorComment ? 'flex-1' : ''}`}
-              >
-                📋 Instructions
-              </Button>
-              {puzzle.creatorComment && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-[13px] flex items-center gap-2 flex-1 shadow-none ring-0 whitespace-nowrap"
-                  onClick={() => setCommentPuzzleId(puzzle.id)}
-                >
-                  💬 Comment
-                </Button>
-              )}
-            </div>
-
-            {/* Rating and leaderboard */}
-            <div className="flex flex-wrap items-start gap-3 border-t border-border pt-3 puzzle-rating-section">
-              {/* Already Rated Badge */}
-              {puzzle.user_rating && (
-                <div className="flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 w-full">
-                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                  <span>You already rated this puzzle</span>
-                </div>
-              )}
-
-              {/* Weighted Difficulty — clickable to open rating dialog */}
-              <button
-                type="button"
-                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
-                  puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-secondary/80'
-                    : 'cursor-default opacity-80'
-                }`}
-                title={
-                  puzzle.can_rate
-                    ? 'Click to rate this puzzle'
-                    : puzzle.rating_min_attempt_seconds != null
-                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
-                      : 'Solve or spend the configured minimum time to rate'
-                }
-                onClick={() => {
-                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
-                }}
-              >
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Difficulty
-                </span>
-                <div className="flex items-center gap-1">
-                  {puzzle.rating_metrics && puzzle.rating_metrics.count > 0 ? (
-                    <>
-                      {renderStars(puzzle.rating_metrics.weighted_difficulty)}
-                      <span className="ml-1 text-[13px] text-muted-foreground">
-                        {puzzle.rating_metrics.weighted_difficulty.toFixed(1)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      No Ratings
-                    </span>
-                  )}
-                </div>
-              </button>
-
-              {/* Fun Rating — clickable to open rating dialog */}
-              <button
-                type="button"
-                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
-                  puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-secondary/80'
-                    : 'cursor-default opacity-80'
-                }`}
-                title={
-                  puzzle.can_rate
-                    ? 'Click to rate this puzzle'
-                    : puzzle.rating_min_attempt_seconds != null
-                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
-                      : 'Solve or spend the configured minimum time to rate'
-                }
-                onClick={() => {
-                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
-                }}
-              >
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Fun
-                </span>
-                <div className="flex items-center gap-1">
-                  {puzzle.rating_metrics?.avg_fun != null ? (
-                    <>
-                      <span className="text-xl leading-none" title={`Fun: ${puzzle.rating_metrics.avg_fun.toFixed(1)}/5`}>
-                        {puzzle.rating_metrics.avg_fun < 2
-                          ? '😞'
-                          : puzzle.rating_metrics.avg_fun < 3.5
-                            ? '😊'
-                            : '😄'}
-                      </span>
-                      <span className="ml-1 text-[13px] text-muted-foreground">
-                        {puzzle.rating_metrics.avg_fun.toFixed(1)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Needs Votes
-                    </span>
-                  )}
-                </div>
-              </button>
-
-              {/* Clearness — clickable to open rating dialog */}
-              <button
-                type="button"
-                className={`flex flex-col gap-0.5 rounded px-1.5 py-1 text-left transition-colors ${
-                  puzzle.can_rate
-                    ? 'cursor-pointer hover:bg-secondary/80'
-                    : 'cursor-default opacity-80'
-                }`}
-                title={
-                  puzzle.can_rate
-                    ? 'Click to rate this puzzle'
-                    : puzzle.rating_min_attempt_seconds != null
-                      ? `Solve or spend ${puzzle.rating_min_attempt_seconds} sec to rate`
-                      : 'Solve or spend the configured minimum time to rate'
-                }
-                onClick={() => {
-                  if (puzzle.can_rate) setRatingPuzzleId(puzzle.id);
-                }}
-              >
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Clearness
-                </span>
-                <div className="flex items-center gap-1">
-                  {puzzle.rating_metrics?.avg_clearness != null ? (
-                    <>
-                      <span className="text-xl leading-none" title={`Clearness: ${puzzle.rating_metrics.avg_clearness.toFixed(1)}/5`}>
-                        {puzzle.rating_metrics.avg_clearness < 2
-                          ? '❌'
-                          : puzzle.rating_metrics.avg_clearness < 3.5
-                            ? '💡'
-                            : '✨'}
-                      </span>
-                      <span className="ml-1 text-[13px] text-muted-foreground">
-                        {puzzle.rating_metrics.avg_clearness < 2
-                          ? 'Not clear'
-                          : puzzle.rating_metrics.avg_clearness < 3.5
-                            ? 'Clear'
-                            : 'Very clear'}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Needs Votes
-                    </span>
-                  )}
-                </div>
-              </button>
-
-              <div className="w-full flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 text-[13px] sm:w-40 whitespace-nowrap"
-                  onClick={() => setLeaderboardPuzzleId(puzzle.id)}
-                >
-                  🏆 Leaderboard
-                </Button>
-              </div>
-            </div>
-
-            {/* Primary action */}
-            <div className="mt-4 flex justify-center">
-              <Link
-                href={paths.app.puzzle.getHref(puzzle.id)}
-                className="w-full max-w-xs rounded-lg bg-foreground px-4 py-3 text-center text-sm font-semibold text-background shadow-md transition-colors hover:bg-foreground/90 puzzle-card-action"
-              >
-                Solve Puzzle
-              </Link>
-            </div>
-            </div>
-          );
-          })}
-          </div>
-        </div>
-      )}
-
+      {/* Dialogs */}
       <PuzzleDetailsDialog
         puzzle={selectedPuzzle}
         open={Boolean(selectedPuzzle)}
@@ -767,24 +334,28 @@ export const PuzzlesList = () => {
       />
 
       {leaderboardPuzzleId && selectedLeaderboardPuzzle && (
-        <Dialog open={true} onOpenChange={(open) => {
-          if (!open) setLeaderboardPuzzleId(null);
-        }}>
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setLeaderboardPuzzleId(null);
+          }}
+        >
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Trophy className="size-5 text-amber-500" />
                 Leaderboard
               </DialogTitle>
-              <DialogDescription>
-                Top solvers for this puzzle
-              </DialogDescription>
+              <DialogDescription>Top solvers for this puzzle</DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto">
               <PuzzleLeaderboard puzzleId={selectedLeaderboardPuzzle.id} />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setLeaderboardPuzzleId(null)}>
+              <Button
+                variant="outline"
+                onClick={() => setLeaderboardPuzzleId(null)}
+              >
                 Close
               </Button>
             </DialogFooter>
@@ -802,27 +373,14 @@ export const PuzzlesList = () => {
         />
       )}
 
-      {/* Pagination */}
-      {!puzzlesQuery.isLoading && meta && meta.totalPages > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
-          {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map(
-            (pageNum) => (
-              <button
-                type="button"
-                key={pageNum}
-                onClick={() => setFilters((prev) => ({ ...prev, page: pageNum }))}
-                className={`rounded-lg border px-3 py-2 text-sm ${pageNum === meta.page
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border bg-card text-foreground hover:bg-secondary'
-                  }`}
-              >
-                {pageNum}
-              </button>
-            ),
-          )}
-        </div>
-      )}
-    </div>
+      <PageTourLauncher
+        tourName="browse-puzzles"
+        pageTitle="Circuit Puzzles"
+        pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the ? button."
+        steps={tourSteps}
+        side="left"
+        disableScrolling
+      />
     </>
   );
 };
