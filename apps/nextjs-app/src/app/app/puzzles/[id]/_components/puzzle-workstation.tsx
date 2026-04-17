@@ -38,14 +38,34 @@ import {
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 const CircuitDebugger = dynamic(
-  () => import('@/components/circuit-debugger').then(mod => ({ default: mod.CircuitDebugger })),
-  { ssr: false, loading: () => <div className="flex items-center justify-center p-8 text-muted-foreground">Loading debugger...</div> }
+  () =>
+    import('@/components/circuit-debugger').then((mod) => ({
+      default: mod.CircuitDebugger,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-8 text-muted-foreground">
+        Loading debugger...
+      </div>
+    ),
+  },
 );
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
-import { Bug, ChevronDown, StepBack, StepForward, ArrowRight, Trash2 } from 'lucide-react';
+import {
+  Bug,
+  ChevronDown,
+  StepBack,
+  StepForward,
+  ArrowRight,
+  Trash2,
+  CircleAlert,
+  CircuitBoard,
+  Medal,
+} from 'lucide-react';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { workstationTourSteps } from '@/config/tourSteps';
 import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
@@ -64,7 +84,9 @@ const BASIC_COMPONENTS: CircuitComponent[] = [
 const EMPTY_STRINGS: string[] = [];
 const EMPTY_COMPONENTS: CircuitComponent[] = [];
 
-const dedupeComponentsById = (components: CircuitComponent[]): CircuitComponent[] => {
+const dedupeComponentsById = (
+  components: CircuitComponent[],
+): CircuitComponent[] => {
   const byId = new Map<string, CircuitComponent>();
   for (const component of components) {
     byId.set(String(component.id), component);
@@ -92,7 +114,8 @@ type VictoryFxState = {
   visible: boolean;
 };
 
-const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const wait = (ms: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const sanitizeBitSequence = (value: string) => value.replace(/[^01]/g, '');
 
@@ -105,70 +128,73 @@ const parseBitSequence = (value: string) => {
 // Convert LaTeX document structure to Markdown
 const latexToMarkdown = (latex: string): string => {
   let markdown = latex;
-  
+
   // Convert tabular environments to markdown tables
-  const tabularyRegex = /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
-  markdown = markdown.replace(tabularyRegex, (_match: string, content: string) => {
-    // Split by \\ to get rows
-    const rows = content
-      .split('\\\\')
-      .map((row: string) => row.replace(/\\hline/g, '').trim())
-      .filter((row: string) => row.length > 0);
-    
-    if (rows.length === 0) return '';
-    
-    // Split each row by & to get cells
-    const mdRows = rows.map((row: string) => {
-      const cells = row.split('&').map((cell: string) => cell.trim());
-      return '| ' + cells.join(' | ') + ' |';
-    });
-    
-    // Add header separator after first row
-    if (mdRows.length > 0) {
-      const firstRowCells = rows[0].split('&').length;
-      const separator = '|' + Array(firstRowCells).fill('---|').join('');
-      mdRows.splice(1, 0, separator);
-    }
-    
-    return '\n' + mdRows.join('\n') + '\n';
-  });
-  
+  const tabularyRegex =
+    /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
+  markdown = markdown.replace(
+    tabularyRegex,
+    (_match: string, content: string) => {
+      // Split by \\ to get rows
+      const rows = content
+        .split('\\\\')
+        .map((row: string) => row.replace(/\\hline/g, '').trim())
+        .filter((row: string) => row.length > 0);
+
+      if (rows.length === 0) return '';
+
+      // Split each row by & to get cells
+      const mdRows = rows.map((row: string) => {
+        const cells = row.split('&').map((cell: string) => cell.trim());
+        return '| ' + cells.join(' | ') + ' |';
+      });
+
+      // Add header separator after first row
+      if (mdRows.length > 0) {
+        const firstRowCells = rows[0].split('&').length;
+        const separator = '|' + Array(firstRowCells).fill('---|').join('');
+        mdRows.splice(1, 0, separator);
+      }
+
+      return '\n' + mdRows.join('\n') + '\n';
+    },
+  );
+
   // Convert \section*{...} to # ...
   markdown = markdown.replace(/\\section\*\s*\{([^}]+)\}/g, '# $1');
-  
+
   // Convert \subsection*{...} to ## ...
   markdown = markdown.replace(/\\subsection\*\s*\{([^}]+)\}/g, '## $1');
-  
+
   // Convert \subsubsection*{...} to ### ...
   markdown = markdown.replace(/\\subsubsection\*\s*\{([^}]+)\}/g, '### $1');
-  
+
   // Convert \textbf{...} to **...**
   markdown = markdown.replace(/\\textbf\s*\{([^}]+)\}/g, '**$1**');
-  
+
   // Convert \textit{...} to *...*
   markdown = markdown.replace(/\\textit\s*\{([^}]+)\}/g, '*$1*');
-  
+
   // Convert \texttt{...} to `...`
   markdown = markdown.replace(/\\texttt\s*\{([^}]+)\}/g, '`$1`');
-  
-  // Handle \begin{center}...\end{center}  
+
+  // Handle \begin{center}...\end{center}
   markdown = markdown.replace(/\\begin\{center\}(.*?)\\end\{center\}/gs, '$1');
-  
+
   // Handle \begin{itemize}...\end{itemize} - markdown-it handles bullet lists
   markdown = markdown.replace(/\\begin\{itemize\}/g, '');
   markdown = markdown.replace(/\\end\{itemize\}/g, '');
   markdown = markdown.replace(/\\item\s+/g, '- ');
-  
+
   // Handle \begin{enumerate}...\end{enumerate}
   markdown = markdown.replace(/\\begin\{enumerate\}/g, '');
   markdown = markdown.replace(/\\end\{enumerate\}/g, '');
-  
+
   // Remove remaining LaTeX commands that don't need conversion
   markdown = markdown.replace(/\\\\/g, '\n'); // \\ to newline
-  
+
   return markdown;
 };
-
 
 export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
@@ -181,7 +207,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
 
-
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedComponent, setSelectedComponent] =
@@ -192,21 +217,28 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     future: { placed: PlacedGridComponent[]; wires: Wire[] }[];
   }>({ past: [], future: [] });
   // Feature: Drag-and-Drop Ghost/Preview
-  const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<string | null>(null);
+  const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<
+    string | null
+  >(null);
 
   // Sandbox state
   const [sandboxPlaced, setSandboxPlaced] = useState<PlacedGridComponent[]>([]);
   const [sandboxWires, setSandboxWires] = useState<Wire[]>([]);
   const [sandboxSelectedComponent, setSandboxSelectedComponent] =
     useState<SelectedComponentState>({ mode: 'none' });
-  const [sandboxDraggedPaletteComponentId, setSandboxDraggedPaletteComponentId] = useState<string | null>(null);
+  const [
+    sandboxDraggedPaletteComponentId,
+    setSandboxDraggedPaletteComponentId,
+  ] = useState<string | null>(null);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxNumInputs, setSandboxNumInputs] = useState(2);
   const [sandboxNumOutputs, setSandboxNumOutputs] = useState(1);
   const [showSandboxDebugger, setShowSandboxDebugger] = useState(false);
 
   const [showPuzzleInfo, setShowPuzzleInfo] = useState(false);
-  const [renderedInstructionsHtml, setRenderedInstructionsHtml] = useState<string | null>(null);
+  const [renderedInstructionsHtml, setRenderedInstructionsHtml] = useState<
+    string | null
+  >(null);
   const [showDebugger, setShowDebugger] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatorComment, setShowCreatorComment] = useState(false);
@@ -214,14 +246,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [postCheck, setPostCheck] = useState<PostCheckState>({ open: false });
   const [isChecking, setIsChecking] = useState(false);
   const [isSolved, setIsSolved] = useState(false);
-  const [boardFeedback, setBoardFeedback] = useState<BoardFeedbackState>('idle');
+  const [boardFeedback, setBoardFeedback] =
+    useState<BoardFeedbackState>('idle');
   const [isPowerSurge, setIsPowerSurge] = useState(false);
   const [showSolvedSlam, setShowSolvedSlam] = useState(false);
   const [victoryFx, setVictoryFx] = useState<VictoryFxState>({
     key: 0,
     visible: false,
   });
-  const [showFirstSolveCelebration, setShowFirstSolveCelebration] = useState(false);
+  const [showFirstSolveCelebration, setShowFirstSolveCelebration] =
+    useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [typedInstructionText, setTypedInstructionText] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -229,7 +263,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     null,
   );
   const [isInlineDebugger, setIsInlineDebugger] = useState(false);
-  const [debugSequences, setDebugSequences] = useState<Record<string, string>>({});
+  const [debugSequences, setDebugSequences] = useState<Record<string, string>>(
+    {},
+  );
   const [debugStepIndex, setDebugStepIndex] = useState(0);
   const [debugIsRunning, setDebugIsRunning] = useState(false);
   const [debugRunKey, setDebugRunKey] = useState(0);
@@ -239,9 +275,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     outputSteps: Record<string, string>[];
     gateOutputSteps: Record<string, string>[];
   } | null>(null);
-  const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(null);
-  const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<string | null>(null);
-
+  const [inspectingPlacedId, setInspectingPlacedId] = useState<string | null>(
+    null,
+  );
+  const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<
+    string | null
+  >(null);
 
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
@@ -421,18 +460,54 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       const markdown = latexToMarkdown(puzzle.instructions!);
       const html = md.render(markdown);
 
-      setRenderedInstructionsHtml(DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: [
-          'p', 'strong', 'em', 'u', 'code', 'pre', 'blockquote',
-          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'ul', 'ol', 'li',
-          'table', 'thead', 'tbody', 'tr', 'th', 'td',
-          'a', 'span', 'div', 'i', 'br', 'sup', 'sub',
-          'annotation', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mtext',
-          'mfrac', 'msup', 'msub', 'mroot', 'msqrt'
-        ],
-        ALLOWED_ATTR: ['class', 'style', 'href', 'data-*']
-      }));
+      setRenderedInstructionsHtml(
+        DOMPurify.sanitize(html, {
+          ALLOWED_TAGS: [
+            'p',
+            'strong',
+            'em',
+            'u',
+            'code',
+            'pre',
+            'blockquote',
+            'h1',
+            'h2',
+            'h3',
+            'h4',
+            'h5',
+            'h6',
+            'ul',
+            'ol',
+            'li',
+            'table',
+            'thead',
+            'tbody',
+            'tr',
+            'th',
+            'td',
+            'a',
+            'span',
+            'div',
+            'i',
+            'br',
+            'sup',
+            'sub',
+            'annotation',
+            'semantics',
+            'mrow',
+            'mi',
+            'mn',
+            'mo',
+            'mtext',
+            'mfrac',
+            'msup',
+            'msub',
+            'mroot',
+            'msqrt',
+          ],
+          ALLOWED_ATTR: ['class', 'style', 'href', 'data-*'],
+        }),
+      );
     });
   }, [showPuzzleInfo, puzzle?.instructions]);
 
@@ -462,12 +537,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [inputs, defaultDebugSequence]);
 
   // Undo/Redo keyboard shortcuts (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
-  const stateToRestoreRef = useRef<{ placed: PlacedGridComponent[]; wires: Wire[] } | null>(null);
-  
+  const stateToRestoreRef = useRef<{
+    placed: PlacedGridComponent[];
+    wires: Wire[];
+  } | null>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isUndo = (e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
-      const isRedo = ((e.key === 'y' || e.key === 'Y') || ((e.key === 'z' || e.key === 'Z') && e.shiftKey)) && (e.ctrlKey || e.metaKey);
+      const isUndo =
+        (e.key === 'z' || e.key === 'Z') &&
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey;
+      const isRedo =
+        (e.key === 'y' ||
+          e.key === 'Y' ||
+          ((e.key === 'z' || e.key === 'Z') && e.shiftKey)) &&
+        (e.ctrlKey || e.metaKey);
 
       if (isUndo) {
         e.preventDefault();
@@ -538,7 +623,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [puzzle?.allowedArsenalComponentIds]);
 
   const arsenalComponentDisplayModes = useMemo(() => {
-    return (puzzle?.arsenalComponentDisplayModes as Record<string, 'circuit' | 'description'>) ?? {};
+    return (
+      (puzzle?.arsenalComponentDisplayModes as Record<
+        string,
+        'circuit' | 'description'
+      >) ?? {}
+    );
   }, [puzzle?.arsenalComponentDisplayModes]);
 
   const customComponents = useMemo(() => {
@@ -557,32 +647,48 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
 
     const fallbackShared = mergedArsenal.filter((component) =>
-      allowedArsenalComponentIds.has(String(component.id))
+      allowedArsenalComponentIds.has(String(component.id)),
     );
     return dedupeComponentsById(fallbackShared);
-  }, [puzzle?.sharedArsenalComponents, puzzle?.arsenalComponents, allowedArsenalComponentIds]);
+  }, [
+    puzzle?.sharedArsenalComponents,
+    puzzle?.arsenalComponents,
+    allowedArsenalComponentIds,
+  ]);
 
   const solverArsenalComponents = useMemo(() => {
     if (!allowArsenal) {
       return EMPTY_COMPONENTS;
     }
 
-    const sharedIds = new Set(sharedArsenalComponents.map((component) => String(component.id)));
+    const sharedIds = new Set(
+      sharedArsenalComponents.map((component) => String(component.id)),
+    );
 
     if (Array.isArray(puzzle?.solverArsenalComponents)) {
       const deduped = dedupeComponentsById(puzzle.solverArsenalComponents);
-      return deduped.filter((component) => !sharedIds.has(String(component.id)));
+      return deduped.filter(
+        (component) => !sharedIds.has(String(component.id)),
+      );
     }
 
     const mergedArsenal = puzzle?.arsenalComponents ?? EMPTY_COMPONENTS;
     const fallbackSolver = mergedArsenal.filter(
-      (component) => !sharedIds.has(String(component.id))
+      (component) => !sharedIds.has(String(component.id)),
     );
     return dedupeComponentsById(fallbackSolver);
-  }, [allowArsenal, puzzle?.solverArsenalComponents, puzzle?.arsenalComponents, sharedArsenalComponents]);
+  }, [
+    allowArsenal,
+    puzzle?.solverArsenalComponents,
+    puzzle?.arsenalComponents,
+    sharedArsenalComponents,
+  ]);
 
   const arsenalComponents = useMemo(() => {
-    return dedupeComponentsById([...sharedArsenalComponents, ...solverArsenalComponents]);
+    return dedupeComponentsById([
+      ...sharedArsenalComponents,
+      ...solverArsenalComponents,
+    ]);
   }, [sharedArsenalComponents, solverArsenalComponents]);
 
   const specialComponents = useMemo(() => {
@@ -597,14 +703,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const filteredBasicTypes = useMemo(() => {
     // WorkstationMenu expects a blacklist (to hide/dim items).
     // We calculate it as ALL_BASIC - ALLOWED.
-    const all = new Set(BASIC_COMPONENTS.map(c => c.type));
-    return Array.from(all).filter(t => !allowedGates.has(t));
+    const all = new Set(BASIC_COMPONENTS.map((c) => c.type));
+    return Array.from(all).filter((t) => !allowedGates.has(t));
   }, [allowedGates]);
 
   const componentCatalog = useMemo(() => {
     const byId = new Map<string, CircuitComponent>();
     for (const c of basicComponents) byId.set(c.id, c);
-    
+
     for (const c of specialComponents) {
       byId.set(c.id, c);
     }
@@ -723,25 +829,25 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     for (const [id, def] of componentCatalog.entries()) {
       // Arsenal pieces have custom sizing: width 4, height = max(inputs, outputs)
       const isArsenal = (def as any).is_arsenal === true;
-      
+
       let size: { w: number; h: number };
       let ports: ComponentDef['ports'];
-      
+
       if (isArsenal) {
         // Arsenal piece sizing: width=3 (fixed), height=max(inputs, outputs)
         const num_inputs = (def as any).num_inputs ?? 0;
         const num_outputs = (def as any).num_outputs ?? 0;
-        
+
         // If inputs or outputs are 0, fall back to pins-based calculation
         if (num_inputs > 0 && num_outputs > 0) {
           size = {
             h: Math.max(num_inputs, num_outputs),
             w: 3,
           };
-          
+
           // Generate ports for arsenal pieces
           ports = [];
-          
+
           // Place inputs on the left (col 0), distributed vertically
           for (let i = 0; i < num_inputs; i++) {
             ports.push({
@@ -750,7 +856,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               offset: { row: i, col: 0 },
             });
           }
-          
+
           // Place outputs on the right (col = width - 1), distributed vertically
           for (let i = 0; i < num_outputs; i++) {
             ports.push({
@@ -774,9 +880,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           w: 4,
           h: Math.max(1, Math.min(4, Math.ceil(def.pins / 2))),
         };
-        ports = (hardcoded[def.type]?.ports) ?? toDefaultPorts(def.pins, size);
+        ports = hardcoded[def.type]?.ports ?? toDefaultPorts(def.pins, size);
       }
-      
+
       ui.set(id, {
         id,
         label: def.type,
@@ -838,12 +944,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       | { kind: 'empty' }
       | { kind: 'component'; placedId: string; componentId: string }
       | {
-        kind: 'port';
-        placedId: string;
-        componentId: string;
-        portIndex: number;
-        portKind: 'input' | 'output';
-      }
+          kind: 'port';
+          placedId: string;
+          componentId: string;
+          portIndex: number;
+          portKind: 'input' | 'output';
+        }
     > = {};
 
     const rotateOffset = (
@@ -890,33 +996,36 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return holes;
   }, [placed, uiCatalog]);
 
-  const applyParsedState = useCallback((parsed: any) => {
-    if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
-    if (Array.isArray(parsed?.wires)) {
-      const migratedWires = parsed.wires.map((w: any) => {
-        const migrateEndpoint = (ep: any) => {
-          if (ep.portId) return ep;
-          if (ep.componentId.startsWith('IO:')) {
-            return { ...ep, portId: 'P0' };
-          }
-          const placedInst = parsed.placed.find(
-            (p: any) => p.id === ep.componentId,
-          );
-          if (!placedInst) return ep;
-          const def = uiCatalog[placedInst.componentId];
-          if (!def) return ep;
-          const port = def.ports[ep.pinIndex];
-          return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
-        };
-        return {
-          ...w,
-          from: migrateEndpoint(w.from),
-          to: migrateEndpoint(w.to),
-        };
-      });
-      setWires(migratedWires);
-    }
-  }, [uiCatalog]);
+  const applyParsedState = useCallback(
+    (parsed: any) => {
+      if (Array.isArray(parsed?.placed)) setPlaced(parsed.placed);
+      if (Array.isArray(parsed?.wires)) {
+        const migratedWires = parsed.wires.map((w: any) => {
+          const migrateEndpoint = (ep: any) => {
+            if (ep.portId) return ep;
+            if (ep.componentId.startsWith('IO:')) {
+              return { ...ep, portId: 'P0' };
+            }
+            const placedInst = parsed.placed.find(
+              (p: any) => p.id === ep.componentId,
+            );
+            if (!placedInst) return ep;
+            const def = uiCatalog[placedInst.componentId];
+            if (!def) return ep;
+            const port = def.ports[ep.pinIndex];
+            return { ...ep, portId: port?.id ?? `unknown-${ep.pinIndex}` };
+          };
+          return {
+            ...w,
+            from: migrateEndpoint(w.from),
+            to: migrateEndpoint(w.to),
+          };
+        });
+        setWires(migratedWires);
+      }
+    },
+    [uiCatalog],
+  );
 
   // Keep a ref to applyParsedState so the load-state effect doesn't re-run
   // every time uiCatalog changes (which would reset the board from localStorage).
@@ -1039,10 +1148,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [saveDraft, clearDraft]);
 
   const ratingMinAttemptSeconds = puzzle?.rating_min_attempt_seconds;
-  const hasAttemptedMinTime = ratingMinAttemptSeconds != null
-    ? elapsedSeconds >= ratingMinAttemptSeconds
-    : false;
-  const canRatePuzzle = Boolean(puzzle?.can_rate) || isSolved || hasAttemptedMinTime;
+  const hasAttemptedMinTime =
+    ratingMinAttemptSeconds != null
+      ? elapsedSeconds >= ratingMinAttemptSeconds
+      : false;
+  const canRatePuzzle =
+    Boolean(puzzle?.can_rate) || isSolved || hasAttemptedMinTime;
 
   useEffect(() => {
     if (!puzzle?.id) return;
@@ -1051,8 +1162,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
     // Refresh cached puzzle/list data once threshold is reached so rating
     // options update without a manual page reload.
-    queryClient.invalidateQueries({ queryKey: ['puzzle', { id: puzzle.id }], refetchType: 'active' });
-    queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'active' });
+    queryClient.invalidateQueries({
+      queryKey: ['puzzle', { id: puzzle.id }],
+      refetchType: 'active',
+    });
+    queryClient.invalidateQueries({
+      queryKey: ['puzzles'],
+      refetchType: 'active',
+    });
   }, [hasAttemptedMinTime, puzzle?.id, puzzle?.can_rate, queryClient]);
 
   // Define all hooks BEFORE early returns to comply with Rules of Hooks
@@ -1115,22 +1232,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         (step: any) => {
           const mapped: Record<string, string> = {};
           for (const outputName of outputs) {
-            mapped[outputName] = String(step?.puzzleOutputs?.[outputName] ?? '0');
+            mapped[outputName] = String(
+              step?.puzzleOutputs?.[outputName] ?? '0',
+            );
           }
           return mapped;
         },
       );
 
-      const gateOutputSteps: Record<string, string>[] = (result.steps ?? []).map(
-        (step: any) => {
-          const mapped: Record<string, string> = {};
-          for (const gate of step?.gateOutputs ?? []) {
-            if (!gate?.placedId) continue;
-            mapped[String(gate.placedId)] = String(gate?.values ?? '0');
-          }
-          return mapped;
-        },
-      );
+      const gateOutputSteps: Record<string, string>[] = (
+        result.steps ?? []
+      ).map((step: any) => {
+        const mapped: Record<string, string> = {};
+        for (const gate of step?.gateOutputs ?? []) {
+          if (!gate?.placedId) continue;
+          mapped[String(gate.placedId)] = String(gate?.values ?? '0');
+        }
+        return mapped;
+      });
 
       const effectiveStepCount = outputSteps.length || stepCount;
       setDebugSnapshot({
@@ -1139,7 +1258,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         outputSteps,
         gateOutputSteps,
       });
-      setDebugStepIndex((prev) => Math.min(prev, Math.max(effectiveStepCount - 1, 0)));
+      setDebugStepIndex((prev) =>
+        Math.min(prev, Math.max(effectiveStepCount - 1, 0)),
+      );
       setDebugRunKey((prev) => prev + 1);
     } catch (err: any) {
       notifications.addNotification({
@@ -1150,7 +1271,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     } finally {
       setDebugIsRunning(false);
     }
-  }, [puzzle?.id, inputs, debugSequences, placed, wires, currentCost, outputs, notifications]);
+  }, [
+    puzzle?.id,
+    inputs,
+    debugSequences,
+    placed,
+    wires,
+    currentCost,
+    outputs,
+    notifications,
+  ]);
 
   const enterInlineDebugger = useCallback(() => {
     setIsInlineDebugger(true);
@@ -1172,7 +1302,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const currentInputBits = useMemo(() => {
     const bits: Record<string, string> = {};
     for (const inputName of inputs) {
-      bits[inputName] = debugSnapshot?.inputSteps?.[inputName]?.[debugStepIndex] ?? '0';
+      bits[inputName] =
+        debugSnapshot?.inputSteps?.[inputName]?.[debugStepIndex] ?? '0';
     }
     return bits;
   }, [inputs, debugSnapshot, debugStepIndex]);
@@ -1180,7 +1311,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const currentOutputBits = useMemo(() => {
     const bits: Record<string, string> = {};
     for (const outputName of outputs) {
-      bits[outputName] = debugSnapshot?.outputSteps?.[debugStepIndex]?.[outputName] ?? '0';
+      bits[outputName] =
+        debugSnapshot?.outputSteps?.[debugStepIndex]?.[outputName] ?? '0';
     }
     return bits;
   }, [outputs, debugSnapshot, debugStepIndex]);
@@ -1209,13 +1341,21 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         return null;
       }
 
-      const sourceOutputs = (localComputed[wireFrom.componentId] ?? '0').split('');
+      const sourceOutputs = (localComputed[wireFrom.componentId] ?? '0').split(
+        '',
+      );
       const sourceOutputPortIndices = sourceDef.ports
         .map((port, idx) => ({ port, idx }))
         .filter((x) => x.port.kind === 'output')
         .map((x) => x.idx);
-      const outputPosition = Math.max(0, sourceOutputPortIndices.indexOf(wireFrom.pinIndex));
-      return Number(sourceOutputs[Math.min(outputPosition, sourceOutputs.length - 1)] ?? '0');
+      const outputPosition = Math.max(
+        0,
+        sourceOutputPortIndices.indexOf(wireFrom.pinIndex),
+      );
+      return Number(
+        sourceOutputs[Math.min(outputPosition, sourceOutputs.length - 1)] ??
+          '0',
+      );
     };
 
     const evalGate = (componentId: string, gateInputs: number[]) => {
@@ -1300,7 +1440,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       if (!progressed) {
         for (const unresolvedId of Array.from(unresolved)) {
-          localComputed[unresolvedId] = normalizeBits(backendStep[unresolvedId]);
+          localComputed[unresolvedId] = normalizeBits(
+            backendStep[unresolvedId],
+          );
           unresolved.delete(unresolvedId);
         }
         break;
@@ -1308,7 +1450,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
 
     return localComputed;
-  }, [debugSnapshot, debugStepIndex, currentInputBits, placed, wires, uiCatalog]);
+  }, [
+    debugSnapshot,
+    debugStepIndex,
+    currentInputBits,
+    placed,
+    wires,
+    uiCatalog,
+  ]);
 
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
@@ -1317,7 +1466,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   if (!puzzle) {
     return (
       <div className="flex w-full flex-col gap-3">
-        <div className="text-[13px] text-muted-foreground">Puzzle not found.</div>
+        <div className="text-[13px] text-muted-foreground">
+          Puzzle not found.
+        </div>
         <Button
           variant="outline"
           onClick={() => router.push(paths.app.puzzles.getHref())}
@@ -1331,20 +1482,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const onPlacedChange = (next: PlacedGridComponent[]) => {
     // Record history: save current state to past before changing
     commitHistory();
-    
+
     // Budget guard: detect new placements and check total cost of ALL new items.
     if (next.length > placed.length) {
       // Find all new components by diffing the arrays
       const placedIds = new Set(placed.map((p) => p.id));
       const newComponents = next.filter((p) => !placedIds.has(p.id));
-      
+
       // Calculate total cost of all new components
       let totalNewCost = 0;
       for (const comp of newComponents) {
         const def = componentCatalog.get(comp.componentId);
         totalNewCost += def?.cost ?? 0;
       }
-      
+
       // Check if total cost exceeds budget
       if (currentCost + totalNewCost > budgetLimit) {
         notifications.addNotification({
@@ -1498,12 +1649,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         }
       }
 
-      const unusedLockedIds = lockedComponentIds.filter((id) => !connectedLockedIds.has(id));
+      const unusedLockedIds = lockedComponentIds.filter(
+        (id) => !connectedLockedIds.has(id),
+      );
       if (unusedLockedIds.length > 0) {
         notifications.addNotification({
           type: 'warning',
           title: 'Pre-placed Components Not Connected',
-          message: `You must connect and use all pre-placed locked components! ${unusedLockedIds.length} component(s) are not connected to any wires. (Look for 🔒 icons on the board)`,
+          message: `You must connect and use all pre-placed locked components. ${unusedLockedIds.length} component(s) are not connected to any wires. Look for lock badges on the board.`,
         });
         return;
       }
@@ -1530,8 +1683,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         clearDraft();
         const isFirstSolve = Boolean(
           (res as any).is_first_solve ??
-            (res as any).first_solve ??
-            ((res.xp_earned ?? 0) > 0),
+          (res as any).first_solve ??
+          (res.xp_earned ?? 0) > 0,
         );
 
         playSuccess();
@@ -1554,10 +1707,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         message: res.solved
           ? Boolean(
               (res as any).is_first_solve ??
-                (res as any).first_solve ??
-                ((res.xp_earned ?? 0) > 0),
+              (res as any).first_solve ??
+              (res.xp_earned ?? 0) > 0,
             )
-            ? (res.message || 'You earned XP!')
+            ? res.message || 'You earned XP!'
             : 'Correct! You rebuilt it.'
           : res.message,
         medal: res.medal,
@@ -1570,8 +1723,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         setIsSolved(true);
         const isFirstSolve = Boolean(
           (res as any).is_first_solve ??
-            (res as any).first_solve ??
-            ((res.xp_earned ?? 0) > 0),
+          (res as any).first_solve ??
+          (res.xp_earned ?? 0) > 0,
         );
 
         // Update user XP immediately for first solves.
@@ -1585,27 +1738,42 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           });
         }
         // Refresh user profile stats (including medal counters) from backend source of truth.
-        await queryClient.invalidateQueries({ queryKey: ['user'], refetchType: 'all' });
+        await queryClient.invalidateQueries({
+          queryKey: ['user'],
+          refetchType: 'all',
+        });
         // Invalidate caches so the puzzles list shows "Solved"
-        await queryClient.invalidateQueries({ queryKey: ['puzzles'], refetchType: 'all' });
+        await queryClient.invalidateQueries({
+          queryKey: ['puzzles'],
+          refetchType: 'all',
+        });
       }
     } catch (e: any) {
       setIsPowerSurge(false);
       let errorTitle = 'Validation Failed';
       let errorMessage = e?.message ?? 'Something went wrong';
-      
+
       // Provide more specific error messages
-      if (errorMessage.includes('Circuit cost') || errorMessage.includes('exceeds')) {
+      if (
+        errorMessage.includes('Circuit cost') ||
+        errorMessage.includes('exceeds')
+      ) {
         errorTitle = 'Budget Exceeded';
-        errorMessage = 'Your circuit exceeds the budget limit. Try removing some components or using less expensive alternatives.';
+        errorMessage =
+          'Your circuit exceeds the budget limit. Try removing some components or using less expensive alternatives.';
       } else if (errorMessage.includes('not found')) {
         errorTitle = 'Puzzle Not Found';
-        errorMessage = 'This puzzle could not be found. Please refresh the page and try again.';
-      } else if (errorMessage.includes('test case') || errorMessage.includes('test cases')) {
+        errorMessage =
+          'This puzzle could not be found. Please refresh the page and try again.';
+      } else if (
+        errorMessage.includes('test case') ||
+        errorMessage.includes('test cases')
+      ) {
         errorTitle = 'Puzzle Test Cases Issue';
-        errorMessage = 'This puzzle has no test cases configured. Please contact the puzzle creator.';
+        errorMessage =
+          'This puzzle has no test cases configured. Please contact the puzzle creator.';
       }
-      
+
       notifications.addNotification({
         type: 'error',
         title: errorTitle,
@@ -1645,45 +1813,52 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const applySandboxToWorkstation = () => {
     // Filter wires: keep only those that don't connect to IO:IN or IO:OUT
-    const filteredWires = sandboxWires.filter(w => {
-      const fromIsIO = w.from.componentId.startsWith('IO:IN:') || w.from.componentId.startsWith('IO:OUT:');
-      const toIsIO = w.to.componentId.startsWith('IO:IN:') || w.to.componentId.startsWith('IO:OUT:');
+    const filteredWires = sandboxWires.filter((w) => {
+      const fromIsIO =
+        w.from.componentId.startsWith('IO:IN:') ||
+        w.from.componentId.startsWith('IO:OUT:');
+      const toIsIO =
+        w.to.componentId.startsWith('IO:IN:') ||
+        w.to.componentId.startsWith('IO:OUT:');
       return !fromIsIO && !toIsIO;
     });
 
     // Create mapping of old component IDs to new IDs
     const oldToNewId = new Map<string, string>();
-    sandboxPlaced.forEach(p => {
+    sandboxPlaced.forEach((p) => {
       oldToNewId.set(p.id, `${p.id}-applied`);
     });
 
     // Clear main workstation and apply sandbox content
-    const newPlaced = sandboxPlaced.map(p => ({...p, id: `${p.id}-applied`}));
-    
+    const newPlaced = sandboxPlaced.map((p) => ({
+      ...p,
+      id: `${p.id}-applied`,
+    }));
+
     // Update wire component IDs to match renamed components
-    const newWires = filteredWires.map(w => ({
+    const newWires = filteredWires.map((w) => ({
       ...w,
       id: `${w.id}-applied`,
       from: {
         ...w.from,
-        componentId: oldToNewId.get(w.from.componentId) || w.from.componentId
+        componentId: oldToNewId.get(w.from.componentId) || w.from.componentId,
       },
       to: {
         ...w.to,
-        componentId: oldToNewId.get(w.to.componentId) || w.to.componentId
-      }
+        componentId: oldToNewId.get(w.to.componentId) || w.to.componentId,
+      },
     }));
-    
+
     setPlaced(newPlaced);
     setWires(newWires);
     setSelectedComponent({ mode: 'none' });
-    
+
     // Clear sandbox after applying
     setSandboxPlaced([]);
     setSandboxWires([]);
     setSandboxSelectedComponent({ mode: 'none' });
     setShowSandbox(false);
-    
+
     const removedWireCount = sandboxWires.length - filteredWires.length;
     notifications.addNotification({
       type: 'success',
@@ -1699,9 +1874,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   };
 
   // Sandbox I/O and cost (non-hook values to avoid conditional hook order issues)
-  const sandboxInputs = Array.from({ length: sandboxNumInputs }, (_, i) => `in${i}`);
+  const sandboxInputs = Array.from(
+    { length: sandboxNumInputs },
+    (_, i) => `in${i}`,
+  );
 
-  const sandboxOutputs = Array.from({ length: sandboxNumOutputs }, (_, i) => `out${i}`);
+  const sandboxOutputs = Array.from(
+    { length: sandboxNumOutputs },
+    (_, i) => `out${i}`,
+  );
 
   const sandboxCurrentCost = sandboxPlaced.reduce((acc, p) => {
     const def = componentCatalog.get(p.componentId);
@@ -1714,12 +1895,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const onInlineSequenceChange = (inputName: string, rawValue: string) => {
     const edited = sanitizeBitSequence(rawValue);
-    const targetLength = Math.max(1, edited.length || defaultDebugSequence.length || 1);
+    const targetLength = Math.max(
+      1,
+      edited.length || defaultDebugSequence.length || 1,
+    );
 
     const normalizeToTargetLength = (value: string) => {
       const sanitized = sanitizeBitSequence(value);
       if (sanitized.length === targetLength) return sanitized;
-      if (sanitized.length > targetLength) return sanitized.slice(0, targetLength);
+      if (sanitized.length > targetLength)
+        return sanitized.slice(0, targetLength);
       return sanitized.padEnd(targetLength, '0');
     };
 
@@ -1729,7 +1914,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         if (name === inputName) {
           next[name] = normalizeToTargetLength(edited || '0');
         } else {
-          next[name] = normalizeToTargetLength(prev[name] ?? defaultDebugSequence);
+          next[name] = normalizeToTargetLength(
+            prev[name] ?? defaultDebugSequence,
+          );
         }
       }
       return next;
@@ -1776,554 +1963,667 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         side="left"
       />
       <div className="flex w-full flex-col gap-3">
-      {visualEffectsEnabled && showFirstSolveCelebration && viewportSize.width > 0 && viewportSize.height > 0 ? (
-        <Confetti
-          width={viewportSize.width}
-          height={viewportSize.height}
-          numberOfPieces={220}
-          recycle={false}
-          gravity={0.18}
-          tweenDuration={4500}
-        />
-      ) : null}
-
-      {visualEffectsEnabled && victoryFx.visible ? (
-        <div
-          key={victoryFx.key}
-          className="pointer-events-none fixed left-1/2 top-1/2 z-[120] -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200 bg-white px-5 py-2 font-semibold text-sky-700 shadow-xl"
-        >
-          +{victoryFx.xp ?? 'XP'} • You earned XP!
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                🧩 {puzzle.title}
-              </h1>
-              {isSolved && (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
-                  <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  Solved
-                </span>
-              )}
-            </div>
-            <div className="text-[13px] text-muted-foreground">
-              by {puzzle.creator?.username ?? ''}
-            </div>
-            {puzzle.description && (
-              <div className="text-[13px] text-muted-foreground">
-                {puzzle.description}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <WorkstationTimer
-              timeLimitSeconds={puzzle.timeLimit ?? (puzzle as any).time_limit_seconds}
-            />
-            {!isInlineDebugger ? (
-              <Button variant="outline" size="sm" className="workstation-debugger-button" onClick={enterInlineDebugger}>
-                <Bug className="mr-1 size-4" />
-                Debugger
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" size="sm" onClick={onDebuggerStepPrev}>
-                  <StepBack className="mr-1 size-4" />
-                  Previous Step
-                </Button>
-                <Button variant="outline" size="sm" onClick={onDebuggerStepNext}>
-                  <StepForward className="mr-1 size-4" />
-                  Next Step
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowDebugger(true)}>
-                  View Full Debugger Report
-                </Button>
-                <Button variant="outline" size="sm" onClick={exitInlineDebugger}>
-                  Exit Debugger
-                </Button>
-              </>
-            )}
-            <Button variant="outline" size="sm" onClick={() => setShowLeaderboard(true)}>
-              Leaderboard
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!puzzle?.creatorComment?.trim()}
-              title={puzzle?.creatorComment?.trim() ? 'View creator comment' : 'No creator comment available'}
-              onClick={() => setShowCreatorComment(true)}
-            >
-              Creator Comment
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canRatePuzzle}
-              title={canRatePuzzle ? 'Rate this puzzle' : `Available after solving or ${ratingMinAttemptSeconds} seconds of trying`}
-              onClick={() => setShowRating(true)}
-            >
-              Rate Puzzle
-            </Button>
-            <Button variant="outline" size="sm" className="workstation-instructions-button" onClick={() => setShowPuzzleInfo(true)}>
-              Instructions
-            </Button>
-            <div className="relative">
-              <Button
-                size="sm"
-                className="workstation-check-button transition-all hover:scale-105 active:scale-95"
-                onClick={checkSolution}
-                isLoading={isChecking}
-              >
-                {isChecking ? 'Checking...' : 'Check Solution'}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">Budget:</span> {budgetLimit}
-            {creatorBudget !== null && (
-              <><span className="text-muted-foreground ml-2">Creator Cost:</span> {creatorBudget}</>
-            )}
-            <span className="text-muted-foreground ml-2">Cost:</span> {currentCost}
-            <InfoPopup>
-              <p className="font-medium text-foreground mb-1">Circuit Cost Limits</p>
-              <p><span className="font-medium text-foreground">Budget</span> — Max gate cost allowed. Your circuit must stay within this limit.</p>
-              {creatorBudget !== null && (
-                <p className="mt-1"><span className="font-medium text-foreground">Creator Cost</span> — The creator&apos;s solution cost. Match or beat it to earn a better medal.</p>
-              )}
-              <p className="mt-1"><span className="font-medium text-foreground">Cost</span> — Your current circuit&apos;s total gate cost.</p>
-            </InfoPopup>
-          </div>
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Inputs:</span>
-              {inputs.map((i) => (
-                <span
-                  key={i}
-                  className={
-                    ioUsage.usedInputs.has(i)
-                      ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                      : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
-                  }
-                >
-                  {i}
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Outputs:</span>
-              {outputs.map((o) => (
-                <span
-                  key={o}
-                  className={
-                    ioUsage.usedOutputs.has(o)
-                      ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                      : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
-                  }
-                >
-                  {o}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
-        <div className="workstation-component-menu">
-          <WorkstationMenu
-            basic={visibleBasics}
-            custom={customComponents}
-            sharedArsenal={sharedArsenalComponents}
-            solverArsenal={solverArsenalComponents}
-            componentDefs={uiCatalog}
-            allowArsenal={allowArsenal}
-            filteredBasicTypes={filteredBasicTypes}
-            selectedComponentId={
-              selectedComponent.mode === 'placing'
-                ? selectedComponent.componentId
-                : undefined
-            }
-            onSelectComponent={(componentId) =>
-              setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
-            }
-            onDragStart={setDraggedPaletteComponentId}
-            onDragEnd={() => setDraggedPaletteComponentId(null)}
+        {visualEffectsEnabled &&
+        showFirstSolveCelebration &&
+        viewportSize.width > 0 &&
+        viewportSize.height > 0 ? (
+          <Confetti
+            width={viewportSize.width}
+            height={viewportSize.height}
+            numberOfPieces={220}
+            recycle={false}
+            gravity={0.18}
+            tweenDuration={4500}
           />
-        </div>
+        ) : null}
 
-        <div className="workstation-grid">
-          <WorkstationGrid
-          puzzleId={puzzle.id}
-          inputs={inputs}
-          outputs={outputs}
-          catalog={uiCatalog}
-          placed={placed}
-          wires={wires}
-          selectedComponent={selectedComponent}
-          onSelectedComponentChange={setSelectedComponent}
-          onPlacedChange={onPlacedChange}
-          onWiresChange={(next: Wire[]) => {
-            commitHistory();
-            setWires(next);
-          }}
-          draggedPaletteComponentId={draggedPaletteComponentId}
-          isChecking={isChecking}
-          isPowerSurge={isPowerSurge}
-          boardFeedback={boardFeedback}
-          showSolvedSlam={showSolvedSlam}
-          boardRows={puzzle.board_rows ?? 15}
-          boardCols={puzzle.board_cols ?? 30}
-          debuggerActive={isInlineDebugger}
-          debuggerStepIndex={debugStepIndex}
-          debuggerStepCount={stepCount}
-          debuggerInputBits={currentInputBits}
-          debuggerOutputBits={currentOutputBits}
-          debuggerGateBits={currentGateBits}
-          debuggerSequences={debugSequences}
-          onDebuggerSequenceChange={onInlineSequenceChange}
-          onInspectComponent={setInspectingPlacedId}
-          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
-        />
-        </div>
+        {visualEffectsEnabled && victoryFx.visible ? (
+          <div
+            key={victoryFx.key}
+            className="pointer-events-none fixed left-1/2 top-1/2 z-[120] -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200 bg-white px-5 py-2 font-semibold text-sky-700 shadow-xl"
+          >
+            +{victoryFx.xp ?? 'XP'} • You earned XP!
+          </div>
+        ) : null}
 
-        <div className="flex flex-col gap-3">
-          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
-            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
-              Debugger
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5">
+                <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                  {puzzle.title}
+                </h1>
+                {isSolved && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <svg
+                      className="size-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Solved
+                  </span>
+                )}
+              </div>
+              <div className="text-[13px] text-muted-foreground">
+                by {puzzle.creator?.username ?? ''}
+              </div>
+              {puzzle.description && (
+                <div className="text-[13px] text-muted-foreground">
+                  {puzzle.description}
+                </div>
+              )}
             </div>
-            {isInlineDebugger ? (
-              <div className="space-y-1 text-[11px] text-muted-foreground">
-                <div>
-                  Step {stepCount ? debugStepIndex + 1 : 0}/{stepCount || 0}
-                </div>
-                <div>
-                  Edit bit sequences near each input pin, then refresh.
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <WorkstationTimer
+                timeLimitSeconds={
+                  puzzle.timeLimit ?? (puzzle as any).time_limit_seconds
+                }
+              />
+              {!isInlineDebugger ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="workstation-debugger-button"
+                  onClick={enterInlineDebugger}
+                >
+                  <Bug className="mr-1 size-4" />
+                  Debugger
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDebuggerStepPrev}
+                  >
+                    <StepBack className="mr-1 size-4" />
+                    Previous Step
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDebuggerStepNext}
+                  >
+                    <StepForward className="mr-1 size-4" />
+                    Next Step
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDebugger(true)}
+                  >
+                    View Full Debugger Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exitInlineDebugger}
+                  >
+                    Exit Debugger
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLeaderboard(true)}
+              >
+                Leaderboard
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!puzzle?.creatorComment?.trim()}
+                title={
+                  puzzle?.creatorComment?.trim()
+                    ? 'View creator comment'
+                    : 'No creator comment available'
+                }
+                onClick={() => setShowCreatorComment(true)}
+              >
+                Creator Comment
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!canRatePuzzle}
+                title={
+                  canRatePuzzle
+                    ? 'Rate this puzzle'
+                    : `Available after solving or ${ratingMinAttemptSeconds} seconds of trying`
+                }
+                onClick={() => setShowRating(true)}
+              >
+                Rate Puzzle
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="workstation-instructions-button"
+                onClick={() => setShowPuzzleInfo(true)}
+              >
+                Instructions
+              </Button>
+              <div className="relative">
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="mt-2 w-full"
-                  onClick={() => void runInlineDebugger()}
-                  isLoading={debugIsRunning}
+                  className="workstation-check-button transition-all hover:scale-105 active:scale-95"
+                  onClick={checkSolution}
+                  isLoading={isChecking}
                 >
-                  {debugIsRunning ? 'Refreshing...' : 'Refresh Debug'}
+                  {isChecking ? 'Checking...' : 'Check Solution'}
                 </Button>
               </div>
-            ) : (
-              <div className="text-[11px] text-muted-foreground">
-                Press Debugger to enter inline step-by-step mode.
-              </div>
-            )}
-            <div className="mt-3">
-              <div className="mb-2 text-[11px] font-medium text-muted-foreground">
-                Wires
-              </div>
-              {wires.length === 0 ? (
-                <div className="text-[11px] text-muted-foreground/60">No wires yet.</div>
-              ) : (
-                <ul className="space-y-1.5">
-                  {wires.map((w) => {
-                    // Helper function to format wire node names with proper numbering
-                    const formatWireNode = (componentId: string): string => {
-                      if (componentId.startsWith('IO:IN:')) {
-                        const name = componentId.replace('IO:IN:', '');
-                        return `Input '${name}'`;
-                      }
-                      if (componentId.startsWith('IO:OUT:')) {
-                        const name = componentId.replace('IO:OUT:', '');
-                        return `Output '${name}'`;
-                      }
-                      
-                      // For placed components, find the component and add numbering if multiple exist
-                      const placedComponent = placed.find(p => p.id === componentId);
-                      if (!placedComponent) return componentId;
-                      
-                      // Count how many gates of the same type appear before this one
-                      const countBefore = placed
-                        .slice(0, placed.indexOf(placedComponent))
-                        .filter(comp => comp.componentId === placedComponent.componentId).length;
-                      const gateNumber = countBefore + 1;
-                      
-                      // Count total gates of this type
-                      const totalCount = placed.filter(
-                        comp => comp.componentId === placedComponent.componentId
-                      ).length;
-                      
-                      // Extract gate type from ID (e.g., "NOT:1234567" -> "NOT")
-                      const parts = placedComponent.componentId.split(':');
-                      const gateType = parts[0] || placedComponent.componentId;
-                      
-                      // Only show number if there are multiple gates of this type
-                      return totalCount > 1 ? `${gateType} Gate ${gateNumber}` : `${gateType} Gate`;
-                    };
-
-                    const fromLabel = formatWireNode(w.from.componentId);
-                    const toLabel = formatWireNode(w.to.componentId);
-
-                    return (
-                      <li
-                        key={w.id}
-                        className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:bg-secondary/70 hover:border-border"
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          {/* From Badge */}
-                          <div className="flex-shrink-0 inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-1 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
-                            {fromLabel}
-                          </div>
-                          
-                          {/* Arrow Icon */}
-                          <ArrowRight size={12} className="text-muted-foreground flex-shrink-0" />
-                          
-                          {/* To Badge */}
-                          <div className="flex-shrink-0 inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
-                            {toLabel}
-                          </div>
-                        </div>
-                        
-                        {/* Delete Button */}
-                        <button
-                          type="button"
-                          className="hidden rounded-sm p-0.5 text-muted-foreground transition-all group-hover:flex items-center justify-center hover:scale-110 hover:bg-red-100 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
-                          onClick={() =>
-                            setWires((prev) => prev.filter((x) => x.id !== w.id))
-                          }
-                          title="Delete wire"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
-            <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
-              Session
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border/60 bg-card/80 px-4 py-2.5 text-[13px] text-foreground shadow-subtle backdrop-blur-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Budget:</span>{' '}
+              {budgetLimit}
+              {creatorBudget !== null && (
+                <>
+                  <span className="text-muted-foreground ml-2">
+                    Creator Cost:
+                  </span>{' '}
+                  {creatorBudget}
+                </>
+              )}
+              <span className="text-muted-foreground ml-2">Cost:</span>{' '}
+              {currentCost}
+              <InfoPopup>
+                <p className="font-medium text-foreground mb-1">
+                  Circuit Cost Limits
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Budget</span> —
+                  Max gate cost allowed. Your circuit must stay within this
+                  limit.
+                </p>
+                {creatorBudget !== null && (
+                  <p className="mt-1">
+                    <span className="font-medium text-foreground">
+                      Creator Cost
+                    </span>{' '}
+                    — The creator&apos;s solution cost. Match or beat it to earn
+                    a better medal.
+                  </p>
+                )}
+                <p className="mt-1">
+                  <span className="font-medium text-foreground">Cost</span> —
+                  Your current circuit&apos;s total gate cost.
+                </p>
+              </InfoPopup>
             </div>
-            <div className="text-[11px] text-muted-foreground">
-              Signed in as {user.data?.email ?? 'Unknown'}
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Inputs:</span>
+                {inputs.map((i) => (
+                  <span
+                    key={i}
+                    className={
+                      ioUsage.usedInputs.has(i)
+                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+                    }
+                  >
+                    {i}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Outputs:</span>
+                {outputs.map((o) => (
+                  <span
+                    key={o}
+                    className={
+                      ioUsage.usedOutputs.has(o)
+                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+                    }
+                  >
+                    {o}
+                  </span>
+                ))}
+              </div>
             </div>
-            <Button
-              variant="outline"
-              className="mt-3 w-full"
-              onClick={onBrowsePuzzles}
-            >
-              Exit Puzzle
-            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Sandbox Section */}
-      <div className="w-full">
-        <button
-          type="button"
-          onClick={() => setShowSandbox(!showSandbox)}
-          className="workstation-sandbox-toggle flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm transition-colors hover:bg-card"
-        >
-          <ChevronDown
-            size={16}
-            className={cn(
-              'transition-transform',
-              showSandbox ? 'rotate-180' : ''
-            )}
-          />
-          <span className="text-[13px] font-semibold tracking-tight text-foreground">
-            Sandbox Workstation
-          </span>
-          {sandboxPlaced.length > 0 && (
-            <span className="ml-auto text-[11px] text-muted-foreground">
-              {sandboxPlaced.length} components · {sandboxWires.length} wires
-            </span>
-          )}
-        </button>
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
+          <div className="workstation-component-menu">
+            <WorkstationMenu
+              basic={visibleBasics}
+              custom={customComponents}
+              sharedArsenal={sharedArsenalComponents}
+              solverArsenal={solverArsenalComponents}
+              componentDefs={uiCatalog}
+              allowArsenal={allowArsenal}
+              filteredBasicTypes={filteredBasicTypes}
+              selectedComponentId={
+                selectedComponent.mode === 'placing'
+                  ? selectedComponent.componentId
+                  : undefined
+              }
+              onSelectComponent={(componentId) =>
+                setSelectedComponent({
+                  mode: 'placing',
+                  componentId,
+                  rotation: 0,
+                })
+              }
+              onDragStart={setDraggedPaletteComponentId}
+              onDragEnd={() => setDraggedPaletteComponentId(null)}
+            />
+          </div>
 
-        {showSandbox && (
-          <div className="mt-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-subtle backdrop-blur-sm">
-            <div className="mb-4 text-[13px] text-muted-foreground">
-              Design and test circuits here, then transfer to main workstation
-            </div>
+          <div className="workstation-grid">
+            <WorkstationGrid
+              puzzleId={puzzle.id}
+              inputs={inputs}
+              outputs={outputs}
+              catalog={uiCatalog}
+              placed={placed}
+              wires={wires}
+              selectedComponent={selectedComponent}
+              onSelectedComponentChange={setSelectedComponent}
+              onPlacedChange={onPlacedChange}
+              onWiresChange={(next: Wire[]) => {
+                commitHistory();
+                setWires(next);
+              }}
+              draggedPaletteComponentId={draggedPaletteComponentId}
+              isChecking={isChecking}
+              isPowerSurge={isPowerSurge}
+              boardFeedback={boardFeedback}
+              showSolvedSlam={showSolvedSlam}
+              boardRows={puzzle.board_rows ?? 15}
+              boardCols={puzzle.board_cols ?? 30}
+              debuggerActive={isInlineDebugger}
+              debuggerStepIndex={debugStepIndex}
+              debuggerStepCount={stepCount}
+              debuggerInputBits={currentInputBits}
+              debuggerOutputBits={currentOutputBits}
+              debuggerGateBits={currentGateBits}
+              debuggerSequences={debugSequences}
+              onDebuggerSequenceChange={onInlineSequenceChange}
+              onInspectComponent={setInspectingPlacedId}
+              arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+            />
+          </div>
 
-            <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-              {/* Configuration & Controls Panel */}
-              <div className="flex flex-col gap-4">
-                {/* I/O Configuration */}
-                <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-                  <div className="mb-3 text-[13px] font-semibold text-foreground">
-                    I/O Configuration
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+              <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
+                Debugger
+              </div>
+              {isInlineDebugger ? (
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  <div>
+                    Step {stepCount ? debugStepIndex + 1 : 0}/{stepCount || 0}
                   </div>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[11px] font-medium text-foreground block mb-2">
-                        Inputs
-                      </label>
-                      <select
-                        value={sandboxNumInputs}
-                        onChange={(e) => setSandboxNumInputs(parseInt(e.target.value))}
-                        className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                          <option key={n} value={n}>
-                            {n} input{n !== 1 ? 's' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-foreground block mb-2">
-                        Outputs
-                      </label>
-                      <select
-                        value={sandboxNumOutputs}
-                        onChange={(e) => setSandboxNumOutputs(parseInt(e.target.value))}
-                          className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                          <option key={n} value={n}>
-                            {n} output{n !== 1 ? 's' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    Edit bit sequences near each input pin, then refresh.
                   </div>
-                </div>
-
-                {/* Statistics */}
-                <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-                  <div className="mb-3 text-[13px] font-semibold text-foreground">
-                    Sandbox Info
-                  </div>
-                  
-                  <div className="space-y-2 text-[13px]">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Components:</span>
-                      <span className="font-medium">{sandboxPlaced.length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Cost:</span>
-                      <span className="font-medium">{sandboxCurrentCost}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Wires:</span>
-                      <span className="font-medium">{sandboxWires.length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">I/O Pins:</span>
-                      <span className="font-medium">{sandboxNumInputs + sandboxNumOutputs}</span>
-                    </div>
-                  </div>
-                  
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setShowSandboxDebugger(true)}
-                    className="w-full mt-3"
+                    className="mt-2 w-full"
+                    onClick={() => void runInlineDebugger()}
+                    isLoading={debugIsRunning}
                   >
-                    Debug
+                    {debugIsRunning ? 'Refreshing...' : 'Refresh Debug'}
                   </Button>
                 </div>
-
-                {/* Action Buttons */}
-                {sandboxPlaced.length > 0 && (
-                  <div className="space-y-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={clearSandbox}
-                      className="w-full"
-                    >
-                      Clear Sandbox
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={applySandboxToWorkstation}
-                      className="w-full"
-                    >
-                      Send to Workstation
-                    </Button>
+              ) : (
+                <div className="text-[11px] text-muted-foreground">
+                  Press Debugger to enter inline step-by-step mode.
+                </div>
+              )}
+              <div className="mt-3">
+                <div className="mb-2 text-[11px] font-medium text-muted-foreground">
+                  Wires
+                </div>
+                {wires.length === 0 ? (
+                  <div className="text-[11px] text-muted-foreground/60">
+                    No wires yet.
                   </div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {wires.map((w) => {
+                      // Helper function to format wire node names with proper numbering
+                      const formatWireNode = (componentId: string): string => {
+                        if (componentId.startsWith('IO:IN:')) {
+                          const name = componentId.replace('IO:IN:', '');
+                          return `Input '${name}'`;
+                        }
+                        if (componentId.startsWith('IO:OUT:')) {
+                          const name = componentId.replace('IO:OUT:', '');
+                          return `Output '${name}'`;
+                        }
+
+                        // For placed components, find the component and add numbering if multiple exist
+                        const placedComponent = placed.find(
+                          (p) => p.id === componentId,
+                        );
+                        if (!placedComponent) return componentId;
+
+                        // Count how many gates of the same type appear before this one
+                        const countBefore = placed
+                          .slice(0, placed.indexOf(placedComponent))
+                          .filter(
+                            (comp) =>
+                              comp.componentId === placedComponent.componentId,
+                          ).length;
+                        const gateNumber = countBefore + 1;
+
+                        // Count total gates of this type
+                        const totalCount = placed.filter(
+                          (comp) =>
+                            comp.componentId === placedComponent.componentId,
+                        ).length;
+
+                        // Extract gate type from ID (e.g., "NOT:1234567" -> "NOT")
+                        const parts = placedComponent.componentId.split(':');
+                        const gateType =
+                          parts[0] || placedComponent.componentId;
+
+                        // Only show number if there are multiple gates of this type
+                        return totalCount > 1
+                          ? `${gateType} Gate ${gateNumber}`
+                          : `${gateType} Gate`;
+                      };
+
+                      const fromLabel = formatWireNode(w.from.componentId);
+                      const toLabel = formatWireNode(w.to.componentId);
+
+                      return (
+                        <li
+                          key={w.id}
+                          className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:bg-secondary/70 hover:border-border"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            {/* From Badge */}
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-1 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                              {fromLabel}
+                            </div>
+
+                            {/* Arrow Icon */}
+                            <ArrowRight
+                              size={12}
+                              className="text-muted-foreground flex-shrink-0"
+                            />
+
+                            {/* To Badge */}
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+                              {toLabel}
+                            </div>
+                          </div>
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            className="hidden rounded-sm p-0.5 text-muted-foreground transition-all group-hover:flex items-center justify-center hover:scale-110 hover:bg-red-100 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
+                            onClick={() =>
+                              setWires((prev) =>
+                                prev.filter((x) => x.id !== w.id),
+                              )
+                            }
+                            title="Delete wire"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-              </div>
-
-              {/* Menu & Grid */}
-              <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-                <WorkstationMenu
-                  basic={visibleBasics}
-                  custom={customComponents}
-                  sharedArsenal={sharedArsenalComponents}
-                  solverArsenal={solverArsenalComponents}
-                  componentDefs={uiCatalog}
-                  allowArsenal={allowArsenal}
-                  filteredBasicTypes={filteredBasicTypes}
-                  selectedComponentId={
-                    sandboxSelectedComponent.mode === 'placing'
-                      ? sandboxSelectedComponent.componentId
-                      : undefined
-                  }
-                  onSelectComponent={(componentId) =>
-                    setSandboxSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
-                  }
-                  onDragStart={setSandboxDraggedPaletteComponentId}
-                  onDragEnd={() => setSandboxDraggedPaletteComponentId(null)}
-                />
-
-                <WorkstationGrid
-                  puzzleId={puzzle.id}
-                  inputs={sandboxInputs}
-                  outputs={sandboxOutputs}
-                  catalog={uiCatalog}
-                  placed={sandboxPlaced}
-                  wires={sandboxWires}
-                  selectedComponent={sandboxSelectedComponent}
-                  onSelectedComponentChange={setSandboxSelectedComponent}
-                  onPlacedChange={setSandboxPlaced}
-                  onWiresChange={setSandboxWires}
-                  draggedPaletteComponentId={sandboxDraggedPaletteComponentId}
-                  boardRows={puzzle.board_rows ?? 15}
-                  boardCols={puzzle.board_cols ?? 30}
-                  onInspectComponent={setInspectingSandboxPlacedId}
-                />
               </div>
             </div>
 
-            {/* Sandbox Debugger */}
-            <CircuitDebugger
-              isOpen={showSandboxDebugger}
-              onClose={() => setShowSandboxDebugger(false)}
-              inputs={sandboxInputs}
-              outputs={sandboxOutputs}
-              placed={sandboxPlaced}
-              wires={sandboxWires}
-              catalog={uiCatalog}
-              puzzleId={puzzle.id}
-            />
+            <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
+              <div className="mb-1.5 text-[13px] font-semibold tracking-tight text-foreground">
+                Session
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                Signed in as {user.data?.email ?? 'Unknown'}
+              </div>
+              <Button
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={onBrowsePuzzles}
+              >
+                Exit Puzzle
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>
-        <DialogContent className="flex h-[75vh] max-h-[75vh] flex-col overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>{puzzle.title}</DialogTitle>
-            <DialogDescription>
-              Puzzle instructions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {puzzle?.instructions ? (
-              <>
-                <style>{`
+        {/* Sandbox Section */}
+        <div className="w-full">
+          <button
+            type="button"
+            onClick={() => setShowSandbox(!showSandbox)}
+            className="workstation-sandbox-toggle flex w-full items-center gap-2 rounded-xl border border-border/60 bg-card/80 px-4 py-3 shadow-subtle backdrop-blur-sm transition-colors hover:bg-card"
+          >
+            <ChevronDown
+              size={16}
+              className={cn(
+                'transition-transform',
+                showSandbox ? 'rotate-180' : '',
+              )}
+            />
+            <span className="text-[13px] font-semibold tracking-tight text-foreground">
+              Sandbox Workstation
+            </span>
+            {sandboxPlaced.length > 0 && (
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {sandboxPlaced.length} components · {sandboxWires.length} wires
+              </span>
+            )}
+          </button>
+
+          {showSandbox && (
+            <div className="mt-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-subtle backdrop-blur-sm">
+              <div className="mb-4 text-[13px] text-muted-foreground">
+                Design and test circuits here, then transfer to main workstation
+              </div>
+
+              <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+                {/* Configuration & Controls Panel */}
+                <div className="flex flex-col gap-4">
+                  {/* I/O Configuration */}
+                  <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+                    <div className="mb-3 text-[13px] font-semibold text-foreground">
+                      I/O Configuration
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-2">
+                          Inputs
+                        </label>
+                        <select
+                          value={sandboxNumInputs}
+                          onChange={(e) =>
+                            setSandboxNumInputs(parseInt(e.target.value))
+                          }
+                          className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                            <option key={n} value={n}>
+                              {n} input{n !== 1 ? 's' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-2">
+                          Outputs
+                        </label>
+                        <select
+                          value={sandboxNumOutputs}
+                          onChange={(e) =>
+                            setSandboxNumOutputs(parseInt(e.target.value))
+                          }
+                          className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                            <option key={n} value={n}>
+                              {n} output{n !== 1 ? 's' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statistics */}
+                  <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+                    <div className="mb-3 text-[13px] font-semibold text-foreground">
+                      Sandbox Info
+                    </div>
+
+                    <div className="space-y-2 text-[13px]">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Components:
+                        </span>
+                        <span className="font-medium">
+                          {sandboxPlaced.length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Total Cost:
+                        </span>
+                        <span className="font-medium">
+                          {sandboxCurrentCost}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Wires:</span>
+                        <span className="font-medium">
+                          {sandboxWires.length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">I/O Pins:</span>
+                        <span className="font-medium">
+                          {sandboxNumInputs + sandboxNumOutputs}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowSandboxDebugger(true)}
+                      className="w-full mt-3"
+                    >
+                      Debug
+                    </Button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  {sandboxPlaced.length > 0 && (
+                    <div className="space-y-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={clearSandbox}
+                        className="w-full"
+                      >
+                        Clear Sandbox
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={applySandboxToWorkstation}
+                        className="w-full"
+                      >
+                        Send to Workstation
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Menu & Grid */}
+                <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                  <WorkstationMenu
+                    basic={visibleBasics}
+                    custom={customComponents}
+                    sharedArsenal={sharedArsenalComponents}
+                    solverArsenal={solverArsenalComponents}
+                    componentDefs={uiCatalog}
+                    allowArsenal={allowArsenal}
+                    filteredBasicTypes={filteredBasicTypes}
+                    selectedComponentId={
+                      sandboxSelectedComponent.mode === 'placing'
+                        ? sandboxSelectedComponent.componentId
+                        : undefined
+                    }
+                    onSelectComponent={(componentId) =>
+                      setSandboxSelectedComponent({
+                        mode: 'placing',
+                        componentId,
+                        rotation: 0,
+                      })
+                    }
+                    onDragStart={setSandboxDraggedPaletteComponentId}
+                    onDragEnd={() => setSandboxDraggedPaletteComponentId(null)}
+                  />
+
+                  <WorkstationGrid
+                    puzzleId={puzzle.id}
+                    inputs={sandboxInputs}
+                    outputs={sandboxOutputs}
+                    catalog={uiCatalog}
+                    placed={sandboxPlaced}
+                    wires={sandboxWires}
+                    selectedComponent={sandboxSelectedComponent}
+                    onSelectedComponentChange={setSandboxSelectedComponent}
+                    onPlacedChange={setSandboxPlaced}
+                    onWiresChange={setSandboxWires}
+                    draggedPaletteComponentId={sandboxDraggedPaletteComponentId}
+                    boardRows={puzzle.board_rows ?? 15}
+                    boardCols={puzzle.board_cols ?? 30}
+                    onInspectComponent={setInspectingSandboxPlacedId}
+                  />
+                </div>
+              </div>
+
+              {/* Sandbox Debugger */}
+              <CircuitDebugger
+                isOpen={showSandboxDebugger}
+                onClose={() => setShowSandboxDebugger(false)}
+                inputs={sandboxInputs}
+                outputs={sandboxOutputs}
+                placed={sandboxPlaced}
+                wires={sandboxWires}
+                catalog={uiCatalog}
+                puzzleId={puzzle.id}
+              />
+            </div>
+          )}
+        </div>
+
+        <Dialog open={showPuzzleInfo} onOpenChange={setShowPuzzleInfo}>
+          <DialogContent className="flex h-[75vh] max-h-[75vh] flex-col overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>{puzzle.title}</DialogTitle>
+              <DialogDescription>Puzzle instructions.</DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {puzzle?.instructions ? (
+                <>
+                  <style>{`
                   .prose .katex {
                     vertical-align: baseline !important;
                     margin: 0 !important;
@@ -2351,234 +2651,272 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     text-underline-offset: 4px;
                   }
                 `}</style>
-                {renderedInstructionsHtml ? (
-                  <div
-                    className="prose prose-sm max-w-none rounded-md border border-border bg-card p-4 text-card-foreground [&_*]:text-card-foreground"
-                    dangerouslySetInnerHTML={{ __html: renderedInstructionsHtml }}
-                  />
-                ) : (
-                  <div className="text-muted-foreground text-[13px]">Loading instructions...</div>
-                )}
-              </>
-            ) : (
-              <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {showRating && (
-        <RatingDialog
-          puzzleId={puzzle.id}
-          open={showRating}
-          onOpenChange={setShowRating}
-          startTime={startTime.current}
-        />
-      )}
-
-      <CircuitDebugger
-        isOpen={showDebugger}
-        onClose={() => setShowDebugger(false)}
-        inputs={inputs}
-        outputs={outputs}
-        placed={placed}
-        wires={wires}
-        catalog={uiCatalog}
-        puzzleId={puzzleId}
-        modeOverride="sequence"
-        sequenceInputsOverride={debugSequences}
-        autoRunToken={debugRunKey}
-      />
-
-      <Dialog
-        open={Boolean(connectivityIssues?.length)}
-        onOpenChange={(open) => (open ? null : setConnectivityIssues(null))}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cannot check circuit</DialogTitle>
-            <DialogDescription>
-              Some inputs/outputs are missing or extra. Fix these before
-              checking.
-            </DialogDescription>
-          </DialogHeader>
-          <div
-            className={cn('max-h-[50vh] overflow-auto text-[13px] text-foreground')}
-          >
-            <ul className="list-disc space-y-1 pl-5">
-              {(connectivityIssues ?? []).map((m, idx) => (
-                <li key={`${idx}:${m}`}>{m}</li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConnectivityIssues(null)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={postCheck.open}
-        onOpenChange={(open) => {
-          setPostCheck(open ? postCheck : ({ open: false } as PostCheckState));
-        }}
-      >
-        <DialogContent className="max-w-[90vw] sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {postCheck.open && postCheck.solved
-                ? 'Puzzle solved'
-                : 'Failed to solve'}
-            </DialogTitle>
-            <div className="mt-2 max-h-[200px] w-full overflow-y-auto rounded-lg bg-secondary/50 p-3 text-[13px] text-foreground">
-               <p className="whitespace-pre-wrap break-words">
-                {postCheck.open ? postCheck.message : ''}
-              </p>
-            </div>
-            {/* Hidden Description for accessibility but we render custom content above */}
-            <DialogDescription className="sr-only">
-              {postCheck.open ? postCheck.message : 'Solution check result'}
-            </DialogDescription>
-          </DialogHeader>
-          {/* Visual Fix: Modal Text Overflow */}
-          <div className="max-h-[60vh] overflow-y-auto break-words text-[13px] text-foreground">
-            {postCheck.open && postCheck.solved ? (
-              <div className="space-y-2">
-                {postCheck.medal && postCheck.medal !== 'NONE' && (
-                  <div className="flex items-center gap-2 text-lg font-semibold">
-                    <span className="animate-[bounce_0.9s_ease-in-out_2]">
-                      {postCheck.medal === 'GOLD' ? '🥇' : postCheck.medal === 'SILVER' ? '🥈' : '🥉'}
-                    </span>
-                    <span className={
-                      postCheck.medal === 'GOLD' ? 'text-amber-500' :
-                      postCheck.medal === 'SILVER' ? 'text-muted-foreground' :
-                      'text-amber-700'
-                    }>
-                      {postCheck.medal} Medal
-                    </span>
-                  </div>
-                )}
-                {typeof postCheck.puzzleTotalXP === 'number' && (
-                  <div className="rounded-lg border border-border/60 bg-secondary/40 p-2.5">
-                    <PuzzleXPBar
-                      difficulty={puzzle.difficulty}
-                      avgDifficulty={puzzle.avg_difficulty ?? 0}
-                      currentXP={postCheck.puzzleTotalXP}
+                  {renderedInstructionsHtml ? (
+                    <div
+                      className="prose prose-sm max-w-none rounded-md border border-border bg-card p-4 text-card-foreground [&_*]:text-card-foreground"
+                      dangerouslySetInnerHTML={{
+                        __html: renderedInstructionsHtml,
+                      }}
                     />
-                  </div>
-                )}
-                {typeof postCheck.xpLeftForMax === 'number' && postCheck.xpLeftForMax > 0 && (
-                  <p className="font-medium text-amber-700">
-                    You have {postCheck.xpLeftForMax} XP left for max.
-                  </p>
-                )}
-                {typeof postCheck.xpLeftForMax === 'number' && postCheck.xpLeftForMax === 0 && postCheck.xpEarned === 0 && (
-                  <p className="font-medium text-emerald-700">
-                    You have reached the maximum XP for this puzzle.
-                  </p>
-                )}
-                <p className="font-medium text-foreground mt-4">Congrats! Your solution passed all test cases.</p>
-              </div>
-            ) : (
-              <div className="text-muted-foreground">
-                Your circuit did not pass the test cases. Try adjusting your
-                wiring/components.
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              className="transition-all hover:scale-105 active:scale-95"
-              onClick={onSolveAgain}
-              disabled={!postCheck.open}
-            >
-              {postCheck.open && postCheck.solved ? 'Solve again' : 'Try again'}
-            </Button>
-            <Button
-              className="transition-all hover:scale-105 active:scale-95"
-              onClick={onBrowsePuzzles}
-              disabled={!postCheck.open}
-            >
-              Browse puzzles
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                  ) : (
+                    <div className="text-muted-foreground text-[13px]">
+                      Loading instructions...
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-muted-foreground text-[13px]">
+                  No instructions provided.
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
-      {/* Leaderboard Dialog */}
-      <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <svg className="size-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                <path d="M4 22h16" />
-                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-              </svg>
-              Leaderboard
-            </DialogTitle>
-            <DialogDescription>
-              Fastest solvers for this puzzle
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            <PuzzleLeaderboard puzzleId={puzzleId} />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              className="transition-all hover:scale-105 active:scale-95"
-              onClick={() => setShowLeaderboard(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {showRating && (
+          <RatingDialog
+            puzzleId={puzzle.id}
+            open={showRating}
+            onOpenChange={setShowRating}
+            startTime={startTime.current}
+          />
+        )}
 
-      {/* Creator Comment Dialog */}
-      <CreatorCommentDialog
-        open={showCreatorComment}
-        onOpenChange={setShowCreatorComment}
-        puzzle={puzzle}
-        showLink={false}
-      />
-
-      {/* Component Inspection Dialog - Main Workstation */}
-      {inspectingPlacedId && placed.find(p => p.id === inspectingPlacedId) && (
-        <InspectionDialog
-          placedId={inspectingPlacedId}
+        <CircuitDebugger
+          isOpen={showDebugger}
+          onClose={() => setShowDebugger(false)}
+          inputs={inputs}
+          outputs={outputs}
           placed={placed}
-          componentCatalog={componentCatalog}
-          uiCatalog={uiCatalog}
-          isOpen={!!inspectingPlacedId}
-          onClose={() => setInspectingPlacedId(null)}
-          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+          wires={wires}
+          catalog={uiCatalog}
+          puzzleId={puzzleId}
+          modeOverride="sequence"
+          sequenceInputsOverride={debugSequences}
+          autoRunToken={debugRunKey}
         />
-      )}
 
-      {/* Component Inspection Dialog - Sandbox */}
-      {inspectingSandboxPlacedId && sandboxPlaced.find(p => p.id === inspectingSandboxPlacedId) && (
-        <InspectionDialog
-          placedId={inspectingSandboxPlacedId}
-          placed={sandboxPlaced}
-          componentCatalog={componentCatalog}
-          uiCatalog={uiCatalog}
-          isOpen={!!inspectingSandboxPlacedId}
-          onClose={() => setInspectingSandboxPlacedId(null)}
-          arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+        <Dialog
+          open={Boolean(connectivityIssues?.length)}
+          onOpenChange={(open) => (open ? null : setConnectivityIssues(null))}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cannot check circuit</DialogTitle>
+              <DialogDescription>
+                Some inputs/outputs are missing or extra. Fix these before
+                checking.
+              </DialogDescription>
+            </DialogHeader>
+            <div
+              className={cn(
+                'max-h-[50vh] overflow-auto text-[13px] text-foreground',
+              )}
+            >
+              <ul className="list-disc space-y-1 pl-5">
+                {(connectivityIssues ?? []).map((m, idx) => (
+                  <li key={`${idx}:${m}`}>{m}</li>
+                ))}
+              </ul>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setConnectivityIssues(null)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={postCheck.open}
+          onOpenChange={(open) => {
+            setPostCheck(
+              open ? postCheck : ({ open: false } as PostCheckState),
+            );
+          }}
+        >
+          <DialogContent className="max-w-[90vw] sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {postCheck.open && postCheck.solved
+                  ? 'Puzzle solved'
+                  : 'Failed to solve'}
+              </DialogTitle>
+              <div className="mt-2 max-h-[200px] w-full overflow-y-auto rounded-lg bg-secondary/50 p-3 text-[13px] text-foreground">
+                <p className="whitespace-pre-wrap break-words">
+                  {postCheck.open ? postCheck.message : ''}
+                </p>
+              </div>
+              {/* Hidden Description for accessibility but we render custom content above */}
+              <DialogDescription className="sr-only">
+                {postCheck.open ? postCheck.message : 'Solution check result'}
+              </DialogDescription>
+            </DialogHeader>
+            {/* Visual Fix: Modal Text Overflow */}
+            <div className="max-h-[60vh] overflow-y-auto break-words text-[13px] text-foreground">
+              {postCheck.open && postCheck.solved ? (
+                <div className="space-y-2">
+                  {postCheck.medal && postCheck.medal !== 'NONE' && (
+                    <div className="flex items-center gap-2 text-lg font-semibold">
+                      <Medal
+                        className={cn(
+                          'size-5',
+                          postCheck.medal === 'GOLD'
+                            ? 'text-amber-500'
+                            : postCheck.medal === 'SILVER'
+                              ? 'text-slate-400'
+                              : 'text-amber-700',
+                        )}
+                        aria-hidden
+                      />
+                      <span
+                        className={
+                          postCheck.medal === 'GOLD'
+                            ? 'text-amber-500'
+                            : postCheck.medal === 'SILVER'
+                              ? 'text-muted-foreground'
+                              : 'text-amber-700'
+                        }
+                      >
+                        {postCheck.medal} medal
+                      </span>
+                    </div>
+                  )}
+                  {typeof postCheck.puzzleTotalXP === 'number' && (
+                    <div className="rounded-lg border border-border/60 bg-secondary/40 p-2.5">
+                      <PuzzleXPBar
+                        difficulty={puzzle.difficulty}
+                        avgDifficulty={puzzle.avg_difficulty ?? 0}
+                        currentXP={postCheck.puzzleTotalXP}
+                      />
+                    </div>
+                  )}
+                  {typeof postCheck.xpLeftForMax === 'number' &&
+                    postCheck.xpLeftForMax > 0 && (
+                      <p className="font-medium text-amber-700">
+                        You have {postCheck.xpLeftForMax} XP left for max.
+                      </p>
+                    )}
+                  {typeof postCheck.xpLeftForMax === 'number' &&
+                    postCheck.xpLeftForMax === 0 &&
+                    postCheck.xpEarned === 0 && (
+                      <p className="font-medium text-emerald-700">
+                        You have reached the maximum XP for this puzzle.
+                      </p>
+                    )}
+                  <p className="font-medium text-foreground mt-4">
+                    Congrats! Your solution passed all test cases.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-muted-foreground">
+                  Your circuit did not pass the test cases. Try adjusting your
+                  wiring/components.
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                className="transition-all hover:scale-105 active:scale-95"
+                onClick={onSolveAgain}
+                disabled={!postCheck.open}
+              >
+                {postCheck.open && postCheck.solved
+                  ? 'Solve again'
+                  : 'Try again'}
+              </Button>
+              <Button
+                className="transition-all hover:scale-105 active:scale-95"
+                onClick={onBrowsePuzzles}
+                disabled={!postCheck.open}
+              >
+                Browse puzzles
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Leaderboard Dialog */}
+        <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <svg
+                  className="size-5 text-amber-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                  <path d="M4 22h16" />
+                  <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                  <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                  <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                </svg>
+                Leaderboard
+              </DialogTitle>
+              <DialogDescription>
+                Fastest solvers for this puzzle
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <PuzzleLeaderboard puzzleId={puzzleId} />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="transition-all hover:scale-105 active:scale-95"
+                onClick={() => setShowLeaderboard(false)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Creator Comment Dialog */}
+        <CreatorCommentDialog
+          open={showCreatorComment}
+          onOpenChange={setShowCreatorComment}
+          puzzle={puzzle}
+          showLink={false}
         />
-      )}
 
-    </div>
+        {/* Component Inspection Dialog - Main Workstation */}
+        {inspectingPlacedId &&
+          placed.find((p) => p.id === inspectingPlacedId) && (
+            <InspectionDialog
+              placedId={inspectingPlacedId}
+              placed={placed}
+              componentCatalog={componentCatalog}
+              uiCatalog={uiCatalog}
+              isOpen={!!inspectingPlacedId}
+              onClose={() => setInspectingPlacedId(null)}
+              arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+            />
+          )}
+
+        {/* Component Inspection Dialog - Sandbox */}
+        {inspectingSandboxPlacedId &&
+          sandboxPlaced.find((p) => p.id === inspectingSandboxPlacedId) && (
+            <InspectionDialog
+              placedId={inspectingSandboxPlacedId}
+              placed={sandboxPlaced}
+              componentCatalog={componentCatalog}
+              uiCatalog={uiCatalog}
+              isOpen={!!inspectingSandboxPlacedId}
+              onClose={() => setInspectingSandboxPlacedId(null)}
+              arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+            />
+          )}
+      </div>
     </>
   );
 };
@@ -2602,7 +2940,7 @@ const InspectionDialog = ({
   onClose,
   arsenalComponentDisplayModes,
 }: InspectionDialogProps) => {
-  const placedComponent = placed.find(p => p.id === placedId);
+  const placedComponent = placed.find((p) => p.id === placedId);
   if (!placedComponent) return null;
 
   const uiDef = uiCatalog[placedComponent.componentId];
@@ -2613,31 +2951,35 @@ const InspectionDialog = ({
   // Determine visibility mode for this component (if it's an Arsenal piece in a puzzle context)
   const componentId = String(placedComponent.componentId);
   // Map both snake_case and camelCase for API compatibility
-  const visibilityMode = arsenalComponentDisplayModes?.[componentId] || 
-                         (arsenalComponentDisplayModes as any)?.[componentId.replace(/([A-Z])/g, '_$1').toLowerCase()];
-  
+  const visibilityMode =
+    arsenalComponentDisplayModes?.[componentId] ||
+    (arsenalComponentDisplayModes as any)?.[
+      componentId.replace(/([A-Z])/g, '_$1').toLowerCase()
+    ];
 
-  const inputs = uiDef.ports.filter(p => p.kind === 'input');
-  const outputs = uiDef.ports.filter(p => p.kind === 'output');
+  const inputs = uiDef.ports.filter((p) => p.kind === 'input');
+  const outputs = uiDef.ports.filter((p) => p.kind === 'output');
 
   // Determine if arsenal and has internal structure
   const isArsenal = (catalogEntry as any).is_arsenal === true;
   const hasSolution = !!(catalogEntry as any).solution;
-  const hasUsedBasicTypes = Array.isArray((catalogEntry as any).used_basic_types) && (catalogEntry as any).used_basic_types.length > 0;
+  const hasUsedBasicTypes =
+    Array.isArray((catalogEntry as any).used_basic_types) &&
+    (catalogEntry as any).used_basic_types.length > 0;
   const hasStructure = hasSolution || hasUsedBasicTypes;
   const isHidden = (catalogEntry as any).hide_internal_structure === true;
-  
+
   // STRICT Visibility Mode Enforcement:
   // If visibilityMode is set, ONLY show what's requested
   // If visibilityMode is NOT set, show normal behavior (both description and structure)
-  const showDescription = isArsenal 
-    ? visibilityMode !== 'circuit'  // For arsenal: show description unless explicitly circuit-only
+  const showDescription = isArsenal
+    ? visibilityMode !== 'circuit' // For arsenal: show description unless explicitly circuit-only
     : true; // For basic gates: always show description section
-  
+
   const showInternalStructure = isArsenal
-    ? visibilityMode !== 'description'  // For arsenal: show structure unless explicitly description-only
+    ? visibilityMode !== 'description' // For arsenal: show structure unless explicitly description-only
     : false; // For basic gates: never show internal structure
-  
+
   const showIOMap = !isArsenal; // I/O Map ONLY for basic gates, never for Arsenal pieces
 
   // Parse internal structure for circuit preview
@@ -2645,7 +2987,8 @@ const InspectionDialog = ({
     try {
       const solution = (catalogEntry as any).solution;
       if (!solution) return null;
-      const parsed = typeof solution === 'string' ? JSON.parse(solution) : solution;
+      const parsed =
+        typeof solution === 'string' ? JSON.parse(solution) : solution;
       return {
         placed: parsed.placed || [],
         wires: parsed.wires || [],
@@ -2668,14 +3011,18 @@ const InspectionDialog = ({
       return entry.description_text;
     }
     // Try description_text_field as another fallback
-    if (entry.descriptionTextField && String(entry.descriptionTextField).trim()) {
+    if (
+      entry.descriptionTextField &&
+      String(entry.descriptionTextField).trim()
+    ) {
       return entry.descriptionTextField;
     }
-    return "";
+    return '';
   };
 
   const mappedDescriptionContent = getDescriptionContent();
-  const hasValidDescription = mappedDescriptionContent !== "" && mappedDescriptionContent !== null;
+  const hasValidDescription =
+    mappedDescriptionContent !== '' && mappedDescriptionContent !== null;
 
   // Helper to generate curved wire paths (same logic as workstation grid)
   const getCurvedWirePath = (
@@ -2685,7 +3032,10 @@ const InspectionDialog = ({
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const controlX = Math.max(28, Math.abs(dx) * 0.38);
-    const droopY = Math.max(8, Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04));
+    const droopY = Math.max(
+      8,
+      Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04),
+    );
     const c1x = from.x + controlX;
     const c1y = from.y + droopY;
     const c2x = to.x - controlX;
@@ -2698,7 +3048,15 @@ const InspectionDialog = ({
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <svg className="size-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              className="size-5 text-blue-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="8" />
               <path d="M12 8v4" />
               <path d="M9 12h6" />
@@ -2714,7 +3072,9 @@ const InspectionDialog = ({
           {/* Description Section - if present and not hidden by visibility mode */}
           {showDescription && hasValidDescription && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <h3 className="mb-2 text-[13px] font-semibold text-foreground">📝 Description</h3>
+              <h3 className="mb-2 text-[13px] font-semibold text-foreground">
+                Description
+              </h3>
               <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed font-normal">
                 {mappedDescriptionContent}
               </p>
@@ -2723,7 +3083,7 @@ const InspectionDialog = ({
           {showDescription && !hasValidDescription && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="text-[12px] text-amber-900">
-                ℹ️ No description provided for this component.
+                No description provided for this component.
               </p>
             </div>
           )}
@@ -2731,20 +3091,22 @@ const InspectionDialog = ({
           {/* I/O Map Section - ONLY for basic gates */}
           {showIOMap && (
             <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-              <h3 className="mb-3 text-[13px] font-semibold text-foreground">I/O Map</h3>
-              
+              <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+                I/O Map
+              </h3>
+
               <div className="space-y-2">
                 <div className="text-[12px]">
                   <span className="font-medium text-foreground">Inputs: </span>
                   <span className="text-muted-foreground">
-                    {inputs.length} ({inputs.map(p => p.id).join(', ')})
+                    {inputs.length} ({inputs.map((p) => p.id).join(', ')})
                   </span>
                 </div>
-                
+
                 <div className="text-[12px]">
                   <span className="font-medium text-foreground">Outputs: </span>
                   <span className="text-muted-foreground">
-                    {outputs.length} ({outputs.map(p => p.id).join(', ')})
+                    {outputs.length} ({outputs.map((p) => p.id).join(', ')})
                   </span>
                 </div>
               </div>
@@ -2754,21 +3116,29 @@ const InspectionDialog = ({
                 <table className="w-full text-[12px]">
                   <thead className="bg-secondary">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-foreground">Port</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground">Type</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground">
+                        Port
+                      </th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground">
+                        Type
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {uiDef.ports.map((port) => (
                       <tr key={port.id} className="border-t border-border/40">
-                        <td className="px-3 py-2 font-mono text-foreground">{port.id}</td>
+                        <td className="px-3 py-2 font-mono text-foreground">
+                          {port.id}
+                        </td>
                         <td className="px-3 py-2">
-                          <span className={cn(
-                            "inline-block px-2 py-0.5 rounded text-[11px] font-medium",
-                            port.kind === 'input'
-                              ? "bg-green-100/80 text-green-700"
-                              : "bg-purple-100/80 text-purple-700"
-                          )}>
+                          <span
+                            className={cn(
+                              'inline-block px-2 py-0.5 rounded text-[11px] font-medium',
+                              port.kind === 'input'
+                                ? 'bg-green-100/80 text-green-700'
+                                : 'bg-purple-100/80 text-purple-700',
+                            )}
+                          >
                             {port.kind === 'input' ? 'Input' : 'Output'}
                           </span>
                         </td>
@@ -2783,12 +3153,25 @@ const InspectionDialog = ({
           {/* Internal Structure Section - Arsenal pieces only, if not hidden by visibility mode */}
           {showInternalStructure && isArsenal && (
             <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
-              <h3 className="mb-3 text-[13px] font-semibold text-foreground">🔧 Internal Circuit Structure</h3>
-              
+              <h3 className="mb-3 inline-flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                <CircuitBoard
+                  className="size-4 text-muted-foreground"
+                  aria-hidden
+                />
+                Internal Circuit Structure
+              </h3>
+
               {isHidden ? (
                 <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
-                  <p className="text-[12px] text-amber-900 font-medium">
-                    ⚠️ The internal structure of this component is hidden by the creator.
+                  <p className="inline-flex items-start gap-2 text-[12px] font-medium text-amber-900">
+                    <CircleAlert
+                      className="mt-0.5 size-4 shrink-0"
+                      aria-hidden
+                    />
+                    <span>
+                      The internal structure of this component is hidden by the
+                      creator.
+                    </span>
                   </p>
                 </div>
               ) : hasStructure ? (
@@ -2796,100 +3179,148 @@ const InspectionDialog = ({
                   {/* Show basic gates list */}
                   {hasUsedBasicTypes && (
                     <div>
-                      <p className="text-[12px] font-medium text-foreground mb-2">Gates Used:</p>
+                      <p className="text-[12px] font-medium text-foreground mb-2">
+                        Gates Used:
+                      </p>
                       <div className="pl-3 space-y-1">
-                        {((catalogEntry as any).used_basic_types || []).map((gate: string) => (
-                          <div key={gate} className="flex items-center gap-2">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                            <span className="text-[12px] text-muted-foreground">{gate}</span>
-                          </div>
-                        ))}
+                        {((catalogEntry as any).used_basic_types || []).map(
+                          (gate: string) => (
+                            <div key={gate} className="flex items-center gap-2">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                              <span className="text-[12px] text-muted-foreground">
+                                {gate}
+                              </span>
+                            </div>
+                          ),
+                        )}
                       </div>
                     </div>
                   )}
 
                   {/* Circuit Preview - Render actual gates and wires */}
-                  {hasSolution && parsedSolution && (parsedSolution.placed.length > 0 || parsedSolution.wires.length > 0) && (
-                    <div className="mt-4 pt-4 border-t border-cyan-200">
-                      <p className="text-[12px] font-medium text-foreground mb-2">Circuit Preview:</p>
-                      <div className="relative w-full bg-slate-50 rounded border border-slate-200 overflow-auto" style={{ minHeight: '200px', maxHeight: '300px' }}>
-                        {/* Mini grid canvas */}
-                        <svg
-                          className="absolute inset-0 pointer-events-none"
-                          width="100%"
-                          height="100%"
-                          style={{ minWidth: '100%', minHeight: '100%' }}
+                  {hasSolution &&
+                    parsedSolution &&
+                    (parsedSolution.placed.length > 0 ||
+                      parsedSolution.wires.length > 0) && (
+                      <div className="mt-4 pt-4 border-t border-cyan-200">
+                        <p className="text-[12px] font-medium text-foreground mb-2">
+                          Circuit Preview:
+                        </p>
+                        <div
+                          className="relative w-full bg-slate-50 rounded border border-slate-200 overflow-auto"
+                          style={{ minHeight: '200px', maxHeight: '300px' }}
                         >
-                          {/* Draw wires */}
-                          {(parsedSolution.wires || []).map((wire: any, idx: number) => {
-                            // Find the placed components to locate ports
-                            const fromComp = parsedSolution.placed.find((p: any) => p.id === wire.from?.componentId);
-                            const toComp = parsedSolution.placed.find((p: any) => p.id === wire.to?.componentId);
-                            
-                            if (!fromComp || !toComp) return null;
-                            
-                            // Rough scaling: 18px per grid cell
-                            const CELL_SIZE = 16;
-                            const SCALE = 0.65;
-                            const fromX = (fromComp.origin?.col ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
-                            const fromY = (fromComp.origin?.row ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
-                            const toX = (toComp.origin?.col ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
-                            const toY = (toComp.origin?.row ?? 0) * CELL_SIZE * SCALE + CELL_SIZE * SCALE / 2;
-                            
-                            const wirePath = getCurvedWirePath({ x: fromX, y: fromY }, { x: toX, y: toY });
-                            
-                            return (
-                              <path
-                                key={`wire-${idx}`}
-                                d={wirePath}
-                                fill="none"
-                                stroke="#3b82f6"
-                                strokeWidth="1.5"
-                                opacity="0.7"
-                              />
-                            );
-                          })}
-                        </svg>
+                          {/* Mini grid canvas */}
+                          <svg
+                            className="absolute inset-0 pointer-events-none"
+                            width="100%"
+                            height="100%"
+                            style={{ minWidth: '100%', minHeight: '100%' }}
+                          >
+                            {/* Draw wires */}
+                            {(parsedSolution.wires || []).map(
+                              (wire: any, idx: number) => {
+                                // Find the placed components to locate ports
+                                const fromComp = parsedSolution.placed.find(
+                                  (p: any) => p.id === wire.from?.componentId,
+                                );
+                                const toComp = parsedSolution.placed.find(
+                                  (p: any) => p.id === wire.to?.componentId,
+                                );
 
-                        {/* Render mini gates */}
-                        <div className="absolute inset-0 pointer-events-none" style={{ perspective: '1000px' }}>
-                          {(parsedSolution.placed || []).map((placed: any) => {
-                            const CELL_SIZE = 16;
-                            const SCALE = 0.65;
-                            const left = (placed.origin?.col ?? 0) * CELL_SIZE * SCALE;
-                            const top = (placed.origin?.row ?? 0) * CELL_SIZE * SCALE;
-                            const width = 2 * CELL_SIZE * SCALE;
-                            const height = 2 * CELL_SIZE * SCALE;
-                            
-                            // Find component definition for this placed component
-                            const uiDef = uiCatalog[placed.componentId];
-                            if (!uiDef) return null;
-                            
-                            return (
-                              <div
-                                key={placed.id}
-                                className="absolute border border-border bg-card rounded text-[9px] font-bold text-foreground flex items-center justify-center pointer-events-none"
-                                style={{
-                                  left: `${left}px`,
-                                  top: `${top}px`,
-                                  width: `${width}px`,
-                                  height: `${height}px`,
-                                  fontSize: '9px',
-                                  lineHeight: '1',
-                                }}
-                                title={uiDef.label}
-                              >
-                                {uiDef.label}
-                              </div>
-                            );
-                          })}
+                                if (!fromComp || !toComp) return null;
+
+                                // Rough scaling: 18px per grid cell
+                                const CELL_SIZE = 16;
+                                const SCALE = 0.65;
+                                const fromX =
+                                  (fromComp.origin?.col ?? 0) *
+                                    CELL_SIZE *
+                                    SCALE +
+                                  (CELL_SIZE * SCALE) / 2;
+                                const fromY =
+                                  (fromComp.origin?.row ?? 0) *
+                                    CELL_SIZE *
+                                    SCALE +
+                                  (CELL_SIZE * SCALE) / 2;
+                                const toX =
+                                  (toComp.origin?.col ?? 0) *
+                                    CELL_SIZE *
+                                    SCALE +
+                                  (CELL_SIZE * SCALE) / 2;
+                                const toY =
+                                  (toComp.origin?.row ?? 0) *
+                                    CELL_SIZE *
+                                    SCALE +
+                                  (CELL_SIZE * SCALE) / 2;
+
+                                const wirePath = getCurvedWirePath(
+                                  { x: fromX, y: fromY },
+                                  { x: toX, y: toY },
+                                );
+
+                                return (
+                                  <path
+                                    key={`wire-${idx}`}
+                                    d={wirePath}
+                                    fill="none"
+                                    stroke="#3b82f6"
+                                    strokeWidth="1.5"
+                                    opacity="0.7"
+                                  />
+                                );
+                              },
+                            )}
+                          </svg>
+
+                          {/* Render mini gates */}
+                          <div
+                            className="absolute inset-0 pointer-events-none"
+                            style={{ perspective: '1000px' }}
+                          >
+                            {(parsedSolution.placed || []).map(
+                              (placed: any) => {
+                                const CELL_SIZE = 16;
+                                const SCALE = 0.65;
+                                const left =
+                                  (placed.origin?.col ?? 0) * CELL_SIZE * SCALE;
+                                const top =
+                                  (placed.origin?.row ?? 0) * CELL_SIZE * SCALE;
+                                const width = 2 * CELL_SIZE * SCALE;
+                                const height = 2 * CELL_SIZE * SCALE;
+
+                                // Find component definition for this placed component
+                                const uiDef = uiCatalog[placed.componentId];
+                                if (!uiDef) return null;
+
+                                return (
+                                  <div
+                                    key={placed.id}
+                                    className="absolute border border-border bg-card rounded text-[9px] font-bold text-foreground flex items-center justify-center pointer-events-none"
+                                    style={{
+                                      left: `${left}px`,
+                                      top: `${top}px`,
+                                      width: `${width}px`,
+                                      height: `${height}px`,
+                                      fontSize: '9px',
+                                      lineHeight: '1',
+                                    }}
+                                    title={uiDef.label}
+                                  >
+                                    {uiDef.label}
+                                  </div>
+                                );
+                              },
+                            )}
+                          </div>
                         </div>
+                        <p className="text-[11px] text-muted-foreground mt-2 italic">
+                          This component contains{' '}
+                          {parsedSolution.placed?.length || 0} gate(s) connected
+                          by {parsedSolution.wires?.length || 0} wire(s).
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-2 italic">
-                        This component contains {parsedSolution.placed?.length || 0} gate(s) connected by {parsedSolution.wires?.length || 0} wire(s).
-                      </p>
-                    </div>
-                  )}
+                    )}
                 </div>
               ) : (
                 <div className="rounded-md bg-slate-50 border border-slate-200 p-3">
@@ -2904,7 +3335,9 @@ const InspectionDialog = ({
           {/* Basic Gate Info */}
           {!isArsenal && getBasicGateInfo(catalogEntry.type) && (
             <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-              <h3 className="mb-3 text-[13px] font-semibold text-foreground">Gate Information</h3>
+              <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+                Gate Information
+              </h3>
               <p className="text-[12px] text-muted-foreground">
                 {getBasicGateInfo(catalogEntry.type)}
               </p>
@@ -2915,8 +3348,12 @@ const InspectionDialog = ({
           {catalogEntry.cost !== undefined && (
             <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-foreground">Cost:</span>
-                <span className="text-[12px] font-bold text-blue-600">{catalogEntry.cost}</span>
+                <span className="text-[12px] font-medium text-foreground">
+                  Cost:
+                </span>
+                <span className="text-[12px] font-bold text-blue-600">
+                  {catalogEntry.cost}
+                </span>
               </div>
             </div>
           )}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NextLink from 'next/link';
+import { CircuitBoard, MessageSquare, Trophy } from 'lucide-react';
 
 import Cookies from 'js-cookie';
 
@@ -32,20 +33,28 @@ const HomePage = () => {
   }, [user.status, user.data, router, hasToken]);
 
   // No cookie → show landing immediately (no need to wait for API)
-  const showLanding = hasToken ? (user.status !== 'pending' && !user.data) : true;
+  const showLanding = hasToken ? user.status !== 'pending' && !user.data : true;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <img className="h-7 w-auto sm:h-8 shrink-0" src="/logo.svg" alt="EscapeCircuit" />
-          <span className="text-base font-semibold text-foreground sm:text-xl">EscapeCircuit</span>
+          <img
+            className="h-7 w-auto sm:h-8 shrink-0"
+            src="/logo.svg"
+            alt="EscapeCircuit"
+          />
+          <span className="text-base font-semibold text-foreground sm:text-xl">
+            EscapeCircuit
+          </span>
         </div>
         {showLanding ? (
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <NextLink href={paths.auth.login.getHref()}>
-              <Button variant="outline" size="sm">Log in</Button>
+              <Button variant="outline" size="sm">
+                Log in
+              </Button>
             </NextLink>
             <NextLink href={paths.auth.register.getHref()}>
               <Button size="sm">Register</Button>
@@ -61,7 +70,7 @@ const HomePage = () => {
         <div className="max-w-2xl text-center">
           <img className="mx-auto mb-8 h-24 w-auto" src="/logo.svg" alt="" />
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Wire your way out ⚡
+            Wire your way out
           </h1>
           <p className="mt-4 text-base text-muted-foreground sm:text-lg">
             Create and solve logic-circuit puzzles, compete on the leaderboard,
@@ -87,16 +96,17 @@ const HomePage = () => {
           <div className="mt-20 grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-card p-6 text-center shadow-card">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-2xl">
-                <span role="img" aria-label="Puzzle">&#x1F9E9;</span>
+                <CircuitBoard className="size-5 text-foreground" aria-hidden />
               </div>
               <h3 className="font-semibold text-foreground">Solve Puzzles</h3>
               <p className="mt-1 text-[13px] text-muted-foreground">
-                Challenge yourself with logic-circuit puzzles of varying difficulty.
+                Challenge yourself with logic-circuit puzzles of varying
+                difficulty.
               </p>
             </div>
             <div className="rounded-xl border border-border bg-card p-6 text-center shadow-card">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-2xl">
-                <span role="img" aria-label="Trophy">&#x1F3C6;</span>
+                <Trophy className="size-5 text-foreground" aria-hidden />
               </div>
               <h3 className="font-semibold text-foreground">Earn XP</h3>
               <p className="mt-1 text-[13px] text-muted-foreground">
@@ -105,7 +115,7 @@ const HomePage = () => {
             </div>
             <div className="rounded-xl border border-border bg-card p-6 text-center shadow-card">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-2xl">
-                <span role="img" aria-label="Discussion">&#x1F4AC;</span>
+                <MessageSquare className="size-5 text-foreground" aria-hidden />
               </div>
               <h3 className="font-semibold text-foreground">Discuss</h3>
               <p className="mt-1 text-[13px] text-muted-foreground">

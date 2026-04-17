@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { cn } from '@/utils/cn';
 
@@ -35,7 +34,7 @@ import {
 } from './puzzles-skeleton';
 import { PuzzlesToolbar } from './puzzles-toolbar';
 
-const tourSteps = [
+export const puzzlesTourSteps = [
   {
     target: '.puzzle-filters-button',
     content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
@@ -45,6 +44,8 @@ const tourSteps = [
     target: '.puzzle-instructions-button',
     content:
       'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+    scrollIntoView: true,
+    scrollTarget: '.puzzle-card-action',
   },
   {
     target: '.dialog-close-button',
@@ -373,14 +374,6 @@ export const PuzzlesList = () => {
         />
       )}
 
-      <PageTourLauncher
-        tourName="browse-puzzles"
-        pageTitle="Circuit Puzzles"
-        pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the ? button."
-        steps={tourSteps}
-        side="left"
-        disableScrolling
-      />
     </>
   );
 };

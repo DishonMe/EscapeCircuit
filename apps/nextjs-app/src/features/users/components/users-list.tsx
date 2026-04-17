@@ -5,10 +5,32 @@ import { Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { Table } from '@/components/ui/table';
 import { formatDate } from '@/utils/format';
 
 import { useUsers, UserFilters } from '../api/get-users';
+
+const ROLE_OPTIONS = [
+  { value: '', label: 'All Roles' },
+  { value: 'solver', label: 'Solver' },
+  { value: 'creator', label: 'Creator' },
+  { value: 'pending_creator', label: 'Pending Creator' },
+  { value: 'admin', label: 'Admin' },
+] as const;
+
+const EXPERIENCE_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'experienced', label: 'Experienced (Lvl 5+)' },
+  { value: 'inexperienced', label: 'Inexperienced (Lvl 1-4)' },
+] as const;
+
+const USER_ORDER_BY_OPTIONS = [
+  { value: 'created_at', label: 'Creation Date' },
+  { value: 'level', label: 'Level' },
+  { value: 'experienced', label: 'Experienced Status' },
+  { value: 'role', label: 'Role' },
+] as const;
 
 import { DeleteUser } from './delete-user';
 import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
@@ -182,89 +204,82 @@ export const UsersList = () => {
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
         <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Username Search */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Username</label>
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Username</label>
               <input
                 type="text"
                 placeholder="Search username..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.usernameSearch || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, usernameSearch: e.target.value || undefined })}
               />
             </div>
 
             {/* Role */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Role</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Role</label>
+              <StyledSelect
+                aria-label="Role"
                 value={filters.role || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, role: (e.target.value || undefined) as any })}
-              >
-                <option className="text-foreground bg-card" value="">All Roles</option>
-                <option className="text-foreground bg-card" value="solver">Solver</option>
-                <option className="text-foreground bg-card" value="creator">Creator</option>
-                <option className="text-foreground bg-card" value="pending_creator">Pending Creator</option>
-                <option className="text-foreground bg-card" value="admin">Admin</option>
-              </select>
+                onValueChange={(v) =>
+                  setFilters({ ...filters, role: (v || undefined) as any })
+                }
+                options={ROLE_OPTIONS}
+              />
             </div>
 
             {/* Experience Level */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience</label>
+              <StyledSelect
+                aria-label="Experience level"
                 value={filters.experienceLevel || 'all'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, experienceLevel: e.target.value as any })}
-              >
-                <option className="text-foreground bg-card" value="all">All</option>
-                <option className="text-foreground bg-card" value="experienced">Experienced (Lvl 5+)</option>
-                <option className="text-foreground bg-card" value="inexperienced">Inexperienced (Lvl 1-4)</option>
-              </select>
+                onValueChange={(v) =>
+                  setFilters({ ...filters, experienceLevel: v as any })
+                }
+                options={EXPERIENCE_OPTIONS}
+              />
             </div>
 
             {/* Order By */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
+              <StyledSelect
+                aria-label="Order by"
                 value={filters.orderBy || 'created_at'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
-              >
-                <option className="text-foreground bg-card" value="created_at">Creation Date</option>
-                <option className="text-foreground bg-card" value="level">Level</option>
-                <option className="text-foreground bg-card" value="experienced">Experienced Status</option>
-                <option className="text-foreground bg-card" value="role">Role</option>
-              </select>
+                onValueChange={(v) =>
+                  setFilters({ ...filters, orderBy: v as any })
+                }
+                options={USER_ORDER_BY_OPTIONS}
+              />
             </div>
 
             {/* Direction */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
+              <button
+                type="button"
                 onClick={() => {
                   const currentDirection = filters.orderDirection || 'ASC';
                   const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
                   setFilters({ ...filters, orderDirection: newDirection as any });
                 }}
-                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
+                className="inline-flex h-9 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-3 text-[13px] text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/30 focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {(filters.orderDirection || 'ASC') === 'ASC' ? (
                   <>
-                    <ArrowUp className="size-3 inline-block" />
-                    <span> Ascending</span>
+                    <ArrowUp className="size-4" />
+                    <span>Ascending</span>
                   </>
                 ) : (
                   <>
-                    <ArrowDown className="size-3 inline-block" />
-                    <span> Descending</span>
+                    <ArrowDown className="size-4" />
+                    <span>Descending</span>
                   </>
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </div>

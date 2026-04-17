@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import 'katex/dist/katex.min.css';
+import { CircleCheck, CircleX, Medal, Star } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -166,27 +167,36 @@ const BASE_PREVIEW_CATALOG: Record<string, ComponentDef> = {
   },
 };
 
-const getCreatorSolutionPayload = (puzzle: Puzzle | null): Record<string, any> | null => {
+const getCreatorSolutionPayload = (
+  puzzle: Puzzle | null,
+): Record<string, any> | null => {
   if (!puzzle) return null;
   const payload =
-    (puzzle as any).creatorSolution ??
-    (puzzle as any).creator_solution ??
-    null;
+    (puzzle as any).creatorSolution ?? (puzzle as any).creator_solution ?? null;
 
-  return payload && typeof payload === 'object' ? (payload as Record<string, any>) : null;
+  return payload && typeof payload === 'object'
+    ? (payload as Record<string, any>)
+    : null;
 };
 
-const getCreatorSolutionMeta = (puzzle: Puzzle | null): Record<string, any> | null => {
+const getCreatorSolutionMeta = (
+  puzzle: Puzzle | null,
+): Record<string, any> | null => {
   if (!puzzle) return null;
   const meta =
     (puzzle as any).creatorSolutionMeta ??
     (puzzle as any).creator_solution_meta ??
     null;
 
-  return meta && typeof meta === 'object' ? (meta as Record<string, any>) : null;
+  return meta && typeof meta === 'object'
+    ? (meta as Record<string, any>)
+    : null;
 };
 
-const normalizePlacedComponent = (component: any, index: number): PlacedGridComponent | null => {
+const normalizePlacedComponent = (
+  component: any,
+  index: number,
+): PlacedGridComponent | null => {
   const componentId = String(
     component?.componentId ??
       component?.type ??
@@ -239,15 +249,13 @@ const normalizeWire = (wire: any, index: number): Wire | null => {
       '',
   ).trim();
   const toComponentId = String(
-    toObj.componentId ??
-      toObj.ownerId ??
-      toObj.id ??
-      wire?.toComponentId ??
-      '',
+    toObj.componentId ?? toObj.ownerId ?? toObj.id ?? wire?.toComponentId ?? '',
   ).trim();
   if (!fromComponentId || !toComponentId) return null;
 
-  const fromPin = Number.isFinite(Number(fromObj.pinIndex ?? wire?.fromPinIndex))
+  const fromPin = Number.isFinite(
+    Number(fromObj.pinIndex ?? wire?.fromPinIndex),
+  )
     ? Number(fromObj.pinIndex ?? wire?.fromPinIndex)
     : 0;
   const toPin = Number.isFinite(Number(toObj.pinIndex ?? wire?.toPinIndex))
@@ -284,20 +292,20 @@ const parseCreatorSolution = (
       ? circuit.placedComponents
       : Array.isArray(circuit.placed_components)
         ? circuit.placed_components
-      : Array.isArray(circuit.components)
-        ? circuit.components
-        : asObject(circuit.placed)
-          ? Object.values(asObject(circuit.placed) || {})
-      : [];
+        : Array.isArray(circuit.components)
+          ? circuit.components
+          : asObject(circuit.placed)
+            ? Object.values(asObject(circuit.placed) || {})
+            : [];
   const rawWires = Array.isArray(circuit.wires)
     ? circuit.wires
     : Array.isArray(circuit.wire_list)
       ? circuit.wire_list
-    : Array.isArray(circuit.connections)
-      ? circuit.connections
-      : asObject(circuit.wires)
-        ? Object.values(asObject(circuit.wires) || {})
-      : [];
+      : Array.isArray(circuit.connections)
+        ? circuit.connections
+        : asObject(circuit.wires)
+          ? Object.values(asObject(circuit.wires) || {})
+          : [];
   const totalCostRaw =
     payload.totalCost ??
     payload.total_cost ??
@@ -305,12 +313,18 @@ const parseCreatorSolution = (
     circuit.total_cost ??
     asObject(payload.solution)?.totalCost ??
     0;
-  const totalCost = Number.isFinite(Number(totalCostRaw)) ? Number(totalCostRaw) : 0;
+  const totalCost = Number.isFinite(Number(totalCostRaw))
+    ? Number(totalCostRaw)
+    : 0;
 
   const placed = rawPlaced
-    .map((component: any, index: number) => normalizePlacedComponent(component, index))
-    .filter((component: PlacedGridComponent | null): component is PlacedGridComponent =>
-      component !== null,
+    .map((component: any, index: number) =>
+      normalizePlacedComponent(component, index),
+    )
+    .filter(
+      (
+        component: PlacedGridComponent | null,
+      ): component is PlacedGridComponent => component !== null,
     );
 
   const wires = rawWires
@@ -361,8 +375,12 @@ const buildCatalog = (
     if (known) {
       const numInputs = Number((known as any).num_inputs ?? 1);
       const numOutputs = Number((known as any).num_outputs ?? 1);
-      const safeInputs = Number.isFinite(numInputs) ? Math.max(0, numInputs) : 1;
-      const safeOutputs = Number.isFinite(numOutputs) ? Math.max(0, numOutputs) : 1;
+      const safeInputs = Number.isFinite(numInputs)
+        ? Math.max(0, numInputs)
+        : 1;
+      const safeOutputs = Number.isFinite(numOutputs)
+        ? Math.max(0, numOutputs)
+        : 1;
       const height = Math.max(1, safeInputs, safeOutputs);
 
       const ports: ComponentDef['ports'] = [];
@@ -408,31 +426,35 @@ const buildCatalog = (
 
 const latexToMarkdown = (latex: string): string => {
   let markdown = latex;
-  
+
   // Convert tabular environments to markdown tables
-  const tabularyRegex = /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
-  markdown = markdown.replace(tabularyRegex, (_match: string, content: string) => {
-    const rows = content
-      .split('\\\\')
-      .map((row: string) => row.replace(/\\hline/g, '').trim())
-      .filter((row: string) => row.length > 0);
-    
-    if (rows.length === 0) return '';
-    
-    const mdRows = rows.map((row: string) => {
-      const cells = row.split('&').map((cell: string) => cell.trim());
-      return '| ' + cells.join(' | ') + ' |';
-    });
-    
-    if (mdRows.length > 0) {
-      const firstRowCells = rows[0].split('&').length;
-      const separator = '|' + Array(firstRowCells).fill('---|').join('');
-      mdRows.splice(1, 0, separator);
-    }
-    
-    return '\n' + mdRows.join('\n') + '\n';
-  });
-  
+  const tabularyRegex =
+    /\\begin\{(?:tabular|array)\}\{[^}]*\}(.*?)\\end\{(?:tabular|array)\}/gs;
+  markdown = markdown.replace(
+    tabularyRegex,
+    (_match: string, content: string) => {
+      const rows = content
+        .split('\\\\')
+        .map((row: string) => row.replace(/\\hline/g, '').trim())
+        .filter((row: string) => row.length > 0);
+
+      if (rows.length === 0) return '';
+
+      const mdRows = rows.map((row: string) => {
+        const cells = row.split('&').map((cell: string) => cell.trim());
+        return '| ' + cells.join(' | ') + ' |';
+      });
+
+      if (mdRows.length > 0) {
+        const firstRowCells = rows[0].split('&').length;
+        const separator = '|' + Array(firstRowCells).fill('---|').join('');
+        mdRows.splice(1, 0, separator);
+      }
+
+      return '\n' + mdRows.join('\n') + '\n';
+    },
+  );
+
   markdown = markdown.replace(/\\section\*\s*\{([^}]+)\}/g, '# $1');
   markdown = markdown.replace(/\\subsection\*\s*\{([^}]+)\}/g, '## $1');
   markdown = markdown.replace(/\\subsubsection\*\s*\{([^}]+)\}/g, '### $1');
@@ -446,7 +468,7 @@ const latexToMarkdown = (latex: string): string => {
   markdown = markdown.replace(/\\begin\{enumerate\}/g, '');
   markdown = markdown.replace(/\\end\{enumerate\}/g, '');
   markdown = markdown.replace(/\\\\/g, '\n');
-  
+
   return markdown;
 };
 
@@ -455,10 +477,13 @@ export const PuzzleViewDialog = ({
   open,
   onOpenChange,
 }: PuzzleViewDialogProps) => {
-  const [tab, setTab] = useState<'base' | 'test' | 'ratings' | 'instructions' | 'creator-solution'>('base');
+  const [tab, setTab] = useState<
+    'base' | 'test' | 'ratings' | 'instructions' | 'creator-solution'
+  >('base');
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
-  const [showCreatorSolutionPreview, setShowCreatorSolutionPreview] = useState(false);
-  
+  const [showCreatorSolutionPreview, setShowCreatorSolutionPreview] =
+    useState(false);
+
   // Fetch full puzzle details when dialog opens
   const { data: fullPuzzle, isLoading: isPuzzleLoading } = usePuzzle({
     id: String(puzzle?.id || ''),
@@ -466,7 +491,7 @@ export const PuzzleViewDialog = ({
       enabled: open && !!puzzle?.id,
     },
   });
-  
+
   // Use full puzzle if available, otherwise use the passed puzzle
   const displayPuzzle = fullPuzzle || puzzle;
 
@@ -482,16 +507,16 @@ export const PuzzleViewDialog = ({
           import('markdown-it'),
           import('markdown-it-katex'),
         ]);
-        
+
         const mdit = markdown.default();
         const katex = (await import('markdown-it-katex')).default;
         mdit.use(katex);
-        
+
         const instructions = displayPuzzle.instructions || '';
         const processedMarkdown = latexToMarkdown(instructions);
         const html = mdit.render(processedMarkdown);
-        
-        const { default: DOMPurify } = await import('isomorphic-dompurify');
+
+        const { default: DOMPurify } = await import('dompurify');
         const clean = DOMPurify.sanitize(html);
         setRenderedHtml(clean);
       } catch (error) {
@@ -520,7 +545,9 @@ export const PuzzleViewDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-2xl bg-card flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-foreground">{displayPuzzle.title}</DialogTitle>
+          <DialogTitle className="text-foreground">
+            {displayPuzzle.title}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Tabs */}
@@ -582,46 +609,84 @@ export const PuzzleViewDialog = ({
           {tab === 'base' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Title</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.title}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Description</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.description || 'No description'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Creator</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.creator?.username || 'Unknown'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Difficulty</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.difficulty}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Status</p>
-                <p className="text-[13px] text-foreground capitalize">
-                  {(displayPuzzle as any).status || ((displayPuzzle as any).isPublished ? 'Published' : 'Unpublished')}
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Title
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.title}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Visibility</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.isPublic ? 'Public' : 'Private'}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Description
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.description || 'No description'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Creator
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.creator?.username || 'Unknown'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Difficulty
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.difficulty}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Status
+                </p>
+                <p className="text-[13px] text-foreground capitalize">
+                  {(displayPuzzle as any).status ||
+                    ((displayPuzzle as any).isPublished
+                      ? 'Published'
+                      : 'Unpublished')}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Visibility
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.isPublic ? 'Public' : 'Private'}
+                </p>
               </div>
               {displayPuzzle.creatorComment && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Creator Comment</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.creatorComment}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Creator Comment
+                  </p>
+                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                    {displayPuzzle.creatorComment}
+                  </p>
                 </div>
               )}
               {displayPuzzle.defaultGateSet && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Default Gate Set</p>
-                  <p className="text-[13px] text-foreground">{(displayPuzzle.defaultGateSet as any).join?.(',') || displayPuzzle.defaultGateSet}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Default Gate Set
+                  </p>
+                  <p className="text-[13px] text-foreground">
+                    {(displayPuzzle.defaultGateSet as any).join?.(',') ||
+                      displayPuzzle.defaultGateSet}
+                  </p>
                 </div>
               )}
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Arsenal Allowed</p>
-                <p className="text-[13px] text-foreground">{displayPuzzle.allowArsenal ? 'Yes' : 'No'}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Arsenal Allowed
+                </p>
+                <p className="text-[13px] text-foreground">
+                  {displayPuzzle.allowArsenal ? 'Yes' : 'No'}
+                </p>
               </div>
             </div>
           )}
@@ -629,42 +694,90 @@ export const PuzzleViewDialog = ({
           {tab === 'test' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Time Limit</p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.timeLimit} seconds</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Time Limit
+                </p>
+                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                  {displayPuzzle.timeLimit} seconds
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Budget Limit</p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.budgetLimit || displayPuzzle.budget}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Budget Limit
+                </p>
+                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                  {displayPuzzle.budgetLimit || displayPuzzle.budget}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Test Cases</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Test Cases
+                </p>
                 <div className="border border-border rounded overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary">
-                        <th className="px-3 py-2 text-left text-foreground">Inputs</th>
-                        <th className="px-3 py-2 text-left text-foreground">Expected Outputs</th>
+                        <th className="px-3 py-2 text-left text-foreground">
+                          Inputs
+                        </th>
+                        <th className="px-3 py-2 text-left text-foreground">
+                          Expected Outputs
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(displayPuzzle as any).test_cases && (displayPuzzle as any).test_cases.length > 0 ? (
+                      {(displayPuzzle as any).test_cases &&
+                      (displayPuzzle as any).test_cases.length > 0 ? (
                         (displayPuzzle as any).test_cases
                           .filter((tc: any) => {
-                            const hasInputs = tc.inputs && Object.keys(tc.inputs).length > 0;
-                            const hasOutputs = tc.outputs && Object.keys(tc.outputs).length > 0;
-                            const hasInputStreams = Array.isArray(tc.input_stream) && tc.input_stream.length > 0;
-                            const hasOutputStreams = Array.isArray(tc.expected_output_stream) && tc.expected_output_stream.length > 0;
-                            return hasInputs || hasOutputs || hasInputStreams || hasOutputStreams;
+                            const hasInputs =
+                              tc.inputs && Object.keys(tc.inputs).length > 0;
+                            const hasOutputs =
+                              tc.outputs && Object.keys(tc.outputs).length > 0;
+                            const hasInputStreams =
+                              Array.isArray(tc.input_stream) &&
+                              tc.input_stream.length > 0;
+                            const hasOutputStreams =
+                              Array.isArray(tc.expected_output_stream) &&
+                              tc.expected_output_stream.length > 0;
+                            return (
+                              hasInputs ||
+                              hasOutputs ||
+                              hasInputStreams ||
+                              hasOutputStreams
+                            );
                           })
                           .map((tc: any, idx: number) => (
-                            <tr key={idx} className="border-b border-border hover:bg-secondary/50">
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.inputs || tc.input_stream || {})}</pre></td>
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]"><pre className="font-mono text-wrap break-words">{JSON.stringify(tc.outputs || tc.expected_output_stream || {})}</pre></td>
+                            <tr
+                              key={idx}
+                              className="border-b border-border hover:bg-secondary/50"
+                            >
+                              <td className="px-3 py-2 text-muted-foreground text-[11px]">
+                                <pre className="font-mono text-wrap break-words">
+                                  {JSON.stringify(
+                                    tc.inputs || tc.input_stream || {},
+                                  )}
+                                </pre>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground text-[11px]">
+                                <pre className="font-mono text-wrap break-words">
+                                  {JSON.stringify(
+                                    tc.outputs ||
+                                      tc.expected_output_stream ||
+                                      {},
+                                  )}
+                                </pre>
+                              </td>
                             </tr>
                           ))
                       ) : (
                         <tr>
-                          <td colSpan={2} className="px-3 py-2 text-center text-muted-foreground">No test cases specified</td>
+                          <td
+                            colSpan={2}
+                            className="px-3 py-2 text-center text-muted-foreground"
+                          >
+                            No test cases specified
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -672,35 +785,66 @@ export const PuzzleViewDialog = ({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Gate Limits (Allowed Gates)</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Gate Limits (Allowed Gates)
+                </p>
                 <div className="bg-secondary p-3 rounded text-[13px] text-foreground">
-                  {(displayPuzzle as any).gateLimits && Object.keys((displayPuzzle as any).gateLimits).length > 0 ? (
-                    Object.entries((displayPuzzle as any).gateLimits)
-                      .map(([gate, limit]: [string, any]) => `${gate}-${limit === null ? 'unlimited' : limit}`)
-                      .join(', ')
-                  ) : (
-                    "No gates allowed"
-                  )}
+                  {(displayPuzzle as any).gateLimits &&
+                  Object.keys((displayPuzzle as any).gateLimits).length > 0
+                    ? Object.entries((displayPuzzle as any).gateLimits)
+                        .map(
+                          ([gate, limit]: [string, any]) =>
+                            `${gate}-${limit === null ? 'unlimited' : limit}`,
+                        )
+                        .join(', ')
+                    : 'No gates allowed'}
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Arsenal Pieces</p>
-                <p className="text-[12px] text-foreground">
-                  {displayPuzzle.allowArsenal !== false ? "✓ Allowed" : "✗ Not allowed - Only basic gates permitted"}
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Arsenal Pieces
+                </p>
+                <p className="inline-flex items-center gap-1.5 text-[12px] text-foreground">
+                  {displayPuzzle.allowArsenal !== false ? (
+                    <>
+                      <CircleCheck
+                        className="size-3.5 text-emerald-600"
+                        aria-hidden
+                      />
+                      Allowed
+                    </>
+                  ) : (
+                    <>
+                      <CircleX className="size-3.5 text-red-600" aria-hidden />
+                      Not allowed - Only basic gates permitted
+                    </>
+                  )}
                 </p>
               </div>
-              {displayPuzzle.allowArsenal !== false && displayPuzzle.specialComponents && displayPuzzle.specialComponents.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Available Arsenal</p>
-                  <div className="space-y-2">
-                    {displayPuzzle.specialComponents.map((comp: any, idx: number) => (
-                      <div key={idx} className="bg-secondary p-3 rounded text-[12px]">
-                        <p className="text-foreground"><strong>{comp.type}</strong> - Cost: {comp.cost}, Pins: {comp.pins}</p>
-                      </div>
-                    ))}
+              {displayPuzzle.allowArsenal !== false &&
+                displayPuzzle.specialComponents &&
+                displayPuzzle.specialComponents.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                      Available Arsenal
+                    </p>
+                    <div className="space-y-2">
+                      {displayPuzzle.specialComponents.map(
+                        (comp: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="bg-secondary p-3 rounded text-[12px]"
+                          >
+                            <p className="text-foreground">
+                              <strong>{comp.type}</strong> - Cost: {comp.cost},
+                              Pins: {comp.pins}
+                            </p>
+                          </div>
+                        ),
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
@@ -708,96 +852,201 @@ export const PuzzleViewDialog = ({
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Total Solves</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{displayPuzzle.solvedCount || 0}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Total Solves
+                  </p>
+                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                    {displayPuzzle.solvedCount || 0}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Times Saved</p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">{(displayPuzzle as any).timesSaved || 0}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Times Saved
+                  </p>
+                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                    {(displayPuzzle as any).timesSaved || 0}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Average Ratings</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Average Ratings
+                </p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Difficulty</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_difficulty || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-muted-foreground mb-1">
+                      Difficulty
+                    </p>
+                    <p className="text-[16px] font-semibold text-foreground">
+                      {Math.round(
+                        (displayPuzzle.rating_metrics?.avg_difficulty || 0) *
+                          10,
+                      ) / 10}
+                      /5
+                    </p>
                   </div>
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Fun</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_fun || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-muted-foreground mb-1">
+                      Fun
+                    </p>
+                    <p className="text-[16px] font-semibold text-foreground">
+                      {Math.round(
+                        (displayPuzzle.rating_metrics?.avg_fun || 0) * 10,
+                      ) / 10}
+                      /5
+                    </p>
                   </div>
                   <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">Clearness</p>
-                    <p className="text-[16px] font-semibold text-foreground">{Math.round((displayPuzzle.rating_metrics?.avg_clearness || 0) * 10) / 10}/5</p>
+                    <p className="text-[11px] text-muted-foreground mb-1">
+                      Clearness
+                    </p>
+                    <p className="text-[16px] font-semibold text-foreground">
+                      {Math.round(
+                        (displayPuzzle.rating_metrics?.avg_clearness || 0) * 10,
+                      ) / 10}
+                      /5
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Rating Distribution</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Rating Distribution
+                </p>
                 <div className="border border-border rounded overflow-hidden">
                   <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-secondary">
-                          <th className="px-3 py-2 text-left text-foreground">Stars</th>
-                          <th className="px-3 py-2 text-center text-foreground">Difficulty</th>
-                          <th className="px-3 py-2 text-center text-foreground">Fun</th>
-                          <th className="px-3 py-2 text-center text-foreground">Clearness</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[5, 4, 3, 2, 1].map((stars) => {
-                          const distribution = (displayPuzzle.rating_metrics as any)?.rating_distribution;
-                          const diffCount = distribution?.difficulty?.[stars - 1] || 0;
-                          const funCount = distribution?.fun?.[stars - 1] || 0;
-                          const clearCount = distribution?.clearness?.[stars - 1] || 0;
-                          return (
-                            <tr key={stars} className="border-b border-border hover:bg-secondary/50">
-                              <td className="px-3 py-2 text-foreground">{stars} ⭐</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{diffCount}</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{funCount}</td>
-                              <td className="px-3 py-2 text-center text-muted-foreground">{clearCount}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                    <thead>
+                      <tr className="border-b border-border bg-secondary">
+                        <th className="px-3 py-2 text-left text-foreground">
+                          Stars
+                        </th>
+                        <th className="px-3 py-2 text-center text-foreground">
+                          Difficulty
+                        </th>
+                        <th className="px-3 py-2 text-center text-foreground">
+                          Fun
+                        </th>
+                        <th className="px-3 py-2 text-center text-foreground">
+                          Clearness
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[5, 4, 3, 2, 1].map((stars) => {
+                        const distribution = (
+                          displayPuzzle.rating_metrics as any
+                        )?.rating_distribution;
+                        const diffCount =
+                          distribution?.difficulty?.[stars - 1] || 0;
+                        const funCount = distribution?.fun?.[stars - 1] || 0;
+                        const clearCount =
+                          distribution?.clearness?.[stars - 1] || 0;
+                        return (
+                          <tr
+                            key={stars}
+                            className="border-b border-border hover:bg-secondary/50"
+                          >
+                            <td className="px-3 py-2 text-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <Star
+                                  className="size-3.5 fill-yellow-500 text-yellow-500"
+                                  aria-hidden
+                                />
+                                {stars} star{stars === 1 ? '' : 's'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-center text-muted-foreground">
+                              {diffCount}
+                            </td>
+                            <td className="px-3 py-2 text-center text-muted-foreground">
+                              {funCount}
+                            </td>
+                            <td className="px-3 py-2 text-center text-muted-foreground">
+                              {clearCount}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
+              </div>
 
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Medal Distribution</p>
-                  <div className="border border-border rounded overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-secondary">
-                          <th className="px-3 py-2 text-left text-foreground">Medal</th>
-                          <th className="px-3 py-2 text-center text-foreground">Count</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥇 Gold</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.gold || 0}</td>
-                        </tr>
-                        <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥈 Silver</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.silver || 0}</td>
-                        </tr>
-                        <tr className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">🥉 Bronze</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.bronze || 0}</td>
-                        </tr>
-                        <tr className="hover:bg-secondary/50">
-                          <td className="px-3 py-2 text-foreground">- Unsolved</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{(displayPuzzle as any).medalDistribution?.none || 0}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Medal Distribution
+                </p>
+                <div className="border border-border rounded overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-secondary">
+                        <th className="px-3 py-2 text-left text-foreground">
+                          Medal
+                        </th>
+                        <th className="px-3 py-2 text-center text-foreground">
+                          Count
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-border hover:bg-secondary/50">
+                        <td className="px-3 py-2 text-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Medal
+                              className="size-3.5 text-amber-500"
+                              aria-hidden
+                            />
+                            Gold
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {(displayPuzzle as any).medalDistribution?.gold || 0}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border hover:bg-secondary/50">
+                        <td className="px-3 py-2 text-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Medal
+                              className="size-3.5 text-slate-400"
+                              aria-hidden
+                            />
+                            Silver
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {(displayPuzzle as any).medalDistribution?.silver ||
+                            0}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border hover:bg-secondary/50">
+                        <td className="px-3 py-2 text-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Medal
+                              className="size-3.5 text-amber-700"
+                              aria-hidden
+                            />
+                            Bronze
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {(displayPuzzle as any).medalDistribution?.bronze ||
+                            0}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-secondary/50">
+                        <td className="px-3 py-2 text-foreground">
+                          - Unsolved
+                        </td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {(displayPuzzle as any).medalDistribution?.none || 0}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
+              </div>
             </div>
           )}
 
@@ -854,7 +1103,9 @@ export const PuzzleViewDialog = ({
                   />
                 </>
               ) : (
-                <div className="text-muted-foreground text-[13px]">No instructions provided.</div>
+                <div className="text-muted-foreground text-[13px]">
+                  No instructions provided.
+                </div>
               )}
             </div>
           )}
@@ -866,7 +1117,8 @@ export const PuzzleViewDialog = ({
                   Creator Solution
                 </p>
                 <p className="mt-2 text-[13px] text-foreground">
-                  Preview the uploaded sample solution in a read-only workstation window styled like Arsenal preview.
+                  Preview the uploaded sample solution in a read-only
+                  workstation window styled like Arsenal preview.
                 </p>
               </div>
 
@@ -874,12 +1126,18 @@ export const PuzzleViewDialog = ({
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary p-3 rounded border border-border/60">
-                      <p className="text-[11px] text-muted-foreground">Components</p>
-                      <p className="text-[16px] font-semibold text-foreground">{creatorSolution.placed.length}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Components
+                      </p>
+                      <p className="text-[16px] font-semibold text-foreground">
+                        {creatorSolution.placed.length}
+                      </p>
                     </div>
                     <div className="bg-secondary p-3 rounded border border-border/60">
                       <p className="text-[11px] text-muted-foreground">Wires</p>
-                      <p className="text-[16px] font-semibold text-foreground">{creatorSolution.wires.length}</p>
+                      <p className="text-[16px] font-semibold text-foreground">
+                        {creatorSolution.wires.length}
+                      </p>
                     </div>
                   </div>
 
@@ -892,15 +1150,27 @@ export const PuzzleViewDialog = ({
                 </>
               ) : (
                 <div className="rounded-lg border border-border bg-card p-4 text-[13px] text-muted-foreground space-y-2">
-                  <div>No creator solution is available for preview for this puzzle.</div>
+                  <div>
+                    No creator solution is available for preview for this
+                    puzzle.
+                  </div>
                   {creatorSolutionMeta && (
                     <div className="text-[11px] text-muted-foreground/90 space-y-1">
-                      <div>Backend availability: {String(creatorSolutionMeta.available)}</div>
+                      <div>
+                        Backend availability:{' '}
+                        {String(creatorSolutionMeta.available)}
+                      </div>
                       {creatorSolutionMeta.riddle_base_name && (
-                        <div>Riddle base: {String(creatorSolutionMeta.riddle_base_name)}</div>
+                        <div>
+                          Riddle base:{' '}
+                          {String(creatorSolutionMeta.riddle_base_name)}
+                        </div>
                       )}
                       {creatorSolutionMeta.expected_path && (
-                        <div className="break-all">Expected file: {String(creatorSolutionMeta.expected_path)}</div>
+                        <div className="break-all">
+                          Expected file:{' '}
+                          {String(creatorSolutionMeta.expected_path)}
+                        </div>
                       )}
                     </div>
                   )}
@@ -910,10 +1180,15 @@ export const PuzzleViewDialog = ({
           )}
         </div>
 
-        <Dialog open={showCreatorSolutionPreview} onOpenChange={setShowCreatorSolutionPreview}>
+        <Dialog
+          open={showCreatorSolutionPreview}
+          onOpenChange={setShowCreatorSolutionPreview}
+        >
           <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{displayPuzzle.title} - Creator Solution Preview</DialogTitle>
+              <DialogTitle>
+                {displayPuzzle.title} - Creator Solution Preview
+              </DialogTitle>
               <DialogDescription>
                 Read-only preview of the sample solution used by the creator.
               </DialogDescription>
@@ -936,17 +1211,21 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
     );
   }
 
-  const { placed, wires, totalCost } = parseCreatorSolution(creatorSolutionPayload);
+  const { placed, wires, totalCost } = parseCreatorSolution(
+    creatorSolutionPayload,
+  );
   const inferredLabels = inferIoLabels(wires);
   const hasRenderableCircuit = placed.length > 0 || wires.length > 0;
 
-  const inputLabels = Array.isArray((puzzle as any).inputs) && (puzzle as any).inputs.length > 0
-    ? (puzzle as any).inputs.map((input: any) => String(input))
-    : inferredLabels.inputs;
+  const inputLabels =
+    Array.isArray((puzzle as any).inputs) && (puzzle as any).inputs.length > 0
+      ? (puzzle as any).inputs.map((input: any) => String(input))
+      : inferredLabels.inputs;
 
-  const outputLabels = Array.isArray((puzzle as any).outputs) && (puzzle as any).outputs.length > 0
-    ? (puzzle as any).outputs.map((output: any) => String(output))
-    : inferredLabels.outputs;
+  const outputLabels =
+    Array.isArray((puzzle as any).outputs) && (puzzle as any).outputs.length > 0
+      ? (puzzle as any).outputs.map((output: any) => String(output))
+      : inferredLabels.outputs;
 
   const knownComponentsMap = new Map<string, CircuitComponent>();
   [
@@ -959,13 +1238,21 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
   const knownComponents = Array.from(knownComponentsMap.values());
 
   const catalog = buildCatalog(placed, knownComponents);
-  const computedRows = Math.max(15, Math.max(...placed.map((component) => component.origin.row), 0) + 3);
-  const computedCols = Math.max(30, Math.max(...placed.map((component) => component.origin.col), 0) + 3);
+  const computedRows = Math.max(
+    15,
+    Math.max(...placed.map((component) => component.origin.row), 0) + 3,
+  );
+  const computedCols = Math.max(
+    30,
+    Math.max(...placed.map((component) => component.origin.col), 0) + 3,
+  );
 
   const rowsRaw = Number((puzzle as any).board_rows);
   const colsRaw = Number((puzzle as any).board_cols);
-  const boardRows = Number.isFinite(rowsRaw) && rowsRaw > 0 ? rowsRaw : computedRows;
-  const boardCols = Number.isFinite(colsRaw) && colsRaw > 0 ? colsRaw : computedCols;
+  const boardRows =
+    Number.isFinite(rowsRaw) && rowsRaw > 0 ? rowsRaw : computedRows;
+  const boardCols =
+    Number.isFinite(colsRaw) && colsRaw > 0 ? colsRaw : computedCols;
 
   return (
     <div className="space-y-4">
@@ -978,15 +1265,21 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{inputLabels.length}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {inputLabels.length}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{outputLabels.length}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {outputLabels.length}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Cost</p>
@@ -996,7 +1289,8 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
 
       {!hasRenderableCircuit && (
         <div className="rounded-lg border border-amber-300/60 bg-amber-50/50 p-3 text-[12px] text-amber-900">
-          Creator solution payload was found but no circuit nodes/wires could be parsed for rendering.
+          Creator solution payload was found but no circuit nodes/wires could be
+          parsed for rendering.
           <div className="mt-1 text-[11px] text-amber-800/90">
             Keys: {Object.keys(creatorSolutionPayload).join(', ') || 'none'}
           </div>
@@ -1046,18 +1340,26 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
 
       {placed.length > 0 && (
         <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+          <p className="text-xs font-semibold text-foreground/70 mb-2">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
               .filter(
                 (component, index, all) =>
-                  all.findIndex((candidate) => candidate.componentId === component.componentId) ===
-                  index,
+                  all.findIndex(
+                    (candidate) =>
+                      candidate.componentId === component.componentId,
+                  ) === index,
               )
               .map((component) => (
-                <div key={component.componentId} className="flex items-center gap-2 text-xs">
+                <div
+                  key={component.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
                   <span className="text-foreground/70">
-                    {catalog[component.componentId]?.label || component.componentId}
+                    {catalog[component.componentId]?.label ||
+                      component.componentId}
                   </span>
                 </div>
               ))}

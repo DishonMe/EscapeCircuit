@@ -1,6 +1,10 @@
 'use client';
 
-import { PuzzlesList } from '@/features/puzzles/components/puzzles-list';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import {
+  PuzzlesList,
+  puzzlesTourSteps,
+} from '@/features/puzzles/components/puzzles-list';
 import { PuzzlesPageHeader } from '@/features/puzzles/components/puzzles-page-header';
 
 export const Puzzles = () => {
@@ -18,7 +22,19 @@ export const Puzzles = () => {
           }}
         />
 
-        <PuzzlesPageHeader />
+        <PuzzlesPageHeader
+          tutorialSlot={
+            <PageTourLauncher
+              tourName="browse-puzzles"
+              pageTitle="Circuit Puzzles"
+              pageDescription="Learn how to filter, sort, and open a puzzle to start solving. You can reopen this guide any time from the Tutorial button."
+              steps={puzzlesTourSteps}
+              disableScrolling
+              floating={false}
+              inlineLabel="Tutorial"
+            />
+          }
+        />
         <PuzzlesList />
       </div>
     </div>

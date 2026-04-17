@@ -4,12 +4,21 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search } from 'lucide-react';
 
 import { Spinner } from '@/components/ui/spinner';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { ThreadCategory } from '@/types/api';
 import { cn } from '@/utils/cn';
 
 import { useDiscussions, DiscussionFilters } from '../api/get-discussions';
 import { CATEGORY_OPTIONS } from './category-badge';
 import { DiscussionCard } from './discussion-card';
+
+const SORT_OPTIONS = [
+  { value: 'newest' as const, label: 'Newest' },
+  { value: 'oldest' as const, label: 'Oldest' },
+  { value: 'most_replies' as const, label: 'Most Replies' },
+  { value: 'most_upvotes' as const, label: 'Most Upvotes' },
+  { value: 'trending' as const, label: 'Trending' },
+];
 
 export const DiscussionsList = () => {
   const [filters, setFilters] = useState<DiscussionFilters>({
@@ -36,7 +45,8 @@ export const DiscussionsList = () => {
   const discussions = useMemo(() => {
     const rows = discussionsQuery.data?.discussions || [];
     return [...rows].sort(
-      (a, b) => Number(Boolean(b.is_bookmarked)) - Number(Boolean(a.is_bookmarked)),
+      (a, b) =>
+        Number(Boolean(b.is_bookmarked)) - Number(Boolean(a.is_bookmarked)),
     );
   }, [discussionsQuery.data?.discussions]);
   const total = discussionsQuery.data?.total ?? 0;
@@ -47,60 +57,70 @@ export const DiscussionsList = () => {
 
   return (
     <div className="space-y-4">
-      {/* Search bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search discussions..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-      </div>
+      {/* Toolbar — search, chips, sort, bookmark toggle (single row, spread across) */}
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search discussions..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        {CATEGORY_OPTIONS.map((opt) => (
-          <button
-            key={opt.value || 'all'}
-            onClick={() =>
-              setFilters((prev) => ({
-                ...prev,
-                category: opt.value ? (opt.value as ThreadCategory) : undefined,
-                offset: 0,
-              }))
-            }
-            className={cn(
-              'rounded-full px-3 py-1 text-[11px] font-medium transition-colors',
-              filters.category === opt.value || (!filters.category && !opt.value)
-                ? 'bg-foreground/5 border border-foreground/20 text-foreground'
-                : 'bg-secondary text-muted-foreground hover:bg-secondary',
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border/70 lg:block" />
 
-        <select
-          value={filters.sort ?? 'newest'}
-          onChange={(e) =>
-            setFilters((prev) => ({
-              ...prev,
-              sort: e.target.value as DiscussionFilters['sort'],
-              offset: 0,
-            }))
-          }
-          className="ml-auto rounded-lg border border-border bg-card text-foreground px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+        {/* Category chips */}
+        <div
+          role="group"
+          aria-label="Filter by category"
+          className="flex shrink-0 flex-nowrap items-center gap-1.5"
         >
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="most_replies">Most Replies</option>
-          <option value="most_upvotes">Most Upvotes</option>
-          <option value="trending">Trending</option>
-        </select>
+          {CATEGORY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value || 'all'}
+              type="button"
+              aria-pressed={
+                filters.category === opt.value ||
+                (!filters.category && !opt.value)
+              }
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  category: opt.value
+                    ? (opt.value as ThreadCategory)
+                    : undefined,
+                  offset: 0,
+                }))
+              }
+              className={cn(
+                'shrink-0 whitespace-nowrap rounded-full border border-border bg-background px-3 py-1 text-[12px] transition-colors hover:bg-secondary/40',
+                'aria-pressed:bg-secondary aria-pressed:ring-1 aria-pressed:ring-foreground/20',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
-        <label className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-foreground">
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border/70 lg:block" />
+
+        {/* Sort */}
+        <StyledSelect
+          aria-label="Sort discussions"
+          className="w-[150px] shrink-0"
+          value={filters.sort ?? 'newest'}
+          onValueChange={(v) =>
+            setFilters((prev) => ({ ...prev, sort: v, offset: 0 }))
+          }
+          options={SORT_OPTIONS}
+        />
+
+        {/* Bookmarked toggle */}
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-border bg-card px-3 py-2 text-[12px] text-foreground transition-colors hover:bg-secondary/40">
           <input
             type="checkbox"
             checked={filters.bookmarkedOnly ?? false}
@@ -111,9 +131,9 @@ export const DiscussionsList = () => {
                 offset: 0,
               }))
             }
-            className="size-3"
+            className="size-3.5 accent-primary"
           />
-          Show Bookmarked Only
+          Bookmarked only
         </label>
       </div>
 
@@ -126,8 +146,8 @@ export const DiscussionsList = () => {
           {filters.bookmarkedOnly
             ? 'No bookmarked discussions yet.'
             : searchInput
-            ? 'No discussions match your search.'
-            : 'No discussions found. Start the conversation 💬'}
+              ? 'No discussions match your search.'
+              : 'No discussions found. Start the conversation.'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -142,7 +162,10 @@ export const DiscussionsList = () => {
           <button
             disabled={currentPage <= 1}
             onClick={() =>
-              setFilters((prev) => ({ ...prev, offset: (currentPage - 2) * limit }))
+              setFilters((prev) => ({
+                ...prev,
+                offset: (currentPage - 2) * limit,
+              }))
             }
             className="rounded-lg px-3 py-1 text-[13px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
           >

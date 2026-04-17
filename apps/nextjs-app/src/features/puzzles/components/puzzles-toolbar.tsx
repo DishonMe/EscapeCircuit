@@ -12,6 +12,7 @@ import {
 import { ChangeEvent, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import type { Meta } from '@/types/api';
 import { cn } from '@/utils/cn';
 
@@ -99,13 +100,22 @@ export const PuzzlesToolbar = ({
     onFiltersChange({ ...filters, medalFilter: medal, page: 1 });
   };
 
-  const handleOrderByChange = (e: ChangeEvent<HTMLSelectElement>) => {
+  const handleOrderByChange = (
+    value: NonNullable<PuzzleFilters['orderBy']>,
+  ) => {
     onFiltersChange({
       ...filters,
-      orderBy: e.target.value as PuzzleFilters['orderBy'],
+      orderBy: value,
       page: 1,
     });
   };
+
+  const ORDER_BY_OPTIONS = [
+    { value: 'created_at' as const, label: 'Newest' },
+    { value: 'difficulty' as const, label: 'Difficulty' },
+    { value: 'fun' as const, label: 'Fun' },
+    { value: 'clearness' as const, label: 'Clearness' },
+  ];
 
   const handleDirectionToggle = () => {
     const current = filters.orderDirection ?? 'ASC';
@@ -118,9 +128,12 @@ export const PuzzlesToolbar = ({
 
   return (
     <div className="sticky top-14 z-20 border-b border-border bg-background">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3">
+        {/* Row 1: search, chips, sort, view toggle (pinned right) */}
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto">
         {/* Search input */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
@@ -128,7 +141,7 @@ export const PuzzlesToolbar = ({
           <input
             type="text"
             placeholder="Search puzzles..."
-            className="w-72 rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-64 rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
             value={searchInput}
             onChange={(e: ChangeEvent<HTMLInputElement>) => {
               onSearchInputChange(e.target.value);
@@ -148,11 +161,16 @@ export const PuzzlesToolbar = ({
           </span>
         )}
 
+        <span
+          aria-hidden
+          className="h-6 w-px shrink-0 bg-border/70"
+        />
+
         {/* Difficulty chip group */}
         <div
           role="group"
           aria-label="Filter by difficulty"
-          className="flex flex-wrap items-center gap-1.5"
+          className="flex shrink-0 flex-nowrap items-center gap-1.5"
         >
           <button
             type="button"
@@ -198,11 +216,16 @@ export const PuzzlesToolbar = ({
           )}
         </div>
 
+        <span
+          aria-hidden
+          className="h-6 w-px shrink-0 bg-border/70"
+        />
+
         {/* Status chip group */}
         <div
           role="group"
           aria-label="Filter by status"
-          className="flex flex-wrap items-center gap-1.5"
+          className="flex shrink-0 flex-nowrap items-center gap-1.5"
         >
           {(
             [
@@ -226,17 +249,13 @@ export const PuzzlesToolbar = ({
         </div>
 
         {/* Sort select */}
-        <select
-          className="puzzle-sort-dropdown rounded-lg border border-border bg-background px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-          value={filters.orderBy ?? 'created_at'}
-          onChange={handleOrderByChange}
+        <StyledSelect
           aria-label="Sort by"
-        >
-          <option value="created_at">Newest</option>
-          <option value="difficulty">Difficulty</option>
-          <option value="fun">Fun</option>
-          <option value="clearness">Clearness</option>
-        </select>
+          className="puzzle-sort-dropdown w-[140px]"
+          value={filters.orderBy ?? 'created_at'}
+          onValueChange={handleOrderByChange}
+          options={ORDER_BY_OPTIONS}
+        />
 
         {/* Direction toggle */}
         <button
@@ -256,8 +275,10 @@ export const PuzzlesToolbar = ({
           )}
         </button>
 
-        {/* View toggle — hidden on <sm */}
-        <div className="hidden items-center overflow-hidden rounded-lg border border-border sm:inline-flex">
+          </div>
+
+        {/* View toggle — hidden on <sm, pinned to the far right of row 1 */}
+        <div className="hidden shrink-0 items-center overflow-hidden rounded-lg border border-border sm:inline-flex">
           <button
             type="button"
             aria-pressed={view === 'gallery'}
@@ -283,40 +304,44 @@ export const PuzzlesToolbar = ({
             <List className="size-4" />
           </button>
         </div>
+        </div>
 
-        {/* More filters button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="puzzle-filters-button gap-2"
-          onClick={() => setShowAdvanced((prev) => !prev)}
-        >
-          <Filter className="size-4" />
-          More filters
-          {activeFilterCount > 0 && (
-            <span className="ml-0.5">({activeFilterCount})</span>
-          )}
-        </Button>
-
-        {/* Clear button */}
-        {activeFilterCount > 0 && (
+        {/* Row 2: More filters, Clear, Updating */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* More filters button */}
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="gap-1 text-[13px] text-muted-foreground"
-            onClick={onClearFilters}
+            className="puzzle-filters-button gap-2"
+            onClick={() => setShowAdvanced((prev) => !prev)}
           >
-            <X className="size-4" />
-            Clear
+            <Filter className="size-4" />
+            More filters
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5">({activeFilterCount})</span>
+            )}
           </Button>
-        )}
 
-        {/* Updating label */}
-        {isRefetching && (
-          <span className="ml-auto font-mono text-[12px] text-muted-foreground">
-            Updating&hellip;
-          </span>
-        )}
+          {/* Clear button */}
+          {activeFilterCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-[13px] text-muted-foreground"
+              onClick={onClearFilters}
+            >
+              <X className="size-4" />
+              Clear
+            </Button>
+          )}
+
+          {/* Updating label */}
+          {isRefetching && (
+            <span className="ml-auto font-mono text-[12px] text-muted-foreground">
+              Updating&hellip;
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Advanced filters panel — inline below toolbar */}

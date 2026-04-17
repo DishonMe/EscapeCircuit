@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { ChangeEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { cn } from '@/utils/cn';
 
 import type { PuzzleFilters } from '../api/get-puzzles';
@@ -55,8 +56,7 @@ export const PuzzlesAdvancedFilters = ({
   const from = getFrom(filters.selectedDifficulties);
   const to = getTo(filters.selectedDifficulties);
 
-  const handleFromChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const newFrom = parseInt(e.target.value, 10);
+  const handleFromChange = (newFrom: number) => {
     const newTo = newFrom > to ? newFrom : to;
     onFiltersChange({
       ...filters,
@@ -65,8 +65,7 @@ export const PuzzlesAdvancedFilters = ({
     });
   };
 
-  const handleToChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const newTo = parseInt(e.target.value, 10);
+  const handleToChange = (newTo: number) => {
     const newFrom = newTo < from ? newTo : from;
     onFiltersChange({
       ...filters,
@@ -114,18 +113,13 @@ export const PuzzlesAdvancedFilters = ({
               <label htmlFor="adv-diff-from" className="sr-only">
                 From
               </label>
-              <select
+              <StyledSelect
                 id="adv-diff-from"
-                className={FIELD_INPUT}
+                aria-label="Difficulty range from"
                 value={from}
-                onChange={handleFromChange}
-              >
-                {DIFFICULTY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={handleFromChange}
+                options={DIFFICULTY_OPTIONS}
+              />
             </div>
             <span className="shrink-0 text-[12px] text-muted-foreground">
               to
@@ -134,18 +128,13 @@ export const PuzzlesAdvancedFilters = ({
               <label htmlFor="adv-diff-to" className="sr-only">
                 To
               </label>
-              <select
+              <StyledSelect
                 id="adv-diff-to"
-                className={FIELD_INPUT}
+                aria-label="Difficulty range to"
                 value={to}
-                onChange={handleToChange}
-              >
-                {DIFFICULTY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={handleToChange}
+                options={DIFFICULTY_OPTIONS}
+              />
             </div>
           </div>
         </div>

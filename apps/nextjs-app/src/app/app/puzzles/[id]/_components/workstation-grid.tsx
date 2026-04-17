@@ -6,6 +6,7 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -61,10 +62,11 @@ const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 
 // Visual Feature: Dynamic Wire Coloring
-const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316']; 
+const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316'];
 const getWireColor = (id: string) => {
   let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < id.length; i++)
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
   const index = Math.abs(hash % WIRE_COLORS.length);
   return WIRE_COLORS[index];
 };
@@ -220,12 +222,26 @@ export const WorkstationGrid = ({
   // Ghost/Preview State
   const [dropPreview, setDropPreview] = useState<HoleCoord | null>(null);
   const [recentlyPlacedId, setRecentlyPlacedId] = useState<string | null>(null);
-  const [recentlyConnectedWireId, setRecentlyConnectedWireId] = useState<string | null>(null);
-  const [hoveredDeleteComponentId, setHoveredDeleteComponentId] = useState<string | null>(null);
-  const [hoveredDeleteWireId, setHoveredDeleteWireId] = useState<string | null>(null);
-  const [deletingComponentIds, setDeletingComponentIds] = useState<string[]>([]);
-  const [activeRipples, setActiveRipples] = useState<Array<{ id: string; x: number; y: number }>>([]);
-  const [cursorSpotlight, setCursorSpotlight] = useState<{ x: number; y: number; visible: boolean }>({
+  const [recentlyConnectedWireId, setRecentlyConnectedWireId] = useState<
+    string | null
+  >(null);
+  const [hoveredDeleteComponentId, setHoveredDeleteComponentId] = useState<
+    string | null
+  >(null);
+  const [hoveredDeleteWireId, setHoveredDeleteWireId] = useState<string | null>(
+    null,
+  );
+  const [deletingComponentIds, setDeletingComponentIds] = useState<string[]>(
+    [],
+  );
+  const [activeRipples, setActiveRipples] = useState<
+    Array<{ id: string; x: number; y: number }>
+  >([]);
+  const [cursorSpotlight, setCursorSpotlight] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+  }>({
     x: 0,
     y: 0,
     visible: false,
@@ -245,22 +261,32 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
-  const [clipboard, setClipboard] = useState<{ components: PlacedGridComponent[], wires: Wire[] } | null>(null);
+  const [clipboard, setClipboard] = useState<{
+    components: PlacedGridComponent[];
+    wires: Wire[];
+  } | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
 
   const canCopySelection =
     selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0;
-  const canPasteSelection = Boolean(clipboard && clipboard.components.length > 0);
+  const canPasteSelection = Boolean(
+    clipboard && clipboard.components.length > 0,
+  );
 
   const copySelectionToClipboard = useCallback(() => {
-    if (selectedEntity.type !== 'component' || selectedEntity.placedIds.length === 0) {
+    if (
+      selectedEntity.type !== 'component' ||
+      selectedEntity.placedIds.length === 0
+    ) {
       return;
     }
 
     const selectedIds = new Set(selectedEntity.placedIds);
     const selectedComps = placed.filter((p) => selectedIds.has(p.id));
     const internalWires = wires.filter(
-      (w) => selectedIds.has(w.from.componentId) && selectedIds.has(w.to.componentId),
+      (w) =>
+        selectedIds.has(w.from.componentId) &&
+        selectedIds.has(w.to.componentId),
     );
 
     setClipboard({ components: selectedComps, wires: internalWires });
@@ -294,8 +320,12 @@ export const WorkstationGrid = ({
       });
     }
 
-    const minRow = Math.min(...copiedWithDefs.map(({ comp }) => comp.origin.row));
-    const minCol = Math.min(...copiedWithDefs.map(({ comp }) => comp.origin.col));
+    const minRow = Math.min(
+      ...copiedWithDefs.map(({ comp }) => comp.origin.row),
+    );
+    const minCol = Math.min(
+      ...copiedWithDefs.map(({ comp }) => comp.origin.col),
+    );
     const maxRowExclusive = Math.max(
       ...copiedWithDefs.map(({ comp, size }) => comp.origin.row + size.h),
     );
@@ -325,7 +355,9 @@ export const WorkstationGrid = ({
       const size = rotatedSize(def.size, existing.rotation);
       for (let r = 0; r < size.h; r++) {
         for (let c = 0; c < size.w; c++) {
-          existingOccupiedHoles.add(`r${existing.origin.row + r}c${existing.origin.col + c}`);
+          existingOccupiedHoles.add(
+            `r${existing.origin.row + r}c${existing.origin.col + c}`,
+          );
         }
       }
 
@@ -366,9 +398,16 @@ export const WorkstationGrid = ({
         }
 
         for (const port of item.def.ports) {
-          const rotOff = rotateOffset(port.offset, item.def.size, item.comp.rotation);
+          const rotOff = rotateOffset(
+            port.offset,
+            item.def.size,
+            item.comp.rotation,
+          );
           const key = `r${row + rotOff.row}c${col + rotOff.col}`;
-          if (existingOccupiedPortHoles.has(key) || groupOccupiedPortHoles.has(key)) {
+          if (
+            existingOccupiedPortHoles.has(key) ||
+            groupOccupiedPortHoles.has(key)
+          ) {
             return false;
           }
           groupOccupiedPortHoles.add(key);
@@ -393,7 +432,8 @@ export const WorkstationGrid = ({
     } else {
       for (let row = 0; row <= maxAnchorRow && !chosenAnchor; row++) {
         for (let col = 0; col <= maxAnchorCol; col++) {
-          if (row === preferredAnchor.row && col === preferredAnchor.col) continue;
+          if (row === preferredAnchor.row && col === preferredAnchor.col)
+            continue;
           if (isValidAnchor(row, col)) {
             chosenAnchor = { row, col };
             break;
@@ -472,8 +512,14 @@ export const WorkstationGrid = ({
   // Copy/Paste keyboard shortcuts (Ctrl+C / Ctrl+V)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isCopyKey = (e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
-      const isPasteKey = (e.key === 'v' || e.key === 'V') && (e.ctrlKey || e.metaKey) && !e.shiftKey;
+      const isCopyKey =
+        (e.key === 'c' || e.key === 'C') &&
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey;
+      const isPasteKey =
+        (e.key === 'v' || e.key === 'V') &&
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey;
 
       if (isCopyKey) {
         e.preventDefault();
@@ -497,13 +543,19 @@ export const WorkstationGrid = ({
 
       // Don't delete if user is typing in an input field
       const activeEl = document.activeElement as HTMLElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
+      ) {
         return;
       }
 
       e.preventDefault();
 
-      if (selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0) {
+      if (
+        selectedEntity.type === 'component' &&
+        selectedEntity.placedIds.length > 0
+      ) {
         // Delete all selected components (skip locked ones unless in edit mode)
         for (const placedId of selectedEntity.placedIds) {
           const component = placed.find((c) => c.id === placedId);
@@ -524,7 +576,10 @@ export const WorkstationGrid = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedEntity]);
 
-  const activeWireIdsSet = useMemo(() => new Set(activeWireIds), [activeWireIds]);
+  const activeWireIdsSet = useMemo(
+    () => new Set(activeWireIds),
+    [activeWireIds],
+  );
   const activeComponentIdsSet = useMemo(
     () => new Set(activeComponentIds),
     [activeComponentIds],
@@ -540,7 +595,9 @@ export const WorkstationGrid = ({
     return set;
   }, [wires, activeWireIdsSet]);
 
-  const previousPlacedIdsRef = useRef<string[]>(placed.map((component) => component.id));
+  const previousPlacedIdsRef = useRef<string[]>(
+    placed.map((component) => component.id),
+  );
   const previousWireIdsRef = useRef<string[]>(wires.map((wire) => wire.id));
 
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
@@ -648,7 +705,7 @@ export const WorkstationGrid = ({
       // Formula: screen_x = pan.x + (col + 0.5) * CELL_PX * fit
       // To place col -1 at ~15% from left (leaving room for input labels):
       const targetScreenX = containerWidth * 0.15;
-      const panX = targetScreenX - (-0.5) * CELL_PX * fit;
+      const panX = targetScreenX - -0.5 * CELL_PX * fit;
       // Pan Y: center vertically
       const panY = 2 * CELL_PX * fit;
       return { x: panX, y: panY };
@@ -691,7 +748,11 @@ export const WorkstationGrid = ({
         const size = rotatedSize(def.size, p.rotation);
         return { placedId: p.id, origin: p.origin, size };
       })
-      .filter((item) => item !== null) as Array<{ placedId: string; origin: { row: number; col: number }; size: { w: number; h: number } }>;
+      .filter((item) => item !== null) as Array<{
+      placedId: string;
+      origin: { row: number; col: number };
+      size: { w: number; h: number };
+    }>;
   }, [catalog, placed]);
 
   const placedById = useMemo(() => {
@@ -877,7 +938,7 @@ export const WorkstationGrid = ({
     }
 
     const newId = `${componentId}:${Date.now()}`;
-    
+
     onPlacedChange(
       placed.concat({
         id: newId,
@@ -892,8 +953,11 @@ export const WorkstationGrid = ({
     const ripleId = `ripple:${Date.now()}`;
     const centerX = (origin.col + 1) * CELL_PX * zoom + pan.x;
     const centerY = (origin.row + 1) * CELL_PX * zoom + pan.y;
-    setActiveRipples((prev) => [...prev, { id: ripleId, x: centerX, y: centerY }]);
-    
+    setActiveRipples((prev) => [
+      ...prev,
+      { id: ripleId, x: centerX, y: centerY },
+    ]);
+
     // Remove ripple after animation completes
     window.setTimeout(() => {
       setActiveRipples((prev) => prev.filter((r) => r.id !== ripleId));
@@ -1073,12 +1137,12 @@ export const WorkstationGrid = ({
     if (rect) {
       const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
       const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
-      
+
       const minPanX = Math.min(0, rect.width - gridWidthPx);
       const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
       const minPanY = Math.min(0, rect.height - gridHeightPx);
       const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
-      
+
       afterPanX = clamp(afterPanX, minPanX, maxPanX);
       afterPanY = clamp(afterPanY, minPanY, maxPanY);
     }
@@ -1146,10 +1210,10 @@ export const WorkstationGrid = ({
 
     const start = panStartRef.current;
     if (!start) return;
-    
+
     const newPanX = start.panX + (e.clientX - start.x);
     const newPanY = start.panY + (e.clientY - start.y);
-    
+
     // Apply pan limits to keep inputs/outputs in view
     const el = containerRef.current;
     if (el) {
@@ -1157,13 +1221,13 @@ export const WorkstationGrid = ({
       // Allow panning the full grid - left edge should show col -1, right edge should show the grid
       const gridWidthPx = (gridCols + 1) * CELL_PX * zoom;
       const gridHeightPx = (gridRows + 1) * CELL_PX * zoom;
-      
+
       // Pan limits: ensure grid fits properly in view with margins
       const minPanX = Math.min(0, rect.width - gridWidthPx);
       const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
       const minPanY = Math.min(0, rect.height - gridHeightPx);
       const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
-      
+
       setPan({
         x: clamp(newPanX, minPanX, maxPanX),
         y: clamp(newPanY, minPanY, maxPanY),
@@ -1312,7 +1376,9 @@ export const WorkstationGrid = ({
     const ids = new Set(created.map((spark) => spark.id));
     setMicroSparks((current) => [...current, ...created]);
     window.setTimeout(() => {
-      setMicroSparks((current) => current.filter((spark) => !ids.has(spark.id)));
+      setMicroSparks((current) =>
+        current.filter((spark) => !ids.has(spark.id)),
+      );
     }, 320);
   };
 
@@ -1330,7 +1396,9 @@ export const WorkstationGrid = ({
   const removeWire = (wireId: string) => {
     onWiresChange(wires.filter((w) => w.id !== wireId));
     setSelectedEntity({ type: 'none' });
-    setHoveredWireSignal((current) => (current?.wireId === wireId ? null : current));
+    setHoveredWireSignal((current) =>
+      current?.wireId === wireId ? null : current,
+    );
   };
 
   const trashRef = useRef<HTMLButtonElement | null>(null);
@@ -1420,7 +1488,9 @@ export const WorkstationGrid = ({
           className="h-7 px-2 transition-all hover:scale-105 hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-95"
           onMouseEnter={() => setHoveredDeleteWireId(w.id)}
           onMouseLeave={() =>
-            setHoveredDeleteWireId((current) => (current === w.id ? null : current))
+            setHoveredDeleteWireId((current) =>
+              current === w.id ? null : current,
+            )
           }
           onClick={(e) => {
             e.stopPropagation();
@@ -1441,7 +1511,10 @@ export const WorkstationGrid = ({
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const controlX = Math.max(28, Math.abs(dx) * 0.38);
-    const droopY = Math.max(8, Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04));
+    const droopY = Math.max(
+      8,
+      Math.min(42, Math.abs(dy) * 0.22 + Math.abs(dx) * 0.04),
+    );
     const c1x = from.x + controlX;
     const c1y = from.y + droopY;
     const c2x = to.x - controlX;
@@ -1488,16 +1561,21 @@ export const WorkstationGrid = ({
 
     if (selectedEntity.type === 'component') {
       const selectedIds = new Set(selectedEntity.placedIds);
-      
+
       // Disable highlighting if any selected component is a puzzle INPUT node
-      const hasInputNode = Array.from(selectedIds).some(id => id.startsWith('IO:IN:'));
+      const hasInputNode = Array.from(selectedIds).some((id) =>
+        id.startsWith('IO:IN:'),
+      );
       if (hasInputNode) {
         return highlighted; // Return empty set for INPUT nodes
       }
 
       // For selected components: highlight all wires directly connected
       for (const wire of wires) {
-        if (selectedIds.has(wire.from.componentId) || selectedIds.has(wire.to.componentId)) {
+        if (
+          selectedIds.has(wire.from.componentId) ||
+          selectedIds.has(wire.to.componentId)
+        ) {
           highlighted.add(wire.id);
         }
       }
@@ -1516,11 +1594,12 @@ export const WorkstationGrid = ({
           Working Area
         </div>
         <div className="text-xs text-muted-foreground">
-          {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan. Click/drag ports to
-          wire. 
+          {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan.
+          Click/drag ports to wire.
         </div>
         <div className="text-xs text-muted-foreground">
-          Use Shift+click to select multiple components. Copy/Paste with Ctrl+C/Ctrl+V.
+          Use Shift+click to select multiple components. Copy/Paste with
+          Ctrl+C/Ctrl+V.
         </div>
       </div>
 
@@ -1529,8 +1608,10 @@ export const WorkstationGrid = ({
         className={cn(
           'relative h-[calc(100vh-18rem)] overflow-hidden rounded-md border border-border bg-card transition-[box-shadow,transform,border-color] duration-300 cursor-crosshair',
           isPowerSurge && 'workstation-board-surge',
-          boardFeedback === 'success' && 'workstation-board-success border-emerald-400',
-          boardFeedback === 'failure' && 'workstation-board-failure border-red-400',
+          boardFeedback === 'success' &&
+            'workstation-board-success border-emerald-400',
+          boardFeedback === 'failure' &&
+            'workstation-board-failure border-red-400',
           viewportClassName,
         )}
         onWheel={onWheel}
@@ -1613,9 +1694,10 @@ export const WorkstationGrid = ({
         )}
 
         {/* Ripple Effects */}
-        {visualEffectsEnabled && activeRipples.map((ripple) => (
-          <RippleEffect key={ripple.id} x={ripple.x} y={ripple.y} />
-        ))}
+        {visualEffectsEnabled &&
+          activeRipples.map((ripple) => (
+            <RippleEffect key={ripple.id} x={ripple.x} y={ripple.y} />
+          ))}
 
         {/* Interactive Spotlight */}
         <div
@@ -1695,7 +1777,9 @@ export const WorkstationGrid = ({
                   return;
                 }
                 // Clear all
-                if (confirm('Are you sure you want to clear the entire grid?')) {
+                if (
+                  confirm('Are you sure you want to clear the entire grid?')
+                ) {
                   onWiresChange([]);
                   onPlacedChange([]);
                 }
@@ -1766,29 +1850,30 @@ export const WorkstationGrid = ({
             const isDeleteWarn = hoveredDeleteWireId === w.id;
             const isHighlighted = highlightedWireIds.has(w.id);
             const wirePath = getCurvedWirePath(a, b);
-            const isSurgePowered = isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
+            const isSurgePowered =
+              isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
 
             // Visual Feature: Dynamic Wire Coloring with Highlight Support
             const strokeColor = isSelected
               ? '#2563eb'
               : isDeleteWarn
                 ? '#ef4444'
-              : isHighlighted
-                ? '#3b82f6'  // Bright blue for highlighted wires
-              : isHighSignal
-                ? '#fde047'
-              : isRecentlyConnected
-                ? '#60a5fa'
-                : getWireColor(w.id);
+                : isHighlighted
+                  ? '#3b82f6' // Bright blue for highlighted wires
+                  : isHighSignal
+                    ? '#fde047'
+                    : isRecentlyConnected
+                      ? '#60a5fa'
+                      : getWireColor(w.id);
 
             const flowColor = isHighlighted
-              ? '#60a5fa'  // Flow color for highlighted wires
+              ? '#60a5fa' // Flow color for highlighted wires
               : isHighSignal
-              ? '#fef08a'
-              : isRecentlyConnected
-                ? '#bfdbfe'
-                : '#93c5fd';
-            
+                ? '#fef08a'
+                : isRecentlyConnected
+                  ? '#bfdbfe'
+                  : '#93c5fd';
+
             // Check if wire is locked (at least one endpoint is locked)
             const isWireLocked = w.isLocked === true;
 
@@ -1803,20 +1888,30 @@ export const WorkstationGrid = ({
                   d={wirePath}
                   fill="none"
                   stroke={strokeColor}
-                  strokeWidth={isPowerSurge ? 4.2 : isSelected ? 3 : isHighlighted ? 4 : isRecentlyConnected ? 4 : 2}
+                  strokeWidth={
+                    isPowerSurge
+                      ? 4.2
+                      : isSelected
+                        ? 3
+                        : isHighlighted
+                          ? 4
+                          : isRecentlyConnected
+                            ? 4
+                            : 2
+                  }
                   strokeDasharray={isWireLocked ? '6,3' : undefined}
                   style={{
                     filter: isDeleteWarn
                       ? 'drop-shadow(0 0 8px rgba(239,68,68,0.85))'
                       : isHighlighted
-                      ? 'drop-shadow(0 0 8px rgba(59,130,246,0.8))'
-                      : isSurgePowered
-                      ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
-                      : isHighSignal
-                      ? 'drop-shadow(0 0 8px rgba(250,204,21,0.9))'
-                      : isRecentlyConnected
-                        ? 'drop-shadow(0 0 6px rgba(96,165,250,0.95))'
-                        : 'drop-shadow(0 0 3px rgba(59,130,246,0.2))',
+                        ? 'drop-shadow(0 0 8px rgba(59,130,246,0.8))'
+                        : isSurgePowered
+                          ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
+                          : isHighSignal
+                            ? 'drop-shadow(0 0 8px rgba(250,204,21,0.9))'
+                            : isRecentlyConnected
+                              ? 'drop-shadow(0 0 6px rgba(96,165,250,0.95))'
+                              : 'drop-shadow(0 0 3px rgba(59,130,246,0.2))',
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -1847,21 +1942,38 @@ export const WorkstationGrid = ({
                   d={wirePath}
                   fill="none"
                   stroke={flowColor}
-                  strokeWidth={isPowerSurge ? 3.2 : isHighlighted ? 3 : isHighSignal ? 2.4 : 1.4}
-                  strokeDasharray={isHighlighted ? '5 5' : isHighSignal ? '9 7' : '7 9'}
+                  strokeWidth={
+                    isPowerSurge
+                      ? 3.2
+                      : isHighlighted
+                        ? 3
+                        : isHighSignal
+                          ? 2.4
+                          : 1.4
+                  }
+                  strokeDasharray={
+                    isHighlighted ? '5 5' : isHighSignal ? '9 7' : '7 9'
+                  }
                   className={cn(
                     'pointer-events-none workstation-wire-flow transition-all duration-200',
-                    (isHighSignal || isPowerSurge || isHighlighted) && 'workstation-wire-flow-fast',
+                    (isHighSignal || isPowerSurge || isHighlighted) &&
+                      'workstation-wire-flow-fast',
                   )}
                   style={{
-                    opacity: isPowerSurge ? 1 : isHighlighted ? 0.85 : isHighSignal ? 0.95 : 0.45,
+                    opacity: isPowerSurge
+                      ? 1
+                      : isHighlighted
+                        ? 0.85
+                        : isHighSignal
+                          ? 0.95
+                          : 0.45,
                     filter: isPowerSurge
                       ? 'drop-shadow(0 0 14px rgba(34,211,238,0.95))'
                       : isHighlighted
-                      ? 'drop-shadow(0 0 6px rgba(59,130,246,0.7))'
-                      : isHighSignal
-                      ? 'drop-shadow(0 0 8px rgba(250,204,21,0.8))'
-                      : 'drop-shadow(0 0 4px rgba(96,165,250,0.45))',
+                        ? 'drop-shadow(0 0 6px rgba(59,130,246,0.7))'
+                        : isHighSignal
+                          ? 'drop-shadow(0 0 8px rgba(250,204,21,0.8))'
+                          : 'drop-shadow(0 0 4px rgba(96,165,250,0.45))',
                   }}
                 />
               </g>
@@ -1871,14 +1983,20 @@ export const WorkstationGrid = ({
           {wireDraft ? (
             <>
               <path
-                d={getCurvedWirePath(getPortScreenPoint(wireDraft.start, ioLayout), wireDraft.current)}
+                d={getCurvedWirePath(
+                  getPortScreenPoint(wireDraft.start, ioLayout),
+                  wireDraft.current,
+                )}
                 fill="none"
                 stroke="#2563eb"
                 strokeWidth={2}
                 strokeDasharray="4 3"
               />
               <path
-                d={getCurvedWirePath(getPortScreenPoint(wireDraft.start, ioLayout), wireDraft.current)}
+                d={getCurvedWirePath(
+                  getPortScreenPoint(wireDraft.start, ioLayout),
+                  wireDraft.current,
+                )}
                 fill="none"
                 stroke="#bfdbfe"
                 strokeWidth={1.4}
@@ -1952,7 +2070,7 @@ export const WorkstationGrid = ({
                   // Canvas Rendering: Grid & Labels (Grid Dots)
                   // Use small dots instead of full-size buttons for cleaner look
                   return (
-                     <div
+                    <div
                       key={key}
                       className="absolute flex items-center justify-center p-0"
                       style={{
@@ -1961,7 +2079,7 @@ export const WorkstationGrid = ({
                         width: CELL_PX,
                         height: CELL_PX,
                       }}
-                     >
+                    >
                       <button
                         className={cn(
                           'rounded-full transition-colors',
@@ -1980,7 +2098,7 @@ export const WorkstationGrid = ({
                         }}
                         title={`(${r},${c})`}
                       />
-                     </div>
+                    </div>
                   );
                 },
               );
@@ -1990,26 +2108,29 @@ export const WorkstationGrid = ({
           {/* Components */}
           {placed.map((p, placedIndex) => {
             const def = catalog[p.componentId];
-            
+
             // Safety check: skip rendering if component definition is missing from catalog
             if (!def) {
-              console.warn(`Component definition missing for ID: ${p.componentId}`);
+              console.warn(
+                `Component definition missing for ID: ${p.componentId}`,
+              );
               return null;
             }
-            
+
             const size = rotatedSize(def.size, p.rotation);
 
-            const isDragging = draggedComponent && draggedComponent.placedIds.includes(p.id);
-            const origin = isDragging 
-              ? { 
-                  row: p.origin.row + draggedComponent.deltaRow, 
-                  col: p.origin.col + draggedComponent.deltaCol 
+            const isDragging =
+              draggedComponent && draggedComponent.placedIds.includes(p.id);
+            const origin = isDragging
+              ? {
+                  row: p.origin.row + draggedComponent.deltaRow,
+                  col: p.origin.col + draggedComponent.deltaCol,
                 }
               : p.origin;
 
             const left = origin.col * CELL_PX;
             const top = origin.row * CELL_PX;
-            
+
             const isSelected =
               selectedEntity.type === 'component' &&
               selectedEntity.placedIds.includes(p.id);
@@ -2018,13 +2139,18 @@ export const WorkstationGrid = ({
             const isDeleting = deletingComponentIds.includes(p.id);
 
             // Calculate the count of this component type that appear before this one
-            const countBefore = placed.slice(0, placedIndex).filter(comp => comp.componentId === p.componentId).length;
+            const countBefore = placed
+              .slice(0, placedIndex)
+              .filter((comp) => comp.componentId === p.componentId).length;
             const componentNumber = countBefore + 1;
-            const totalCount = placed.filter(comp => comp.componentId === p.componentId).length;
+            const totalCount = placed.filter(
+              (comp) => comp.componentId === p.componentId,
+            ).length;
             // Only add number if there are multiple gates of this type
             const defWithNumber = {
               ...def,
-              label: totalCount > 1 ? `${def.label} ${componentNumber}` : def.label,
+              label:
+                totalCount > 1 ? `${def.label} ${componentNumber}` : def.label,
             };
 
             return (
@@ -2036,8 +2162,10 @@ export const WorkstationGrid = ({
                   bootSequenceActive && 'animate-in fade-in zoom-in-75',
                   isDeleting && 'workstation-component-delete-out',
                   !isDragging && !isDeleting && 'workstation-component-breathe',
-                  isDeleteWarn && 'border-red-400 bg-red-50/60 shadow-[0_0_0_1px_rgba(248,113,113,0.45),0_0_18px_rgba(239,68,68,0.25)]',
-                  isActive && 'border-cyan-300 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)] shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_0_12px_rgba(59,130,246,0.4),0_0_24px_rgba(34,211,238,0.32)]',
+                  isDeleteWarn &&
+                    'border-red-400 bg-red-50/60 shadow-[0_0_0_1px_rgba(248,113,113,0.45),0_0_18px_rgba(239,68,68,0.25)]',
+                  isActive &&
+                    'border-cyan-300 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)] shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_0_12px_rgba(59,130,246,0.4),0_0_24px_rgba(34,211,238,0.32)]',
                   isPowerSurge && 'workstation-component-surge',
                   isSelected
                     ? 'border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.55),0_0_18px_rgba(59,130,246,0.28)]'
@@ -2057,7 +2185,7 @@ export const WorkstationGrid = ({
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   e.currentTarget.setPointerCapture(e.pointerId);
-                  
+
                   // Multi-select: Shift+Click toggles component in selection, otherwise single select
                   if (e.shiftKey) {
                     setSelectedEntity((current) => {
@@ -2071,7 +2199,10 @@ export const WorkstationGrid = ({
                       } else {
                         ids.push(p.id); // Add if missing
                       }
-                      return { type: 'component', placedIds: ids.length > 0 ? ids : [p.id] };
+                      return {
+                        type: 'component',
+                        placedIds: ids.length > 0 ? ids : [p.id],
+                      };
                     });
                   } else {
                     setSelectedEntity({ type: 'component', placedIds: [p.id] });
@@ -2092,9 +2223,11 @@ export const WorkstationGrid = ({
                   const worldPos = screenToWorld(cursor);
 
                   // Group dragging: if clicked component is in selection, drag all selected
-                  const placedIdsToMove = selectedEntity.type === 'component' && selectedEntity.placedIds.includes(p.id)
-                    ? selectedEntity.placedIds
-                    : [p.id];
+                  const placedIdsToMove =
+                    selectedEntity.type === 'component' &&
+                    selectedEntity.placedIds.includes(p.id)
+                      ? selectedEntity.placedIds
+                      : [p.id];
 
                   setDraggedComponent({
                     placedIds: placedIdsToMove,
@@ -2105,8 +2238,12 @@ export const WorkstationGrid = ({
                   });
                 }}
                 onPointerMove={(e) => {
-                  if (!draggedComponent || !draggedComponent.placedIds.includes(p.id)) return;
-                  
+                  if (
+                    !draggedComponent ||
+                    !draggedComponent.placedIds.includes(p.id)
+                  )
+                    return;
+
                   e.stopPropagation();
                   const el = containerRef.current;
                   if (!el) return;
@@ -2139,7 +2276,11 @@ export const WorkstationGrid = ({
                   e.stopPropagation();
                   e.currentTarget.releasePointerCapture(e.pointerId);
 
-                  if (!draggedComponent || !draggedComponent.placedIds.includes(p.id)) return;
+                  if (
+                    !draggedComponent ||
+                    !draggedComponent.placedIds.includes(p.id)
+                  )
+                    return;
 
                   if (isOverTrash(e.clientX, e.clientY)) {
                     // Delete all dragged components
@@ -2148,21 +2289,31 @@ export const WorkstationGrid = ({
                     }
                   } else {
                     // Commit all moves: validate each component, then update all
-                    const allValid = draggedComponent.placedIds.every((placedId) => {
-                      const comp = placed.find((c) => c.id === placedId);
-                      if (!comp) return false;
-                      const newOrigin = {
-                        row: clamp(comp.origin.row + draggedComponent.deltaRow, 0, gridRows - 1),
-                        col: clamp(comp.origin.col + draggedComponent.deltaCol, 0, gridCols - 1),
-                      };
-                      return canPlaceComponentAt(
-                        comp.componentId,
-                        newOrigin,
-                        comp.rotation,
-                        undefined,
-                        draggedComponent.placedIds, // exclude all dragged components from collision
-                      );
-                    });
+                    const allValid = draggedComponent.placedIds.every(
+                      (placedId) => {
+                        const comp = placed.find((c) => c.id === placedId);
+                        if (!comp) return false;
+                        const newOrigin = {
+                          row: clamp(
+                            comp.origin.row + draggedComponent.deltaRow,
+                            0,
+                            gridRows - 1,
+                          ),
+                          col: clamp(
+                            comp.origin.col + draggedComponent.deltaCol,
+                            0,
+                            gridCols - 1,
+                          ),
+                        };
+                        return canPlaceComponentAt(
+                          comp.componentId,
+                          newOrigin,
+                          comp.rotation,
+                          undefined,
+                          draggedComponent.placedIds, // exclude all dragged components from collision
+                        );
+                      },
+                    );
 
                     if (allValid) {
                       const next = placed.map((comp) => {
@@ -2170,8 +2321,16 @@ export const WorkstationGrid = ({
                           return {
                             ...comp,
                             origin: {
-                              row: clamp(comp.origin.row + draggedComponent.deltaRow, 0, gridRows - 1),
-                              col: clamp(comp.origin.col + draggedComponent.deltaCol, 0, gridCols - 1),
+                              row: clamp(
+                                comp.origin.row + draggedComponent.deltaRow,
+                                0,
+                                gridRows - 1,
+                              ),
+                              col: clamp(
+                                comp.origin.col + draggedComponent.deltaCol,
+                                0,
+                                gridCols - 1,
+                              ),
                             },
                           };
                         }
@@ -2188,39 +2347,43 @@ export const WorkstationGrid = ({
                   <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
-                    <button
-                      type="button"
-                      className="flex size-5 items-center justify-center rounded-full bg-card text-red-600 shadow-sm ring-1 ring-border transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
-                      onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
-                      onMouseLeave={() =>
-                        setHoveredDeleteComponentId((current) =>
-                          current === p.id ? null : current,
-                        )
-                      }
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        triggerDeleteComponent(p.id);
-                      }}
-                      title={p.isLocked && isEditMode ? "Delete locked component" : "Delete component"}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="size-3"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                      <button
+                        type="button"
+                        className="flex size-5 items-center justify-center rounded-full bg-card text-red-600 shadow-sm ring-1 ring-border transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                        onMouseEnter={() => setHoveredDeleteComponentId(p.id)}
+                        onMouseLeave={() =>
+                          setHoveredDeleteComponentId((current) =>
+                            current === p.id ? null : current,
+                          )
+                        }
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerDeleteComponent(p.id);
+                        }}
+                        title={
+                          p.isLocked && isEditMode
+                            ? 'Delete locked component'
+                            : 'Delete component'
+                        }
                       >
-                        <path d="M3 6h18" />
-                        <path d="M8 6V4h8v2" />
-                        <path d="M6 6l1 16h10l1-16" />
-                      </svg>
-                    </button>
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="size-3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M6 6l1 16h10l1-16" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 )}
 
-                {/* Lock Indicator (🔒 icon for locked components) */}
+                {/* Lock indicator for locked components */}
                 {p.isLocked && (
                   <div
                     className="lock-indicator absolute -top-3 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
@@ -2230,15 +2393,13 @@ export const WorkstationGrid = ({
                       backgroundColor: '#fbbf24',
                       borderRadius: '50%',
                       border: '2px solid #f59e0b',
-                      fontSize: '12px',
-                      lineHeight: '1',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                     title="This component is locked and cannot be moved or deleted"
                   >
-                    🔒
+                    <Lock className="size-3 text-amber-950" aria-hidden />
                   </div>
                 )}
 
@@ -2258,7 +2419,8 @@ export const WorkstationGrid = ({
                     },
                   };
                   const effectiveKey = `${effective.ownerId}:${effective.portId}`;
-                  const isPortFlashing = flashingPortKeys.includes(effectiveKey);
+                  const isPortFlashing =
+                    flashingPortKeys.includes(effectiveKey);
                   const portBit = debuggerActive
                     ? getPortBitForDisplay(p.id, port.kind, portIndex)
                     : '0';
@@ -2280,7 +2442,8 @@ export const WorkstationGrid = ({
                         type="button"
                         className={cn(
                           'absolute flex items-center justify-center rounded-full border transition-transform duration-200 hover:scale-150 hover:bg-blue-400 cursor-pointer',
-                          wireDraft && 'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
+                          wireDraft &&
+                            'scale-125 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
                           isPortFlashing && 'workstation-port-lock-flash',
                           port.kind === 'input'
                             ? 'border-green-300 bg-green-50'
@@ -2320,7 +2483,8 @@ export const WorkstationGrid = ({
           })}
 
           {/* Drop Preview / Ghost Node */}
-          {dropPreview && draggedPaletteComponentId &&
+          {dropPreview &&
+            draggedPaletteComponentId &&
             (() => {
               const def = catalog[draggedPaletteComponentId];
               if (!def) return null;
@@ -2388,8 +2552,10 @@ export const WorkstationGrid = ({
                   type="button"
                   className={cn(
                     'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125 animate-in fade-in zoom-in-90',
-                    highInputOwnerIds.has(id) && 'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
-                    isPowerSurge && 'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
+                    highInputOwnerIds.has(id) &&
+                      'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
+                    isPowerSurge &&
+                      'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
                   )}
                   style={{
                     left: pt.x,
@@ -2505,7 +2671,8 @@ export const WorkstationGrid = ({
 
         {debuggerActive ? (
           <div className="pointer-events-none absolute right-3 top-14 z-30 rounded border border-border bg-card/90 px-2 py-1 text-[11px] text-foreground shadow-sm backdrop-blur-sm">
-            Step {debuggerStepCount ? debuggerStepIndex + 1 : 0}/{debuggerStepCount || 0}
+            Step {debuggerStepCount ? debuggerStepIndex + 1 : 0}/
+            {debuggerStepCount || 0}
           </div>
         ) : null}
 
@@ -2523,17 +2690,21 @@ export const WorkstationGrid = ({
           // Input indicator - positioned above the middle of inputs
           if (inputs.length > 0) {
             const firstInput = ioLayout.inputs[`IO:IN:${inputs[0]}`];
-            const lastInput = ioLayout.inputs[`IO:IN:${inputs[inputs.length - 1]}`];
-            
+            const lastInput =
+              ioLayout.inputs[`IO:IN:${inputs[inputs.length - 1]}`];
+
             if (firstInput && lastInput) {
               const midY = (firstInput.y + lastInput.y) / 2;
               const midX = firstInput.x;
-              
+
               // Calculate position and rotation
               let rotation = 0;
               let posX = midX - 40; // Position to the left of inputs column
-              let posY = Math.max(16, Math.min(containerSize.h - 40, midY - 30));
-              
+              let posY = Math.max(
+                16,
+                Math.min(containerSize.h - 40, midY - 30),
+              );
+
               // Determine arrow direction based on where inputs are
               if (midX < 0) {
                 rotation = 0; // point right (inputs are off-screen left)
@@ -2554,7 +2725,7 @@ export const WorkstationGrid = ({
                 posY = firstInput.y - 60; // Position above topmost input
                 posX = midX - 30;
               }
-              
+
               indicators.push({
                 id: 'inputs',
                 label: 'IN',
@@ -2568,7 +2739,8 @@ export const WorkstationGrid = ({
           // Output indicator - positioned above outputs (mirroring IN indicator)
           if (outputs.length > 0) {
             const firstOutput = ioLayout.outputs[`IO:OUT:${outputs[0]}`];
-            const lastOutput = ioLayout.outputs[`IO:OUT:${outputs[outputs.length - 1]}`];
+            const lastOutput =
+              ioLayout.outputs[`IO:OUT:${outputs[outputs.length - 1]}`];
 
             if (firstOutput && lastOutput) {
               const midX = firstOutput.x;
@@ -2637,7 +2809,6 @@ export const WorkstationGrid = ({
             </div>
           ));
         })()}
-
       </div>
 
       <style jsx>{`
@@ -2659,17 +2830,26 @@ export const WorkstationGrid = ({
 
         .workstation-board-success {
           animation: workstation-board-success 1s ease-out;
-          box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.55), 0 0 28px rgba(34, 197, 94, 0.3);
+          box-shadow:
+            0 0 0 1px rgba(74, 222, 128, 0.55),
+            0 0 28px rgba(34, 197, 94, 0.3);
         }
 
         .workstation-board-surge {
-          animation: workstation-board-surge 600ms cubic-bezier(0.22, 0.7, 0.2, 1);
-          box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.7), 0 0 40px rgba(34, 211, 238, 0.45);
+          animation: workstation-board-surge 600ms
+            cubic-bezier(0.22, 0.7, 0.2, 1);
+          box-shadow:
+            0 0 0 1px rgba(34, 211, 238, 0.7),
+            0 0 40px rgba(34, 211, 238, 0.45);
         }
 
         .workstation-board-failure {
-          animation: workstation-shake 420ms ease-in-out, workstation-board-failure 700ms ease-out;
-          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55), 0 0 28px rgba(239, 68, 68, 0.28);
+          animation:
+            workstation-shake 420ms ease-in-out,
+            workstation-board-failure 700ms ease-out;
+          box-shadow:
+            0 0 0 1px rgba(248, 113, 113, 0.55),
+            0 0 28px rgba(239, 68, 68, 0.28);
         }
 
         .workstation-port-lock-flash {
@@ -2677,7 +2857,8 @@ export const WorkstationGrid = ({
         }
 
         .workstation-wire-snap {
-          animation: workstation-wire-snap 360ms cubic-bezier(0.16, 0.84, 0.24, 1);
+          animation: workstation-wire-snap 360ms
+            cubic-bezier(0.16, 0.84, 0.24, 1);
           transform-origin: center;
         }
 
@@ -2699,9 +2880,15 @@ export const WorkstationGrid = ({
         }
 
         @keyframes workstation-pop {
-          0% { transform: scale(0.88); }
-          65% { transform: scale(1.08); }
-          100% { transform: scale(1); }
+          0% {
+            transform: scale(0.88);
+          }
+          65% {
+            transform: scale(1.08);
+          }
+          100% {
+            transform: scale(1);
+          }
         }
 
         @keyframes workstation-board-surge {
@@ -2710,54 +2897,102 @@ export const WorkstationGrid = ({
             transform: scale(1);
           }
           38% {
-            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.75), 0 0 46px rgba(34, 211, 238, 0.55);
+            box-shadow:
+              0 0 0 2px rgba(34, 211, 238, 0.75),
+              0 0 46px rgba(34, 211, 238, 0.55);
             transform: scale(1.006);
           }
           100% {
-            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.45), 0 0 24px rgba(34, 211, 238, 0.24);
+            box-shadow:
+              0 0 0 1px rgba(34, 211, 238, 0.45),
+              0 0 24px rgba(34, 211, 238, 0.24);
             transform: scale(1);
           }
         }
 
         @keyframes workstation-wire-flow {
-          0% { stroke-dashoffset: 0; }
-          100% { stroke-dashoffset: -64; }
+          0% {
+            stroke-dashoffset: 0;
+          }
+          100% {
+            stroke-dashoffset: -64;
+          }
         }
 
         @keyframes workstation-board-success {
-          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-          35% { box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.55), 0 0 36px rgba(34, 197, 94, 0.35); }
-          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+          0% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+          }
+          35% {
+            box-shadow:
+              0 0 0 2px rgba(74, 222, 128, 0.55),
+              0 0 36px rgba(34, 197, 94, 0.35);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+          }
         }
 
         @keyframes workstation-board-failure {
-          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-          30% { box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.55), 0 0 34px rgba(239, 68, 68, 0.35); }
-          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+          0% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
+          30% {
+            box-shadow:
+              0 0 0 2px rgba(248, 113, 113, 0.55),
+              0 0 34px rgba(239, 68, 68, 0.35);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
         }
 
         @keyframes workstation-shake {
-          0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-5px); }
-          40% { transform: translateX(4px); }
-          60% { transform: translateX(-3px); }
-          80% { transform: translateX(2px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          20% {
+            transform: translateX(-5px);
+          }
+          40% {
+            transform: translateX(4px);
+          }
+          60% {
+            transform: translateX(-3px);
+          }
+          80% {
+            transform: translateX(2px);
+          }
         }
 
         @keyframes workstation-wire-snap {
-          0% { transform: scaleY(0.88) scaleX(0.98) translateY(0.5px); }
-          42% { transform: scaleY(1.18) scaleX(1.03) translateY(-0.6px); }
-          68% { transform: scaleY(0.95) scaleX(0.995) translateY(0.3px); }
-          100% { transform: scaleY(1) scaleX(1) translateY(0); }
+          0% {
+            transform: scaleY(0.88) scaleX(0.98) translateY(0.5px);
+          }
+          42% {
+            transform: scaleY(1.18) scaleX(1.03) translateY(-0.6px);
+          }
+          68% {
+            transform: scaleY(0.95) scaleX(0.995) translateY(0.3px);
+          }
+          100% {
+            transform: scaleY(1) scaleX(1) translateY(0);
+          }
         }
 
         @keyframes workstation-component-surge {
-          0%, 100% {
-            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 10px rgba(34, 211, 238, 0.22);
+          0%,
+          100% {
+            box-shadow:
+              0 0 0 1px rgba(34, 211, 238, 0.35),
+              0 0 10px rgba(34, 211, 238, 0.22);
             transform: scale(1);
           }
           50% {
-            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.9), 0 0 28px rgba(34, 211, 238, 0.5);
+            box-shadow:
+              0 0 0 1px rgba(34, 211, 238, 0.9),
+              0 0 28px rgba(34, 211, 238, 0.5);
             transform: scale(1.016);
           }
         }
@@ -2774,7 +3009,8 @@ export const WorkstationGrid = ({
         }
 
         @keyframes workstation-component-breathe {
-          0%, 100% {
+          0%,
+          100% {
             transform: scale(1);
           }
           50% {
@@ -2789,7 +3025,11 @@ export const WorkstationGrid = ({
           }
           100% {
             opacity: 0;
-            transform: translate(calc(-50% + var(--spark-dx)), calc(-50% + var(--spark-dy))) scale(0.2);
+            transform: translate(
+                calc(-50% + var(--spark-dx)),
+                calc(-50% + var(--spark-dy))
+              )
+              scale(0.2);
           }
         }
 
