@@ -150,6 +150,22 @@ const getGateSVG = (label: string) => {
         </svg>
       );
     }
+    case 'DFF': {
+      // 3x1 gate: D flip-flop symbol with clock notch and Q output
+      return (
+        <svg viewBox="0 0 54 18" className="w-full h-full">
+          {/* Body */}
+          <rect x="10" y="1.5" width="26" height="15" rx="2.5" {...commonProps} />
+          {/* Clock notch */}
+          <path d="M 10 9 L 14 6.3 L 14 11.7 Z" {...commonProps} />
+          {/* Output lead */}
+          <line x1="36" y1="9" x2="45" y2="9" {...commonProps} />
+          {/* Labels */}
+          <text x="18" y="11" fill="currentColor" fontSize="5.5" fontWeight="700">D</text>
+          <text x="28" y="11" fill="currentColor" fontSize="5.5" fontWeight="700">Q</text>
+        </svg>
+      );
+    }
     default:
       return null;
   }
@@ -167,6 +183,10 @@ export const LogicNode = ({
   // Extract gate type (e.g., "AND" from "AND 1" or just "AND")
   const gateType = node.label.split(' ')[0];
   const isBasicGate = BASIC_GATES.includes(gateType);
+  const isDffGate = gateType === 'DFF';
+  const gateInstanceLabel = node.label.startsWith(`${gateType} `)
+    ? node.label.slice(gateType.length + 1)
+    : '';
 
   return (
     <div
@@ -193,14 +213,27 @@ export const LogicNode = ({
             gateType === 'XNOR' && 'translate-x-[2px]', 
             gateType === 'NOT' && 'absolute left-1/4 top-1/2 -translate-y-1/2'
           )}>
-            {node.label.includes(' ') ? node.label.split(' ')[1] : ''}
+            {gateInstanceLabel}
+          </span>
+        </div>
+      ) : isDffGate ? (
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-[1px] rounded-sm bg-gradient-to-b from-card to-card/70" />
+          <div className="absolute inset-0">
+            {getGateSVG('DFF')}
+          </div>
+          <span className="absolute right-1 top-0.5 select-none rounded border border-border/60 bg-background/80 px-1 text-[6px] font-semibold leading-none text-muted-foreground">
+            {gateInstanceLabel}
           </span>
         </div>
       ) : (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="select-none text-[9px] font-semibold tracking-wide text-foreground">
-            {node.label}
-          </span>
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-[1px] rounded-[5px] border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
+          <div className="absolute inset-x-1 inset-y-0 flex items-center justify-center">
+            <span className="max-w-full truncate px-2 text-[9px] font-semibold tracking-wide text-foreground">
+              {node.label}
+            </span>
+          </div>
         </div>
       )}
 
