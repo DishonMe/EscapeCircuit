@@ -87,6 +87,60 @@ const rotatedSize = (size: { w: number; h: number }, rotation: 0 | 90) => {
   return rotation === 0 ? size : { w: size.h, h: size.w };
 };
 
+const getVisualPortOffsets = (
+  def: ComponentDef,
+  rotation: 0 | 90,
+): Map<string, HoleCoord> => {
+  const result = new Map<string, HoleCoord>();
+
+  for (const port of def.ports) {
+    result.set(port.id, rotateOffset(port.offset, def.size, rotation));
+  }
+
+  const grouped: Record<PortKind, Array<{ port: PortDef; index: number }>> = {
+    input: [],
+    output: [],
+  };
+
+  def.ports.forEach((port, index) => {
+    grouped[port.kind].push({ port, index });
+  });
+
+  const inputCount = grouped.input.length;
+  const outputCount = grouped.output.length;
+
+  if (inputCount === outputCount || inputCount === 0 || outputCount === 0) {
+    return result;
+  }
+
+  const lowerKind: PortKind = inputCount < outputCount ? 'input' : 'output';
+  const lowerPorts = grouped[lowerKind].sort(
+    (a, b) =>
+      a.port.offset.row - b.port.offset.row ||
+      a.port.offset.col - b.port.offset.col ||
+      a.index - b.index,
+  );
+
+  const componentHeight = Math.max(1, def.size.h);
+
+  lowerPorts.forEach(({ port }, index) => {
+    const distributedRow =
+      -0.5 +
+      ((index + 1) * componentHeight) / (lowerPorts.length + 1);
+
+    result.set(
+      port.id,
+      rotateOffset(
+        { row: distributedRow, col: port.offset.col },
+        def.size,
+        rotation,
+      ),
+    );
+  });
+
+  return result;
+};
+
 const inRect = (
   p: HoleCoord,
   origin: HoleCoord,
@@ -707,6 +761,16 @@ export const WorkstationGrid = ({
     return map;
   }, [placed]);
 
+  const visualPortOffsetsByPlacedId = useMemo(() => {
+    const map = new Map<string, Map<string, HoleCoord>>();
+    for (const p of placed) {
+      const def = catalog[p.componentId];
+      if (!def) continue;
+      map.set(p.id, getVisualPortOffsets(def, p.rotation));
+    }
+    return map;
+  }, [catalog, placed]);
+
   const portIndexByPortId = useMemo(() => {
     const map = new Map<string, Map<string, number>>();
     for (const [id, def] of Object.entries(catalog)) {
@@ -923,6 +987,20 @@ export const WorkstationGrid = ({
     if (port.ownerId.startsWith('IO:OUT:')) {
       return ioLayout.outputs[port.ownerId] ?? { x: 0, y: 0 };
     }
+
+    const placedInst = placedById[port.ownerId];
+    const visualOffsets = visualPortOffsetsByPlacedId.get(port.ownerId);
+    const visualOffset = visualOffsets?.get(port.portId);
+
+    if (placedInst && visualOffset) {
+      const visualHole = {
+        row: placedInst.origin.row + visualOffset.row,
+        col: placedInst.origin.col + visualOffset.col,
+      };
+      const pt = worldToScreen(visualHole);
+      return { x: pt.x + (CELL_PX * zoom) / 2, y: pt.y + (CELL_PX * zoom) / 2 };
+    }
+
     if (!port.hole) return { x: 0, y: 0 };
     const pt = worldToScreen(port.hole);
     // center of hole
@@ -2033,11 +2111,18 @@ export const WorkstationGrid = ({
               ...def,
               label: totalCount > 1 ? `${def.label} ${componentNumber}` : def.label,
             };
+            const visualPortOffsets = visualPortOffsetsByPlacedId.get(p.id);
 
             return (
               <LogicNode
                 key={p.id}
-                node={defWithNumber}
+                node={{
+                  ...defWithNumber,
+                  ports: def.ports.map((port) => ({
+                    ...port,
+                    offset: visualPortOffsets?.get(port.id) ?? port.offset,
+                  })),
+                }}
                 className={cn(
                   'absolute transition-[box-shadow,transform,border-color] duration-300',
                   bootSequenceActive && 'animate-in fade-in zoom-in-75',
@@ -2252,8 +2337,9 @@ export const WorkstationGrid = ({
                 {/* Port markers */}
                 {def.ports.map((port, portIndex) => {
                   const rot = rotateOffset(port.offset, def.size, p.rotation);
-                  const pl = rot.col * CELL_PX;
-                  const pt = rot.row * CELL_PX;
+                  const visualOffset = visualPortOffsets?.get(port.id) ?? rot;
+                  const pl = visualOffset.col * CELL_PX;
+                  const pt = visualOffset.row * CELL_PX;
 
                   const effective: PortAddress = {
                     ownerId: p.id,
