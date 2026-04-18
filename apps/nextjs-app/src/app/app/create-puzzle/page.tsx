@@ -35,6 +35,7 @@ import {
   type PlacedGridComponent,
   type SelectedComponentState,
 } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import { extractVisualStyleFromComponentLike } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
@@ -648,6 +649,7 @@ export default function CreatePuzzleForm() {
 
     const result = filtered.map((piece) => {
       const pieceMeta = piece as any;
+      const visualStyle = extractVisualStyleFromComponentLike(piece);
       // Parse structure to extract num_inputs and num_outputs
       let num_inputs = 1;
       let num_outputs = 1;
@@ -681,6 +683,7 @@ export default function CreatePuzzleForm() {
         structure_json: pieceMeta.structure_json,
         isArsenal: true,
         basic_gates: piece.basic_gates,
+        visual_style: visualStyle,
       };
     });
 
@@ -1197,6 +1200,7 @@ export default function CreatePuzzleForm() {
         cost: piece.cost,
         size: { w: 3, h: Math.max(piece.num_inputs, piece.num_outputs) },
         ports: ports,
+        visualStyle: extractVisualStyleFromComponentLike(piece),
       };
     }
 
@@ -1229,6 +1233,7 @@ export default function CreatePuzzleForm() {
         cost: piece.cost,
         size: { w: 3, h: Math.max(piece.num_inputs, piece.num_outputs) },
         ports: ports,
+        visualStyle: extractVisualStyleFromComponentLike(piece),
       };
     }
 

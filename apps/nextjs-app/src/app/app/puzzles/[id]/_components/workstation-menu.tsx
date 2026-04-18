@@ -2,8 +2,6 @@
 
 import { Info } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { createRoot } from 'react-dom/client';
 
 import {
   Dialog,
@@ -298,33 +296,10 @@ const DraggableItem = ({
         <div
           draggable
           onDragStart={(e) => {
-            const dragPreview = document.createElement('div');
-            dragPreview.style.position = 'fixed';
-            dragPreview.style.left = '-10000px';
-            dragPreview.style.top = '-10000px';
-            dragPreview.style.pointerEvents = 'none';
-            dragPreview.style.zIndex = '-1';
-            document.body.appendChild(dragPreview);
-
-            const root = createRoot(dragPreview);
-            flushSync(() => {
-              root.render(
-                <LogicNode
-                  node={node}
-                  className="border-border opacity-80 shadow-xl"
-                />,
-              );
-            });
-
-            e.dataTransfer.setDragImage(
-              dragPreview,
-              (node.size.w * 18) / 2,
-              (node.size.h * 18) / 2,
-            );
-            window.requestAnimationFrame(() => {
-              root.unmount();
-              dragPreview.remove();
-            });
+            const transparentDragImage = document.createElement('canvas');
+            transparentDragImage.width = 1;
+            transparentDragImage.height = 1;
+            e.dataTransfer.setDragImage(transparentDragImage, 0, 0);
             e.dataTransfer.setData(
               'application/x-escapecircuit-component',
               component.id,

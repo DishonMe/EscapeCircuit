@@ -35,6 +35,7 @@ import {
   type PlacedGridComponent,
   type SelectedComponentState,
 } from './workstation-grid';
+import { extractVisualStyleFromComponentLike } from './piece-visual-style';
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 const CircuitDebugger = dynamic(
@@ -829,6 +830,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     for (const [id, def] of componentCatalog.entries()) {
       // Arsenal pieces have custom sizing: width 4, height = max(inputs, outputs)
       const isArsenal = (def as any).is_arsenal === true;
+      const visualStyle = extractVisualStyleFromComponentLike(def);
+
 
       let size: { w: number; h: number };
       let ports: ComponentDef['ports'];
@@ -889,6 +892,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         cost: def.cost,
         size,
         ports,
+        visualStyle,
       });
     }
     return Object.fromEntries(Array.from(ui.entries())) as Record<
@@ -2255,6 +2259,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               onDebuggerSequenceChange={onInlineSequenceChange}
               onInspectComponent={setInspectingPlacedId}
               arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+              disableZoomPersistence
             />
           </div>
 
@@ -2595,6 +2600,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     boardRows={puzzle.board_rows ?? 15}
                     boardCols={puzzle.board_cols ?? 30}
                     onInspectComponent={setInspectingSandboxPlacedId}
+                    disableZoomPersistence
                   />
                 </div>
               </div>

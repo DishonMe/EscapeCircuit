@@ -33,6 +33,16 @@ import {
   type SelectedComponentState,
 } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { WorkstationMenu } from '@/app/app/puzzles/[id]/_components/workstation-menu';
+import {
+  LogicNode,
+  type LogicNodeDefinition,
+  type LogicNodePort,
+  type LogicNodeVisualStyle,
+} from '@/app/app/puzzles/[id]/_components/node';
+import {
+  DEFAULT_PIECE_VISUAL_STYLE,
+  extractVisualStyleFromComponentLike,
+} from '@/app/app/puzzles/[id]/_components/piece-visual-style';
 import dynamic from 'next/dynamic';
 const CircuitDebugger = dynamic(
   () =>
@@ -64,6 +74,61 @@ type SaveState =
   | { open: false }
   | { open: true; saving: boolean; error?: string };
 
+const buildPiecePreviewNode = ({
+  label,
+  numInputs,
+  numOutputs,
+  visualStyle,
+}: {
+  label: string;
+  numInputs: number;
+  numOutputs: number;
+  visualStyle?: LogicNodeVisualStyle;
+}): LogicNodeDefinition => {
+  const safeInputs = Math.max(0, Math.floor(numInputs));
+  const safeOutputs = Math.max(0, Math.floor(numOutputs));
+  const height = Math.max(1, safeInputs, safeOutputs);
+  const width = 3;
+
+  const ports: LogicNodePort[] = [];
+  for (let i = 0; i < safeInputs; i += 1) {
+    ports.push({
+      id: `in${i}`,
+      kind: 'input',
+      offset: { row: Math.min(i, height - 1), col: 0 },
+    });
+  }
+  for (let i = 0; i < safeOutputs; i += 1) {
+    ports.push({
+      id: `out${i}`,
+      kind: 'output',
+      offset: { row: Math.min(i, height - 1), col: width - 1 },
+    });
+  }
+
+  if (safeInputs !== safeOutputs && safeInputs > 0 && safeOutputs > 0) {
+    const lowerKind: 'input' | 'output' = safeInputs < safeOutputs ? 'input' : 'output';
+    const lowerPorts = ports
+      .filter((port) => port.kind === lowerKind)
+      .sort((a, b) => a.offset.row - b.offset.row);
+
+    lowerPorts.forEach((port, index) => {
+      const distributedRow = -0.5 + ((index + 1) * height) / (lowerPorts.length + 1);
+      port.offset = {
+        row: distributedRow,
+        col: port.offset.col,
+      };
+    });
+  }
+
+  return {
+    label: label.trim() || 'Unnamed Piece',
+    size: { w: width, h: height },
+    ports,
+    visualStyle,
+  };
+};
+
 export default function ArsenalCreatorPage() {
   const router = useRouter();
   const { addNotification } = useNotifications();
@@ -72,6 +137,9 @@ export default function ArsenalCreatorPage() {
   const [numOutputs, setNumOutputs] = useState(1);
   const [pieceName, setPieceName] = useState('');
   const [pieceDescription, setPieceDescription] = useState('');
+  const [pieceVisualStyle, setPieceVisualStyle] = useState<Required<LogicNodeVisualStyle>>(
+    DEFAULT_PIECE_VISUAL_STYLE,
+  );
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ open: false });
@@ -89,23 +157,45 @@ export default function ArsenalCreatorPage() {
   const saveArsenalMutation = useSaveArsenalPiece();
   const { data: myArsenalData } = useMyArsenal();
 
+  const hasCustomPieceVisualStyle = useMemo(() => {
+    return (
+      pieceVisualStyle.accentColor.toLowerCase() !==
+        DEFAULT_PIECE_VISUAL_STYLE.accentColor.toLowerCase() ||
+      pieceVisualStyle.roundness !== DEFAULT_PIECE_VISUAL_STYLE.roundness ||
+      pieceVisualStyle.borderStyle !== DEFAULT_PIECE_VISUAL_STYLE.borderStyle ||
+      pieceVisualStyle.edgeAddon !== DEFAULT_PIECE_VISUAL_STYLE.edgeAddon ||
+      pieceVisualStyle.surfaceStyle !== DEFAULT_PIECE_VISUAL_STYLE.surfaceStyle
+    );
+  }, [pieceVisualStyle]);
+
+  const saveDialogPreviewNode = useMemo(() => {
+    return buildPiecePreviewNode({
+      label: pieceName,
+      numInputs,
+      numOutputs,
+      visualStyle: hasCustomPieceVisualStyle ? pieceVisualStyle : undefined,
+    });
+  }, [pieceName, numInputs, numOutputs, hasCustomPieceVisualStyle, pieceVisualStyle]);
+
   // Convert arsenal pieces to CircuitComponent format
   const arsenalComponents = useMemo(() => {
     if (!myArsenalData) return [];
-    return myArsenalData.map(
-      (piece) =>
-        ({
-          id: String(piece.id),
-          type: piece.name,
-          cost: piece.cost,
-          pins: (piece as any).num_inputs + (piece as any).num_outputs,
-          basic_gates: piece.basic_gates,
-          truth_table: piece.truth_table,
-          is_arsenal: piece.is_arsenal,
-          num_inputs: (piece as any).num_inputs ?? 0,
-          num_outputs: (piece as any).num_outputs ?? 0,
-        }) as CircuitComponent,
-    );
+    return myArsenalData.map((piece) => {
+      const visualStyle = extractVisualStyleFromComponentLike(piece);
+
+      return {
+        id: String(piece.id),
+        type: piece.name,
+        cost: piece.cost,
+        pins: (piece as any).num_inputs + (piece as any).num_outputs,
+        basic_gates: piece.basic_gates,
+        truth_table: piece.truth_table,
+        is_arsenal: piece.is_arsenal,
+        num_inputs: (piece as any).num_inputs ?? 0,
+        num_outputs: (piece as any).num_outputs ?? 0,
+        visual_style: visualStyle,
+      } as CircuitComponent;
+    });
   }, [myArsenalData]);
   const inputs = useMemo(() => {
     return Array.from({ length: numInputs }, (_, i) => `in${i}`);
@@ -238,6 +328,8 @@ export default function ArsenalCreatorPage() {
     for (const [id, def] of componentCatalog.entries()) {
       const hc = hardcoded[def.type];
       const isArsenal = (def as any).is_arsenal === true;
+      const visualStyle = extractVisualStyleFromComponentLike(def);
+
 
       let size: { w: number; h: number };
       let ports: Array<{
@@ -289,6 +381,7 @@ export default function ArsenalCreatorPage() {
         cost: def.cost,
         size,
         ports,
+        visualStyle,
       });
     }
     return Object.fromEntries(Array.from(ui.entries())) as Record<
@@ -359,17 +452,23 @@ export default function ArsenalCreatorPage() {
     try {
       const { gates, usedArsenalPieceIds } = extractGatesAndArsenal();
 
+      const structurePayload: Record<string, unknown> = {
+        numInputs,
+        numOutputs,
+        placed,
+        wires,
+      };
+
+      if (hasCustomPieceVisualStyle) {
+        structurePayload.visualStyle = pieceVisualStyle;
+      }
+
       const savePayload = {
         name: pieceName.trim(),
         description: pieceDescription.trim(),
         num_inputs: numInputs,
         num_outputs: numOutputs,
-        structure_json: JSON.stringify({
-          numInputs,
-          numOutputs,
-          placed,
-          wires,
-        }),
+        structure_json: JSON.stringify(structurePayload),
         basic_gates: JSON.stringify(gates),
         truth_table: {},
         used_arsenal_pieces: usedArsenalPieceIds,
@@ -385,6 +484,7 @@ export default function ArsenalCreatorPage() {
 
       setShowNameDialog(false);
       setPieceDescription('');
+      setPieceVisualStyle(DEFAULT_PIECE_VISUAL_STYLE);
       setSaveState({ open: false });
       router.push(paths.app.arsenal.root.getHref());
     } catch (error: any) {
@@ -560,6 +660,124 @@ export default function ArsenalCreatorPage() {
                   A description is required for Arsenal components.
                 </p>
               )}
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
+              <p className="mb-2 text-[13px] font-medium text-foreground">Piece Preview</p>
+              <div className="rounded-md border border-border/60 bg-background/80 p-4">
+                <div className="flex items-center justify-center">
+                  <LogicNode node={saveDialogPreviewNode} cellPx={22} portPx={8} />
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-foreground/80">
+                  <div className="rounded border border-border/50 bg-card px-2 py-1">
+                    <span className="text-foreground/60">Name:</span> {saveDialogPreviewNode.label}
+                  </div>
+                  <div className="rounded border border-border/50 bg-card px-2 py-1">
+                    <span className="text-foreground/60">Inputs:</span> {numInputs}
+                  </div>
+                  <div className="rounded border border-border/50 bg-card px-2 py-1">
+                    <span className="text-foreground/60">Outputs:</span> {numOutputs}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
+              <p className="mb-2 text-[13px] font-medium text-foreground">Piece Look</p>
+              <div className="grid grid-cols-2 gap-2 text-[12px]">
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                  Accent
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={pieceVisualStyle.accentColor}
+                      onChange={(e: any) =>
+                        setPieceVisualStyle((prev) => ({
+                          ...prev,
+                          accentColor: e.target.value,
+                        }))
+                      }
+                      className="h-8 w-10 cursor-pointer rounded border border-border bg-card p-1"
+                    />
+                    <span className="font-mono text-[11px] text-foreground">{pieceVisualStyle.accentColor}</span>
+                  </div>
+                </label>
+
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                  Roundness
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={pieceVisualStyle.roundness}
+                    onChange={(e: any) =>
+                      setPieceVisualStyle((prev) => ({
+                        ...prev,
+                        roundness: Number(e.target.value),
+                      }))
+                    }
+                    className="h-8"
+                  />
+                  <span className="text-[11px] text-foreground/75">{pieceVisualStyle.roundness} / 10</span>
+                </label>
+
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                  Border
+                  <select
+                    value={pieceVisualStyle.borderStyle}
+                    onChange={(e: any) =>
+                      setPieceVisualStyle((prev) => ({
+                        ...prev,
+                        borderStyle: e.target.value,
+                      }))
+                    }
+                    className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                  >
+                    <option value="solid">Solid</option>
+                    <option value="double">Double</option>
+                    <option value="etched">Etched</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                  Edge Add-on
+                  <select
+                    value={pieceVisualStyle.edgeAddon}
+                    onChange={(e: any) =>
+                      setPieceVisualStyle((prev) => ({
+                        ...prev,
+                        edgeAddon: e.target.value,
+                      }))
+                    }
+                    className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                  >
+                    <option value="none">None</option>
+                    <option value="chip-legs">Chip Legs</option>
+                  </select>
+                </label>
+
+                <label className="col-span-2 flex flex-col gap-1 text-muted-foreground">
+                  Surface
+                  <select
+                    value={pieceVisualStyle.surfaceStyle}
+                    onChange={(e: any) =>
+                      setPieceVisualStyle((prev) => ({
+                        ...prev,
+                        surfaceStyle: e.target.value,
+                      }))
+                    }
+                    className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                  >
+                    <option value="flat">Flat</option>
+                    <option value="brushed">Brushed</option>
+                    <option value="gradient">Gradient</option>
+                    <option value="matte">Matte</option>
+                    <option value="glass">Glass</option>
+                    <option value="carbon">Carbon</option>
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="bg-secondary/50 p-3 rounded-lg text-[13px] space-y-1">
