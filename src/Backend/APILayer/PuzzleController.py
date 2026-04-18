@@ -298,6 +298,18 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
         if isinstance(rating_distribution, dict):
             puzzle_payload["rating_distribution"] = rating_distribution
 
+        # Frontend rating chips read from a nested `rating_metrics` object —
+        # mirror the flat fields into that shape so they render after a rating.
+        puzzle_payload["rating_metrics"] = {
+            "count": metrics.get("count", 0),
+            "avg_difficulty": metrics.get("avg_difficulty"),
+            "weighted_difficulty": metrics.get("weighted_difficulty"),
+            "avg_fun": metrics.get("avg_fun"),
+            "avg_clearness": metrics.get("avg_clearness"),
+            "rating_distribution": rating_distribution,
+            "experienced_metrics": metrics.get("experienced_metrics"),
+        }
+
 
     @router.get("")
     def browse(

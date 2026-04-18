@@ -38,14 +38,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(appUrl);
   }
 
-  // If trying to access a protected route without a token, redirect to login
+  // If trying to access a protected route without a token, send the user to
+  // the public home page (not the login form). The login form, when reached
+  // through a redirect with a `redirectTo` query, has historically failed to
+  // submit cleanly; the home page has working "Log in" / "Register" CTAs.
   if (!isPublicRoute && !hasAuthToken) {
-    const loginUrl = new URL('/auth/login', request.url);
-    // Add redirectTo parameter to return user to original page after login
-    loginUrl.searchParams.set('redirectTo', pathname);
-    // Add reason parameter for notification
-    loginUrl.searchParams.set('reason', 'unauthorized');
-    return NextResponse.redirect(loginUrl);
+    const homeUrl = new URL('/', request.url);
+    homeUrl.searchParams.set('reason', 'unauthorized');
+    return NextResponse.redirect(homeUrl);
   }
 
   return NextResponse.next();
