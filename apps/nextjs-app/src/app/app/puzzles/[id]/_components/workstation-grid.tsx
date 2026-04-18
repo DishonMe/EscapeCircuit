@@ -15,7 +15,7 @@ import { useAudio } from '@/hooks/useAudio';
 import { useSettings } from '@/context/settings-context';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
-import { LogicNode } from './node';
+import { LogicNode, type LogicNodeVisualStyle } from './node';
 
 export type HoleCoord = { row: number; col: number };
 
@@ -34,6 +34,7 @@ export type ComponentDef = {
   cost: number;
   size: { w: number; h: number };
   ports: PortDef[];
+  visualStyle?: LogicNodeVisualStyle;
 };
 
 export type PlacedGridComponent = {
@@ -59,6 +60,7 @@ export type SelectedComponentState =
 const DEFAULT_GRID_ROWS = 15;
 const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
+const PUZZLE_IO_Y_OFFSET_PX = 20;
 
 // Visual Feature: Dynamic Wire Coloring
 const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316']; 
@@ -85,6 +87,60 @@ const rotateOffset = (
 
 const rotatedSize = (size: { w: number; h: number }, rotation: 0 | 90) => {
   return rotation === 0 ? size : { w: size.h, h: size.w };
+};
+
+const getVisualPortOffsets = (
+  def: ComponentDef,
+  rotation: 0 | 90,
+): Map<string, HoleCoord> => {
+  const result = new Map<string, HoleCoord>();
+
+  for (const port of def.ports) {
+    result.set(port.id, rotateOffset(port.offset, def.size, rotation));
+  }
+
+  const grouped: Record<PortKind, Array<{ port: PortDef; index: number }>> = {
+    input: [],
+    output: [],
+  };
+
+  def.ports.forEach((port, index) => {
+    grouped[port.kind].push({ port, index });
+  });
+
+  const inputCount = grouped.input.length;
+  const outputCount = grouped.output.length;
+
+  if (inputCount === outputCount || inputCount === 0 || outputCount === 0) {
+    return result;
+  }
+
+  const lowerKind: PortKind = inputCount < outputCount ? 'input' : 'output';
+  const lowerPorts = grouped[lowerKind].sort(
+    (a, b) =>
+      a.port.offset.row - b.port.offset.row ||
+      a.port.offset.col - b.port.offset.col ||
+      a.index - b.index,
+  );
+
+  const componentHeight = Math.max(1, def.size.h);
+
+  lowerPorts.forEach(({ port }, index) => {
+    const distributedRow =
+      -0.5 +
+      ((index + 1) * componentHeight) / (lowerPorts.length + 1);
+
+    result.set(
+      port.id,
+      rotateOffset(
+        { row: distributedRow, col: port.offset.col },
+        def.size,
+        rotation,
+      ),
+    );
+  });
+
+  return result;
 };
 
 const inRect = (
@@ -146,6 +202,7 @@ export const WorkstationGrid = ({
   onInspectComponent,
   isEditMode = false,
   viewportClassName,
+  disableZoomPersistence = false,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -178,6 +235,7 @@ export const WorkstationGrid = ({
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
   viewportClassName?: string;
+  disableZoomPersistence?: boolean;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -544,9 +602,12 @@ export const WorkstationGrid = ({
   const previousWireIdsRef = useRef<string[]>(wires.map((wire) => wire.id));
 
   const STORAGE_KEY = `escapecircuit.workstation.grid.v1:${puzzleId}`;
+  const shouldPersistZoom = !disableZoomPersistence;
 
   // Load/save view state.
   useEffect(() => {
+    if (!shouldPersistZoom) return;
+
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       let hasSavedZoom = false;
@@ -576,15 +637,17 @@ export const WorkstationGrid = ({
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY, gridCols, gridRows]);
+  }, [STORAGE_KEY, gridCols, gridRows, shouldPersistZoom]);
 
   useEffect(() => {
+    if (!shouldPersistZoom) return;
+
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ zoom }));
     } catch {
       // ignore
     }
-  }, [STORAGE_KEY, zoom]);
+  }, [STORAGE_KEY, zoom, shouldPersistZoom]);
 
   useEffect(() => {
     const previousPlacedIds = previousPlacedIdsRef.current;
@@ -654,7 +717,7 @@ export const WorkstationGrid = ({
       return { x: panX, y: panY };
     };
 
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = shouldPersistZoom ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) {
       const fit = updateFit();
       setZoom(fit);
@@ -678,7 +741,7 @@ export const WorkstationGrid = ({
 
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [STORAGE_KEY, gridCols, gridRows]);
+  }, [STORAGE_KEY, gridCols, gridRows, shouldPersistZoom]);
 
   const componentRects = useMemo(() => {
     return placed
@@ -699,6 +762,16 @@ export const WorkstationGrid = ({
     for (const p of placed) map[p.id] = p;
     return map;
   }, [placed]);
+
+  const visualPortOffsetsByPlacedId = useMemo(() => {
+    const map = new Map<string, Map<string, HoleCoord>>();
+    for (const p of placed) {
+      const def = catalog[p.componentId];
+      if (!def) continue;
+      map.set(p.id, getVisualPortOffsets(def, p.rotation));
+    }
+    return map;
+  }, [catalog, placed]);
 
   const portIndexByPortId = useMemo(() => {
     const map = new Map<string, Map<string, number>>();
@@ -764,6 +837,33 @@ export const WorkstationGrid = ({
     }
     return occ;
   }, [allPorts]);
+
+  const staleLogicalPortHoleKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    for (const p of placed) {
+      const def = catalog[p.componentId];
+      if (!def) continue;
+
+      const visualOffsets = visualPortOffsetsByPlacedId.get(p.id);
+      if (!visualOffsets) continue;
+
+      for (const port of def.ports) {
+        const logicalOffset = rotateOffset(port.offset, def.size, p.rotation);
+        const visualOffset = visualOffsets.get(port.id) ?? logicalOffset;
+
+        if (
+          visualOffset.row !== logicalOffset.row ||
+          visualOffset.col !== logicalOffset.col
+        ) {
+          const key = `r${p.origin.row + logicalOffset.row}c${p.origin.col + logicalOffset.col}`;
+          keys.add(key);
+        }
+      }
+    }
+
+    return keys;
+  }, [catalog, placed, visualPortOffsetsByPlacedId]);
 
   const worldToScreen = (hole: HoleCoord) => {
     const x = pan.x + hole.col * CELL_PX * zoom;
@@ -911,11 +1011,27 @@ export const WorkstationGrid = ({
 
   const getPortScreenPoint = (port: PortAddress, ioLayout: IOLayout) => {
     if (port.ownerId.startsWith('IO:IN:')) {
-      return ioLayout.inputs[port.ownerId] ?? { x: 0, y: 0 };
+      const pt = ioLayout.inputs[port.ownerId] ?? { x: 0, y: 0 };
+      return { x: pt.x, y: pt.y + PUZZLE_IO_Y_OFFSET_PX };
     }
     if (port.ownerId.startsWith('IO:OUT:')) {
-      return ioLayout.outputs[port.ownerId] ?? { x: 0, y: 0 };
+      const pt = ioLayout.outputs[port.ownerId] ?? { x: 0, y: 0 };
+      return { x: pt.x, y: pt.y + PUZZLE_IO_Y_OFFSET_PX };
     }
+
+    const placedInst = placedById[port.ownerId];
+    const visualOffsets = visualPortOffsetsByPlacedId.get(port.ownerId);
+    const visualOffset = visualOffsets?.get(port.portId);
+
+    if (placedInst && visualOffset) {
+      const visualHole = {
+        row: placedInst.origin.row + visualOffset.row,
+        col: placedInst.origin.col + visualOffset.col,
+      };
+      const pt = worldToScreen(visualHole);
+      return { x: pt.x + (CELL_PX * zoom) / 2, y: pt.y + (CELL_PX * zoom) / 2 };
+    }
+
     if (!port.hole) return { x: 0, y: 0 };
     const pt = worldToScreen(port.hole);
     // center of hole
@@ -1945,6 +2061,7 @@ export const WorkstationGrid = ({
                   const key = `r${r}c${c}`;
                   const occ = occupiedHoles.get(key);
                   const portOcc = occupiedPortHoles.get(key);
+                  const showPortOcc = Boolean(portOcc) && !staleLogicalPortHoleKeys.has(key);
 
                   const left = c * CELL_PX;
                   const top = r * CELL_PX;
@@ -1965,7 +2082,7 @@ export const WorkstationGrid = ({
                       <button
                         className={cn(
                           'rounded-full transition-colors',
-                          portOcc
+                          showPortOcc
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-muted-foreground/50'
@@ -2026,11 +2143,18 @@ export const WorkstationGrid = ({
               ...def,
               label: totalCount > 1 ? `${def.label} ${componentNumber}` : def.label,
             };
+            const visualPortOffsets = visualPortOffsetsByPlacedId.get(p.id);
 
             return (
               <LogicNode
                 key={p.id}
-                node={defWithNumber}
+                node={{
+                  ...defWithNumber,
+                  ports: def.ports.map((port) => ({
+                    ...port,
+                    offset: visualPortOffsets?.get(port.id) ?? port.offset,
+                  })),
+                }}
                 className={cn(
                   'absolute transition-[box-shadow,transform,border-color] duration-300',
                   bootSequenceActive && 'animate-in fade-in zoom-in-75',
@@ -2245,8 +2369,9 @@ export const WorkstationGrid = ({
                 {/* Port markers */}
                 {def.ports.map((port, portIndex) => {
                   const rot = rotateOffset(port.offset, def.size, p.rotation);
-                  const pl = rot.col * CELL_PX;
-                  const pt = rot.row * CELL_PX;
+                  const visualOffset = visualPortOffsets?.get(port.id) ?? rot;
+                  const pl = visualOffset.col * CELL_PX;
+                  const pt = visualOffset.row * CELL_PX;
 
                   const effective: PortAddress = {
                     ownerId: p.id,
@@ -2330,9 +2455,16 @@ export const WorkstationGrid = ({
                   ? selectedComponent.rotation
                   : 0;
               const size = rotatedSize(def.size, rotation);
+              const previewVisualPortOffsets = getVisualPortOffsets(def, rotation);
               return (
                 <LogicNode
-                  node={def}
+                  node={{
+                    ...def,
+                    ports: def.ports.map((port) => ({
+                      ...port,
+                      offset: previewVisualPortOffsets.get(port.id) ?? port.offset,
+                    })),
+                  }}
                   className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
                   style={{
                     left: dropPreview.col * 18,
@@ -2394,7 +2526,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(-100%, calc(-50% + 20px))',
+                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -2464,7 +2596,7 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: 'translate(0%, calc(-50% + 20px))',
+                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
