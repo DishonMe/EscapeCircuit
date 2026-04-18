@@ -163,6 +163,7 @@ export type Puzzle = Entity<{
   can_rate?: boolean;
   rating_min_attempt_seconds?: number;
   best_time?: number | null;
+  first_solved_at?: string | null;
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
   is_saved?: boolean; // Whether user has saved this puzzle
