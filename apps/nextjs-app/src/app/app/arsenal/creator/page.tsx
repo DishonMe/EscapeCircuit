@@ -13,7 +13,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { paths } from '@/config/paths';
+
+const INPUT_COUNT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({
+  value: n,
+  label: String(n),
+}));
+const OUTPUT_COUNT_OPTIONS = [1, 2, 3].map((n) => ({
+  value: n,
+  label: String(n),
+}));
 import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
 import { CircuitComponent, Wire } from '@/types/api';
 import {
@@ -35,8 +45,18 @@ import {
 } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
 import dynamic from 'next/dynamic';
 const CircuitDebugger = dynamic(
-  () => import('@/components/circuit-debugger').then(mod => ({ default: mod.CircuitDebugger })),
-  { ssr: false, loading: () => <div className="flex items-center justify-center p-8 text-muted-foreground">Loading debugger...</div> }
+  () =>
+    import('@/components/circuit-debugger').then((mod) => ({
+      default: mod.CircuitDebugger,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-8 text-muted-foreground">
+        Loading debugger...
+      </div>
+    ),
+  },
 );
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
@@ -126,9 +146,10 @@ export default function ArsenalCreatorPage() {
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
-  const [selectedComponent, setSelectedComponent] = useState<SelectedComponentState>({
-    mode: 'none',
-  });
+  const [selectedComponent, setSelectedComponent] =
+    useState<SelectedComponentState>({
+      mode: 'none',
+    });
   const [draggedPaletteComponentId, setDraggedPaletteComponentId] = useState<
     string | null
   >(null);
@@ -308,19 +329,28 @@ export default function ArsenalCreatorPage() {
       const hc = hardcoded[def.type];
       const isArsenal = (def as any).is_arsenal === true;
       const visualStyle = extractVisualStyleFromComponentLike(def);
-      
+
+
       let size: { w: number; h: number };
-      let ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }>;
-      
+      let ports: Array<{
+        id: string;
+        kind: 'input' | 'output';
+        offset: { row: number; col: number };
+      }>;
+
       if (isArsenal) {
         // Arsenal piece sizing: width=3, height=max(inputs, outputs)
         const numInputs = (def as any).num_inputs ?? 0;
         const numOutputs = (def as any).num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
         size = { w: 3, h: Math.max(1, maxPorts) };
-        
+
         // Generate ports for arsenal pieces
-        const ports_list: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        const ports_list: Array<{
+          id: string;
+          kind: 'input' | 'output';
+          offset: { row: number; col: number };
+        }> = [];
         for (let i = 0; i < numInputs; i++) {
           ports_list.push({
             id: `in${i}`,
@@ -344,7 +374,7 @@ export default function ArsenalCreatorPage() {
         };
         ports = hc?.ports ?? toDefaultPorts(def.pins, size);
       }
-      
+
       ui.set(id, {
         id,
         label: def.type,
@@ -372,7 +402,7 @@ export default function ArsenalCreatorPage() {
   const extractGatesAndArsenal = useCallback(() => {
     const gates: string[] = [];
     const usedArsenalPieceIds: number[] = [];
-    
+
     for (const p of placed) {
       const def = componentCatalog.get(p.componentId);
       if (def) {
@@ -461,7 +491,9 @@ export default function ArsenalCreatorPage() {
       setSaveState({
         open: true,
         saving: false,
-        error: error?.response?.data?.detail || 'Failed to save arsenal piece. Please check your circuit and try again.',
+        error:
+          error?.response?.data?.detail ||
+          'Failed to save arsenal piece. Please check your circuit and try again.',
       });
       // Error notification handled automatically by API client
     }
@@ -475,35 +507,46 @@ export default function ArsenalCreatorPage() {
     <div className="flex flex-col h-full gap-2">
       {/* Header + Compact Config Bar */}
       <div className="flex flex-wrap items-center gap-4 px-6 pt-3 pb-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Create Arsenal Piece 🛠️</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          Create Arsenal Piece
+        </h1>
 
         <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
-          <span className="text-[12px] font-medium text-muted-foreground">Inputs</span>
-          <select
+          <span className="text-[12px] font-medium text-muted-foreground">
+            Inputs
+          </span>
+          <StyledSelect
+            aria-label="Number of inputs"
+            className="h-7 w-16 px-2 text-[12px]"
             value={numInputs}
-            onChange={(e: any) => setNumInputs(parseInt(e.target.value))}
-            className="border border-border rounded bg-card text-foreground px-1.5 py-0.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-          <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
-          <select
+            onValueChange={(v) => setNumInputs(v)}
+            options={INPUT_COUNT_OPTIONS}
+          />
+          <span className="text-[12px] font-medium text-muted-foreground">
+            Outputs
+          </span>
+          <StyledSelect
+            aria-label="Number of outputs"
+            className="h-7 w-16 px-2 text-[12px]"
             value={numOutputs}
-            onChange={(e: any) => setNumOutputs(parseInt(e.target.value))}
-            className="border border-border rounded bg-card text-foreground px-1.5 py-0.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            {[1, 2, 3].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+            onValueChange={(v) => setNumOutputs(v)}
+            options={OUTPUT_COUNT_OPTIONS}
+          />
         </div>
 
         <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
-          <span className="text-muted-foreground">Components: <span className="font-medium text-foreground">{placed.length}</span></span>
-          <span className="text-muted-foreground">Cost: <span className="font-medium text-foreground">{currentCost}</span></span>
-          <span className="text-muted-foreground">Wires: <span className="font-medium text-foreground">{wires.length}</span></span>
+          <span className="text-muted-foreground">
+            Components:{' '}
+            <span className="font-medium text-foreground">{placed.length}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Cost:{' '}
+            <span className="font-medium text-foreground">{currentCost}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Wires:{' '}
+            <span className="font-medium text-foreground">{wires.length}</span>
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -523,7 +566,12 @@ export default function ArsenalCreatorPage() {
           </Button>
         </div>
 
-        <Button variant="outline" size="sm" className="ml-auto" onClick={() => router.push(paths.app.arsenal.root.getHref())}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={() => router.push(paths.app.arsenal.root.getHref())}
+        >
           Back to Arsenal
         </Button>
       </div>
@@ -538,7 +586,9 @@ export default function ArsenalCreatorPage() {
           allowArsenal={true}
           filteredBasicTypes={[]}
           selectedComponentId={
-            selectedComponent.mode === 'placing' ? selectedComponent.componentId : undefined
+            selectedComponent.mode === 'placing'
+              ? selectedComponent.componentId
+              : undefined
           }
           onSelectComponent={(componentId) =>
             setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
@@ -568,12 +618,16 @@ export default function ArsenalCreatorPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save Arsenal Piece</DialogTitle>
-            <DialogDescription>Give your custom logic piece a unique name and description.</DialogDescription>
+            <DialogDescription>
+              Give your custom logic piece a unique name and description.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-[13px] font-medium text-foreground block mb-2">Piece Name</label>
+              <label className="text-[13px] font-medium text-foreground block mb-2">
+                Piece Name
+              </label>
               <input
                 type="text"
                 value={pieceName}
@@ -581,7 +635,12 @@ export default function ArsenalCreatorPage() {
                 placeholder="Enter piece name (must be unique)"
                 className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e: any) => {
-                  if (e.key === 'Enter' && pieceName.trim() && pieceDescription.trim()) handleSave();
+                  if (
+                    e.key === 'Enter' &&
+                    pieceName.trim() &&
+                    pieceDescription.trim()
+                  )
+                    handleSave();
                 }}
               />
             </div>
@@ -597,7 +656,9 @@ export default function ArsenalCreatorPage() {
                 className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none h-20"
               />
               {!pieceDescription.trim() && (
-                <p className="text-[11px] text-red-600 mt-1">A description is required for Arsenal components.</p>
+                <p className="text-[11px] text-red-600 mt-1">
+                  A description is required for Arsenal components.
+                </p>
               )}
             </div>
 
@@ -721,16 +782,20 @@ export default function ArsenalCreatorPage() {
 
             <div className="bg-secondary/50 p-3 rounded-lg text-[13px] space-y-1">
               <p>
-                <span className="text-muted-foreground">Inputs:</span> {numInputs}
+                <span className="text-muted-foreground">Inputs:</span>{' '}
+                {numInputs}
               </p>
               <p>
-                <span className="text-muted-foreground">Outputs:</span> {numOutputs}
+                <span className="text-muted-foreground">Outputs:</span>{' '}
+                {numOutputs}
               </p>
               <p>
-                <span className="text-muted-foreground">Cost:</span> {currentCost}
+                <span className="text-muted-foreground">Cost:</span>{' '}
+                {currentCost}
               </p>
               <p>
-                <span className="text-muted-foreground">Components:</span> {placed.length}
+                <span className="text-muted-foreground">Components:</span>{' '}
+                {placed.length}
               </p>
             </div>
           </div>
@@ -748,7 +813,11 @@ export default function ArsenalCreatorPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saveState.open && saveState.saving || !pieceName.trim() || !pieceDescription.trim()}
+              disabled={
+                (saveState.open && saveState.saving) ||
+                !pieceName.trim() ||
+                !pieceDescription.trim()
+              }
             >
               {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
             </Button>

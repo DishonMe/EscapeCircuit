@@ -23,6 +23,21 @@ import json
 from fastapi import UploadFile, File, Form
 
 
+def _validation_error_to_http_status(error: ValidationError) -> int:
+    message = str(error).strip().lower()
+    if message in {
+        "unauthorized",
+        "missing authorization header",
+        "invalid authorization header format",
+        "invalid token",
+        "session expired",
+    }:
+        return 401
+    if "not found" in message:
+        return 404
+    return 400
+
+
 class CreatePuzzleReq(BaseModel):
     name: str = "" # maps to title
     title: str = "" # also accept title directly

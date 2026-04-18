@@ -20,8 +20,8 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const hasShownNotificationRef = useRef(false);
   const isLoginPage = pathname === paths.auth.login.getHref();
   const title = isLoginPage
-    ? 'Log in to your account 🔐'
-    : 'Register your account ✍️';
+    ? 'Log in to your account'
+    : 'Register your account';
 
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirectTo');
@@ -36,7 +36,8 @@ export const AuthLayout = ({ children }: LayoutProps) => {
         const token = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
         if (token) {
           // Verify the token is still valid with the API
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const apiUrl =
+            process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
           const res = await fetch(`${apiUrl}/users/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -64,7 +65,7 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   useEffect(() => {
     if (!hasShownNotificationRef.current && reason && hasCheckedToken) {
       hasShownNotificationRef.current = true;
-      
+
       if (reason === 'unauthorized') {
         addNotification({
           type: 'info',
@@ -91,10 +92,7 @@ export const AuthLayout = ({ children }: LayoutProps) => {
     <div className="flex min-h-screen flex-col justify-center bg-background py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <Link
-            className="flex items-center"
-            href={paths.home.getHref()}
-          >
+          <Link className="flex items-center" href={paths.home.getHref()}>
             <img className="h-20 w-20" src="/logo.svg" alt="Workflow" />
           </Link>
         </div>

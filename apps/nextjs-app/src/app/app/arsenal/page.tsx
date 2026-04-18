@@ -2,8 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Swords, Plus, HelpCircle, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/page-hero/page-hero';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +26,10 @@ import {
 } from '@/features/arsenal/api';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { PlacedGridComponent, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type {
+  PlacedGridComponent,
+  ComponentDef,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import {
   LogicNode,
   type LogicNodeDefinition,
@@ -38,6 +43,7 @@ import {
 import type { Wire } from '@/types/api';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { arsenalTourSteps } from '@/config/tourSteps';
+import { cn } from '@/utils/cn';
 
 const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [
   [2, 5],
@@ -163,10 +169,12 @@ export default function ArsenalPage() {
     DEFAULT_PIECE_VISUAL_STYLE,
   );
   const [deletingPieceId, setDeletingPieceId] = useState<number | null>(null);
+  const [showEmptyTourDialog, setShowEmptyTourDialog] = useState(false);
+  const [highlightCreate, setHighlightCreate] = useState(false);
 
   const handleDelete = async (piece: ArsenalPiece) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${piece.name}"? This action cannot be undone.`
+      `Are you sure you want to delete "${piece.name}"? This action cannot be undone.`,
     );
     if (!confirmed) return;
 
@@ -281,7 +289,9 @@ export default function ArsenalPage() {
       gates.forEach((gate) => {
         counts[gate] = (counts[gate] || 0) + 1;
       });
-      return Object.entries(counts).map(([gate, count]) => `${gate}${count > 1 ? ` x${count}` : ''}`);
+      return Object.entries(counts).map(
+        ([gate, count]) => `${gate}${count > 1 ? ` x${count}` : ''}`,
+      );
     } catch {
       return [];
     }
@@ -309,28 +319,23 @@ export default function ArsenalPage() {
   const maxSlots = calculateArsenalSlots(level);
 
   return (
-    <>
-      <PageTourLauncher
-        tourName="arsenal"
-        pageTitle="My Arsenal"
-        pageDescription="Explore your saved custom pieces, preview them, and manage actions like rename or delete."
-        steps={arsenalTourSteps}
-        side="left"
-      />
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Arsenal 🧰</h1>
-            <div className="flex items-center gap-1 text-foreground/85">
-              <span>
-                {isAdmin
-                  ? `Custom logic pieces you've created (${pieces.length}/Unlimited - Admin)`
-                  : `Custom logic pieces you've created (${pieces.length}/${maxSlots})`}
-              </span>
+    <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
+      <PageHero
+        badge="Custom logic"
+        icon={Swords}
+        title="My Arsenal"
+        description="Build, preview, and refine the reusable circuit pieces you've crafted. Your toolkit grows as you level up."
+        metaSlot={
+          <div className="flex flex-wrap items-center gap-2 text-[12px]">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-3 py-1 font-mono text-muted-foreground backdrop-blur">
+              {isAdmin
+                ? `${pieces.length} / Unlimited`
+                : `${pieces.length} / ${maxSlots} slots`}
               {!isAdmin && (
                 <InfoPopup>
-                  <p className="font-medium text-foreground mb-1">Arsenal Capacity</p>
+                  <p className="font-medium text-foreground mb-1">
+                    Arsenal Capacity
+                  </p>
                   <p>Your arsenal slots increase as you level up:</p>
                   <ul className="mt-1 space-y-0.5 list-disc list-inside">
                     <li>Level 1-2: 5 slots</li>
@@ -341,353 +346,461 @@ export default function ArsenalPage() {
                   </ul>
                 </InfoPopup>
               )}
-            </div>
+            </span>
+            {isAdmin && (
+              <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-semibold uppercase tracking-wide text-primary">
+                Admin
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
-              + Create New Piece
+        }
+        rightSlot={
+          <div className="flex flex-col items-stretch gap-3 sm:items-end">
+            {pieces.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowEmptyTourDialog(true)}
+                aria-label="Start My Arsenal tutorial"
+                className="group inline-flex h-auto items-center gap-2 rounded-full border border-border/70 bg-card/70 px-4 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/10 hover:shadow-md"
+              >
+                <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors group-hover:bg-primary/25">
+                  <HelpCircle className="size-4" />
+                </span>
+                Take a tour
+              </button>
+            ) : (
+              <PageTourLauncher
+                tourName="arsenal"
+                pageTitle="My Arsenal"
+                pageDescription="Explore your saved custom pieces, preview them, and manage actions like rename or delete."
+                steps={arsenalTourSteps}
+                floating={false}
+                inlineLabel="Take a tour"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => router.push(paths.app.arsenal.creator.getHref())}
+              className={cn(
+                'group inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-primary/80 px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:shadow-xl hover:shadow-primary/30 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                highlightCreate &&
+                  'ring-2 ring-primary/60 ring-offset-2 ring-offset-background animate-pulse',
+              )}
+            >
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary-foreground/20 transition-transform group-hover:rotate-90">
+                <Plus className="size-4" />
+              </span>
+              Create New Piece
+            </button>
+          </div>
+        }
+      />
+
+        {/* Arsenal Grid */}
+        {pieces.length === 0 ? (
+          <div className="text-center py-12 bg-card rounded-lg border border-border/70">
+            <p className="text-foreground/80 mb-4">No arsenal pieces yet</p>
+            <Button
+              onClick={() => router.push(paths.app.arsenal.creator.getHref())}
+            >
+              Create Your First Piece
             </Button>
           </div>
-      </div>
-
-      {/* Arsenal Grid */}
-      {pieces.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-lg border border-border/70">
-          <p className="text-foreground/80 mb-4">No arsenal pieces yet</p>
-          <Button onClick={() => router.push(paths.app.arsenal.creator.getHref())}>
-            Create Your First Piece
-          </Button>
-        </div>
-      ) : (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full tour-arsenal-list">
-              <thead className="bg-muted/70">
-                <tr>
-                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">Name</th>
-                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      Cost
-                      <InfoPopup>
-                        <p className="font-medium text-foreground mb-1">Piece Cost</p>
-                        <p>The total gate cost when this piece is used in a puzzle. Counts toward the puzzle's budget limit.</p>
-                      </InfoPopup>
-                    </span>
-                  </th>
-                  <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">Basic Gates</th>
-                  <th className="px-6 py-3 text-right text-[13px] font-semibold text-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {pieces.map((piece) => (
-                  <tr key={piece.id} className="hover:bg-muted/50">
-                    <td className="px-6 py-4 font-medium text-foreground">{piece.name}</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-secondary text-foreground px-2 py-1 rounded-md text-[13px] font-medium">
-                        {piece.cost}
+        ) : (
+          <div className="bg-card rounded-lg border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full tour-arsenal-list">
+                <thead className="bg-muted/70">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        Cost
+                        <InfoPopup>
+                          <p className="font-medium text-foreground mb-1">
+                            Piece Cost
+                          </p>
+                          <p>
+                            The total gate cost when this piece is used in a
+                            puzzle. Counts toward the puzzle's budget limit.
+                          </p>
+                        </InfoPopup>
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-[13px] text-foreground/80">
-                      {parseBasicGates(piece.basic_gates).join(', ') || 'None'}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2 tour-arsenal-actions">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPiece(piece);
-                          setShowPreview(true);
-                        }}
-                        className="tour-arsenal-preview"
-                      >
-                        Preview
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDesign(piece)}
-                      >
-                        Design
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRename(piece)}
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(piece)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
+                    </th>
+                    <th className="px-6 py-3 text-left text-[13px] font-semibold text-foreground">
+                      Basic Gates
+                    </th>
+                    <th className="px-6 py-3 text-right text-[13px] font-semibold text-foreground">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {/* Delete Confirmation Dialog */}
-      {/* Using native window.confirm for delete confirmation */}
-
-      {/* Rename Dialog */}
-      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Arsenal Piece</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this arsenal piece.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-[13px] font-medium text-foreground">New Name</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e: any) => setNewName(e.target.value)}
-                placeholder="Enter new name"
-                className="w-full mt-1 border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                onKeyDown={(e: any) => {
-                  if (e.key === 'Enter') confirmRename();
-                }}
-              />
+                </thead>
+                <tbody className="divide-y">
+                  {pieces.map((piece) => (
+                    <tr key={piece.id} className="hover:bg-muted/50">
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        {piece.name}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="bg-secondary text-foreground px-2 py-1 rounded-md text-[13px] font-medium">
+                          {piece.cost}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-[13px] text-foreground/80">
+                        {parseBasicGates(piece.basic_gates).join(', ') ||
+                          'None'}
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2 tour-arsenal-actions">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPiece(piece);
+                            setShowPreview(true);
+                          }}
+                          className="tour-arsenal-preview"
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRename(piece)}
+                        >
+                          Rename
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(piece)}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmRename} disabled={!newName.trim()}>
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+        {/* Delete Confirmation Dialog */}
+        {/* Using native window.confirm for delete confirmation */}
 
-      {/* Design Dialog */}
-      <Dialog open={showDesignDialog} onOpenChange={setShowDesignDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Piece Design</DialogTitle>
-            <DialogDescription>
-              Customize this arsenal piece look. Changes apply wherever this piece is used.
-            </DialogDescription>
-          </DialogHeader>
+        {/* Design Dialog */}
+        <Dialog open={showDesignDialog} onOpenChange={setShowDesignDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Piece Design</DialogTitle>
+              <DialogDescription>
+                Customize this arsenal piece look. Changes apply wherever this piece is used.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-3">
-            <label className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 text-[13px]">
-              <span className="font-medium text-foreground">Use classic default look</span>
-              <input
-                type="checkbox"
-                checked={designUseClassic}
-                onChange={(e) => setDesignUseClassic(e.target.checked)}
-                className="size-4 rounded border-border"
-              />
-            </label>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 text-[13px]">
+                <span className="font-medium text-foreground">Use classic default look</span>
+                <input
+                  type="checkbox"
+                  checked={designUseClassic}
+                  onChange={(e) => setDesignUseClassic(e.target.checked)}
+                  className="size-4 rounded border-border"
+                />
+              </label>
 
-            {!designUseClassic ? (
-              <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
-                <div className="grid grid-cols-2 gap-2 text-[12px]">
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Accent
-                    <div className="flex items-center gap-2">
+              {!designUseClassic ? (
+                <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
+                  <div className="grid grid-cols-2 gap-2 text-[12px]">
+                    <label className="flex flex-col gap-1 text-muted-foreground">
+                      Accent
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={designStyle.accentColor}
+                          onChange={(e: any) =>
+                            setDesignStyle((prev) => ({
+                              ...prev,
+                              accentColor: e.target.value,
+                            }))
+                          }
+                          className="h-8 w-10 cursor-pointer rounded border border-border bg-card p-1"
+                        />
+                        <span className="font-mono text-[11px] text-foreground">{designStyle.accentColor}</span>
+                      </div>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-muted-foreground">
+                      Roundness
                       <input
-                        type="color"
-                        value={designStyle.accentColor}
+                        type="range"
+                        min={0}
+                        max={10}
+                        step={1}
+                        value={designStyle.roundness}
                         onChange={(e: any) =>
                           setDesignStyle((prev) => ({
                             ...prev,
-                            accentColor: e.target.value,
+                            roundness: Number(e.target.value),
                           }))
                         }
-                        className="h-8 w-10 cursor-pointer rounded border border-border bg-card p-1"
+                        className="h-8"
                       />
-                      <span className="font-mono text-[11px] text-foreground">{designStyle.accentColor}</span>
+                      <span className="text-[11px] text-foreground/75">{designStyle.roundness} / 10</span>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-muted-foreground">
+                      Border
+                      <select
+                        value={designStyle.borderStyle}
+                        onChange={(e: any) =>
+                          setDesignStyle((prev) => ({
+                            ...prev,
+                            borderStyle: e.target.value,
+                          }))
+                        }
+                        className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                      >
+                        <option value="solid">Solid</option>
+                        <option value="double">Double</option>
+                        <option value="etched">Etched</option>
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-muted-foreground">
+                      Edge Add-on
+                      <select
+                        value={designStyle.edgeAddon}
+                        onChange={(e: any) =>
+                          setDesignStyle((prev) => ({
+                            ...prev,
+                            edgeAddon: e.target.value,
+                          }))
+                        }
+                        className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                      >
+                        <option value="none">None</option>
+                        <option value="chip-legs">Chip Legs</option>
+                      </select>
+                    </label>
+
+                    <label className="col-span-2 flex flex-col gap-1 text-muted-foreground">
+                      Surface
+                      <select
+                        value={designStyle.surfaceStyle}
+                        onChange={(e: any) =>
+                          setDesignStyle((prev) => ({
+                            ...prev,
+                            surfaceStyle: e.target.value,
+                          }))
+                        }
+                        className="rounded border border-border bg-card px-2 py-1 text-foreground"
+                      >
+                        <option value="flat">Flat</option>
+                        <option value="brushed">Brushed</option>
+                        <option value="gradient">Gradient</option>
+                        <option value="matte">Matte</option>
+                        <option value="glass">Glass</option>
+                        <option value="carbon">Carbon</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
+                <p className="mb-2 text-[13px] font-medium text-foreground">Piece Preview</p>
+                <div className="rounded-md border border-border/60 bg-background/80 p-4">
+                  <div className="flex items-center justify-center">
+                    <LogicNode node={designPreviewNode} cellPx={22} portPx={8} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-foreground/80">
+                    <div className="rounded border border-border/50 bg-card px-2 py-1">
+                      <span className="text-foreground/60">Name:</span> {designPreviewNode.label}
                     </div>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Roundness
-                    <input
-                      type="range"
-                      min={0}
-                      max={10}
-                      step={1}
-                      value={designStyle.roundness}
-                      onChange={(e: any) =>
-                        setDesignStyle((prev) => ({
-                          ...prev,
-                          roundness: Number(e.target.value),
-                        }))
-                      }
-                      className="h-8"
-                    />
-                    <span className="text-[11px] text-foreground/75">{designStyle.roundness} / 10</span>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Border
-                    <select
-                      value={designStyle.borderStyle}
-                      onChange={(e: any) =>
-                        setDesignStyle((prev) => ({
-                          ...prev,
-                          borderStyle: e.target.value,
-                        }))
-                      }
-                      className="rounded border border-border bg-card px-2 py-1 text-foreground"
-                    >
-                      <option value="solid">Solid</option>
-                      <option value="double">Double</option>
-                      <option value="etched">Etched</option>
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Edge Add-on
-                    <select
-                      value={designStyle.edgeAddon}
-                      onChange={(e: any) =>
-                        setDesignStyle((prev) => ({
-                          ...prev,
-                          edgeAddon: e.target.value,
-                        }))
-                      }
-                      className="rounded border border-border bg-card px-2 py-1 text-foreground"
-                    >
-                      <option value="none">None</option>
-                      <option value="chip-legs">Chip Legs</option>
-                    </select>
-                  </label>
-
-                  <label className="col-span-2 flex flex-col gap-1 text-muted-foreground">
-                    Surface
-                    <select
-                      value={designStyle.surfaceStyle}
-                      onChange={(e: any) =>
-                        setDesignStyle((prev) => ({
-                          ...prev,
-                          surfaceStyle: e.target.value,
-                        }))
-                      }
-                      className="rounded border border-border bg-card px-2 py-1 text-foreground"
-                    >
-                      <option value="flat">Flat</option>
-                      <option value="brushed">Brushed</option>
-                      <option value="gradient">Gradient</option>
-                      <option value="matte">Matte</option>
-                      <option value="glass">Glass</option>
-                      <option value="carbon">Carbon</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
-              <p className="mb-2 text-[13px] font-medium text-foreground">Piece Preview</p>
-              <div className="rounded-md border border-border/60 bg-background/80 p-4">
-                <div className="flex items-center justify-center">
-                  <LogicNode node={designPreviewNode} cellPx={22} portPx={8} />
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-foreground/80">
-                  <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Name:</span> {designPreviewNode.label}
-                  </div>
-                  <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Inputs:</span> {designPreviewInputs}
-                  </div>
-                  <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Outputs:</span> {designPreviewOutputs}
+                    <div className="rounded border border-border/50 bg-card px-2 py-1">
+                      <span className="text-foreground/60">Inputs:</span> {designPreviewInputs}
+                    </div>
+                    <div className="rounded border border-border/50 bg-card px-2 py-1">
+                      <span className="text-foreground/60">Outputs:</span> {designPreviewOutputs}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDesignDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmDesign} disabled={updateArsenalPieceMutation.isPending}>
-              {updateArsenalPieceMutation.isPending ? 'Saving...' : 'Save Design'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDesignDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmDesign} disabled={updateArsenalPieceMutation.isPending}>
+                {updateArsenalPieceMutation.isPending ? 'Saving...' : 'Save Design'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Details Dialog */}
-      {selectedPiece && (
-        <Dialog open={showTruthTable} onOpenChange={setShowTruthTable}>
-          <DialogContent className="max-w-2xl">
+        {/* Rename Dialog */}
+        <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>{selectedPiece.name} - Details</DialogTitle>
+              <DialogTitle>Rename Arsenal Piece</DialogTitle>
+              <DialogDescription>
+                Enter a new name for this arsenal piece.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold mb-2">Basic Gates Used</h3>
-                <div className="bg-secondary/60 p-3 rounded-lg text-[13px] text-foreground border border-border/60">
-                  {parseBasicGates(selectedPiece.basic_gates).join(', ') || 'None'} (Cost: {selectedPiece.cost})
-                </div>
+                <label className="text-[13px] font-medium text-foreground">
+                  New Name
+                </label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e: any) => setNewName(e.target.value)}
+                  placeholder="Enter new name"
+                  className="w-full mt-1 border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                  onKeyDown={(e: any) => {
+                    if (e.key === 'Enter') confirmRename();
+                  }}
+                />
               </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowRenameDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={confirmRename} disabled={!newName.trim()}>
+                Rename
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-              <div>
-                <h3 className="font-semibold mb-2">Truth Table</h3>
-                <div className="max-h-96 overflow-auto border border-border rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="bg-secondary sticky top-0">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">Inputs</th>
-                        <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">Outputs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(parseTruthTable(selectedPiece.truth_table)).map(
-                        ([inputKey, output], idx) => (
+        {/* Details Dialog */}
+        {selectedPiece && (
+          <Dialog open={showTruthTable} onOpenChange={setShowTruthTable}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{selectedPiece.name} - Details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Basic Gates Used</h3>
+                  <div className="bg-secondary/60 p-3 rounded-lg text-[13px] text-foreground border border-border/60">
+                    {parseBasicGates(selectedPiece.basic_gates).join(', ') ||
+                      'None'}{' '}
+                    (Cost: {selectedPiece.cost})
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">Truth Table</h3>
+                  <div className="max-h-96 overflow-auto border border-border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">
+                            Inputs
+                          </th>
+                          <th className="px-3 py-2 text-left text-[13px] font-semibold text-foreground">
+                            Outputs
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(
+                          parseTruthTable(selectedPiece.truth_table),
+                        ).map(([inputKey, output], idx) => (
                           <tr key={idx} className="border-t hover:bg-muted/50">
-                            <td className="px-3 py-2 font-mono text-xs text-foreground">{inputKey}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-foreground">
+                              {inputKey}
+                            </td>
                             <td className="px-3 py-2 font-mono text-xs text-foreground">
                               {JSON.stringify(output)}
                             </td>
                           </tr>
-                        )
-                      )}
-                    </tbody>
-                  </table>
-                  {Object.keys(parseTruthTable(selectedPiece.truth_table)).length === 0 && (
-                    <div className="p-4 text-center text-foreground/75">
-                      No truth table data available
-                    </div>
-                  )}
+                        ))}
+                      </tbody>
+                    </table>
+                    {Object.keys(parseTruthTable(selectedPiece.truth_table))
+                      .length === 0 && (
+                      <div className="p-4 text-center text-foreground/75">
+                        No truth table data available
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </DialogContent>
+          </Dialog>
+        )}
 
-      {/* Preview Dialog */}
-      {selectedPiece && (
-        <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        {/* Preview Dialog */}
+        {selectedPiece && (
+          <Dialog open={showPreview} onOpenChange={setShowPreview}>
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedPiece.name} - Circuit Preview
+                </DialogTitle>
+                <DialogDescription>
+                  Read-only preview of the circuit. No modifications allowed.
+                </DialogDescription>
+              </DialogHeader>
+              <CircuitPreview piece={selectedPiece} />
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Empty-arsenal tour dialog */}
+        <Dialog
+          open={showEmptyTourDialog}
+          onOpenChange={setShowEmptyTourDialog}
+        >
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{selectedPiece.name} - Circuit Preview</DialogTitle>
+              <DialogTitle className="inline-flex items-center gap-2">
+                <Sparkles className="size-5 text-primary" />
+                Build a piece first
+              </DialogTitle>
               <DialogDescription>
-                Read-only preview of the circuit. No modifications allowed.
+                The arsenal tour walks through your saved pieces — but your
+                arsenal is empty. Create at least one piece, then come back to
+                take the tour of how to preview, rename, and manage it.
               </DialogDescription>
             </DialogHeader>
-            <CircuitPreview piece={selectedPiece} />
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowEmptyTourDialog(false);
+                  setHighlightCreate(true);
+                  window.setTimeout(() => setHighlightCreate(false), 2400);
+                }}
+              >
+                Got it
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowEmptyTourDialog(false);
+                  router.push(paths.app.arsenal.creator.getHref());
+                }}
+              >
+                <Plus className="size-4" />
+                Create New Piece
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
     </div>
-    </>
   );
 }
 
@@ -695,7 +808,7 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
   const { data: myArsenal } = useMyArsenal();
 
   const parseStructure = (
-    structureJson: string
+    structureJson: string,
   ): {
     numInputs: number;
     numOutputs: number;
@@ -713,8 +826,14 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
   const { placed, wires } = structure;
 
   // Build input/output labels
-  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
-  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+  const inputLabels = Array.from(
+    { length: structure.numInputs },
+    (_, i) => `in${i}`,
+  );
+  const outputLabels = Array.from(
+    { length: structure.numOutputs },
+    (_, i) => `out${i}`,
+  );
 
   // Build map of arsenal pieces by ID for quick lookup
   const arsenalMap = new Map<string, ArsenalPiece>();
@@ -727,13 +846,82 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
   // Build catalog with standard component definitions
   // Size formula: width=3, height=max(inputs, outputs)
   const catalog: Record<string, ComponentDef> = {
-    AND: { id: 'AND', label: 'AND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    OR: { id: 'OR', label: 'OR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOT: { id: 'NOT', label: 'NOT', cost: 1, size: { w: 3, h: 1 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } }] },
-    XOR: { id: 'XOR', label: 'XOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NAND: { id: 'NAND', label: 'NAND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOR: { id: 'NOR', label: 'NOR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    XNOR: { id: 'XNOR', label: 'XNOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    AND: {
+      id: 'AND',
+      label: 'AND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    OR: {
+      id: 'OR',
+      label: 'OR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOT: {
+      id: 'NOT',
+      label: 'NOT',
+      cost: 1,
+      size: { w: 3, h: 1 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    XOR: {
+      id: 'XOR',
+      label: 'XOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NAND: {
+      id: 'NAND',
+      label: 'NAND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOR: {
+      id: 'NOR',
+      label: 'NOR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    XNOR: {
+      id: 'XNOR',
+      label: 'XNOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
   };
 
   // Add any custom arsenal pieces as components
@@ -746,9 +934,13 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
         const numOutputs = (arsenalPiece as any).num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
         const size = { w: 3, h: Math.max(1, maxPorts) };
-        
+
         // Generate ports for arsenal pieces
-        const ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        const ports: Array<{
+          id: string;
+          kind: 'input' | 'output';
+          offset: { row: number; col: number };
+        }> = [];
         for (let i = 0; i < numInputs; i++) {
           ports.push({
             id: `in${i}`,
@@ -763,7 +955,7 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
             offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
           });
         }
-        
+
         catalog[comp.componentId] = {
           id: comp.componentId,
           label: arsenalPiece.name,
@@ -788,8 +980,14 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
     }
   });
 
-  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
-  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+  const gridRows = Math.max(
+    15,
+    Math.max(...placed.map((c) => c.origin.row), 0) + 3,
+  );
+  const gridCols = Math.max(
+    30,
+    Math.max(...placed.map((c) => c.origin.col), 0) + 3,
+  );
 
   return (
     <div className="space-y-4">
@@ -804,15 +1002,21 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numInputs}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numOutputs}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Cost</p>
@@ -821,8 +1025,8 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
       </div>
 
       {/* Circuit Grid - Read-only Workstation */}
-      <div 
-        className="border border-border/60 rounded-lg bg-background overflow-hidden relative" 
+      <div
+        className="border border-border/60 rounded-lg bg-background overflow-hidden relative"
         style={{ height: '500px' }}
       >
         <style>{`
@@ -852,8 +1056,8 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
             wires={wires}
             selectedComponent={{ mode: 'none' }}
             onSelectedComponentChange={() => {}} // Read-only: no changes
-            onPlacedChange={() => {}}             // Read-only: no changes
-            onWiresChange={() => {}}              // Read-only: no changes
+            onPlacedChange={() => {}} // Read-only: no changes
+            onWiresChange={() => {}} // Read-only: no changes
             draggedPaletteComponentId={null}
             isChecking={false}
             boardRows={gridRows}
@@ -865,12 +1069,21 @@ function CircuitPreview({ piece }: { piece: ArsenalPiece }) {
       {/* Component Legend */}
       {placed.length > 0 && (
         <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+          <p className="text-xs font-semibold text-foreground/70 mb-2">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
-              .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
+              .filter(
+                (comp, idx, arr) =>
+                  arr.findIndex((c) => c.componentId === comp.componentId) ===
+                  idx,
+              )
               .map((comp) => (
-                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
+                <div
+                  key={comp.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
                   <span className="text-foreground/70">{comp.componentId}</span>
                 </div>
               ))}

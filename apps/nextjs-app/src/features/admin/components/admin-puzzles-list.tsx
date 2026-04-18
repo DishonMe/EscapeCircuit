@@ -5,6 +5,7 @@ import { Filter, X, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { Table } from '@/components/ui/table';
 import { formatDate } from '@/utils/format';
 
@@ -12,6 +13,21 @@ import {
   useAdminPuzzles,
   AdminPuzzleFilters,
 } from '../api/get-admin-puzzles';
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'published', label: 'Published' },
+  { value: 'unpublished', label: 'Unpublished' },
+] as const;
+
+const PUZZLE_ORDER_BY_OPTIONS = [
+  { value: 'created_at', label: 'Created Date' },
+  { value: 'name', label: 'Name' },
+  { value: 'rating_count', label: 'Rating Count' },
+  { value: 'avg_fun', label: 'Fun Rating' },
+  { value: 'avg_clearness', label: 'Clearness Rating' },
+] as const;
 import { AdminDeletePuzzle } from './admin-delete-puzzle';
 import { AdminUnpublishPuzzle } from './admin-unpublish-puzzle';
 
@@ -216,14 +232,14 @@ export const AdminPuzzlesList = () => {
         <div className="rounded-xl border border-border bg-card p-5 space-y-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Name Search */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Name
               </label>
               <input
                 type="text"
                 placeholder="Search puzzle name..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.search || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -235,14 +251,14 @@ export const AdminPuzzlesList = () => {
             </div>
 
             {/* Creator Username */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Creator
               </label>
               <input
                 type="text"
                 placeholder="Search by creator username..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.creatorUsername || ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setFilters({
@@ -254,58 +270,45 @@ export const AdminPuzzlesList = () => {
             </div>
 
             {/* Status */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Status
               </label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              <StyledSelect
+                aria-label="Status"
                 value={filters.status || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                onValueChange={(v) =>
                   setFilters({
                     ...filters,
-                    status: (e.target.value || undefined) as any,
+                    status: (v || undefined) as any,
                   })
                 }
-              >
-                <option className="text-foreground bg-card" value="">All Statuses</option>
-                <option className="text-foreground bg-card" value="draft">Draft</option>
-                <option className="text-foreground bg-card" value="published">Published</option>
-                <option className="text-foreground bg-card" value="unpublished">Unpublished</option>
-              </select>
+                options={STATUS_OPTIONS}
+              />
             </div>
 
             {/* Order By */}
-            <div>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Order By
               </label>
-              <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              <StyledSelect
+                aria-label="Order by"
                 value={filters.orderBy || 'created_at'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  setFilters({
-                    ...filters,
-                    orderBy: e.target.value as any,
-                  })
+                onValueChange={(v) =>
+                  setFilters({ ...filters, orderBy: v as any })
                 }
-              >
-                <option className="text-foreground bg-card" value="created_at">Created Date</option>
-                <option className="text-foreground bg-card" value="name">Name</option>
-                <option className="text-foreground bg-card" value="rating_count">Rating Count</option>
-                <option className="text-foreground bg-card" value="avg_fun">Fun Rating</option>
-                <option className="text-foreground bg-card" value="avg_clearness">Clearness Rating</option>
-              </select>
+                options={PUZZLE_ORDER_BY_OPTIONS}
+              />
             </div>
 
             {/* Direction */}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex flex-col">
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Direction
               </label>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => {
                   const currentDirection = filters.orderDirection || 'DESC';
                   const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
@@ -314,20 +317,20 @@ export const AdminPuzzlesList = () => {
                     orderDirection: newDirection as any,
                   });
                 }}
-                className="gap-1 px-2 py-1 inline-flex items-center whitespace-nowrap"
+                className="inline-flex h-9 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-3 text-[13px] text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/30 focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {(filters.orderDirection || 'DESC') === 'ASC' ? (
                   <>
-                    <ArrowUp className="size-3 inline-block" />
-                    <span> Ascending</span>
+                    <ArrowUp className="size-4" />
+                    <span>Ascending</span>
                   </>
                 ) : (
                   <>
-                    <ArrowDown className="size-3 inline-block" />
-                    <span> Descending</span>
+                    <ArrowDown className="size-4" />
+                    <span>Descending</span>
                   </>
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
