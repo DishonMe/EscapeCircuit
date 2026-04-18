@@ -367,26 +367,39 @@ class SolveRepo:
         """Return the leaderboard for a puzzle: best (fastest) passed solve per user, ranked by time."""
         rows = self.conn.execute(
             """
-            WITH best_times AS (
-              SELECT user_id, MIN(time_taken_seconds) as best_time
+            WITH first_solves AS (
+              SELECT user_id, MIN(submitted_at) AS first_solved_at
+              FROM solve_attempts
+              WHERE puzzle_id = ? AND passed = 1 AND submitted_at IS NOT NULL
+              GROUP BY user_id
+            ),
+            best_times AS (
+              SELECT user_id, MIN(time_taken_seconds) AS best_time
               FROM solve_attempts
               WHERE puzzle_id = ? AND passed = 1 AND time_taken_seconds IS NOT NULL
               GROUP BY user_id
+            ),
+            best_time_rows AS (
+              SELECT sa.user_id,
+                     bt.best_time,
+                     MAX(COALESCE(sa.highest_medal, 0)) AS best_medal
+              FROM solve_attempts sa
+              JOIN best_times bt ON bt.user_id = sa.user_id
+              WHERE sa.puzzle_id = ? AND sa.passed = 1 AND sa.time_taken_seconds = bt.best_time
+              GROUP BY sa.user_id, bt.best_time
             )
-            SELECT DISTINCT sa.user_id,
+            SELECT btr.user_id,
                    u.username,
-                   bt.best_time,
-                   sa.highest_medal AS best_medal,
-                   sa.submitted_at AS first_solved_at
-            FROM solve_attempts sa
-            JOIN users u ON u.id = sa.user_id
-            JOIN best_times bt ON sa.user_id = bt.user_id
-            WHERE sa.puzzle_id = ? AND sa.passed = 1
-              AND sa.time_taken_seconds = bt.best_time
-            ORDER BY bt.best_time ASC
+                   btr.best_time,
+                   btr.best_medal,
+                   fs.first_solved_at
+            FROM best_time_rows btr
+            JOIN users u ON u.id = btr.user_id
+            LEFT JOIN first_solves fs ON fs.user_id = btr.user_id
+            ORDER BY btr.best_time ASC, fs.first_solved_at ASC, btr.user_id ASC
             LIMIT ?
             """,
-            (int(puzzle_id), int(puzzle_id), int(limit)),
+            (int(puzzle_id), int(puzzle_id), int(puzzle_id), int(limit)),
         ).fetchall()
         result = []
         for rank, r in enumerate(rows, start=1):
@@ -404,26 +417,39 @@ class SolveRepo:
         """Return the leaderboard for a puzzle: best (lowest cost) passed solve per user, ranked by cost."""
         rows = self.conn.execute(
             """
-            WITH best_costs AS (
-              SELECT user_id, MIN(cost_used) as best_cost
+            WITH first_solves AS (
+              SELECT user_id, MIN(submitted_at) AS first_solved_at
+              FROM solve_attempts
+              WHERE puzzle_id = ? AND passed = 1 AND submitted_at IS NOT NULL
+              GROUP BY user_id
+            ),
+            best_costs AS (
+              SELECT user_id, MIN(cost_used) AS best_cost
               FROM solve_attempts
               WHERE puzzle_id = ? AND passed = 1 AND cost_used IS NOT NULL
               GROUP BY user_id
+            ),
+            best_cost_rows AS (
+              SELECT sa.user_id,
+                     bc.best_cost,
+                     MAX(COALESCE(sa.highest_medal, 0)) AS best_medal
+              FROM solve_attempts sa
+              JOIN best_costs bc ON bc.user_id = sa.user_id
+              WHERE sa.puzzle_id = ? AND sa.passed = 1 AND sa.cost_used = bc.best_cost
+              GROUP BY sa.user_id, bc.best_cost
             )
-            SELECT DISTINCT sa.user_id,
+            SELECT bcr.user_id,
                    u.username,
-                   bc.best_cost,
-                   sa.highest_medal AS best_medal,
-                   sa.submitted_at AS first_solved_at
-            FROM solve_attempts sa
-            JOIN users u ON u.id = sa.user_id
-            JOIN best_costs bc ON sa.user_id = bc.user_id
-            WHERE sa.puzzle_id = ? AND sa.passed = 1
-              AND sa.cost_used = bc.best_cost
-            ORDER BY bc.best_cost ASC
+                   bcr.best_cost,
+                   bcr.best_medal,
+                   fs.first_solved_at
+            FROM best_cost_rows bcr
+            JOIN users u ON u.id = bcr.user_id
+            LEFT JOIN first_solves fs ON fs.user_id = bcr.user_id
+            ORDER BY bcr.best_cost ASC, fs.first_solved_at ASC, bcr.user_id ASC
             LIMIT ?
             """,
-            (int(puzzle_id), int(puzzle_id), int(limit)),
+            (int(puzzle_id), int(puzzle_id), int(puzzle_id), int(limit)),
         ).fetchall()
         result = []
         for rank, r in enumerate(rows, start=1):
@@ -432,6 +458,41 @@ class SolveRepo:
                 "user_id": int(r["user_id"]),
                 "username": r["username"],
                 "best_cost": int(r["best_cost"]),
+                "best_medal": int(r["best_medal"]) if r["best_medal"] is not None else 0,
+                "first_solved_at": r["first_solved_at"],
+            })
+        return result
+
+    def get_leaderboard_by_first_solved(self, puzzle_id: int, limit: int = 50) -> list[dict]:
+        """Return the leaderboard for a puzzle ranked by first successful solve timestamp."""
+        rows = self.conn.execute(
+            """
+            WITH first_solves AS (
+              SELECT user_id,
+                     MIN(submitted_at) AS first_solved_at,
+                     MAX(COALESCE(highest_medal, 0)) AS best_medal
+              FROM solve_attempts
+              WHERE puzzle_id = ? AND passed = 1 AND submitted_at IS NOT NULL
+              GROUP BY user_id
+            )
+            SELECT fs.user_id,
+                   u.username,
+                   fs.best_medal,
+                   fs.first_solved_at
+            FROM first_solves fs
+            JOIN users u ON u.id = fs.user_id
+            ORDER BY fs.first_solved_at ASC, fs.user_id ASC
+            LIMIT ?
+            """,
+            (int(puzzle_id), int(limit)),
+        ).fetchall()
+
+        result = []
+        for rank, r in enumerate(rows, start=1):
+            result.append({
+                "rank": rank,
+                "user_id": int(r["user_id"]),
+                "username": r["username"],
                 "best_medal": int(r["best_medal"]) if r["best_medal"] is not None else 0,
                 "first_solved_at": r["first_solved_at"],
             })

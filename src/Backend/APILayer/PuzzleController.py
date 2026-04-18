@@ -377,9 +377,11 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             p["best_time"] = status_map[pid].get("best_time")
                             p["total_xp"] = status_map[pid].get("total_xp", 0)
                             p["best_medal"] = status_map[pid].get("best_medal", 0)
+                            p["first_solved_at"] = status_map[pid].get("first_solved_at")
                         else:
                             p["is_solved"] = False
                             p["best_medal"] = 0
+                            p["first_solved_at"] = None
                         # Global solved count (all users)
                         p["solvedCount"] = solved_counts.get(pid, 0) if pid else 0
                         p["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
@@ -474,8 +476,10 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                         result["best_time"] = info.get("best_time")
                         result["total_xp"] = info.get("total_xp", 0)
                         result["best_medal"] = info.get("best_medal", 0)
+                        result["first_solved_at"] = info.get("first_solved_at")
                     else:
                         result["best_medal"] = 0
+                        result["first_solved_at"] = None
                     # Can-rate flag (solved OR 5 min spent)
                     if rating_service:
                         try:
@@ -582,6 +586,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             puzzle_service.auth.require_user_id(token)
             if type == "cost":
                 entries = puzzle_service.solve_repo.get_leaderboard_by_cost(puzzle_id, limit=limit)
+            elif type == "first_solved":
+                entries = puzzle_service.solve_repo.get_leaderboard_by_first_solved(puzzle_id, limit=limit)
             else:
                 entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
             return {"data": entries}

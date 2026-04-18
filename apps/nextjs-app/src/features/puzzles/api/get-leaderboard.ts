@@ -22,7 +22,7 @@ export const getLeaderboard = ({
   type = "time",
 }: {
   puzzleId: string;
-  type?: "time" | "cost";
+  type?: "time" | "cost" | "first_solved";
 }): Promise<LeaderboardResponse> => {
   return api.get(`/puzzles/${puzzleId}/leaderboard?type=${type}`);
 };
@@ -32,7 +32,7 @@ export const getLeaderboardQueryOptions = ({
   type = "time",
 }: {
   puzzleId: string;
-  type?: "time" | "cost";
+  type?: "time" | "cost" | "first_solved";
 }) => {
   return queryOptions({
     queryKey: ['leaderboard', { puzzleId, type }],
@@ -42,7 +42,7 @@ export const getLeaderboardQueryOptions = ({
 
 type UseLeaderboardOptions = {
   puzzleId: string;
-  type?: "time" | "cost";
+  type?: "time" | "cost" | "first_solved";
   config?: QueryConfig<typeof getLeaderboardQueryOptions>;
 };
 
