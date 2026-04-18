@@ -832,7 +832,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       const isArsenal = (def as any).is_arsenal === true;
       const visualStyle = extractVisualStyleFromComponentLike(def);
 
-
       let size: { w: number; h: number };
       let ports: ComponentDef['ports'];
 
@@ -1232,7 +1231,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         isSequence: true,
       });
 
-      console.log('[DEBUGGER_FRONTEND] Received simulation result steps:', result.steps?.length || 0);
+      console.log(
+        '[DEBUGGER_FRONTEND] Received simulation result steps:',
+        result.steps?.length || 0,
+      );
 
       const outputSteps: Record<string, string>[] = (result.steps ?? []).map(
         (step: any) => {
@@ -1254,13 +1256,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           if (!gate?.placedId) continue;
           mapped[String(gate.placedId)] = String(gate?.values ?? '0');
           if (stepIndex === 0) {
-            console.log(`[DEBUGGER_FRONTEND] Step ${stepIndex}: Gate ${gate.placedId} (${gate.displayLabel}) = ${gate.values}`);
+            console.log(
+              `[DEBUGGER_FRONTEND] Step ${stepIndex}: Gate ${gate.placedId} (${gate.displayLabel}) = ${gate.values}`,
+            );
           }
         }
         return mapped;
       });
 
-      console.log('[DEBUGGER_FRONTEND] Final gateOutputSteps structure:', gateOutputSteps.slice(0, 2).map(step => Object.keys(step).length + ' gates'));
+      console.log(
+        '[DEBUGGER_FRONTEND] Final gateOutputSteps structure:',
+        gateOutputSteps
+          .slice(0, 2)
+          .map((step) => Object.keys(step).length + ' gates'),
+      );
 
       const effectiveStepCount = outputSteps.length || stepCount;
       setDebugSnapshot({
@@ -1338,8 +1347,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const outputBits: Record<string, string> = {};
     for (const p of placed) {
       outputBits[p.id] = normalizeBits(backendStep[p.id]);
-      if (placed.length < 10) {  // Only log for small boards to avoid spam
-        console.log(`[GATE_BITS] Step ${debugStepIndex}: ${p.id} = ${outputBits[p.id]} (raw: ${backendStep[p.id]})`);
+      if (placed.length < 10) {
+        // Only log for small boards to avoid spam
+        console.log(
+          `[GATE_BITS] Step ${debugStepIndex}: ${p.id} = ${outputBits[p.id]} (raw: ${backendStep[p.id]})`,
+        );
       }
     }
     return outputBits;

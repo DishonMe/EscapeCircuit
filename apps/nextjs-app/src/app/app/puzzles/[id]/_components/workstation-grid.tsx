@@ -129,8 +129,7 @@ const getVisualPortOffsets = (
 
   lowerPorts.forEach(({ port }, index) => {
     const distributedRow =
-      -0.5 +
-      ((index + 1) * componentHeight) / (lowerPorts.length + 1);
+      -0.5 + ((index + 1) * componentHeight) / (lowerPorts.length + 1);
 
     result.set(
       port.id,
@@ -246,6 +245,7 @@ export const WorkstationGrid = ({
   const { visualEffectsEnabled } = useSettings();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const panAnimationFrameRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -774,7 +774,9 @@ export const WorkstationGrid = ({
       return { x: panX, y: panY };
     };
 
-    const raw = shouldPersistZoom ? window.localStorage.getItem(STORAGE_KEY) : null;
+    const raw = shouldPersistZoom
+      ? window.localStorage.getItem(STORAGE_KEY)
+      : null;
     if (!raw) {
       const fit = updateFit();
       setZoom(fit);
@@ -975,6 +977,95 @@ export const WorkstationGrid = ({
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, pan.x, pan.y]);
+
+  const clampPanToBounds = useCallback(
+    (nextPan: { x: number; y: number }, nextZoom: number = zoom) => {
+      const el = containerRef.current;
+      if (!el) return nextPan;
+
+      const rect = el.getBoundingClientRect();
+      const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
+      const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
+
+      const minPanX = Math.min(0, rect.width - gridWidthPx);
+      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
+      const minPanY = Math.min(0, rect.height - gridHeightPx);
+      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
+
+      return {
+        x: clamp(nextPan.x, minPanX, maxPanX),
+        y: clamp(nextPan.y, minPanY, maxPanY),
+      };
+    },
+    [gridCols, gridRows, zoom],
+  );
+
+  const stopPanAnimation = useCallback(() => {
+    if (panAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(panAnimationFrameRef.current);
+      panAnimationFrameRef.current = null;
+    }
+  }, []);
+
+  const animatePanTo = useCallback(
+    (targetPan: { x: number; y: number }, durationMs = 320) => {
+      stopPanAnimation();
+
+      const startPan = pan;
+      const startTime = performance.now();
+
+      const step = (now: number) => {
+        const t = Math.min(1, (now - startTime) / durationMs);
+        const eased = 1 - Math.pow(1 - t, 3);
+
+        const nextPan = {
+          x: startPan.x + (targetPan.x - startPan.x) * eased,
+          y: startPan.y + (targetPan.y - startPan.y) * eased,
+        };
+
+        setPan(clampPanToBounds(nextPan));
+
+        if (t < 1) {
+          panAnimationFrameRef.current = window.requestAnimationFrame(step);
+        } else {
+          panAnimationFrameRef.current = null;
+        }
+      };
+
+      panAnimationFrameRef.current = window.requestAnimationFrame(step);
+    },
+    [clampPanToBounds, pan, stopPanAnimation],
+  );
+
+  useEffect(() => {
+    return () => {
+      stopPanAnimation();
+    };
+  }, [stopPanAnimation]);
+
+  const panToIOTarget = useCallback(
+    (target: 'inputs' | 'outputs') => {
+      const el = containerRef.current;
+      if (!el) return;
+
+      const ioCount = target === 'inputs' ? inputs.length : outputs.length;
+      if (ioCount === 0) return;
+
+      const rect = el.getBoundingClientRect();
+      const targetCol = target === 'inputs' ? -1 : gridCols;
+      const targetRow = ((ioCount - 1) * 1.6) / 2;
+      const targetX = rect.width * (target === 'inputs' ? 0.18 : 0.82);
+      const targetY = rect.height * 0.5;
+
+      const rawPan = {
+        x: targetX - (targetCol + 0.5) * CELL_PX * zoom,
+        y: targetY - (targetRow + 0.5) * CELL_PX * zoom,
+      };
+
+      animatePanTo(clampPanToBounds(rawPan, zoom), 360);
+    },
+    [animatePanTo, clampPanToBounds, gridCols, inputs.length, outputs.length, zoom],
+  );
 
   const canPlaceComponentAt = (
     componentId: string,
@@ -1234,6 +1325,7 @@ export const WorkstationGrid = ({
 
   const onWheel = (e: ReactWheelEvent) => {
     e.preventDefault();
+    stopPanAnimation();
     const el = containerRef.current;
     if (!el) return;
 
@@ -1249,26 +1341,18 @@ export const WorkstationGrid = ({
     let afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
     let afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
 
-    // Apply pan limits - allow full scrolling of the grid
-    if (rect) {
-      const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
-      const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
-
-      const minPanX = Math.min(0, rect.width - gridWidthPx);
-      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
-      const minPanY = Math.min(0, rect.height - gridHeightPx);
-      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
-
-      afterPanX = clamp(afterPanX, minPanX, maxPanX);
-      afterPanY = clamp(afterPanY, minPanY, maxPanY);
-    }
+    const clampedPan = clampPanToBounds(
+      { x: afterPanX, y: afterPanY },
+      nextZoom,
+    );
 
     setZoom(nextZoom);
-    setPan({ x: afterPanX, y: afterPanY });
+    setPan(clampedPan);
   };
 
   const onPointerDownBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    stopPanAnimation();
     // If wire is being drafted, ignore background panning.
     if (wireDraft) return;
 
@@ -1330,27 +1414,7 @@ export const WorkstationGrid = ({
     const newPanX = start.panX + (e.clientX - start.x);
     const newPanY = start.panY + (e.clientY - start.y);
 
-    // Apply pan limits to keep inputs/outputs in view
-    const el = containerRef.current;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      // Allow panning the full grid - left edge should show col -1, right edge should show the grid
-      const gridWidthPx = (gridCols + 1) * CELL_PX * zoom;
-      const gridHeightPx = (gridRows + 1) * CELL_PX * zoom;
-
-      // Pan limits: ensure grid fits properly in view with margins
-      const minPanX = Math.min(0, rect.width - gridWidthPx);
-      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
-      const minPanY = Math.min(0, rect.height - gridHeightPx);
-      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
-
-      setPan({
-        x: clamp(newPanX, minPanX, maxPanX),
-        y: clamp(newPanY, minPanY, maxPanY),
-      });
-    } else {
-      setPan({ x: newPanX, y: newPanY });
-    }
+    setPan(clampPanToBounds({ x: newPanX, y: newPanY }));
   };
 
   const onPointerUpBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -1645,7 +1709,7 @@ export const WorkstationGrid = ({
     // Handle both formats: single char "0", or semicolon-separated "0;1;0"
     let valueArray: string[];
     if (rawValues.includes(';')) {
-      valueArray = rawValues.split(';').map(v => v.trim());
+      valueArray = rawValues.split(';').map((v) => v.trim());
     } else if (rawValues.length === 1) {
       valueArray = [rawValues];
     } else {
@@ -1669,7 +1733,20 @@ export const WorkstationGrid = ({
     }
 
     // Fallback: try direct pinIndex access with bounds checking
-    return valueArray[Math.min(Math.max(pinIndex - (def?.ports?.filter(p => p.kind === 'input').length ?? 0), 0), valueArray.length - 1)] ?? valueArray[0] ?? '0';
+    return (
+      valueArray[
+        Math.min(
+          Math.max(
+            pinIndex -
+              (def?.ports?.filter((p) => p.kind === 'input').length ?? 0),
+            0,
+          ),
+          valueArray.length - 1,
+        )
+      ] ??
+      valueArray[0] ??
+      '0'
+    );
   };
 
   const getPortBitForDisplay = (
@@ -2206,7 +2283,8 @@ export const WorkstationGrid = ({
                   const key = `r${r}c${c}`;
                   const occ = occupiedHoles.get(key);
                   const portOcc = occupiedPortHoles.get(key);
-                  const showPortOcc = Boolean(portOcc) && !staleLogicalPortHoleKeys.has(key);
+                  const showPortOcc =
+                    Boolean(portOcc) && !staleLogicalPortHoleKeys.has(key);
 
                   const left = c * CELL_PX;
                   const top = r * CELL_PX;
@@ -2646,14 +2724,18 @@ export const WorkstationGrid = ({
                   ? selectedComponent.rotation
                   : 0;
               const size = rotatedSize(def.size, rotation);
-              const previewVisualPortOffsets = getVisualPortOffsets(def, rotation);
+              const previewVisualPortOffsets = getVisualPortOffsets(
+                def,
+                rotation,
+              );
               return (
                 <LogicNode
                   node={{
                     ...def,
                     ports: def.ports.map((port) => ({
                       ...port,
-                      offset: previewVisualPortOffsets.get(port.id) ?? port.offset,
+                      offset:
+                        previewVisualPortOffsets.get(port.id) ?? port.offset,
                     })),
                   }}
                   className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
@@ -2943,16 +3025,21 @@ export const WorkstationGrid = ({
           }
 
           return indicators.map((ind) => (
-            <div
+            <button
+              type="button"
               key={ind.id}
               className={cn(
-                'absolute z-40 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 ring-black/10',
+                'absolute z-40 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 ring-black/10 cursor-pointer transition-all hover:scale-110 active:scale-95',
                 ind.color,
               )}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={() => panToIOTarget(ind.id as 'inputs' | 'outputs')}
               style={{
                 left: ind.position.x,
                 top: ind.position.y,
               }}
+              title="Click to scroll to inputs or outputs"
             >
               <span>{ind.label}</span>
               <svg
@@ -2965,7 +3052,7 @@ export const WorkstationGrid = ({
               >
                 <path d="M8 0l8 8-8 8V0z" />
               </svg>
-            </div>
+            </button>
           ));
         })()}
       </div>
