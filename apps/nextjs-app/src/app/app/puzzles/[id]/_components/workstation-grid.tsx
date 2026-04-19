@@ -1639,10 +1639,37 @@ export const WorkstationGrid = ({
   };
 
   const getOutputBitForPlaced = (placedId: string, pinIndex: number) => {
-    const values = String(debuggerGateBits[placedId] ?? '0');
-    if (!values.length) return '0';
-    if (values.length === 1) return values;
-    return values[Math.min(pinIndex, values.length - 1)] ?? values[0] ?? '0';
+    const rawValues = String(debuggerGateBits[placedId] ?? '0');
+    if (!rawValues.length) return '0';
+
+    // Handle both formats: single char "0", or semicolon-separated "0;1;0"
+    let valueArray: string[];
+    if (rawValues.includes(';')) {
+      valueArray = rawValues.split(';').map(v => v.trim());
+    } else if (rawValues.length === 1) {
+      valueArray = [rawValues];
+    } else {
+      // Multi-char but no semicolon - treat each character as separate value
+      valueArray = rawValues.split('');
+    }
+
+    if (valueArray.length === 1) return valueArray[0];
+
+    const placedInst = placedById[placedId];
+    const def = placedInst ? catalog[placedInst.componentId] : null;
+    if (def) {
+      const outputPortIndices = def.ports
+        .map((port, idx) => ({ port, idx }))
+        .filter((entry) => entry.port.kind === 'output')
+        .map((entry) => entry.idx);
+      const outputPosition = outputPortIndices.indexOf(pinIndex);
+      if (outputPosition >= 0 && outputPosition < valueArray.length) {
+        return valueArray[outputPosition];
+      }
+    }
+
+    // Fallback: try direct pinIndex access with bounds checking
+    return valueArray[Math.min(Math.max(pinIndex - (def?.ports?.filter(p => p.kind === 'input').length ?? 0), 0), valueArray.length - 1)] ?? valueArray[0] ?? '0';
   };
 
   const getPortBitForDisplay = (

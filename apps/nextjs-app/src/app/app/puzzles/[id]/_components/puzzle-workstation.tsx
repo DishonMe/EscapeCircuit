@@ -1232,6 +1232,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         isSequence: true,
       });
 
+      console.log('[DEBUGGER_FRONTEND] Received simulation result steps:', result.steps?.length || 0);
+
       const outputSteps: Record<string, string>[] = (result.steps ?? []).map(
         (step: any) => {
           const mapped: Record<string, string> = {};
@@ -1246,14 +1248,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       const gateOutputSteps: Record<string, string>[] = (
         result.steps ?? []
-      ).map((step: any) => {
+      ).map((step: any, stepIndex: number) => {
         const mapped: Record<string, string> = {};
         for (const gate of step?.gateOutputs ?? []) {
           if (!gate?.placedId) continue;
           mapped[String(gate.placedId)] = String(gate?.values ?? '0');
+          if (stepIndex === 0) {
+            console.log(`[DEBUGGER_FRONTEND] Step ${stepIndex}: Gate ${gate.placedId} (${gate.displayLabel}) = ${gate.values}`);
+          }
         }
         return mapped;
       });
+
+      console.log('[DEBUGGER_FRONTEND] Final gateOutputSteps structure:', gateOutputSteps.slice(0, 2).map(step => Object.keys(step).length + ' gates'));
 
       const effectiveStepCount = outputSteps.length || stepCount;
       setDebugSnapshot({
@@ -1322,146 +1329,21 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [outputs, debugSnapshot, debugStepIndex]);
 
   const currentGateBits = useMemo(() => {
-    const localComputed: Record<string, string> = {};
     const backendStep = debugSnapshot?.gateOutputSteps?.[debugStepIndex] ?? {};
 
     const normalizeBits = (raw: string | null | undefined) => {
       const normalized = String(raw ?? '0').replace(/[^01]/g, '');
       return normalized || '0';
     };
-
-    const getInputValue = (wireFrom: Wire['from']) => {
-      if (wireFrom.componentId.startsWith('IO:IN:')) {
-        const inputName = wireFrom.componentId.replace('IO:IN:', '');
-        return Number(currentInputBits[inputName] ?? '0');
-      }
-
-      const sourcePlaced = placed.find((p) => p.id === wireFrom.componentId);
-      if (!sourcePlaced) return 0;
-      const sourceDef = uiCatalog[sourcePlaced.componentId];
-      if (!sourceDef) return 0;
-
-      if (localComputed[wireFrom.componentId] == null) {
-        return null;
-      }
-
-      const sourceOutputs = (localComputed[wireFrom.componentId] ?? '0').split(
-        '',
-      );
-      const sourceOutputPortIndices = sourceDef.ports
-        .map((port, idx) => ({ port, idx }))
-        .filter((x) => x.port.kind === 'output')
-        .map((x) => x.idx);
-      const outputPosition = Math.max(
-        0,
-        sourceOutputPortIndices.indexOf(wireFrom.pinIndex),
-      );
-      return Number(
-        sourceOutputs[Math.min(outputPosition, sourceOutputs.length - 1)] ??
-          '0',
-      );
-    };
-
-    const evalGate = (componentId: string, gateInputs: number[]) => {
-      switch (componentId) {
-        case 'AND':
-          return [gateInputs[0] & gateInputs[1]];
-        case 'OR':
-          return [gateInputs[0] | gateInputs[1]];
-        case 'NOT':
-          return [gateInputs[0] ? 0 : 1];
-        case 'XOR':
-          return [gateInputs[0] ^ gateInputs[1]];
-        case 'NAND':
-          return [gateInputs[0] & gateInputs[1] ? 0 : 1];
-        case 'NOR':
-          return [gateInputs[0] | gateInputs[1] ? 0 : 1];
-        case 'XNOR':
-          return [gateInputs[0] ^ gateInputs[1] ? 0 : 1];
-        default:
-          return null;
-      }
-    };
-
-    // Seed stateful/unknown gates from backend step simulation output.
-    // DFF must come from backend trace so delay behavior is correct per step.
+    const outputBits: Record<string, string> = {};
     for (const p of placed) {
-      if (p.componentId === 'DFF') {
-        localComputed[p.id] = normalizeBits(backendStep[p.id]);
+      outputBits[p.id] = normalizeBits(backendStep[p.id]);
+      if (placed.length < 10) {  // Only log for small boards to avoid spam
+        console.log(`[GATE_BITS] Step ${debugStepIndex}: ${p.id} = ${outputBits[p.id]} (raw: ${backendStep[p.id]})`);
       }
     }
-
-    const unresolved = new Set(placed.map((p) => p.id));
-    let iterationGuard = 0;
-    while (unresolved.size > 0 && iterationGuard < placed.length * 4) {
-      iterationGuard += 1;
-      let progressed = false;
-      for (const p of placed) {
-        if (!unresolved.has(p.id)) continue;
-        const def = uiCatalog[p.componentId];
-        if (!def) {
-          unresolved.delete(p.id);
-          progressed = true;
-          continue;
-        }
-
-        const inputPortIndices = def.ports
-          .map((port, idx) => ({ port, idx }))
-          .filter((x) => x.port.kind === 'input')
-          .map((x) => x.idx);
-
-        let hasPendingDependency = false;
-        const gateInputs = inputPortIndices.map((pinIndex) => {
-          const incoming = wires.find(
-            (w) => w.to.componentId === p.id && w.to.pinIndex === pinIndex,
-          );
-          if (!incoming) return 0;
-          const value = getInputValue(incoming.from);
-          if (value == null) {
-            hasPendingDependency = true;
-            return 0;
-          }
-          return value;
-        });
-
-        if (hasPendingDependency) {
-          continue;
-        }
-
-        const evaluated = evalGate(p.componentId, gateInputs);
-        if (evaluated) {
-          localComputed[p.id] = evaluated.map((bit) => String(bit)).join('');
-          unresolved.delete(p.id);
-          progressed = true;
-          continue;
-        }
-
-        const fallback = backendStep[p.id];
-        localComputed[p.id] = normalizeBits(fallback);
-        unresolved.delete(p.id);
-        progressed = true;
-      }
-
-      if (!progressed) {
-        for (const unresolvedId of Array.from(unresolved)) {
-          localComputed[unresolvedId] = normalizeBits(
-            backendStep[unresolvedId],
-          );
-          unresolved.delete(unresolvedId);
-        }
-        break;
-      }
-    }
-
-    return localComputed;
-  }, [
-    debugSnapshot,
-    debugStepIndex,
-    currentInputBits,
-    placed,
-    wires,
-    uiCatalog,
-  ]);
+    return outputBits;
+  }, [debugSnapshot, debugStepIndex, placed]);
 
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
