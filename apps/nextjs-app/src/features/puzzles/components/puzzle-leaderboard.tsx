@@ -6,6 +6,8 @@ import { useLeaderboard } from '@/features/puzzles/api/get-leaderboard';
 import { useUser } from '@/lib/auth';
 import { InfoPopup } from '@/components/ui/info-popup';
 
+import { formatFirstSolved } from '../utils/format-first-solved';
+
 const MEDAL_LABELS: Record<number, string> = {
   3: 'Gold',
   2: 'Silver',
@@ -36,18 +38,23 @@ const formatTime = (seconds: number) => {
   return `${h}h ${rm}m ${s}s`;
 };
 
-const getMetricDisplay = (entry: any, type: 'time' | 'cost') => {
+const getMetricDisplay = (
+  entry: any,
+  type: 'time' | 'cost' | 'first_solved',
+) => {
   if (type === 'time') {
     return formatTime(entry.best_time);
-  } else {
+  }
+  if (type === 'cost') {
     return `${entry.best_cost} cost`;
   }
+  return formatFirstSolved(entry.first_solved_at);
 };
 
 export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
-  const [leaderboardType, setLeaderboardType] = useState<'time' | 'cost'>(
-    'time',
-  );
+  const [leaderboardType, setLeaderboardType] = useState<
+    'time' | 'cost' | 'first_solved'
+  >('time');
   const user = useUser();
   const leaderboardQuery = useLeaderboard({ puzzleId, type: leaderboardType });
   const entries = leaderboardQuery.data?.data ?? [];
@@ -85,6 +92,16 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
           }`}
         >
           Lowest Cost
+        </button>
+        <button
+          onClick={() => setLeaderboardType('first_solved')}
+          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
+            leaderboardType === 'first_solved'
+              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
+              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          First Solved
         </button>
       </div>
 
@@ -239,7 +256,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                   </p>
                 </InfoPopup>
               </>
-            ) : (
+            ) : leaderboardType === 'cost' ? (
               <>
                 Ranked by lowest cost solution
                 <InfoPopup>
@@ -252,6 +269,30 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                       lowest cost solution
                     </span>{' '}
                     across all attempts.
+                  </p>
+                  <p className="mt-1">
+                    Medals (Gold, Silver, Bronze) are earned based on your{' '}
+                    <span className="font-medium text-foreground">
+                      solve performance
+                    </span>{' '}
+                    — staying within time and budget limits — not your
+                    leaderboard position.
+                  </p>
+                </InfoPopup>
+              </>
+            ) : (
+              <>
+                Ranked by first successful solve
+                <InfoPopup>
+                  <p className="font-medium text-foreground mb-1">
+                    Leaderboard & Medals
+                  </p>
+                  <p>
+                    Rank is determined by the timestamp of your{' '}
+                    <span className="font-medium text-foreground">
+                      first successful solve
+                    </span>
+                    .
                   </p>
                   <p className="mt-1">
                     Medals (Gold, Silver, Bronze) are earned based on your{' '}

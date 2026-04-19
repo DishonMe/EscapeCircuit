@@ -8,6 +8,7 @@ import { paths } from '@/config/paths';
 import type { Puzzle } from '@/types/api';
 import { cn } from '@/utils/cn';
 
+import { formatFirstSolved } from '../utils/format-first-solved';
 import { formatTime } from '../utils/format-time';
 
 import { PuzzleActionCluster } from './puzzle-action-cluster';
@@ -132,10 +133,16 @@ export const PuzzleCard = ({
       </p>
 
       {/* Stats row */}
-      <div className="mt-2 flex items-center gap-2 font-mono text-[12px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[12px] text-muted-foreground">
         {puzzle.is_solved && puzzle.best_time != null && (
           <>
             <span>Best {formatTime(puzzle.best_time)}</span>
+            <span aria-hidden>·</span>
+          </>
+        )}
+        {puzzle.is_solved && puzzle.first_solved_at && (
+          <>
+            <span>First Solved - {formatFirstSolved(puzzle.first_solved_at)}</span>
             <span aria-hidden>·</span>
           </>
         )}
