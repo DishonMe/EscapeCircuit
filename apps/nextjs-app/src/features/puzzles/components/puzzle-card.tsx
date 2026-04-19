@@ -171,6 +171,7 @@ export const PuzzleCard = ({
           onInstructions={() => onInstructions(puzzle.id)}
           onComment={() => onComment(puzzle.id)}
           onLeaderboard={() => onLeaderboard(puzzle.id)}
+          onRate={() => onRate(puzzle.id)}
           variant="card"
         />
 
