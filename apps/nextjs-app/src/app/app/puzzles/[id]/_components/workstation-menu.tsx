@@ -129,7 +129,7 @@ const Category = ({
 }) => {
   return (
     <div className="rounded-xl border border-border bg-card p-3 text-card-foreground shadow-subtle transition-all duration-300">
-      <div className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
+      <div className="mb-2 text-[14px] font-semibold tracking-tight text-foreground">{title}</div>
       {children}
     </div>
   );
@@ -273,7 +273,7 @@ const DraggableItem = ({
   return (
       <div
         className={cn(
-          'group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+          'group flex w-full items-center gap-1 rounded-lg border px-1.5 py-0.5 text-left text-[14px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
           isSelected
             ? 'border-sky-500 bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-secondary'
             : 'border-border bg-secondary',
@@ -314,8 +314,8 @@ const DraggableItem = ({
         >
           <span className="font-semibold text-foreground">{component.type}</span>
           {inPalette ? (
-            <span className="text-xs text-muted-foreground">
-              cost {component.cost} · pins {component.pins}
+            <span className="text-[12px] text-muted-foreground">
+              cost {component.cost}
             </span>
           ) : null}
         </div>
@@ -460,7 +460,7 @@ export const WorkstationMenu = ({
     <div className="flex flex-col gap-3">
       {basic.length ? (
         <Category title="Basic">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {basic.map((c) => (
               <DraggableItem
                 key={c.id}
@@ -482,10 +482,10 @@ export const WorkstationMenu = ({
       {/* Custom Pieces Category (puzzle-specific) */}
       {custom.length ? (
         <Category title="Special Pieces">
-          <div className="text-[11px] text-foreground/80 mb-2">
+          <div className="mb-2 text-[12px] text-foreground/80">
             Custom logic gates created for this puzzle
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {custom.map((c) => (
               <DraggableItem
                 key={c.id}
@@ -507,10 +507,10 @@ export const WorkstationMenu = ({
       {/* Creator-shared arsenal pieces for this puzzle */}
       {sharedArsenal.length ? (
         <Category title="Shared Arsenal">
-          <div className="text-[11px] text-foreground/80 mb-2">
+          <div className="mb-2 text-[12px] text-foreground/80">
             Components explicitly shared by the puzzle creator
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {sharedArsenal.map((c) => (
               <DraggableItem
                 key={c.id}
@@ -532,11 +532,11 @@ export const WorkstationMenu = ({
       {/* Solver personal arsenal pieces (when allowed) */}
       {allowArsenal ? (
         <Category title="Your Arsenal">
-          <div className="text-[11px] text-foreground/80 mb-2">
+          <div className="mb-2 text-[12px] text-foreground/80">
             Your personal circuit pieces
           </div>
           {solverArsenal.length > 0 ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               {solverArsenal.map((c) => (
                 <DraggableItem
                   key={c.id}
@@ -553,7 +553,7 @@ export const WorkstationMenu = ({
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-foreground/70 opacity-80">
+            <div className="text-[12px] text-foreground/70 opacity-80">
               No personal arsenal pieces available.
             </div>
           )}
@@ -562,11 +562,11 @@ export const WorkstationMenu = ({
 
       {allowArsenal && visibleArsenal.length ? (
         <Category title="Saved">
-          <div className="text-[11px] text-foreground/80">
+          <div className="text-[12px] text-foreground/80">
             Saved circuits are shown only if they don’t use filtered-out basic
             gates.
           </div>
-          <div className="mt-2 flex flex-col gap-2">
+          <div className="mt-2 flex flex-col gap-1">
             {visibleArsenal.map((c) => (
               <div
                 key={c.id}

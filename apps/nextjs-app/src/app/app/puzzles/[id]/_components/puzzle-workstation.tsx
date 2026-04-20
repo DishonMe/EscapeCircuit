@@ -56,6 +56,7 @@ import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import {
   Bug,
   ChevronDown,
@@ -201,6 +202,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
   const startTime = useRef(Date.now());
+  const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
@@ -1924,15 +1926,18 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 }
               />
               {!isInlineDebugger ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="workstation-debugger-button"
-                  onClick={enterInlineDebugger}
-                >
-                  <Bug className="mr-1 size-4" />
-                  Debugger
-                </Button>
+                <div className="relative">
+                  <Button
+                    ref={debuggerButtonRef}
+                    variant="outline"
+                    size="sm"
+                    className="workstation-debugger-button relative overflow-hidden"
+                    onClick={enterInlineDebugger}
+                  >
+                    <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                    Debugger
+                  </Button>
+                </div>
               ) : (
                 <>
                   <Button
@@ -2067,8 +2072,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     key={i}
                     className={
                       ioUsage.usedInputs.has(i)
-                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+                        ? 'rounded-md border border-green-500/70 bg-green-500 px-2 py-0.5 text-[11px] font-medium text-white'
+                        : 'rounded-md border border-green-200/70 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700'
                     }
                   >
                     {i}
@@ -2082,8 +2087,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     key={o}
                     className={
                       ioUsage.usedOutputs.has(o)
-                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+                        ? 'rounded-md border border-orange-500/80 bg-orange-500 px-2 py-0.5 text-[11px] font-medium text-white'
+                        : 'rounded-md border border-orange-500/80 bg-orange-500 px-2 py-0.5 text-[11px] font-medium text-white'
                     }
                   >
                     {o}
@@ -2094,7 +2099,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_250px]">
           <div className="workstation-component-menu">
             <WorkstationMenu
               basic={visibleBasics}

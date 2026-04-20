@@ -6,7 +6,7 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { ChevronRight, Lock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -324,6 +324,7 @@ export const WorkstationGrid = ({
     wires: Wire[];
   } | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
+  const [isWorkingAreaCollapsed, setIsWorkingAreaCollapsed] = useState(false);
 
   const canCopySelection =
     selectedEntity.type === 'component' && selectedEntity.placedIds.length > 0;
@@ -1810,17 +1811,41 @@ export const WorkstationGrid = ({
   return (
     <div className="flex flex-1 flex-col gap-2 min-h-0">
       <div className="rounded-md border border-border bg-card p-3">
-        <div className="mb-1 text-sm font-medium text-foreground">
-          Working Area
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-medium text-foreground">Working Area</div>
+          <button
+            type="button"
+            className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
+            aria-expanded={!isWorkingAreaCollapsed}
+            aria-label={
+              isWorkingAreaCollapsed
+                ? 'Expand Working Area info'
+                : 'Collapse Working Area info'
+            }
+            title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
+          >
+            <ChevronRight
+              className={cn(
+                'size-4 transition-transform duration-200',
+                !isWorkingAreaCollapsed && 'rotate-90',
+              )}
+            />
+          </button>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {gridRows}×{gridCols} grid. Wheel to zoom. Drag background to pan.
-          Click/drag ports to wire.
-        </div>
-        <div className="text-xs text-muted-foreground">
-          Use Shift+click to select multiple components. Copy/Paste with
-          Ctrl+C/Ctrl+V.
-        </div>
+        {!isWorkingAreaCollapsed ? (
+          <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+            <p>
+              {gridRows} x {gridCols} grid.
+            </p>
+            <p>Scroll to zoom. Drag the background to pan.</p>
+            <p>Click or drag ports to create wires.</p>
+            <p>
+              Use Shift+Click to select multiple components. Use Ctrl+C / Ctrl+V
+              to copy and paste.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div
