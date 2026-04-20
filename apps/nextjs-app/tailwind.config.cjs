@@ -80,12 +80,23 @@ module.exports = {
           from: { opacity: '0', transform: 'translateY(4px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'fade-up': {
+          '0%':   { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'accent-pop': {
+          '0%':   { color: '#f0f4ff', transform: 'scale(0.95)' },
+          '60%':  { transform: 'scale(1.06)' },
+          '100%': { color: '#63b3ed', transform: 'scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.15s ease-out',
         'slide-up': 'slide-up 0.2s ease-out',
+        'fade-up':    'fade-up 0.55s ease-out both',
+        'accent-pop': 'accent-pop 0.8s ease-out both',
       },
     },
   },
