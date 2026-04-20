@@ -2213,6 +2213,30 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                         );
                         if (!placedComponent) return componentId;
 
+                        // Get the component definition from catalog
+                        const catalogEntry = componentCatalog.get(
+                          placedComponent.componentId,
+                        );
+
+                        // Extract display name based on component type
+                        let displayName = placedComponent.componentId;
+                        if (catalogEntry) {
+                          // For Arsenal pieces, use their name property if available
+                          if (
+                            (catalogEntry as any).is_arsenal === true &&
+                            (catalogEntry as any).name
+                          ) {
+                            displayName = (catalogEntry as any).name;
+                          }
+                          // For Custom Pieces, use type or name
+                          else if (
+                            (catalogEntry as any).type &&
+                            !placedComponent.componentId.includes(':')
+                          ) {
+                            displayName = (catalogEntry as any).type;
+                          }
+                        }
+
                         // Count how many gates of the same type appear before this one
                         const countBefore = placed
                           .slice(0, placed.indexOf(placedComponent))
@@ -2228,15 +2252,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                             comp.componentId === placedComponent.componentId,
                         ).length;
 
-                        // Extract gate type from ID (e.g., "NOT:1234567" -> "NOT")
-                        const parts = placedComponent.componentId.split(':');
-                        const gateType =
-                          parts[0] || placedComponent.componentId;
-
                         // Only show number if there are multiple gates of this type
                         return totalCount > 1
-                          ? `${gateType} Gate ${gateNumber}`
-                          : `${gateType} Gate`;
+                          ? `${displayName} ${gateNumber}`
+                          : `${displayName}`;
                       };
 
                       const fromLabel = formatWireNode(w.from.componentId);
@@ -2249,7 +2268,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                         >
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             {/* From Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-1 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-blue-600/80 bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {fromLabel}
                             </div>
 
@@ -2260,7 +2279,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                             />
 
                             {/* To Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-yellow-600/80 bg-yellow-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {toLabel}
                             </div>
                           </div>
@@ -2880,7 +2899,8 @@ const InspectionDialog = ({
     ? visibilityMode !== 'description' // For arsenal: show structure unless explicitly description-only
     : false; // For basic gates: never show internal structure
 
-  const showIOMap = !isArsenal; // I/O Map ONLY for basic gates, never for Arsenal pieces
+  const isDFF = catalogEntry.type === 'DFF';
+  const showIOMap = !isArsenal && !isDFF; // I/O Map for basic gates EXCEPT DFF
 
   // Parse internal structure for circuit preview
   const parsedSolution = useMemo(() => {
@@ -3278,7 +3298,7 @@ const getBasicGateInfo = (gateType: string): string | null => {
     NAND: 'NOT AND: outputs 0 only when both inputs are 1.',
     NOR: 'NOT OR: outputs 1 only when both inputs are 0.',
     XNOR: 'Exclusive NOR: outputs 1 when inputs are the same.',
-    DFF: 'D Flip-Flop: stores state based on clock input.',
+    DFF: 'A D Flip-Flop (DFF) is a sequential logic component. It captures the value of the Data (D) input at a definite portion of the clock cycle (usually the rising edge) and outputs that captured value at Q. The output Q only changes state when the clock ticks, holding its value steady between clock edges.',
   };
   return info[gateType] ?? null;
 };

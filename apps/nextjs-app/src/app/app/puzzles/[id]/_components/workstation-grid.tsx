@@ -2792,7 +2792,7 @@ export const WorkstationGrid = ({
                 <button
                   type="button"
                   className={cn(
-                    'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-700 transition-transform hover:scale-125 animate-in fade-in zoom-in-90',
+                    'pointer-events-auto absolute flex items-center gap-2 rounded border border-green-500/80 bg-green-500 px-2 py-1 text-xs font-semibold text-white shadow-sm transition-all hover:scale-125 hover:bg-green-600 animate-in fade-in zoom-in-90',
                     highInputOwnerIds.has(id) &&
                       'ring-1 ring-emerald-400/70 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.3)]',
                     isPowerSurge &&
@@ -2841,7 +2841,7 @@ export const WorkstationGrid = ({
             );
           })}
 
-          {outputs.map((label) => {
+          {outputs.map((label, outputIndex) => {
             const id = `IO:OUT:${label}`;
             const pt = ioLayout.outputs[id];
             if (!pt) return null;
@@ -2850,7 +2850,7 @@ export const WorkstationGrid = ({
               <div key={id}>
                 {debuggerActive ? (
                   <div
-                    className="pointer-events-none absolute z-30"
+                    className="pointer-events-auto absolute z-30 flex items-center gap-1"
                     style={{
                       left: pt.x,
                       top: pt.y,
@@ -2867,11 +2867,17 @@ export const WorkstationGrid = ({
                 ) : null}
                 <button
                   type="button"
-                  className="pointer-events-auto absolute flex items-center gap-2 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs text-orange-700 transition-transform hover:scale-125"
+                  className={cn(
+                    'pointer-events-auto absolute flex items-center gap-2 rounded border border-orange-500/80 bg-orange-500 px-2 py-1 text-xs font-semibold text-white shadow-sm transition-all hover:scale-125 hover:bg-orange-600 animate-in fade-in zoom-in-90',
+                    isPowerSurge &&
+                      'ring-2 ring-cyan-300/80 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
+                  )}
                   style={{
                     left: pt.x,
                     top: pt.y,
                     transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
+                    animationDelay: `${Math.min(outputIndex, 8) * 110}ms`,
+                    animationFillMode: 'both',
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
