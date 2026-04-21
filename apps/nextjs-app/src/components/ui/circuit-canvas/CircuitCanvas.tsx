@@ -51,6 +51,7 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const context = ctx as CanvasRenderingContext2D;
 
     function rnd(a: number, b: number) {
       return a + Math.random() * (b - a);
@@ -128,6 +129,7 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
     }
 
     function resize() {
+      if (!canvas) return;
       const parent = canvas.parentElement;
       if (!parent) return;
       const W = parent.clientWidth;
@@ -152,17 +154,17 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
 
     function draw() {
       const { nodes, edges, signals, W, H } = stateRef.current;
-      ctx.clearRect(0, 0, W, H);
+      context.clearRect(0, 0, W, H);
 
       // Draw edges
       edges.forEach(edge => {
         const pts = getPathPoints(nodes, edge);
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        pts.slice(1).forEach(pt => ctx.lineTo(pt.x, pt.y));
-        ctx.strokeStyle = 'rgba(100,140,200,0.08)';
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
+        context.beginPath();
+        context.moveTo(pts[0].x, pts[0].y);
+        pts.slice(1).forEach(pt => context.lineTo(pt.x, pt.y));
+        context.strokeStyle = 'rgba(100,140,200,0.08)';
+        context.lineWidth = 0.8;
+        context.stroke();
       });
 
       // Draw & advance signals
@@ -171,15 +173,15 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
         const pts = getPathPoints(nodes, sig.edge);
         const pos = lerpAlongPath(pts, sig.t);
 
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = sig.color;
-        ctx.fill();
+        context.beginPath();
+        context.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2);
+        context.fillStyle = sig.color;
+        context.fill();
 
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 7, 0, Math.PI * 2);
-        ctx.fillStyle = sig.color.replace('0.75', '0.1');
-        ctx.fill();
+        context.beginPath();
+        context.arc(pos.x, pos.y, 7, 0, Math.PI * 2);
+        context.fillStyle = sig.color.replace('0.75', '0.1');
+        context.fill();
 
         sig.t += sig.speed;
         if (sig.t >= 1) signals.splice(i, 1);
@@ -191,23 +193,23 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
         const alpha = n.hot ? 0.4 + 0.6 * Math.sin(n.phase) : 0.15;
 
         if (n.hot) {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r + 7, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(99,179,237,${alpha * 0.12})`;
-          ctx.fill();
+          context.beginPath();
+          context.arc(n.x, n.y, n.r + 7, 0, Math.PI * 2);
+          context.fillStyle = `rgba(99,179,237,${alpha * 0.12})`;
+          context.fill();
         }
 
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fillStyle = n.hot
+        context.beginPath();
+        context.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        context.fillStyle = n.hot
           ? `rgba(99,179,237,${alpha})`
           : `rgba(140,170,210,${alpha * 0.45})`;
-        ctx.fill();
+        context.fill();
 
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, 1.3, 0, Math.PI * 2);
-        ctx.fillStyle = n.hot ? '#90cdf4' : 'rgba(180,210,240,0.5)';
-        ctx.fill();
+        context.beginPath();
+        context.arc(n.x, n.y, 1.3, 0, Math.PI * 2);
+        context.fillStyle = n.hot ? '#90cdf4' : 'rgba(180,210,240,0.5)';
+        context.fill();
       });
 
       animRef.current = requestAnimationFrame(draw);
