@@ -8,112 +8,52 @@ interface BugCrawlerProps {
 }
 
 interface BugState {
-  position: number;
+  x: number;
+  y: number;
+  angle: number;
+  targetX: number;
+  targetY: number;
   speed: number;
   targetSpeed: number;
   burstTime: number;
+  legPhase: number;
 }
 
 export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bugStateRef = useRef<BugState>({
-    position: 0,
+    x: 0,
+    y: 0,
+    angle: 0,
+    targetX: 0,
+    targetY: 0,
     speed: 0.4,
     targetSpeed: 0.4,
     burstTime: 0,
+    legPhase: 0,
   });
-  const pathRef = useRef<{ x: number; y: number }[]>([]);
   const animationFrameRef = useRef<number>();
 
-  // Measure button and rebuild path
-  const rebuildPath = () => {
-    if (!containerRef.current || !canvasRef.current) return;
+  // Pick a new random target within the container bounds
+  const pickNewTarget = () => {
+    if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const w = rect.width;
-    const h = rect.height;
-    const r = borderRadius;
-    const offset = 8; // Distance outward from border to keep bug off text
+    const padding = 16; // Keep bug away from edges
 
-    const path: { x: number; y: number }[] = [];
+    const targetX = Math.random() * (rect.width - padding * 2) + padding;
+    const targetY = Math.random() * (rect.height - padding * 2) + padding;
 
-    // Top-left arc (outward)
-    for (let i = 0; i <= 90; i += 2) {
-      const rad = (i * Math.PI) / 180;
-      const cx = r - r * Math.cos(rad);
-      const cy = r - r * Math.sin(rad);
-      // Distance from corner center
-      const dist = Math.sqrt(cx * cx + cy * cy);
-      path.push({
-        x: cx * (1 + offset / dist),
-        y: cy * (1 + offset / dist),
-      });
-    }
-
-    // Top edge
-    for (let x = r; x <= w - r; x += 2) {
-      path.push({ x, y: -offset });
-    }
-
-    // Top-right arc (outward)
-    for (let i = 0; i <= 90; i += 2) {
-      const rad = (i * Math.PI) / 180;
-      const cx = w - r + r * Math.sin(rad);
-      const cy = r - r * Math.cos(rad);
-      const dist = Math.sqrt((cx - (w - r)) ** 2 + (cy - r) ** 2);
-      path.push({
-        x: (w - r) + (cx - (w - r)) * (1 + offset / dist),
-        y: r + (cy - r) * (1 + offset / dist),
-      });
-    }
-
-    // Right edge
-    for (let y = r; y <= h - r; y += 2) {
-      path.push({ x: w + offset, y });
-    }
-
-    // Bottom-right arc (outward)
-    for (let i = 0; i <= 90; i += 2) {
-      const rad = (i * Math.PI) / 180;
-      const cx = w - r + r * Math.cos(rad);
-      const cy = h - r + r * Math.sin(rad);
-      const dist = Math.sqrt((cx - (w - r)) ** 2 + (cy - (h - r)) ** 2);
-      path.push({
-        x: (w - r) + (cx - (w - r)) * (1 + offset / dist),
-        y: (h - r) + (cy - (h - r)) * (1 + offset / dist),
-      });
-    }
-
-    // Bottom edge
-    for (let x = w - r; x >= r; x -= 2) {
-      path.push({ x, y: h + offset });
-    }
-
-    // Bottom-left arc (outward)
-    for (let i = 0; i <= 90; i += 2) {
-      const rad = (i * Math.PI) / 180;
-      const cx = r - r * Math.sin(rad);
-      const cy = h - r + r * Math.cos(rad);
-      const dist = Math.sqrt(cx * cx + (cy - (h - r)) ** 2);
-      path.push({
-        x: cx * (1 + offset / dist),
-        y: (h - r) + (cy - (h - r)) * (1 + offset / dist),
-      });
-    }
-
-    // Left edge
-    for (let y = h - r; y >= r; y -= 2) {
-      path.push({ x: -offset, y });
-    }
-
-    pathRef.current = path;
+    bugStateRef.current.targetX = targetX;
+    bugStateRef.current.targetY = targetY;
   };
 
   const drawBug = (ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, legPhase: number) => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
+    ctx.rotate(Math.PI / 2);
 
     // Body (oval red)
     ctx.fillStyle = '#DC2626';
@@ -201,9 +141,6 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const path = pathRef.current;
-    if (path.length === 0) return;
-
     // Update speed
     if (state.burstTime > 0) {
       state.burstTime -= 16;
@@ -212,35 +149,48 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
       state.speed += (state.targetSpeed - state.speed) * 0.1;
     }
 
-    // Move position
-    state.position = (state.position + state.speed) % path.length;
+    // Calculate direction to target
+    const dx = state.targetX - state.x;
+    const dy = state.targetY - state.y;
+    const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
-    // Get current and next position for direction
-    const currentIdx = Math.floor(state.position);
-    const nextIdx = (currentIdx + 1) % path.length;
-    const current = path[currentIdx];
-    const next = path[nextIdx];
+    // If reached target, pick a new one
+    if (distanceToTarget < 5) {
+      pickNewTarget();
+    } else {
+      // Calculate target angle
+      const targetAngle = Math.atan2(dy, dx);
 
-    const angle = Math.atan2(next.y - current.y, next.x - current.x);
+      // Smooth angle interpolation with wrap-around handling
+      let angleDiff = targetAngle - state.angle;
+      // Normalize angle difference to [-PI, PI]
+      if (angleDiff > Math.PI) {
+        angleDiff -= Math.PI * 2;
+      } else if (angleDiff < -Math.PI) {
+        angleDiff += Math.PI * 2;
+      }
+
+      // Smoothly turn towards target (0.08 is the interpolation factor)
+      state.angle += angleDiff * 0.08;
+    }
+
+    // Update position based on angle and speed
+    state.x += Math.cos(state.angle) * state.speed;
+    state.y += Math.sin(state.angle) * state.speed;
+
+    // Update leg animation
+    state.legPhase = (state.legPhase + 0.3) % (Math.PI * 2);
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw bug - offset by 24px to account for canvas positioning
-    const bugX = current.x + 24;
-    const bugY = current.y + 24;
-    const legPhase = (state.position * 0.3) % (Math.PI * 2);
-    drawBug(ctx, bugX, bugY, angle, legPhase);
+    const bugX = state.x + 24;
+    const bugY = state.y + 24;
+    drawBug(ctx, bugX, bugY, state.angle, state.legPhase);
 
     animationFrameRef.current = requestAnimationFrame(animate);
   };
-
-  useEffect(() => {
-    rebuildPath();
-    const handleResize = () => rebuildPath();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [borderRadius]);
 
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
@@ -248,6 +198,13 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
     const rect = containerRef.current.getBoundingClientRect();
     canvasRef.current.width = rect.width + 48;
     canvasRef.current.height = rect.height + 48;
+
+    // Initialize bug position to center of container
+    bugStateRef.current.x = rect.width / 2;
+    bugStateRef.current.y = rect.height / 2;
+    
+    // Pick first target
+    pickNewTarget();
 
     animate();
 
@@ -270,6 +227,7 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
     // Only trigger burst if click is on the button itself, not the canvas
     if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
       bugStateRef.current.burstTime = 800;
+      pickNewTarget();
     }
   };
 
