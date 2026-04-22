@@ -12,10 +12,12 @@ interface BugState {
   targetRotation: number; // Target rotation in radians (0 = up, π/2 = right, π = down, -π/2 = left)
   currentRotation: number; // Current rotation in radians
   isWalking: boolean; // Whether we're currently walking
+  isIdle: boolean;
   speed: number;
   targetSpeed: number;
   burstTime: number;
   walkUntil: number;
+  idleUntil: number;
   isTurning: boolean;
   turnStartTime: number;
   turnDuration: number;
@@ -30,10 +32,12 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     targetRotation: 0,
     currentRotation: 0,
     isWalking: false,
+    isIdle: false,
     speed: 0.5,
     targetSpeed: 0.5,
     burstTime: 0,
     walkUntil: 0,
+    idleUntil: 0,
     isTurning: false,
     turnStartTime: 0,
     turnDuration: 0,
@@ -202,7 +206,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
         }
 
         const distance = clearanceDistance(angle);
-        const weight = Math.pow(distance + 1, 1.7);
+        const weight = Math.pow(distance + 1, 2.1);
         candidates.push({ angle, weight });
       }
 
@@ -242,6 +246,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       state.turnDuration = 420 + (Math.abs(angleDiff) / Math.PI) * 320;
       state.isTurning = true;
       state.isWalking = false;
+      state.isIdle = false;
     };
 
     // Update speed based on burst (with smooth easing)
@@ -252,7 +257,20 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       state.speed += (state.targetSpeed - state.speed) * 0.12; // Smoother speed transitions
     }
 
-    if (!state.isWalking && !state.isTurning) {
+    if (!state.isWalking && !state.isTurning && !state.isIdle) {
+      if (Math.random() < 0.05) {
+        state.isIdle = true;
+        state.idleUntil = now + getRandomWalkDurationMs();
+      } else {
+        state.targetRotation = getRandomDirection();
+        state.currentRotation = state.targetRotation;
+        state.walkUntil = now + getRandomWalkDurationMs();
+        state.isWalking = true;
+      }
+    }
+
+    if (state.isIdle && now >= state.idleUntil) {
+      state.isIdle = false;
       state.targetRotation = getRandomDirection();
       state.currentRotation = state.targetRotation;
       state.walkUntil = now + getRandomWalkDurationMs();
