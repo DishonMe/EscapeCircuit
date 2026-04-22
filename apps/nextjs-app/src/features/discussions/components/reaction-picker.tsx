@@ -6,14 +6,13 @@ import { SmilePlus } from 'lucide-react';
 import { ReactionCount, ReactionType } from '@/types/api';
 import { cn } from '@/utils/cn';
 
-const REACTION_EMOJIS: Record<ReactionType, { emoji: string; label: string }> =
-  {
-    insightful: { emoji: '💡', label: 'Insightful' },
-    helpful: { emoji: '🙏', label: 'Helpful' },
-    genius: { emoji: '🧠', label: 'Genius' },
-    spot_on: { emoji: '🎯', label: 'Spot On' },
-    thinking: { emoji: '🤔', label: 'Thinking' },
-  };
+const REACTION_LABELS: Record<ReactionType, { label: string }> = {
+  insightful: { label: 'Insightful' },
+  helpful: { label: 'Helpful' },
+  genius: { label: 'Genius' },
+  spot_on: { label: 'Spot On' },
+  thinking: { label: 'Thinking' },
+};
 
 type ReactionPickerProps = {
   reactions: ReactionCount[];
@@ -34,7 +33,7 @@ export const ReactionPicker = ({
     <div className="flex flex-wrap items-center gap-1">
       {/* Existing reactions */}
       {reactions.map((r) => {
-        const config = REACTION_EMOJIS[r.type];
+        const config = REACTION_LABELS[r.type];
         if (!config) return null;
         const isActive = userReactions.includes(r.type);
         return (
@@ -50,7 +49,7 @@ export const ReactionPicker = ({
             disabled={isLoading}
             title={config.label}
           >
-            <span>{config.emoji}</span>
+            <span>{config.label}</span>
             <span>{r.count}</span>
           </button>
         );
@@ -72,12 +71,12 @@ export const ReactionPicker = ({
               className="fixed inset-0 z-10"
               onClick={() => setShowPicker(false)}
             />
-            <div className="absolute bottom-full left-0 z-20 mb-1 flex gap-1 rounded-xl border border-border bg-card p-1.5 shadow-elevated">
-              {Object.entries(REACTION_EMOJIS).map(([type, config]) => (
+            <div className="absolute bottom-full left-0 z-20 mb-1 flex max-w-[280px] flex-wrap gap-1 rounded-xl border border-border bg-card p-1.5 shadow-elevated">
+              {Object.entries(REACTION_LABELS).map(([type, config]) => (
                 <button
                   key={type}
                   className={cn(
-                    'rounded-lg p-1.5 text-lg transition-colors hover:bg-secondary',
+                    'rounded-lg px-2.5 py-1 text-[12px] font-medium transition-colors hover:bg-secondary',
                     userReactions.includes(type as ReactionType) &&
                       'bg-blue-50/50',
                   )}
@@ -88,7 +87,7 @@ export const ReactionPicker = ({
                   disabled={isLoading}
                   title={config.label}
                 >
-                  {config.emoji}
+                  {config.label}
                 </button>
               ))}
             </div>

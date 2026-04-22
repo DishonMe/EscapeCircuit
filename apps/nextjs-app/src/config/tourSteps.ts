@@ -159,7 +159,9 @@ export const myPuzzlesTourSteps: Step[] = [
     content:
       'Manage your puzzles here: edit details, publish/unpublish, or delete them.',
     placement: 'top',
-  },
+    scrollIntoView: true,
+    scrollTarget: '.tour-my-puzzles-actions',
+  } as Step,
 ];
 
 /**

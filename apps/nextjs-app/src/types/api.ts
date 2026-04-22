@@ -152,6 +152,8 @@ export type Puzzle = Entity<{
   solvedCount: number;
   isPublic: boolean;
   solution?: CircuitSolution;
+  creator_solution?: Record<string, any> | null;
+  creatorSolution?: Record<string, any> | null;
   status?: 'draft' | 'published' | 'unpublished'; // Puzzle publication status
   isPublished?: boolean; // Alias for frontend compat
   is_hall_of_fame?: boolean;
@@ -161,6 +163,7 @@ export type Puzzle = Entity<{
   can_rate?: boolean;
   rating_min_attempt_seconds?: number;
   best_time?: number | null;
+  first_solved_at?: string | null;
   total_xp?: number;
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
   is_saved?: boolean; // Whether user has saved this puzzle
@@ -197,6 +200,13 @@ export type CircuitComponent = {
   is_arsenal?: boolean;
   used_basic_types?: string[];  // Array of basic gate types used in the component
   solution?: Record<string, any>;  // Component's internal structure/implementation
+  visual_style?: {
+    accentColor?: string;
+    roundness?: number;
+    borderStyle?: 'solid' | 'double' | 'etched';
+    edgeAddon?: 'none' | 'chip-legs';
+    surfaceStyle?: 'flat' | 'brushed' | 'gradient' | 'matte' | 'glass' | 'carbon';
+  };
   hide_internal_structure?: boolean;  // Whether internal structure should be hidden from player
   description?: string;  // Component description shown in inspection dialog
 };

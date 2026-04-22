@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import re
 from typing import Any, Dict, List, Set
 
 from Backend.DomainLayer.Circuit import Circuit
@@ -38,6 +39,43 @@ class ArsenalService:
     MAX_OUTPUTS = ARSENAL_MAX_OUTPUTS
     MIN_INPUTS = ARSENAL_MIN_INPUTS
     MIN_OUTPUTS = ARSENAL_MIN_OUTPUTS
+    _LEGACY_CORNER_STYLES = {"rounded", "sharp", "capsule"}
+    _BORDER_STYLES = {"solid", "double", "etched"}
+    _EDGE_ADDONS = {"none", "chip-legs", "chip"}
+    _SURFACE_STYLES = {"flat", "brushed", "gradient", "matte", "glass", "carbon"}
+    _HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+    _MIN_ROUNDNESS = 0
+    _MAX_ROUNDNESS = 10
+    _LEGACY_PRESET_STYLES: Dict[str, Dict[str, Any]] = {
+        "clean-lab": {
+            "accentColor": "#3b82f6",
+            "roundness": 4,
+            "borderStyle": "solid",
+            "edgeAddon": "none",
+            "surfaceStyle": "gradient",
+        },
+        "retro-chip": {
+            "accentColor": "#f59e0b",
+            "roundness": 2,
+            "borderStyle": "double",
+            "edgeAddon": "chip-legs",
+            "surfaceStyle": "brushed",
+        },
+        "blueprint": {
+            "accentColor": "#22d3ee",
+            "roundness": 2,
+            "borderStyle": "etched",
+            "edgeAddon": "none",
+            "surfaceStyle": "flat",
+        },
+        "playful": {
+            "accentColor": "#10b981",
+            "roundness": 8,
+            "borderStyle": "solid",
+            "edgeAddon": "none",
+            "surfaceStyle": "gradient",
+        },
+    }
 
     def __init__(
         self,
@@ -183,13 +221,96 @@ class ArsenalService:
             raise ValidationError("not an arsenal piece")
         return piece.to_dict()
 
-    def rename_arsenal_piece(self, session_token: str, piece_id: int, new_name: str) -> dict:
-        """Rename an arsenal piece (must be unique per user)"""
+    def _normalize_visual_style(self, visual_style: Any) -> dict:
+        if visual_style is None:
+            return {}
+        if not isinstance(visual_style, dict):
+            raise ValidationError("visual_style must be an object")
+
+        normalized: Dict[str, Any] = {}
+
+        preset = visual_style.get("preset")
+        if preset is not None:
+            if not isinstance(preset, str):
+                raise ValidationError("visual_style.preset is invalid")
+            if preset in self._LEGACY_PRESET_STYLES:
+                normalized.update(self._LEGACY_PRESET_STYLES[preset])
+            else:
+                raise ValidationError("visual_style.preset is invalid")
+
+        accent = visual_style.get("accentColor", visual_style.get("accent_color"))
+        if accent is not None:
+            if not isinstance(accent, str) or not self._HEX_COLOR_RE.match(accent):
+                raise ValidationError("visual_style.accentColor must be a valid hex color")
+            normalized["accentColor"] = accent
+
+        roundness = visual_style.get(
+            "roundness",
+            visual_style.get("cornerRadius", visual_style.get("corner_radius")),
+        )
+        if roundness is not None:
+            if isinstance(roundness, bool) or not isinstance(roundness, (int, float)):
+                raise ValidationError("visual_style.roundness must be a number")
+
+            normalized_roundness = int(round(roundness))
+            if not (self._MIN_ROUNDNESS <= normalized_roundness <= self._MAX_ROUNDNESS):
+                raise ValidationError(
+                    f"visual_style.roundness must be between {self._MIN_ROUNDNESS} and {self._MAX_ROUNDNESS}"
+                )
+            normalized["roundness"] = normalized_roundness
+        else:
+            legacy_corner = visual_style.get("cornerStyle", visual_style.get("corner_style"))
+            if legacy_corner is not None:
+                if (
+                    not isinstance(legacy_corner, str)
+                    or legacy_corner not in self._LEGACY_CORNER_STYLES
+                ):
+                    raise ValidationError("visual_style.cornerStyle is invalid")
+
+                normalized["roundness"] = {
+                    "sharp": 0,
+                    "rounded": 4,
+                    "capsule": 10,
+                }[legacy_corner]
+
+        border = visual_style.get("borderStyle", visual_style.get("border_style"))
+        if border is not None:
+            if not isinstance(border, str):
+                raise ValidationError("visual_style.borderStyle is invalid")
+
+            if border == "chip":
+                normalized["edgeAddon"] = "chip-legs"
+                normalized["borderStyle"] = normalized.get("borderStyle", "double")
+            elif border in self._BORDER_STYLES:
+                normalized["borderStyle"] = border
+            else:
+                raise ValidationError("visual_style.borderStyle is invalid")
+
+        edge_addon = visual_style.get("edgeAddon", visual_style.get("edge_addon"))
+        if edge_addon is not None:
+            if not isinstance(edge_addon, str) or edge_addon not in self._EDGE_ADDONS:
+                raise ValidationError("visual_style.edgeAddon is invalid")
+
+            normalized["edgeAddon"] = "chip-legs" if edge_addon == "chip" else edge_addon
+
+        surface = visual_style.get("surfaceStyle", visual_style.get("surface_style"))
+        if surface is not None:
+            if not isinstance(surface, str) or surface not in self._SURFACE_STYLES:
+                raise ValidationError("visual_style.surfaceStyle is invalid")
+            normalized["surfaceStyle"] = surface
+
+        return normalized
+
+    def update_arsenal_piece(
+        self,
+        session_token: str,
+        piece_id: int,
+        new_name: str | None = None,
+        visual_style: Dict[str, Any] | None = None,
+    ) -> dict:
+        """Update an arsenal piece name and/or visual style."""
         user_id = self.auth.require_user_id(session_token)
-        new_name = (new_name or "").strip()
-        if not new_name:
-            raise ValidationError("new name is required")
-        
+
         piece = self.repo.get_by_id(piece_id)
         if not piece:
             raise ValidationError("arsenal piece not found")
@@ -197,14 +318,48 @@ class ArsenalService:
             raise ValidationError("forbidden")
         if not piece.is_arsenal:
             raise ValidationError("not an arsenal piece")
-        
-        piece.name = new_name
+
+        has_changes = False
+
+        if new_name is not None:
+            normalized_name = (new_name or "").strip()
+            if not normalized_name:
+                raise ValidationError("new name is required")
+            piece.name = normalized_name
+            has_changes = True
+
+        if visual_style is not None:
+            normalized_style = self._normalize_visual_style(visual_style)
+            try:
+                structure = json.loads(piece.structure_json) if piece.structure_json else {}
+            except (json.JSONDecodeError, ValueError):
+                structure = {}
+
+            if not isinstance(structure, dict):
+                structure = {}
+
+            if normalized_style:
+                structure["visualStyle"] = normalized_style
+            else:
+                structure.pop("visualStyle", None)
+                structure.pop("visual_style", None)
+
+            piece.structure_json = json.dumps(structure)
+            has_changes = True
+
+        if not has_changes:
+            raise ValidationError("no updates provided")
+
         try:
             self.repo.update(piece)
         except sqlite3.IntegrityError:
             raise ValidationError("arsenal piece name already exists for this user")
-        
+
         return piece.to_dict()
+
+    def rename_arsenal_piece(self, session_token: str, piece_id: int, new_name: str) -> dict:
+        """Rename an arsenal piece (must be unique per user)."""
+        return self.update_arsenal_piece(session_token, piece_id, new_name=new_name)
 
     def delete_arsenal_piece(self, session_token: str, piece_id: int) -> dict:
         """Delete an arsenal piece"""

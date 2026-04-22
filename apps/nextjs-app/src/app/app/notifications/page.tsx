@@ -1,28 +1,73 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Loader, ChevronDown } from 'lucide-react';
+import { Loader, Filter, X, ArrowUp, ArrowDown, Bell } from 'lucide-react';
 import { useState, useEffect, ChangeEvent } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/page-hero/page-hero';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { useUser } from '@/lib/auth';
-import { useCreatorNotificationsHistory, NotificationFilters } from '@/features/notifications/api';
+
+const NOTIF_TYPE_OPTIONS = [
+  { value: '', label: 'All Types' },
+  { value: 'solve', label: 'Puzzle Solved' },
+  { value: 'rating', label: 'Rating' },
+  { value: 'warning', label: 'Warning' },
+  { value: 'ban', label: 'Account Restriction' },
+] as const;
+
+const NOTIF_ORDER_BY_OPTIONS = [
+  { value: 'created_at', label: 'Creation Date' },
+  { value: 'xp_amount', label: 'XP Amount' },
+] as const;
+import {
+  useCreatorNotificationsHistory,
+  NotificationFilters,
+} from '@/features/notifications/api';
+
+const defaultFilters: Pick<NotificationFilters, 'orderBy' | 'orderDirection'> =
+  {
+    orderBy: 'created_at',
+    orderDirection: 'ASC',
+  };
 
 const NotificationsPage = () => {
   const user = useUser();
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<NotificationFilters>({
-    orderBy: 'created_at',
-    orderDirection: 'ASC',
+    ...defaultFilters,
   });
+  const activeFilterCount = Object.entries(filters).reduce(
+    (count, [key, value]) => {
+      if (value === undefined || value === null || value === '') return count;
+      if (key === 'orderBy' && value === defaultFilters.orderBy) return count;
+      if (key === 'orderDirection' && value === defaultFilters.orderDirection)
+        return count;
+      return count + 1;
+    },
+    0,
+  );
 
-  const { data: notifications, isLoading, isError, error, refetch } = useCreatorNotificationsHistory({
+  const handleClearFilters = () => {
+    setFilters({ ...defaultFilters });
+  };
+
+  const {
+    data: notifications,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCreatorNotificationsHistory({
     filters,
   });
 
   // Only allow creators and admins to view this page
   const userRole = user.data?.role?.toLowerCase() || '';
-  const shouldRedirect = user.status === 'success' && userRole !== 'creator' && userRole !== 'admin';
+  const shouldRedirect =
+    user.status === 'success' && userRole !== 'creator' && userRole !== 'admin';
 
   useEffect(() => {
     if (shouldRedirect) {
@@ -33,93 +78,145 @@ const NotificationsPage = () => {
   if (shouldRedirect) return null;
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notifications</h1>
-        <p className="mt-2 text-[13px] text-muted-foreground">
-          View and filter your creator notifications
-        </p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <PageHero
+        badge="Creator inbox"
+        icon={Bell}
+        title="Notifications"
+        description="Stay on top of solves, ratings, and updates on every puzzle you've published."
+      />
 
-      {/* Filters Toggle */}
-      <div className="mb-6">
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 rounded-lg bg-secondary/50 px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
-        >
-          Filters
-          <ChevronDown
-            className={`size-4 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-          />
-        </button>
+      {/* Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="size-4" />
+            Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+          </Button>
+          {activeFilterCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+              className="text-muted-foreground text-[13px]"
+            >
+              <X className="size-4" />
+              Clear
+            </Button>
+          )}
+        </div>
 
-        {/* Filter Controls */}
+        {/* Filter Panel */}
         {showFilters && (
-          <div className="mt-4 flex flex-wrap gap-4 rounded-lg border border-border bg-secondary/50 p-4">
-            {/* Type Filter */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Type</label>
-              <select
-                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.notifType || ''}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, notifType: (e.target.value || undefined) as any })}
-              >
-                <option value="">All Types</option>
-                <option value="solve">Puzzle Solved</option>
-                <option value="rating">Rating</option>
-                <option value="warning">Warning</option>
-                <option value="ban">Account Restriction</option>
-              </select>
-            </div>
+          <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+              {/* Type Filter */}
+              <div className="flex flex-col">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Type
+                </label>
+                <StyledSelect
+                  aria-label="Notification type"
+                  value={filters.notifType || ''}
+                  onValueChange={(v) =>
+                    setFilters({
+                      ...filters,
+                      notifType: (v || undefined) as any,
+                    })
+                  }
+                  options={NOTIF_TYPE_OPTIONS}
+                />
+              </div>
 
-            {/* Puzzle Name Filter */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Puzzle Name</label>
-              <input
-                type="text"
-                placeholder="Search puzzle..."
-                className="w-full rounded border border-border text-muted-foreground px-3 py-2 text-sm"
-                value={filters.puzzleName || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, puzzleName: e.target.value || undefined })}
-              />
-            </div>
+              {/* Puzzle Name Filter */}
+              <div className="flex flex-col">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Puzzle Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search puzzle..."
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={filters.puzzleName || ''}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setFilters({
+                      ...filters,
+                      puzzleName: e.target.value || undefined,
+                    })
+                  }
+                />
+              </div>
 
-            {/* Actor Username Filter */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Actor</label>
-              <input
-                type="text"
-                placeholder="Search user..."
-                className="w-full rounded border border-border text-muted-foreground px-3 py-2 text-sm"
-                value={filters.actorUsername || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, actorUsername: e.target.value || undefined })}
-              />
-            </div>
+              {/* Actor Username Filter */}
+              <div className="flex flex-col">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Actor
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search user..."
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={filters.actorUsername || ''}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setFilters({
+                      ...filters,
+                      actorUsername: e.target.value || undefined,
+                    })
+                  }
+                />
+              </div>
 
-            {/* Order By */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Order By</label>
-              <select
-                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.orderBy || 'created_at'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderBy: e.target.value as any })}
-              >
-                <option value="created_at">Creation Date</option>
-                <option value="xp_amount">XP Amount</option>
-              </select>
-            </div>
+              {/* Order By */}
+              <div className="flex flex-col">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Order By
+                </label>
+                <StyledSelect
+                  aria-label="Order by"
+                  value={filters.orderBy || 'created_at'}
+                  onValueChange={(v) =>
+                    setFilters({ ...filters, orderBy: v as any })
+                  }
+                  options={NOTIF_ORDER_BY_OPTIONS}
+                />
+              </div>
 
-            {/* Direction */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Direction</label>
-              <select
-                className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={filters.orderDirection || 'ASC'}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, orderDirection: e.target.value as any })}
-              >
-                <option value="ASC">Ascending</option>
-                <option value="DESC">Descending</option>
-              </select>
+              {/* Direction */}
+              <div className="flex flex-col">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Direction
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentDirection = filters.orderDirection || 'ASC';
+                    const newDirection =
+                      currentDirection === 'ASC' ? 'DESC' : 'ASC';
+                    setFilters({
+                      ...filters,
+                      orderDirection: newDirection as any,
+                    });
+                  }}
+                  className="inline-flex h-9 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-3 text-[13px] text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/30 focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {(filters.orderDirection || 'ASC') === 'ASC' ? (
+                    <>
+                      <ArrowUp className="size-4" />
+                      <span>Ascending</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDown className="size-4" />
+                      <span>Descending</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -132,7 +229,8 @@ const NotificationsPage = () => {
       ) : isError ? (
         <div className="rounded-xl border border-red-200/60 bg-red-50/50 p-4">
           <p className="text-[13px] text-red-700">
-            Failed to load notifications. {error?.message && `Error: ${error.message}`}
+            Failed to load notifications.{' '}
+            {error?.message && `Error: ${error.message}`}
           </p>
           <button
             onClick={() => refetch()}
@@ -162,13 +260,19 @@ const NotificationsPage = () => {
                         notification.type === 'solve'
                           ? 'bg-emerald-50/50 text-emerald-700'
                           : notification.type === 'warning'
-                          ? 'bg-amber-50/50 text-amber-700'
-                          : notification.type === 'ban'
-                          ? 'bg-red-50/50 text-red-700'
-                          : 'bg-blue-50/50 text-blue-700'
+                            ? 'bg-amber-50/50 text-amber-700'
+                            : notification.type === 'ban'
+                              ? 'bg-red-50/50 text-red-700'
+                              : 'bg-blue-50/50 text-blue-700'
                       }`}
                     >
-                      {notification.type === 'solve' ? 'Puzzle Solved' : notification.type === 'warning' ? 'Warning' : notification.type === 'ban' ? 'Account Restriction' : 'Rating'}
+                      {notification.type === 'solve'
+                        ? 'Puzzle Solved'
+                        : notification.type === 'warning'
+                          ? 'Warning'
+                          : notification.type === 'ban'
+                            ? 'Account Restriction'
+                            : 'Rating'}
                     </span>
                     <span className="text-[13px] font-medium text-foreground">
                       {notification.puzzle_name}

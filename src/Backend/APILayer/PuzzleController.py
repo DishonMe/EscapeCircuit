@@ -23,6 +23,21 @@ import json
 from fastapi import UploadFile, File, Form
 
 
+def _validation_error_to_http_status(error: ValidationError) -> int:
+    message = str(error).strip().lower()
+    if message in {
+        "unauthorized",
+        "missing authorization header",
+        "invalid authorization header format",
+        "invalid token",
+        "session expired",
+    }:
+        return 401
+    if "not found" in message:
+        return 404
+    return 400
+
+
 class CreatePuzzleReq(BaseModel):
     name: str = "" # maps to title
     title: str = "" # also accept title directly
@@ -224,12 +239,13 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
 def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 
-    def _inject_rating_metrics(payload: dict) -> None:
-        """Best-effort rating enrichment for puzzle payloads."""
-        if not rating_service or not isinstance(payload, dict):
+    def _inject_rating_metrics(puzzle_payload: dict) -> None:
+        """Safely enrich a puzzle payload with aggregated rating metrics."""
+        if not isinstance(puzzle_payload, dict) or not rating_service:
             return
 
-        puzzle_id = payload.get("id")
+        puzzle_id = puzzle_payload.get("id")
+
         try:
             puzzle_id = int(puzzle_id)
         except (TypeError, ValueError):
@@ -237,11 +253,62 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
 
         try:
             metrics = rating_service.get_puzzle_metrics(puzzle_id)
-            if isinstance(metrics, dict) and metrics:
-                payload.update(metrics)
         except Exception:
-            # Ratings are non-critical for loading puzzle content.
-            pass
+            return
+
+        if not isinstance(metrics, dict):
+            return
+
+        count = metrics.get("count")
+        if isinstance(count, int):
+            puzzle_payload["rating_count"] = count
+
+        avg_difficulty = metrics.get("avg_difficulty")
+        if isinstance(avg_difficulty, (int, float)):
+            puzzle_payload["avg_difficulty"] = float(avg_difficulty)
+            puzzle_payload["rating"] = float(avg_difficulty)
+
+        avg_fun = metrics.get("avg_fun")
+        if isinstance(avg_fun, (int, float)):
+            puzzle_payload["avg_fun"] = float(avg_fun)
+
+        avg_clearness = metrics.get("avg_clearness")
+        if isinstance(avg_clearness, (int, float)):
+            puzzle_payload["avg_clearness"] = float(avg_clearness)
+
+        experienced_metrics = metrics.get("experienced_metrics")
+        if isinstance(experienced_metrics, dict):
+            exp_count = experienced_metrics.get("count")
+            if isinstance(exp_count, int):
+                puzzle_payload["rating_count_exp"] = exp_count
+
+            exp_avg_difficulty = experienced_metrics.get("experienced_avg_difficulty")
+            if isinstance(exp_avg_difficulty, (int, float)):
+                puzzle_payload["avg_difficulty_exp"] = float(exp_avg_difficulty)
+
+            exp_avg_fun = experienced_metrics.get("experienced_avg_fun")
+            if isinstance(exp_avg_fun, (int, float)):
+                puzzle_payload["avg_fun_exp"] = float(exp_avg_fun)
+
+            exp_avg_clearness = experienced_metrics.get("experienced_avg_clearness")
+            if isinstance(exp_avg_clearness, (int, float)):
+                puzzle_payload["avg_clearness_exp"] = float(exp_avg_clearness)
+
+        rating_distribution = metrics.get("rating_distribution")
+        if isinstance(rating_distribution, dict):
+            puzzle_payload["rating_distribution"] = rating_distribution
+
+        # Frontend rating chips read from a nested `rating_metrics` object —
+        # mirror the flat fields into that shape so they render after a rating.
+        puzzle_payload["rating_metrics"] = {
+            "count": metrics.get("count", 0),
+            "avg_difficulty": metrics.get("avg_difficulty"),
+            "weighted_difficulty": metrics.get("weighted_difficulty"),
+            "avg_fun": metrics.get("avg_fun"),
+            "avg_clearness": metrics.get("avg_clearness"),
+            "rating_distribution": rating_distribution,
+            "experienced_metrics": metrics.get("experienced_metrics"),
+        }
 
 
     @router.get("")
@@ -322,9 +389,11 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                             p["best_time"] = status_map[pid].get("best_time")
                             p["total_xp"] = status_map[pid].get("total_xp", 0)
                             p["best_medal"] = status_map[pid].get("best_medal", 0)
+                            p["first_solved_at"] = status_map[pid].get("first_solved_at")
                         else:
                             p["is_solved"] = False
                             p["best_medal"] = 0
+                            p["first_solved_at"] = None
                         # Global solved count (all users)
                         p["solvedCount"] = solved_counts.get(pid, 0) if pid else 0
                         p["rating_min_attempt_seconds"] = settings.RATING_MIN_ATTEMPT_SECONDS
@@ -419,8 +488,10 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                         result["best_time"] = info.get("best_time")
                         result["total_xp"] = info.get("total_xp", 0)
                         result["best_medal"] = info.get("best_medal", 0)
+                        result["first_solved_at"] = info.get("first_solved_at")
                     else:
                         result["best_medal"] = 0
+                        result["first_solved_at"] = None
                     # Can-rate flag (solved OR 5 min spent)
                     if rating_service:
                         try:
@@ -527,6 +598,8 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             puzzle_service.auth.require_user_id(token)
             if type == "cost":
                 entries = puzzle_service.solve_repo.get_leaderboard_by_cost(puzzle_id, limit=limit)
+            elif type == "first_solved":
+                entries = puzzle_service.solve_repo.get_leaderboard_by_first_solved(puzzle_id, limit=limit)
             else:
                 entries = puzzle_service.solve_repo.get_leaderboard(puzzle_id, limit=limit)
             return {"data": entries}

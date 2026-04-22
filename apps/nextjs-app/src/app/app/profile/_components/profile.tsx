@@ -2,18 +2,35 @@
 
 import { useMemo, useState } from 'react';
 
-import { Boxes, CircuitBoard, Gift, Medal, PackageOpen, Trophy, Eye } from 'lucide-react';
+import {
+  Boxes,
+  CircuitBoard,
+  Gift,
+  Medal,
+  PackageOpen,
+  Trophy,
+  Eye,
+} from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { getLevelInfo } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
 import { useUser } from '@/lib/auth';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { PlacedGridComponent, ComponentDef } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type {
+  PlacedGridComponent,
+  ComponentDef,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type { Wire } from '@/types/api';
 
 type EntryProps = {
@@ -22,8 +39,19 @@ type EntryProps = {
 };
 
 type ArsenalStructure = {
-  placed?: Array<{ id: string; componentId: string; origin?: { row: number; col: number }; x?: number; y?: number }>;
-  placedComponents?: Array<{ id: string; componentId: string; x: number; y: number }>;
+  placed?: Array<{
+    id: string;
+    componentId: string;
+    origin?: { row: number; col: number };
+    x?: number;
+    y?: number;
+  }>;
+  placedComponents?: Array<{
+    id: string;
+    componentId: string;
+    x: number;
+    y: number;
+  }>;
   wires?: Array<{
     id: string;
     from: { componentId: string; pinIndex?: number };
@@ -68,30 +96,38 @@ const LEVEL_BENEFITS: LevelBenefit[] = Array.from({ length: 15 }, (_, i) => {
   };
 });
 
-const LEVEL_BENEFIT_CHANGES: LevelBenefitChange[] = LEVEL_BENEFITS
-  .map((benefit, index) => {
+const LEVEL_BENEFIT_CHANGES: LevelBenefitChange[] = LEVEL_BENEFITS.map(
+  (benefit, index) => {
     if (index === 0) return null;
     const previous = LEVEL_BENEFITS[index - 1];
     const changes: string[] = [];
 
     if (benefit.arsenalSlots !== previous.arsenalSlots) {
-      changes.push(`Arsenal slots ${previous.arsenalSlots}->${benefit.arsenalSlots}`);
+      changes.push(
+        `Arsenal slots ${previous.arsenalSlots}->${benefit.arsenalSlots}`,
+      );
     }
     if (benefit.publishedCap !== previous.publishedCap) {
-      changes.push(`Published puzzles ${previous.publishedCap}->${benefit.publishedCap}`);
+      changes.push(
+        `Published puzzles ${previous.publishedCap}->${benefit.publishedCap}`,
+      );
     }
     if (benefit.unpublishedCap !== previous.unpublishedCap) {
-      changes.push(`Unpublished puzzles ${previous.unpublishedCap}->${benefit.unpublishedCap}`);
+      changes.push(
+        `Unpublished puzzles ${previous.unpublishedCap}->${benefit.unpublishedCap}`,
+      );
     }
 
     if (changes.length === 0) return null;
     return { level: benefit.level, changes };
-  })
-  .filter((entry): entry is LevelBenefitChange => entry !== null);
+  },
+).filter((entry): entry is LevelBenefitChange => entry !== null);
 
 const Entry = ({ label, value }: EntryProps) => (
   <div className="grid grid-cols-1 gap-1 rounded-xl border border-border bg-card/70 px-4 py-3 sm:grid-cols-[140px_1fr]">
-    <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+    <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {label}
+    </dt>
     <dd className="text-sm text-foreground">{value}</dd>
   </div>
 );
@@ -115,7 +151,10 @@ const getPlaced = (structure: ArsenalStructure) => {
     }));
   }
 
-  if (Array.isArray(structure.placedComponents) && structure.placedComponents.length > 0) {
+  if (
+    Array.isArray(structure.placedComponents) &&
+    structure.placedComponents.length > 0
+  ) {
     return structure.placedComponents;
   }
 
@@ -136,7 +175,10 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
 
   return (
     <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-border bg-secondary">
-      <div className="absolute inset-0 origin-top-left scale-[0.5]" style={{ width: '200%', height: '200%' }}>
+      <div
+        className="absolute inset-0 origin-top-left scale-[0.5]"
+        style={{ width: '200%', height: '200%' }}
+      >
         {wires.map((wire) => {
           const fromNode = nodeById.get(wire.from.componentId);
           const toNode = nodeById.get(wire.to.componentId);
@@ -151,7 +193,13 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
 
           return (
             <svg key={wire.id} className="absolute inset-0 h-full w-full">
-              <path d={d} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+              <path
+                d={d}
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
             </svg>
           );
         })}
@@ -209,8 +257,12 @@ export const Profile = () => {
                 {initials}
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-                <p className="text-sm text-muted-foreground">Circuit Operator Profile</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  {displayName}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Circuit Operator Profile
+                </p>
               </div>
             </div>
             <EditBio />
@@ -219,7 +271,12 @@ export const Profile = () => {
           <dl className="mt-4 grid gap-3">
             <Entry label="Email" value={userData.email ?? ''} />
             <Entry label="Role" value={userData.role ?? ''} />
-            <Entry label="Joined" value={formatDateOnly(userData.created_at ?? userData.createdAt ?? '')} />
+            <Entry
+              label="Joined"
+              value={formatDateOnly(
+                userData.created_at ?? userData.createdAt ?? '',
+              )}
+            />
             {userData.bio ? <Entry label="Bio" value={userData.bio} /> : null}
           </dl>
         </div>
@@ -232,7 +289,11 @@ export const Profile = () => {
                 Progress
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setRewardsOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRewardsOpen(true)}
+                >
                   Rewards
                 </Button>
                 <span className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold text-foreground">
@@ -241,41 +302,64 @@ export const Profile = () => {
               </div>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
-              XP to next level: <span className="font-semibold text-foreground">{levelInfo.xpIntoLevel}/{levelInfo.xpForLevel}</span>
+              XP to next level:{' '}
+              <span className="font-semibold text-foreground">
+                {levelInfo.xpIntoLevel}/{levelInfo.xpForLevel}
+              </span>
             </p>
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{levelInfo.level}</span>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {levelInfo.level}
+              </span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
                   style={{ width: `${levelInfo.pct}%` }}
                 />
               </div>
-              <span className="text-xs font-semibold text-muted-foreground">{levelInfo.level + 1}</span>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {levelInfo.level + 1}
+              </span>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{currentXp}/{levelInfo.nextThreshold} total XP</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {currentXp}/{levelInfo.nextThreshold} total XP
+            </p>
           </div>
           <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-muted-foreground"><Trophy size={16} /> Medals</div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{medalsTotal}</p>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Trophy size={16} /> Medals
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {medalsTotal}
+            </p>
             <div className="mt-2 space-y-1 text-xs">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-500" /> Gold</span>
+                <span className="inline-flex items-center gap-1">
+                  <Medal size={14} className="text-amber-500" /> Gold
+                </span>
                 <span className="font-semibold">{goldMedals}</span>
               </div>
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-muted-foreground" /> Silver</span>
+                <span className="inline-flex items-center gap-1">
+                  <Medal size={14} className="text-muted-foreground" /> Silver
+                </span>
                 <span className="font-semibold">{silverMedals}</span>
               </div>
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><Medal size={14} className="text-amber-700" /> Bronze</span>
+                <span className="inline-flex items-center gap-1">
+                  <Medal size={14} className="text-amber-700" /> Bronze
+                </span>
                 <span className="font-semibold">{bronzeMedals}</span>
               </div>
             </div>
           </div>
           <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-muted-foreground"><Boxes size={16} /> Saved Puzzles</div>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{savedPuzzleCount}</p>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Boxes size={16} /> Saved Puzzles
+            </div>
+            <p className="mt-3 text-3xl font-semibold text-foreground">
+              {savedPuzzleCount}
+            </p>
           </div>
         </div>
       </section>
@@ -283,14 +367,20 @@ export const Profile = () => {
       <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Arsenal</h2>
-          <span className="text-xs font-medium text-muted-foreground">{arsenal.length} saved</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {arsenal.length} saved
+          </span>
         </div>
 
         {arsenal.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-secondary px-6 py-10 text-center">
             <PackageOpen className="mx-auto mb-3 size-10 text-muted-foreground" />
-            <p className="text-base font-medium text-muted-foreground">Your Arsenal is empty</p>
-            <p className="mt-1 text-sm text-muted-foreground">Build a custom circuit piece to see it here.</p>
+            <p className="text-base font-medium text-muted-foreground">
+              Your Arsenal is empty
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Build a custom circuit piece to see it here.
+            </p>
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -300,8 +390,12 @@ export const Profile = () => {
                 className="rounded-2xl border border-border bg-card/80 p-3 shadow-sm"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">{piece.name}</h3>
-                  <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">cost {piece.cost}</span>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {piece.name}
+                  </h3>
+                  <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">
+                    cost {piece.cost}
+                  </span>
                 </div>
                 <Button
                   variant="ghost"
@@ -319,15 +413,25 @@ export const Profile = () => {
       </section>
 
       <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold text-foreground">Saved Puzzles</h2>
+        <h2 className="mb-3 text-lg font-semibold text-foreground">
+          Saved Puzzles
+        </h2>
         {userData.saved_puzzles?.length ? (
           <ul className="grid gap-2 md:grid-cols-2">
             {userData.saved_puzzles.map((puzzle: any) => (
-              <li key={puzzle.id} className="rounded-xl border border-border bg-card/70 px-3 py-2 text-sm">
-                <Link href={`${paths.app.puzzles.getHref()}/${puzzle.id}`} className="font-medium text-foreground underline-offset-2 hover:underline">
+              <li
+                key={puzzle.id}
+                className="rounded-xl border border-border bg-card/70 px-3 py-2 text-sm"
+              >
+                <Link
+                  href={`${paths.app.puzzles.getHref()}/${puzzle.id}`}
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
                   {puzzle.name}
                 </Link>
-                <span className="ml-2 text-xs text-muted-foreground">({puzzle.status})</span>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  ({puzzle.status})
+                </span>
               </li>
             ))}
           </ul>
@@ -338,7 +442,10 @@ export const Profile = () => {
 
       {/* Circuit Preview Dialog */}
       {previewPiece && (
-        <Dialog open={!!previewPiece} onOpenChange={(open) => !open && setPreviewPiece(null)}>
+        <Dialog
+          open={!!previewPiece}
+          onOpenChange={(open) => !open && setPreviewPiece(null)}
+        >
           <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{previewPiece.name} - Circuit Preview</DialogTitle>
@@ -358,7 +465,8 @@ export const Profile = () => {
               <Gift size={18} /> Level Rewards (1-15)
             </DialogTitle>
             <DialogDescription>
-              Milestone levels only. Each row shows exactly what changes at that level.
+              Milestone levels only. Each row shows exactly what changes at that
+              level.
             </DialogDescription>
           </DialogHeader>
 
@@ -375,7 +483,11 @@ export const Profile = () => {
                   {LEVEL_BENEFIT_CHANGES.map((benefit) => (
                     <tr
                       key={benefit.level}
-                      className={benefit.level === levelInfo.level ? 'bg-cyan-50/70 dark:bg-cyan-950/30' : 'bg-card'}
+                      className={
+                        benefit.level === levelInfo.level
+                          ? 'bg-cyan-50/70 dark:bg-cyan-950/30'
+                          : 'bg-card'
+                      }
                     >
                       <td className="whitespace-nowrap border-t border-border px-3 py-2 font-semibold text-foreground">
                         Level {benefit.level}
@@ -391,10 +503,12 @@ export const Profile = () => {
 
             <div className="rounded-xl border border-border bg-secondary p-3">
               <p className="text-sm text-muted-foreground">
-                You are level {levelInfo.level}. Next level in {Math.max(0, levelInfo.nextThreshold - currentXp)} XP.
+                You are level {levelInfo.level}. Next level in{' '}
+                {Math.max(0, levelInfo.nextThreshold - currentXp)} XP.
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Starting values at level 1 are: Arsenal slots 5, Published puzzles 5, Unpublished puzzles 5.
+                Starting values at level 1 are: Arsenal slots 5, Published
+                puzzles 5, Unpublished puzzles 5.
               </p>
             </div>
           </div>
@@ -408,7 +522,7 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
   const { data: myArsenal } = useMyArsenal();
 
   const parseStructure = (
-    structureJson: string
+    structureJson: string,
   ): {
     numInputs: number;
     numOutputs: number;
@@ -426,8 +540,14 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
   const { placed, wires } = structure;
 
   // Build input/output labels
-  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
-  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+  const inputLabels = Array.from(
+    { length: structure.numInputs },
+    (_, i) => `in${i}`,
+  );
+  const outputLabels = Array.from(
+    { length: structure.numOutputs },
+    (_, i) => `out${i}`,
+  );
 
   // Build map of arsenal pieces by ID for quick lookup
   const arsenalMap = new Map<string, ArsenalPiece>();
@@ -440,13 +560,82 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
   // Build catalog with standard component definitions
   // Size formula: width=3, height=max(inputs, outputs)
   const catalog: Record<string, ComponentDef> = {
-    AND: { id: 'AND', label: 'AND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    OR: { id: 'OR', label: 'OR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOT: { id: 'NOT', label: 'NOT', cost: 1, size: { w: 3, h: 1 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } }] },
-    XOR: { id: 'XOR', label: 'XOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NAND: { id: 'NAND', label: 'NAND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOR: { id: 'NOR', label: 'NOR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    XNOR: { id: 'XNOR', label: 'XNOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    AND: {
+      id: 'AND',
+      label: 'AND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    OR: {
+      id: 'OR',
+      label: 'OR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOT: {
+      id: 'NOT',
+      label: 'NOT',
+      cost: 1,
+      size: { w: 3, h: 1 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    XOR: {
+      id: 'XOR',
+      label: 'XOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NAND: {
+      id: 'NAND',
+      label: 'NAND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOR: {
+      id: 'NOR',
+      label: 'NOR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    XNOR: {
+      id: 'XNOR',
+      label: 'XNOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
   };
 
   // Add any custom arsenal pieces as components
@@ -459,9 +648,13 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
         const numOutputs = (arsenalPiece as any).num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
         const size = { w: 3, h: Math.max(1, maxPorts) };
-        
+
         // Generate ports for arsenal pieces
-        const ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        const ports: Array<{
+          id: string;
+          kind: 'input' | 'output';
+          offset: { row: number; col: number };
+        }> = [];
         for (let i = 0; i < numInputs; i++) {
           ports.push({
             id: `in${i}`,
@@ -476,7 +669,7 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
             offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
           });
         }
-        
+
         catalog[comp.componentId] = {
           id: comp.componentId,
           label: arsenalPiece.name,
@@ -500,8 +693,14 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
     }
   });
 
-  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
-  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+  const gridRows = Math.max(
+    15,
+    Math.max(...placed.map((c) => c.origin.row), 0) + 3,
+  );
+  const gridCols = Math.max(
+    30,
+    Math.max(...placed.map((c) => c.origin.col), 0) + 3,
+  );
 
   return (
     <div className="space-y-4">
@@ -516,15 +715,21 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numInputs}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numOutputs}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
         <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
           <p className="text-xs text-foreground/70 mb-1">Cost</p>
@@ -533,8 +738,8 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
       </div>
 
       {/* Circuit Grid - Read-only Workstation */}
-      <div 
-        className="border border-border/60 rounded-lg bg-background overflow-hidden relative" 
+      <div
+        className="border border-border/60 rounded-lg bg-background overflow-hidden relative"
         style={{ height: '500px' }}
       >
         <style>{`
@@ -564,8 +769,8 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
             wires={wires}
             selectedComponent={{ mode: 'none' }}
             onSelectedComponentChange={() => {}} // Read-only: no changes
-            onPlacedChange={() => {}}             // Read-only: no changes
-            onWiresChange={() => {}}              // Read-only: no changes
+            onPlacedChange={() => {}} // Read-only: no changes
+            onWiresChange={() => {}} // Read-only: no changes
             draggedPaletteComponentId={null}
             isChecking={false}
             boardRows={gridRows}
@@ -577,12 +782,21 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
       {/* Component Legend */}
       {placed.length > 0 && (
         <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+          <p className="text-xs font-semibold text-foreground/70 mb-2">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
-              .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
+              .filter(
+                (comp, idx, arr) =>
+                  arr.findIndex((c) => c.componentId === comp.componentId) ===
+                  idx,
+              )
               .map((comp) => (
-                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
+                <div
+                  key={comp.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
                   <span className="text-foreground/70">{comp.componentId}</span>
                 </div>
               ))}

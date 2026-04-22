@@ -10,6 +10,9 @@ export function middleware(request: NextRequest) {
     '/auth/login',
     '/auth/register',
     '/auth/complete-google',
+    '/api/auth/login',     
+    '/api/auth/register',  
+    '/api/auth/google',     
   ];
 
   // Protected routes that are only for logged-in users
@@ -38,14 +41,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(appUrl);
   }
 
-  // If trying to access a protected route without a token, redirect to login
+  // If trying to access a protected route without a token, send the user to
+  // the public home page (not the login form). The login form, when reached
+  // through a redirect with a `redirectTo` query, has historically failed to
+  // submit cleanly; the home page has working "Log in" / "Register" CTAs.
   if (!isPublicRoute && !hasAuthToken) {
-    const loginUrl = new URL('/auth/login', request.url);
-    // Add redirectTo parameter to return user to original page after login
-    loginUrl.searchParams.set('redirectTo', pathname);
-    // Add reason parameter for notification
-    loginUrl.searchParams.set('reason', 'unauthorized');
-    return NextResponse.redirect(loginUrl);
+    const homeUrl = new URL('/', request.url);
+    homeUrl.searchParams.set('reason', 'unauthorized');
+    return NextResponse.redirect(homeUrl);
   }
 
   return NextResponse.next();
@@ -59,6 +62,7 @@ export const config = {
     // - _next/image/* (image optimization files)
     // - favicon.ico (favicon file)
     // - Static file extensions (svg, png, jpg, ico, mp3, wav, etc.)
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
+    // '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
+    '/((?!api|server|_next/static|_next/image|favicon.ico).*)',
   ],
 };

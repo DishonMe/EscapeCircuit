@@ -1,9 +1,10 @@
 'use client';
 
 import NextLink from 'next/link';
-import { Plus } from 'lucide-react';
+import { MessageSquare, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/page-hero/page-hero';
 import { paths } from '@/config/paths';
 import { DiscussionsList } from '@/features/discussions/components/discussions-list';
 import { useUser } from '@/lib/auth';
@@ -13,17 +14,22 @@ const DiscussionsPage = () => {
   const user = useUser();
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Discussions</h1>
-        {canCreateDiscussion(user.data) && (
-          <NextLink href={paths.app.newDiscussion.getHref()}>
-            <Button size="sm" icon={<Plus className="size-4" />}>
-              New Discussion
-            </Button>
-          </NextLink>
-        )}
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-8 space-y-4">
+      <PageHero
+        badge="Community"
+        icon={MessageSquare}
+        title="Discussions"
+        description="Trade solutions, compare approaches, and share ideas with the rest of the circuit-solving community."
+        rightSlot={
+          canCreateDiscussion(user.data) && (
+            <NextLink href={paths.app.newDiscussion.getHref()}>
+              <Button size="sm" icon={<Plus className="size-4" />}>
+                New Discussion
+              </Button>
+            </NextLink>
+          )
+        }
+      />
       <DiscussionsList />
     </div>
   );

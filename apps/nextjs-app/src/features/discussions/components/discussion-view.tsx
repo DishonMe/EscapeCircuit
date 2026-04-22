@@ -132,7 +132,9 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {discussion.is_pinned && <Pin className="size-4 text-blue-500" />}
-          {discussion.is_locked && <Lock className="size-4 text-muted-foreground" />}
+          {discussion.is_locked && (
+            <Lock className="size-4 text-muted-foreground" />
+          )}
           <CategoryBadge category={discussion.category} />
         </div>
 
@@ -144,9 +146,7 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
                 upvotes={engagement.upvotes}
                 downvotes={engagement.downvotes}
                 userVote={engagement.user_vote}
-                onVote={(value) =>
-                  voteMutation.mutate({ discussionId, value })
-                }
+                onVote={(value) => voteMutation.mutate({ discussionId, value })}
                 isLoading={voteMutation.isPending}
                 size="md"
               />
@@ -202,7 +202,9 @@ export const DiscussionView = ({ discussionId }: { discussionId: string }) => {
           <Button
             variant="outline"
             size="sm"
-            className={cn(isFollowing && 'bg-foreground/5 border-foreground/20')}
+            className={cn(
+              isFollowing && 'bg-foreground/5 border-foreground/20',
+            )}
             onClick={() => followMutation.mutate({ discussionId })}
             isLoading={followMutation.isPending}
           >

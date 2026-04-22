@@ -3,15 +3,26 @@ import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/r
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 
+export interface ArsenalPieceVisualStyle {
+  accentColor?: string;
+  roundness?: number;
+  borderStyle?: 'solid' | 'double' | 'etched';
+  edgeAddon?: 'none' | 'chip-legs';
+  surfaceStyle?: 'flat' | 'brushed' | 'gradient' | 'matte' | 'glass' | 'carbon';
+}
+
 export interface ArsenalPiece {
   id: string | number;
   name: string;
   cost: number;
   is_arsenal: boolean;
+  num_inputs?: number;
+  num_outputs?: number;
   basic_gates: string; // JSON string
   truth_table: string; // JSON string
   structure_json: string;
   description?: string; // Description of the Arsenal piece
+  visual_style?: ArsenalPieceVisualStyle;
 }
 
 export interface SaveArsenalPiecePayload {
@@ -64,6 +75,21 @@ export const renameArsenalPiece = (
   return api.put(`/arsenal/${pieceId}`, { new_name: newName });
 };
 
+export const updateArsenalPiece = ({
+  pieceId,
+  newName,
+  visualStyle,
+}: {
+  pieceId: number;
+  newName?: string;
+  visualStyle?: ArsenalPieceVisualStyle | null;
+}): Promise<ArsenalPiece> => {
+  const payload: Record<string, unknown> = {};
+  if (typeof newName === 'string') payload.new_name = newName;
+  if (visualStyle !== undefined) payload.visual_style = visualStyle ?? {};
+  return api.put(`/arsenal/${pieceId}`, payload);
+};
+
 export const useDeleteArsenalPiece = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -79,6 +105,16 @@ export const useRenameArsenalPiece = () => {
   return useMutation({
     mutationFn: ({ pieceId, newName }: { pieceId: number; newName: string }) =>
       renameArsenalPiece(pieceId, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['arsenal'] });
+    },
+  });
+};
+
+export const useUpdateArsenalPiece = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateArsenalPiece,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['arsenal'] });
     },

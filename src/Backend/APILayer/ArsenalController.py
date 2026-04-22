@@ -19,8 +19,9 @@ class SaveArsenalPieceReq(BaseModel):
     used_arsenal_pieces: List[int] = []  # IDs of other arsenal pieces used as components
 
 
-class RenameArsenalPieceReq(BaseModel):
-    new_name: str
+class UpdateArsenalPieceReq(BaseModel):
+    new_name: Optional[str] = None
+    visual_style: Optional[Dict[str, Any]] = None
 
 
 class SimulateReq(BaseModel):
@@ -58,10 +59,15 @@ def build_arsenal_router(arsenal_service: ArsenalService, solving_service: Solvi
             raise HTTPException(status_code=code, detail=str(e))
 
     @router.put("/{piece_id}")
-    def rename_piece(piece_id: int, req: RenameArsenalPieceReq, token: str = Depends(verify_token)):
-        """Rename an arsenal piece"""
+    def update_piece(piece_id: int, req: UpdateArsenalPieceReq, token: str = Depends(verify_token)):
+        """Update an arsenal piece (name and/or visual style)."""
         try:
-            return arsenal_service.rename_arsenal_piece(token, piece_id, req.new_name)
+            return arsenal_service.update_arsenal_piece(
+                token,
+                piece_id,
+                new_name=req.new_name,
+                visual_style=req.visual_style,
+            )
         except ValidationError as e:
             code = 403 if "forbidden" in str(e).lower() else 400
             raise HTTPException(status_code=code, detail=str(e))
