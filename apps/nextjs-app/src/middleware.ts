@@ -15,6 +15,9 @@ export function middleware(request: NextRequest) {
     '/auth/login',
     '/auth/register',
     '/auth/complete-google',
+    '/api/auth/login',     
+    '/api/auth/register',  
+    '/api/auth/google',     
   ];
 
   // Protected routes that are only for logged-in users
@@ -61,10 +64,11 @@ export const config = {
   matcher: [
     // Match all routes except:
     // - api/* (API routes)
+    // - server/* (backend proxy routes)
     // - _next/static/* (static files)
     // - _next/image/* (image optimization files)
     // - favicon.ico (favicon file)
     // - Static file extensions (svg, png, jpg, ico, mp3, wav, etc.)
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
+    '/((?!api|server|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
   ],
 };
