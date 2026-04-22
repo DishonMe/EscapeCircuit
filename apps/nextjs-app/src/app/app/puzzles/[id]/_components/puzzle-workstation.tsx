@@ -2070,11 +2070,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 {inputs.map((i) => (
                   <span
                     key={i}
-                    className={
-                      ioUsage.usedInputs.has(i)
-                        ? 'rounded-md border border-green-500/70 bg-green-500 px-2 py-0.5 text-[11px] font-medium text-white'
-                        : 'rounded-md border border-green-200/70 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700'
-                    }
+                    className="rounded-md border border-green-500/70 bg-green-500 px-2 py-0.5 text-[11px] font-medium text-white"
                   >
                     {i}
                   </span>
