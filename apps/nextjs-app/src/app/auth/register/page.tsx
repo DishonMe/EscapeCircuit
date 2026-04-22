@@ -7,6 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 
 import { useNavigationLoading } from '@/components/ui/navigation-loading/navigation-loading';
 import { useNotifications } from '@/components/ui/notifications';
+import { CircuitBackground } from '@/components/ui/circuit-background/CircuitBackground';
 import { paths } from '@/config/paths';
 import { useGoogleLogin, useRegister } from '@/lib/auth';
 
@@ -110,14 +111,7 @@ export default function RegisterPage() {
       className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(224_30%_8%)]"
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(56,189,248,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.05) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-        }}
-      />
+      <CircuitBackground />
 
       <div
         className="pointer-events-none absolute"
@@ -132,13 +126,48 @@ export default function RegisterPage() {
       />
 
       <div
+        className="pointer-events-none absolute h-[560px] w-[560px] rounded-full"
+        style={{
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background:
+            'conic-gradient(from 0deg, rgba(56,189,248,0) 0deg, rgba(56,189,248,0.22) 90deg, rgba(56,189,248,0) 170deg, rgba(14,165,233,0.14) 250deg, rgba(56,189,248,0) 360deg)',
+          filter: 'blur(22px)',
+          animation: 'flow-orbit 16s linear infinite',
+        }}
+      />
+
+      <div
+        className="pointer-events-none absolute h-[500px] w-[500px] rounded-full"
+        style={{
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          border: '1px solid rgba(56,189,248,0.14)',
+          boxShadow: '0 0 40px rgba(56,189,248,0.14), inset 0 0 25px rgba(56,189,248,0.08)',
+          animation: 'flow-orbit-rev 20s ease-in-out infinite',
+        }}
+      />
+
+      <div
         className="relative mx-4 w-full max-w-[380px] rounded-2xl px-8 py-10"
         style={{
           background: 'rgba(255,255,255,0.03)',
           border: '0.5px solid rgba(56,189,248,0.2)',
           backdropFilter: 'blur(12px)',
+          boxShadow:
+            '0 22px 60px rgba(2,12,27,0.5), inset 0 1px 0 rgba(186,230,253,0.08), 0 0 30px rgba(56,189,248,0.1)',
         }}
       >
+        <div
+          className="pointer-events-none absolute inset-0 rounded-2xl"
+          style={{
+            background:
+              'linear-gradient(145deg, rgba(186,230,253,0.12) 0%, rgba(56,189,248,0.06) 24%, rgba(255,255,255,0) 55%), radial-gradient(circle at 88% 16%, rgba(56,189,248,0.16), transparent 45%)',
+          }}
+        />
+
         <div
           className="pointer-events-none absolute left-[30px] right-[30px] top-[-1px] h-px"
           style={{
@@ -391,6 +420,18 @@ export default function RegisterPage() {
         @keyframes pulse-dot {
           0%, 100% { opacity: 0.3; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.5); }
+        }
+
+        @keyframes flow-orbit {
+          0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+          50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1.03); }
+          100% { transform: translate(-50%, -50%) rotate(360deg) scale(1); }
+        }
+
+        @keyframes flow-orbit-rev {
+          0%   { transform: translate(-50%, -50%) rotate(360deg) scale(0.98); opacity: 0.75; }
+          50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1); opacity: 1; }
+          100% { transform: translate(-50%, -50%) rotate(0deg) scale(0.98); opacity: 0.75; }
         }
       `}</style>
     </div>
