@@ -615,7 +615,7 @@ export default function ArsenalCreatorPage() {
 
       {/* Save Dialog */}
       <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Save Arsenal Piece</DialogTitle>
             <DialogDescription>

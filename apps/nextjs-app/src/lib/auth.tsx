@@ -13,6 +13,11 @@ import Cookies from 'js-cookie';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 import { api } from './api-client';
 
+const authCookieOptions: Cookies.CookieAttributes = {
+  path: '/',
+  sameSite: 'lax',
+};
+
 // api call definitions for auth (types, schemas, requests):
 // these are not part of features as this is a module shared across features
 
@@ -52,7 +57,7 @@ export const useLogin = ({
     mutationFn: loginWithEmailAndPassword,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
-      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token, authCookieOptions);
       onSuccess?.();
     },
     onError: (error) => {
@@ -67,7 +72,7 @@ export const useRegister = ({ onSuccess }: { onSuccess?: () => void }) => {
     mutationFn: registerWithEmailAndPassword,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
-      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token, authCookieOptions);
       onSuccess?.();
     },
   });
@@ -80,7 +85,7 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
     onSettled: () => {
       // Clear ALL cached queries so the next user gets fresh data
       queryClient.removeQueries();
-      Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
+      Cookies.remove(AUTH_TOKEN_COOKIE_NAME, { path: '/' });
       onSuccess?.();
     },
   });
@@ -149,7 +154,7 @@ export const useGoogleLogin = ({
 
       // Normal successful login
       queryClient.setQueryData(userQueryKey, data.user);
-      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token, authCookieOptions);
       onSuccess?.();
     },
     onError: (error) => {
@@ -170,7 +175,7 @@ export const useCompleteGoogleRegistration = ({
     mutationFn: completeGoogleRegistration,
     onSuccess: (data) => {
       queryClient.setQueryData(userQueryKey, data.user);
-      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token);
+      Cookies.set(AUTH_TOKEN_COOKIE_NAME, data.token, authCookieOptions);
       onSuccess?.();
     },
     onError: (error) => {

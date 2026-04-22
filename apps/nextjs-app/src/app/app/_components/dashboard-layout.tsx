@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { Button } from '@/components/ui/button';
+import { ColabPets } from '@/components/ui/colab-pets/ColabPets';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ import { Link } from '@/components/ui/link';
 import { SettingsMenu } from '@/components/ui/settings-menu';
 import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
+import { useSettings } from '@/context/settings-context';
 import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
 import { CreatorInviteBanner } from '@/features/admin/components/creator-invite-banner';
@@ -386,6 +388,7 @@ const PaletteThemePicker = () => {
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const user = useUser();
+  const { colabPetsEnabled } = useSettings();
   const pathname = usePathname();
   const router = useRouter();
   const logout = useLogout({
@@ -420,6 +423,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+      {colabPetsEnabled && <ColabPets topOffsetPx={56} stripHeightPx={76} />}
+
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-card/80 backdrop-blur-sm px-5">
         <div className="flex items-center gap-8">
           <Logo />

@@ -19,6 +19,8 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const { addNotification } = useNotifications();
   const hasShownNotificationRef = useRef(false);
   const isLoginPage = pathname === paths.auth.login.getHref();
+  const isRegisterPage = pathname === paths.auth.register.getHref();
+  const useStandalonePageLayout = isLoginPage || isRegisterPage;
   const title = isLoginPage
     ? 'Log in to your account'
     : 'Register your account';
@@ -87,6 +89,10 @@ export const AuthLayout = ({ children }: LayoutProps) => {
       }
     }
   }, [reason, hasCheckedToken, addNotification]);
+
+  if (useStandalonePageLayout) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-background py-12 sm:px-6 lg:px-8">
