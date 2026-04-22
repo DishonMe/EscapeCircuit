@@ -15,9 +15,9 @@ export function middleware(request: NextRequest) {
     '/auth/login',
     '/auth/register',
     '/auth/complete-google',
-    '/api/auth/login',     
-    '/api/auth/register',  
-    '/api/auth/google',     
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/google',
   ];
 
   // Protected routes that are only for logged-in users
