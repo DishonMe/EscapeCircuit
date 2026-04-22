@@ -11,7 +11,7 @@ export const metadata = {
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
   return (
-    <html lang="en">
+    <html lang="en" className="scroll-smooth">
       <body className="bg-background text-foreground transition-colors">
         <AppProvider>
           {children}

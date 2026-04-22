@@ -70,9 +70,12 @@ export default function HomePage() {
             >
               ⚡ Start solving now
             </Link>
-            <button className="bg-transparent text-[#e8eeff] border border-[rgba(200,215,255,0.22)] rounded-[11px] px-7 py-3.5 text-[14px] font-medium hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(99,179,237,0.4)] transition-all">
+            <Link
+              href="#section-2"
+              className="bg-transparent text-[#e8eeff] border border-[rgba(200,215,255,0.22)] rounded-[11px] px-7 py-3.5 text-[14px] font-medium hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(99,179,237,0.4)] transition-all"
+            >
               See how it works
-            </button>
+            </Link>
           </div>
 
           {/* Scroll hint */}
@@ -129,7 +132,7 @@ export default function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section className="bg-white border-t border-b border-[#dde5f0] py-[52px] px-6">
+      <section id="section-2" className="scroll-mt-20 bg-white border-t border-b border-[#dde5f0] py-[52px] px-6">
         <p className="text-center text-[11px] font-bold tracking-[0.18em] uppercase text-[#63b3ed] mb-2.5">
           How it works
         </p>
