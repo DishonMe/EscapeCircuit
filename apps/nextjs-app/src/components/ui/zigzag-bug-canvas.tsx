@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ZigzagBugCanvasProps {
   containerRef: React.RefObject<HTMLButtonElement>;
@@ -9,12 +9,17 @@ interface ZigzagBugCanvasProps {
 interface BugState {
   x: number; // X position (0 to canvas.width)
   y: number; // Y position (0 to canvas.height)
-  targetRotation: number; // Target rotation in radians (0 = right, π/2 = down, π = left, -π/2 = up)
+  targetRotation: number; // Target rotation in radians (0 = up, π/2 = right, π = down, -π/2 = left)
   currentRotation: number; // Current rotation in radians
   isWalking: boolean; // Whether we're currently walking
   speed: number;
   targetSpeed: number;
   burstTime: number;
+  walkUntil: number;
+  isTurning: boolean;
+  turnStartTime: number;
+  turnDuration: number;
+  turnStartRotation: number;
 }
 
 export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
@@ -28,6 +33,11 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     speed: 0.5,
     targetSpeed: 0.5,
     burstTime: 0,
+    walkUntil: 0,
+    isTurning: false,
+    turnStartTime: 0,
+    turnDuration: 0,
+    turnStartRotation: 0,
   });
   const animationFrameRef = useRef<number>();
 
@@ -127,7 +137,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     ctx.restore();
   };
 
-  const animate = () => {
+  const animate = (now: number) => {
     const canvas = canvasRef.current;
     const button = containerRef.current;
     if (!canvas || !button) return;
@@ -138,6 +148,101 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     const state = bugStateRef.current;
     const width = canvas.width;
     const height = canvas.height;
+    const padding = 8;
+    const minX = padding;
+    const maxX = width - padding;
+    const minY = padding;
+    const maxY = height - padding;
+
+    const getRandomDirection = (previousDirection?: number) => {
+      const normalize = (angle: number) => {
+        let value = angle;
+        while (value > Math.PI) value -= Math.PI * 2;
+        while (value < -Math.PI) value += Math.PI * 2;
+        return value;
+      };
+
+      const clearanceDistance = (angle: number) => {
+        const dx = Math.sin(angle);
+        const dy = -Math.cos(angle);
+        const limits: number[] = [];
+
+        if (Math.abs(dx) > 1e-6) {
+          if (dx > 0) {
+            limits.push((maxX - state.x) / dx);
+          } else {
+            limits.push((minX - state.x) / dx);
+          }
+        }
+
+        if (Math.abs(dy) > 1e-6) {
+          if (dy > 0) {
+            limits.push((maxY - state.y) / dy);
+          } else {
+            limits.push((minY - state.y) / dy);
+          }
+        }
+
+        const forwardLimits = limits.filter((limit) => Number.isFinite(limit) && limit > 0);
+        if (forwardLimits.length === 0) return 0;
+        return Math.max(0, Math.min(...forwardLimits));
+      };
+
+      const minTurnRadians = (20 * Math.PI) / 180;
+      const candidateCount = 28;
+      const candidates: Array<{ angle: number; weight: number }> = [];
+
+      for (let i = 0; i < candidateCount; i++) {
+        const angle = normalize(Math.random() * Math.PI * 2);
+        if (previousDirection != null) {
+          const diff = normalize(angle - previousDirection);
+          if (Math.abs(diff) < minTurnRadians) {
+            continue;
+          }
+        }
+
+        const distance = clearanceDistance(angle);
+        const weight = Math.pow(distance + 1, 1.7);
+        candidates.push({ angle, weight });
+      }
+
+      if (candidates.length === 0) {
+        return previousDirection == null
+          ? normalize(Math.random() * Math.PI * 2)
+          : normalize(previousDirection + Math.PI);
+      }
+
+      const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+      let roll = Math.random() * totalWeight;
+      for (const candidate of candidates) {
+        roll -= candidate.weight;
+        if (roll <= 0) {
+          return candidate.angle;
+        }
+      }
+
+      return candidates[candidates.length - 1].angle;
+
+    };
+
+    const getRandomWalkDurationMs = () => {
+      const steps = Math.floor(Math.random() * 31) + 10;
+      return steps * 100;
+    };
+
+    const beginTurn = () => {
+      const nextRotation = getRandomDirection(state.currentRotation);
+      let angleDiff = nextRotation - state.currentRotation;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+      state.targetRotation = nextRotation;
+      state.turnStartRotation = state.currentRotation;
+      state.turnStartTime = now;
+      state.turnDuration = 420 + (Math.abs(angleDiff) / Math.PI) * 320;
+      state.isTurning = true;
+      state.isWalking = false;
+    };
 
     // Update speed based on burst (with smooth easing)
     if (state.burstTime > 0) {
@@ -147,35 +252,46 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       state.speed += (state.targetSpeed - state.speed) * 0.12; // Smoother speed transitions
     }
 
-    // If not walking, pick a random direction
-    if (!state.isWalking) {
-      // Pick a random cardinal direction: 0=right, π/2=down, π=left, -π/2=up
-      const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-      state.targetRotation = directions[Math.floor(Math.random() * directions.length)];
+    if (!state.isWalking && !state.isTurning) {
+      state.targetRotation = getRandomDirection();
+      state.currentRotation = state.targetRotation;
+      state.walkUntil = now + getRandomWalkDurationMs();
       state.isWalking = true;
     }
 
-    // Smoothly rotate toward target direction (with easing)
-    let angleDiff = state.targetRotation - state.currentRotation;
-    // Normalize to [-π, π]
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    
-    // Smooth rotation with easing (faster initial turn, then slows down)
-    const rotationSpeed = 0.12;
-    if (Math.abs(angleDiff) > rotationSpeed) {
-      state.currentRotation += Math.sign(angleDiff) * rotationSpeed;
-    } else {
-      state.currentRotation = state.targetRotation;
+    if (state.isWalking && now >= state.walkUntil) {
+      beginTurn();
+    }
+
+    if (state.isTurning) {
+      const progress = Math.min(
+        1,
+        Math.max(0, (now - state.turnStartTime) / state.turnDuration),
+      );
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+      let angleDiff = state.targetRotation - state.turnStartRotation;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+      state.currentRotation = state.turnStartRotation + angleDiff * easedProgress;
+
+      if (progress >= 1) {
+        state.currentRotation = state.targetRotation;
+        state.isTurning = false;
+        state.isWalking = true;
+        state.walkUntil = now + getRandomWalkDurationMs();
+      }
     }
 
     // Walk in current direction with smooth movement
-    const walkSpeed = state.speed;
-    state.x += Math.cos(state.currentRotation) * walkSpeed;
-    state.y += Math.sin(state.currentRotation) * walkSpeed;
+    if (state.isWalking) {
+      const walkSpeed = state.speed;
+      state.x += Math.sin(state.currentRotation) * walkSpeed;
+      state.y -= Math.cos(state.currentRotation) * walkSpeed;
+    }
 
     // Check for edge collision and pick new direction
-    const padding = 8;
     if (
       state.x < padding ||
       state.x > width - padding ||
@@ -185,8 +301,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       // Clamp position to bounds
       state.x = Math.max(padding, Math.min(width - padding, state.x));
       state.y = Math.max(padding, Math.min(height - padding, state.y));
-      // Pick new direction on next frame
-      state.isWalking = false;
+      beginTurn();
     }
 
     // Clear canvas
@@ -223,7 +338,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
 
-    animate();
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('resize', updateCanvasSize);
@@ -233,29 +348,40 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     };
   }, []);
 
-  const handleMouseEnter = () => {
-    bugStateRef.current.targetSpeed = 1.5; // 3x the normal speed
-  };
+  useEffect(() => {
+    const button = containerRef.current;
+    if (!button) return;
 
-  const handleMouseLeave = () => {
-    bugStateRef.current.targetSpeed = 0.5;
-  };
+    const handlePointerEnter = () => {
+      bugStateRef.current.targetSpeed = 1.5;
+      bugStateRef.current.burstTime = Math.max(bugStateRef.current.burstTime, 250);
+    };
 
-  const handleClick = (e: React.MouseEvent) => {
-    // Only burst on canvas click (not on button click)
-    if ((e.target as HTMLElement).tagName === 'CANVAS') {
-      bugStateRef.current.burstTime = 700;
-    }
-  };
+    const handlePointerLeave = () => {
+      bugStateRef.current.targetSpeed = 0.5;
+    };
+
+    const handleClick = () => {
+      bugStateRef.current.targetSpeed = 2.0;
+      bugStateRef.current.burstTime = 900;
+    };
+
+    button.addEventListener('pointerenter', handlePointerEnter);
+    button.addEventListener('pointerleave', handlePointerLeave);
+    button.addEventListener('click', handleClick);
+
+    return () => {
+      button.removeEventListener('pointerenter', handlePointerEnter);
+      button.removeEventListener('pointerleave', handlePointerLeave);
+      button.removeEventListener('click', handleClick);
+    };
+  }, [containerRef]);
 
   return (
     <canvas
       ref={canvasRef}
       className="pointer-events-none absolute inset-0 w-full h-full"
       style={{ borderRadius: 'inherit' }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
     />
   );
 };
