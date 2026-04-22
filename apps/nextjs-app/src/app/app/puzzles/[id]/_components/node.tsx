@@ -255,13 +255,13 @@ const getGateSVG = (label: string) => {
           {/* Left vertical line */}
           <line x1="9" y1="9" x2="9" y2="27" {...commonProps} />
           {/* Top horizontal line */}
-          <line x1="9" y1="9" x2="32" y2="9" {...commonProps} />
+          <line x1="9" y1="9" x2="25" y2="9" {...commonProps} />
           {/* Bottom horizontal line */}
-          <line x1="9" y1="27" x2="32" y2="27" {...commonProps} />
-          {/* Right curve - AND shape extended to bubble */}
-          <path d="M 32 9 Q 60 18 32 27" {...commonProps} />
-          {/* Negation bubble at output - closer to body */}
-          <circle cx="50" cy="18" r="2.5" {...commonProps} />
+          <line x1="9" y1="27" x2="25" y2="27" {...commonProps} />
+          {/* Right curve - AND shape compressed */}
+          <path d="M 25 9 Q 48 18 25 27" {...commonProps} />
+          {/* Negation bubble at output */}
+          <circle cx="40" cy="18" r="2.5" {...commonProps} />
         </svg>
       );
     }
@@ -272,13 +272,13 @@ const getGateSVG = (label: string) => {
           {/* Curved input side */}
           <path d="M 9 9 Q 17 18 9 27" {...commonProps} />
           {/* Top horizontal line */}
-          <line x1="14" y1="9" x2="32" y2="9" {...commonProps} />
+          <line x1="14" y1="9" x2="25" y2="9" {...commonProps} />
           {/* Bottom horizontal line */}
-          <line x1="14" y1="27" x2="32" y2="27" {...commonProps} />
-          {/* Right curve - OR shape */}
-          <path d="M 32 9 Q 58 18 32 27" {...commonProps} />
-          {/* Negation bubble at output - closer to body */}
-          <circle cx="48" cy="18" r="2.5" {...commonProps} />
+          <line x1="14" y1="27" x2="25" y2="27" {...commonProps} />
+          {/* Right curve - OR shape compressed */}
+          <path d="M 25 9 Q 48 18 25 27" {...commonProps} />
+          {/* Negation bubble at output */}
+          <circle cx="40" cy="18" r="2.5" {...commonProps} />
         </svg>
       );
     }
@@ -294,8 +294,8 @@ const getGateSVG = (label: string) => {
           <line x1="17" y1="9" x2="32" y2="9" {...commonProps} />
           {/* Bottom horizontal line */}
           <line x1="17" y1="27" x2="32" y2="27" {...commonProps} />
-          {/* Right curve - OR-like shape */}
-          <path d="M 32 9 Q 58 18 32 27" {...commonProps} />
+          {/* Right curve - OR-like shape compressed */}
+          <path d="M 32 9 Q 50 18 32 27" {...commonProps} />
         </svg>
       );
     }
@@ -308,13 +308,13 @@ const getGateSVG = (label: string) => {
           {/* Curved input side - second curve for XOR */}
           <path d="M 12 9 Q 20 18 12 27" {...commonProps} />
           {/* Top horizontal line */}
-          <line x1="17" y1="9" x2="32" y2="9" {...commonProps} />
+          <line x1="17" y1="9" x2="25" y2="9" {...commonProps} />
           {/* Bottom horizontal line */}
-          <line x1="17" y1="27" x2="32" y2="27" {...commonProps} />
-          {/* Right curve - OR-like shape */}
-          <path d="M 32 9 Q 58 18 32 27" {...commonProps} />
-          {/* Negation bubble at output - closer to body */}
-          <circle cx="48" cy="18" r="2.5" {...commonProps} />
+          <line x1="17" y1="27" x2="25" y2="27" {...commonProps} />
+          {/* Right curve - OR-like shape compressed */}
+          <path d="M 25 9 Q 48 18 25 27" {...commonProps} />
+          {/* Negation bubble at output */}
+          <circle cx="40" cy="18" r="2.5" {...commonProps} />
         </svg>
       );
     }

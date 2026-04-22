@@ -3,6 +3,11 @@ import { AUTH_TOKEN_COOKIE_NAME } from './utils/auth-constants';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Never gate API routes in page middleware.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
   
   // Public routes that don't require authentication (can be accessed without login)
   const publicRoutes = [
@@ -10,9 +15,9 @@ export function middleware(request: NextRequest) {
     '/auth/login',
     '/auth/register',
     '/auth/complete-google',
-    '/api/auth/login',     
-    '/api/auth/register',  
-    '/api/auth/google',     
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/google',
   ];
 
   // Protected routes that are only for logged-in users
@@ -58,11 +63,12 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Match all routes except:
+    // - api/* (API routes)
+    // - server/* (backend proxy routes)
     // - _next/static/* (static files)
     // - _next/image/* (image optimization files)
     // - favicon.ico (favicon file)
     // - Static file extensions (svg, png, jpg, ico, mp3, wav, etc.)
-    // '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
-    '/((?!api|server|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|server|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
   ],
 };

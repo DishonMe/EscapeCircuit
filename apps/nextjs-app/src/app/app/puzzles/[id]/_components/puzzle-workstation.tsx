@@ -56,6 +56,7 @@ import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import {
   Bug,
   ChevronDown,
@@ -201,6 +202,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
   const startTime = useRef(Date.now());
+  const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
@@ -1924,15 +1926,18 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 }
               />
               {!isInlineDebugger ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="workstation-debugger-button"
-                  onClick={enterInlineDebugger}
-                >
-                  <Bug className="mr-1 size-4" />
-                  Debugger
-                </Button>
+                <div className="relative">
+                  <Button
+                    ref={debuggerButtonRef}
+                    variant="outline"
+                    size="sm"
+                    className="workstation-debugger-button relative overflow-hidden"
+                    onClick={enterInlineDebugger}
+                  >
+                    <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                    Debugger
+                  </Button>
+                </div>
               ) : (
                 <>
                   <Button
@@ -2065,11 +2070,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 {inputs.map((i) => (
                   <span
                     key={i}
-                    className={
-                      ioUsage.usedInputs.has(i)
-                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
-                    }
+                    className="rounded-md border border-green-500/70 bg-green-500 px-2 py-0.5 text-[11px] font-medium text-white"
                   >
                     {i}
                   </span>
@@ -2082,8 +2083,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     key={o}
                     className={
                       ioUsage.usedOutputs.has(o)
-                        ? 'rounded-md border border-emerald-200/60 bg-emerald-50/50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                        : 'rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+                        ? 'rounded-md border border-orange-500/80 bg-orange-500 px-2 py-0.5 text-[11px] font-medium text-white'
+                        : 'rounded-md border border-orange-500/80 bg-orange-500 px-2 py-0.5 text-[11px] font-medium text-white'
                     }
                   >
                     {o}
@@ -2094,7 +2095,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[260px_1fr_280px]">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_250px]">
           <div className="workstation-component-menu">
             <WorkstationMenu
               basic={visibleBasics}
@@ -2213,6 +2214,30 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                         );
                         if (!placedComponent) return componentId;
 
+                        // Get the component definition from catalog
+                        const catalogEntry = componentCatalog.get(
+                          placedComponent.componentId,
+                        );
+
+                        // Extract display name based on component type
+                        let displayName = placedComponent.componentId;
+                        if (catalogEntry) {
+                          // For Arsenal pieces, use their name property if available
+                          if (
+                            (catalogEntry as any).is_arsenal === true &&
+                            (catalogEntry as any).name
+                          ) {
+                            displayName = (catalogEntry as any).name;
+                          }
+                          // For Custom Pieces, use type or name
+                          else if (
+                            (catalogEntry as any).type &&
+                            !placedComponent.componentId.includes(':')
+                          ) {
+                            displayName = (catalogEntry as any).type;
+                          }
+                        }
+
                         // Count how many gates of the same type appear before this one
                         const countBefore = placed
                           .slice(0, placed.indexOf(placedComponent))
@@ -2228,15 +2253,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                             comp.componentId === placedComponent.componentId,
                         ).length;
 
-                        // Extract gate type from ID (e.g., "NOT:1234567" -> "NOT")
-                        const parts = placedComponent.componentId.split(':');
-                        const gateType =
-                          parts[0] || placedComponent.componentId;
-
                         // Only show number if there are multiple gates of this type
                         return totalCount > 1
-                          ? `${gateType} Gate ${gateNumber}`
-                          : `${gateType} Gate`;
+                          ? `${displayName} ${gateNumber}`
+                          : `${displayName}`;
                       };
 
                       const fromLabel = formatWireNode(w.from.componentId);
@@ -2249,7 +2269,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                         >
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             {/* From Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-1 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-blue-600/80 bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {fromLabel}
                             </div>
 
@@ -2260,7 +2280,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                             />
 
                             {/* To Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-yellow-600/80 bg-yellow-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {toLabel}
                             </div>
                           </div>
@@ -2880,7 +2900,8 @@ const InspectionDialog = ({
     ? visibilityMode !== 'description' // For arsenal: show structure unless explicitly description-only
     : false; // For basic gates: never show internal structure
 
-  const showIOMap = !isArsenal; // I/O Map ONLY for basic gates, never for Arsenal pieces
+  const isDFF = catalogEntry.type === 'DFF';
+  const showIOMap = !isArsenal && !isDFF; // I/O Map for basic gates EXCEPT DFF
 
   // Parse internal structure for circuit preview
   const parsedSolution = useMemo(() => {
@@ -3278,7 +3299,7 @@ const getBasicGateInfo = (gateType: string): string | null => {
     NAND: 'NOT AND: outputs 0 only when both inputs are 1.',
     NOR: 'NOT OR: outputs 1 only when both inputs are 0.',
     XNOR: 'Exclusive NOR: outputs 1 when inputs are the same.',
-    DFF: 'D Flip-Flop: stores state based on clock input.',
+    DFF: 'A D Flip-Flop (DFF) is a sequential logic component. It captures the value of the Data (D) input at a definite portion of the clock cycle (usually the rising edge) and outputs that captured value at Q. The output Q only changes state when the clock ticks, holding its value steady between clock edges.',
   };
   return info[gateType] ?? null;
 };
