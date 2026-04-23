@@ -1,5 +1,6 @@
-import { AdminGuard } from './_components/admin-guard';
-import { Users } from './_components/users';
+import { redirect } from 'next/navigation';
+
+import { paths } from '@/config/paths';
 
 export const metadata = {
   title: 'Admin Panel',
@@ -7,13 +8,7 @@ export const metadata = {
 };
 
 const UsersPage = () => {
-  return (
-    <AdminGuard>
-      <div className="text-foreground">
-        <Users />
-      </div>
-    </AdminGuard>
-  );
+  redirect(paths.app.admin.root.getHref());
 };
 
 export default UsersPage;
