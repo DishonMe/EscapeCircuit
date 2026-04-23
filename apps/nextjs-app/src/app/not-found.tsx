@@ -1,16 +1,24 @@
-import { Link } from '@/components/ui/link';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
+
 import { paths } from '@/config/paths';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 const NotFoundPage = () => {
-  return (
-    <div className="mt-52 flex flex-col items-center font-semibold">
-      <h1>404 - Not Found</h1>
-      <p>Sorry, the page you are looking for does not exist.</p>
-      <Link href={paths.home.getHref()} replace>
-        Go to Home
-      </Link>
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    const destination = Cookies.get(AUTH_TOKEN_COOKIE_NAME)
+      ? paths.app.puzzles.getHref()
+      : paths.home.getHref();
+
+    router.replace(destination);
+  }, [router]);
+
+  return null;
 };
 
 export default NotFoundPage;

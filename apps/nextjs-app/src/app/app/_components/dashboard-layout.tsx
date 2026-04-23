@@ -416,7 +416,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     },
     userRole === 'admin' && {
       name: 'Admin',
-      to: paths.app.users.getHref(),
+      to: paths.app.admin.root.getHref(),
       icon: Shield,
     },
   ].filter(Boolean) as SideNavigationItem[];
