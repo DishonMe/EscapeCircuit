@@ -9,6 +9,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import { Button } from '@/components/ui/button';
 import { ColabPets } from '@/components/ui/colab-pets/ColabPets';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import {
   DropdownMenu,
@@ -31,6 +32,13 @@ type SideNavigationItem = {
   to: string;
   icon: (props: React.SVGProps<SVGSVGElement>) => JSX.Element;
 };
+
+type StoredAvatar = {
+  avatarName: string;
+  avatarColor: string;
+};
+
+const DASHBOARD_AVATAR_STORAGE_KEY = 'escape-circuit:last-avatar';
 
 const Logo = () => {
   return (
@@ -388,6 +396,8 @@ const PaletteThemePicker = () => {
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const user = useUser();
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [storedAvatar, setStoredAvatar] = useState<StoredAvatar | null>(null);
   const { colabPetsEnabled } = useSettings();
   const pathname = usePathname();
   const router = useRouter();
@@ -420,6 +430,46 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       icon: Shield,
     },
   ].filter(Boolean) as SideNavigationItem[];
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DASHBOARD_AVATAR_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as StoredAvatar;
+      if (parsed.avatarName && parsed.avatarColor) {
+        setStoredAvatar(parsed);
+      }
+    } catch {
+      // Ignore bad localStorage values.
+    }
+  }, []);
+
+  useEffect(() => {
+    const avatarName = user.data?.avatar_name;
+    const avatarColor = user.data?.avatar_color;
+    if (!avatarName || !avatarColor) return;
+
+    const current = { avatarName, avatarColor };
+    setStoredAvatar(current);
+
+    try {
+      window.localStorage.setItem(
+        DASHBOARD_AVATAR_STORAGE_KEY,
+        JSON.stringify(current),
+      );
+    } catch {
+      // Ignore localStorage write failures.
+    }
+  }, [user.data?.avatar_name, user.data?.avatar_color]);
+
+  const headerAvatarName =
+    user.data?.avatar_name ?? storedAvatar?.avatarName;
+  const headerAvatarColor =
+    user.data?.avatar_color ?? storedAvatar?.avatarColor;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -460,6 +510,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <PaletteThemePicker />
           <SettingsMenu />
           <div className="hidden md:flex items-center gap-2 text-[13px]">
+            {isHydrated && headerAvatarName && headerAvatarColor ? (
+              <AvatarDisplay
+                avatarName={headerAvatarName}
+                avatarColor={headerAvatarColor}
+                size="sm"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-secondary" aria-hidden="true" />
+            )}
             <span className="font-medium text-foreground">{user.data?.username}</span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground capitalize">{user.data?.role}</span>

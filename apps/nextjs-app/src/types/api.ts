@@ -22,6 +22,8 @@ export type User = Entity<{
   bio: string;
   xp: number;
   level: number;
+  avatar_name: string;
+  avatar_color: string;
   max_published_override?: number | null;
   max_unpublished_override?: number | null;
   effective_max_published?: number;

@@ -25,6 +25,8 @@ class UserRepo:
             role TEXT NOT NULL,
             bio TEXT NOT NULL DEFAULT '',
             xp INTEGER NOT NULL,
+            avatar_name TEXT NOT NULL DEFAULT 'Dinosaur',
+            avatar_color TEXT NOT NULL DEFAULT '#38bdf8',
             created_at TEXT NOT NULL,
             pw_salt BLOB,
             pw_hash BLOB
@@ -39,6 +41,12 @@ class UserRepo:
             self.conn.execute("ALTER TABLE users ADD COLUMN max_published_puzzles INTEGER")
         if "max_unpublished_puzzles" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN max_unpublished_puzzles INTEGER")
+        # Migration: add avatar_name column if missing
+        if "avatar_name" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN avatar_name TEXT NOT NULL DEFAULT 'Dinosaur'")
+        # Migration: add avatar_color column if missing
+        if "avatar_color" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN avatar_color TEXT NOT NULL DEFAULT '#38bdf8'")
 
     @staticmethod
     def _row_to_user(row) -> User:
@@ -49,6 +57,8 @@ class UserRepo:
             "role": row["role"],
             "bio": row["bio"],
             "xp": int(row["xp"]),
+            "avatar_name": row["avatar_name"] if "avatar_name" in row.keys() else "Dinosaur",
+            "avatar_color": row["avatar_color"] if "avatar_color" in row.keys() else "#38bdf8",
             "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in row.keys() else False,
             "created_at": row["created_at"],
             "max_published_puzzles": row["max_published_puzzles"] if "max_published_puzzles" in row.keys() else None,
@@ -67,12 +77,12 @@ class UserRepo:
             pw_hash = self._hash_password(password, salt)
 
         cur = self.conn.execute(
-            "INSERT INTO users(username, email, role, bio, xp, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?,?,?)",
-            (user.username, user.email, user.role.value, user.bio, user.xp, user.created_at.isoformat(), salt, pw_hash),
+            "INSERT INTO users(username, email, role, bio, xp, avatar_name, avatar_color, created_at, pw_salt, pw_hash) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (user.username, user.email, user.role.value, user.bio, user.xp, user.avatar_name, user.avatar_color, user.created_at.isoformat(), salt, pw_hash),
         )
         self.conn.commit()
         new_id = int(cur.lastrowid)
-        return User(id=new_id, username=user.username, email=user.email, role=user.role, bio=user.bio, xp=user.xp, created_at=user.created_at)
+        return User(id=new_id, username=user.username, email=user.email, role=user.role, bio=user.bio, xp=user.xp, avatar_name=user.avatar_name, avatar_color=user.avatar_color, created_at=user.created_at)
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         row = self.conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
