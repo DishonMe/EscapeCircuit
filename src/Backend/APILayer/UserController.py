@@ -29,6 +29,8 @@ class GoogleCompleteRegistrationReq(BaseModel):
     token: str
     username: str
     password: str
+    avatar_name: str = "Dinosaur"
+    avatar_color: str = "#38bdf8"
 
 
 class UpdateBioReq(BaseModel):

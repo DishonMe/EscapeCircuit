@@ -291,11 +291,19 @@ class UserService:
         token = payload.get("token") or ""
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
+        avatar_name = (payload.get("avatar_name") or "").strip()
+        avatar_color = (payload.get("avatar_color") or "#38bdf8").strip()
 
         if not token:
             raise ValidationError("token is required")
         if not username or not password:
             raise ValidationError("username and password required")
+        if not avatar_name:
+            raise ValidationError("avatar_name is required")
+        if avatar_name not in self.VALID_AVATARS:
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
+        if not avatar_color or len(avatar_color) != 7 or not avatar_color.startswith("#"):
+            raise ValidationError("invalid avatar_color format")
 
         # Verify the Google token again
         google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
@@ -328,9 +336,7 @@ class UserService:
         if self.user_repo.get_by_username(username):
             raise ValidationError("username already exists")
 
-        # Create new user with username, email, password, and random avatar
-        avatar_name = self._get_random_avatar()
-        avatar_color = "#38bdf8"  # default cyan color
+        # Create new user with username, email, password, and selected avatar
         new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name, avatar_color=avatar_color)
         try:
             user = self.user_repo.create(new_user, password=password)

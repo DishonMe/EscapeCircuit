@@ -131,6 +131,8 @@ const completeGoogleRegistration = (data: {
   token: string;
   username: string;
   password: string;
+  avatar_name: string;
+  avatar_color: string;
 }): Promise<AuthResponse> => {
   return api.post('/users/google-complete-registration', data, { suppressErrorNotification: true });
 };

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import NextLink from 'next/link';
 
@@ -14,6 +15,31 @@ type CompleteGoogleFormProps = {
   onSuccess: () => void;
 };
 
+const AVATAR_LIST = [
+  'Alligator', 'Anteater', 'Armadillo', 'Auroch', 'Axolotl', 'Badger', 'Bat', 'Beaver',
+  'Buffalo', 'Camel', 'Capybara', 'Chameleon', 'Cheetah', 'Chinchilla', 'Chipmunk',
+  'Chupacabra', 'Cormorant', 'Coyote', 'Crow', 'Dingo', 'Dinosaur', 'Dolphin', 'Duck',
+  'Elephant', 'Ferret', 'Fox', 'Frog', 'Giraffe', 'Gopher', 'Grizzly', 'Hedgehog',
+  'Hippo', 'Hyena', 'Ibex', 'Ifrit', 'Iguana', 'Jackal', 'Kangaroo', 'Koala',
+  'Kraken', 'Lemur', 'Leopard', 'Liger', 'Llama', 'Manatee', 'Mink', 'Monkey',
+  'Moose', 'Narwhal', 'Orangutan', 'Otter', 'Panda', 'Penguin', 'Platypus', 'Pumpkin',
+  'Python', 'Quagga', 'Rabbit', 'Raccoon', 'Rhino', 'Sheep', 'Shrew', 'Skunk',
+  'Squirrel', 'Tiger', 'Turtle', 'Walrus', 'Wolf', 'Wolverine', 'Wombat',
+];
+
+const COLOR_PRESETS = [
+  '#38bdf8',
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#06b6d4',
+  '#3b82f6',
+  '#8b5cf6',
+  '#ec4899',
+  '#64748b',
+];
+
 const completeGoogleSchema = z.object({
   username: z.string().min(1, 'Username is required').min(3, 'Username must be at least 3 characters'),
   password: z.string().min(5, 'Password must be at least 5 characters'),
@@ -27,6 +53,10 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addNotification } = useNotifications();
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState('#38bdf8');
+  const [customColor, setCustomColor] = useState('#38bdf8');
+  const [useCustomColor, setUseCustomColor] = useState(false);
 
   const email = searchParams?.get('email') || '';
   const name = searchParams?.get('name') || '';
@@ -83,10 +113,31 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
 
       <Form
         onSubmit={(values) => {
+          if (!selectedAvatar) {
+            addNotification({
+              type: 'error',
+              title: 'Avatar Required',
+              message: 'Please choose an avatar to complete registration.',
+            });
+            return;
+          }
+
+          const finalColor = useCustomColor ? customColor : selectedColor;
+          if (!/^#[0-9A-F]{6}$/i.test(finalColor)) {
+            addNotification({
+              type: 'error',
+              title: 'Invalid Color',
+              message: 'Please choose a valid hex color (for example: #38bdf8).',
+            });
+            return;
+          }
+
           complete.mutate({
             token,
             username: values.username,
             password: values.password,
+            avatar_name: selectedAvatar,
+            avatar_color: finalColor,
           });
         }}
         schema={completeGoogleSchema}
@@ -118,6 +169,83 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
               error={formState.errors['passwordConfirm']}
               registration={register('passwordConfirm')}
             />
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-foreground">Choose Avatar</p>
+              <div className="max-h-36 overflow-y-auto rounded-lg border border-border bg-secondary/40 p-2">
+                <div className="grid grid-cols-6 gap-2">
+                  {AVATAR_LIST.map((avatar) => (
+                    <button
+                      key={avatar}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar)}
+                      className={`aspect-square overflow-hidden rounded-md border transition-all ${
+                        selectedAvatar === avatar
+                          ? 'border-blue-500 ring-2 ring-blue-400'
+                          : 'border-border hover:border-foreground/40'
+                      }`}
+                      title={avatar}
+                    >
+                      <img
+                        src={`/avatars/${avatar}.png`}
+                        alt={avatar}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-foreground">Choose Color</p>
+              <div className="space-y-2 rounded-lg border border-border bg-secondary/40 p-3">
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_PRESETS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => {
+                        setSelectedColor(color);
+                        setUseCustomColor(false);
+                      }}
+                      className={`h-8 w-8 rounded-md border-2 ${
+                        !useCustomColor && selectedColor === color
+                          ? 'border-foreground ring-2 ring-foreground/30'
+                          : 'border-border hover:border-foreground/40'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={(e) => {
+                      setCustomColor(e.target.value);
+                      setUseCustomColor(true);
+                    }}
+                    className="h-9 w-10 cursor-pointer rounded border border-border"
+                  />
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCustomColor(value);
+                      if (/^#[0-9A-F]{6}$/i.test(value)) {
+                        setUseCustomColor(true);
+                      }
+                    }}
+                    placeholder="#000000"
+                    className="h-9 flex-1 rounded border border-border bg-card px-3 text-sm text-foreground"
+                  />
+                </div>
+              </div>
+            </div>
 
             <div>
               <Button
