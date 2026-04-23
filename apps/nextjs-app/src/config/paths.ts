@@ -36,6 +36,14 @@ export const paths = {
     myPuzzles: {
       getHref: () => '/app/my-puzzles',
     },
+    admin: {
+      root: {
+        getHref: () => '/app/admin',
+      },
+      uploadPuzzle: {
+        getHref: () => '/app/admin/upload-puzzle',
+      },
+    },
     arsenal: {
       root: {
         getHref: () => '/app/arsenal',

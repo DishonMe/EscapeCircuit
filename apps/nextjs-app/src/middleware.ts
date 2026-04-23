@@ -52,7 +52,6 @@ export function middleware(request: NextRequest) {
   // submit cleanly; the home page has working "Log in" / "Register" CTAs.
   if (!isPublicRoute && !hasAuthToken) {
     const homeUrl = new URL('/', request.url);
-    homeUrl.searchParams.set('reason', 'unauthorized');
     return NextResponse.redirect(homeUrl);
   }
 

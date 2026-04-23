@@ -236,7 +236,7 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
           </Link>
           {user.data?.role === 'admin' && (
             <Link
-              href="/app/admin/upload-puzzle"
+              href={paths.app.admin.uploadPuzzle.getHref()}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-[13px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-secondary"
             >
               <Upload className="size-4" />
