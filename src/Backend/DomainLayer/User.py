@@ -16,6 +16,8 @@ class User:
     bio: str = ""
     xp: int = 0
     is_discussion_banned: bool = False
+    avatar_name: str = "Dinosaur"
+    avatar_color: str = "#38bdf8"
     created_at: datetime = field(default_factory=utcnow)
     # Admin-set overrides for puzzle capacity (None = use level-based default)
     max_published_puzzles: Optional[int] = None

@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import { getLevelInfo } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
+import { UpdateAvatar } from '@/features/users/components/update-avatar';
 import { useUser } from '@/lib/auth';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type {
@@ -253,9 +255,11 @@ export const Profile = () => {
         <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-secondary text-lg font-semibold text-foreground">
-                {initials}
-              </div>
+              <AvatarDisplay
+                avatarName={userData.avatar_name ?? 'Dinosaur'}
+                avatarColor={userData.avatar_color ?? '#38bdf8'}
+                size="lg"
+              />
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                   {displayName}
@@ -265,7 +269,10 @@ export const Profile = () => {
                 </p>
               </div>
             </div>
-            <EditBio />
+            <div className="flex gap-2">
+              <UpdateAvatar />
+              <EditBio />
+            </div>
           </div>
 
           <dl className="mt-4 grid gap-3">

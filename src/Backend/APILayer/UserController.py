@@ -12,6 +12,7 @@ class RegisterReq(BaseModel):
     username: str
     password: str
     email: str = ""
+    avatar_name: str = "Dinosaur"
 
 
 class LoginReq(BaseModel):
@@ -31,6 +32,11 @@ class GoogleCompleteRegistrationReq(BaseModel):
 
 class UpdateBioReq(BaseModel):
     bio: str = ""
+
+
+class UpdateAvatarReq(BaseModel):
+    avatar_name: str
+    avatar_color: str
 
 
 class SetRoleReq(BaseModel):
@@ -227,6 +233,17 @@ def build_user_router(user_service: UserService, notification_service: Notificat
         try:
             user_id = user_service.auth.require_user_id(token)
             result = user_service.update_user_bio(user_id, req.bio)
+            return result
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.patch("/avatar")
+    def update_avatar(req: UpdateAvatarReq, token: str = Depends(verify_token)):
+        try:
+            user_id = user_service.auth.require_user_id(token)
+            result = user_service.update_user_avatar(user_id, req.avatar_name, req.avatar_color)
             return result
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))

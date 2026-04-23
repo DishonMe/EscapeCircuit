@@ -109,6 +109,7 @@ export const registerInputSchema = z.object({
   email: z.string().min(1, 'Required').email('Invalid email'),
   username: z.string().min(1, 'Required'),
   password: z.string().min(5, 'Required'),
+  avatar_name: z.string().min(1, 'Avatar selection is required'),
 });
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;

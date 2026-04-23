@@ -9,6 +9,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import { Button } from '@/components/ui/button';
 import { ColabPets } from '@/components/ui/colab-pets/ColabPets';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import {
   DropdownMenu,
@@ -460,6 +461,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <PaletteThemePicker />
           <SettingsMenu />
           <div className="hidden md:flex items-center gap-2 text-[13px]">
+            <AvatarDisplay
+              avatarName={user.data?.avatar_name ?? 'Dinosaur'}
+              avatarColor={user.data?.avatar_color ?? '#38bdf8'}
+              size="sm"
+            />
             <span className="font-medium text-foreground">{user.data?.username}</span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground capitalize">{user.data?.role}</span>

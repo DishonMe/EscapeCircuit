@@ -6,6 +6,7 @@ import NextLink from 'next/link';
 import { paths } from '@/config/paths';
 import { Discussion } from '@/types/api';
 import { cn } from '@/utils/cn';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 
 import { useToggleBookmark } from '../api/bookmark-discussion';
 import { CategoryBadge } from './category-badge';
@@ -91,9 +92,18 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
         href={paths.app.discussion.getHref(discussion.id)}
         className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground"
       >
-        <span className="font-medium text-muted-foreground">
-          {discussion.author?.username || 'Unknown'}
-        </span>
+        <div className="flex items-center gap-2">
+          {discussion.author && (
+            <AvatarDisplay
+              avatarName={discussion.author.avatar_name}
+              avatarColor={discussion.author.avatar_color}
+              size="sm"
+            />
+          )}
+          <span className="font-medium text-muted-foreground">
+            {discussion.author?.username || 'Unknown'}
+          </span>
+        </div>
         <UserBadge user={discussion.author} />
         <span className="flex items-center gap-1">
           <MessageSquare className="size-3" />

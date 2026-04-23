@@ -1,5 +1,6 @@
 import sqlite3
 from typing import Dict, Any, List, Optional
+import random
 
 from Backend import settings
 
@@ -23,6 +24,19 @@ class UserService:
     Controller talks only to UserService.
     UserService internally uses AuthService + UserRepo + XPService.
     """
+    
+    # List of valid animal avatars (must match files in public/avatars/)
+    VALID_AVATARS = [
+        "Alligator", "Anteater", "Armadillo", "Auroch", "Axolotl", "Badger", "Bat", "Beaver",
+        "Buffalo", "Camel", "Capybara", "Chameleon", "Cheetah", "Chinchilla", "Chipmunk",
+        "Chupacabra", "Cormorant", "Coyote", "Crow", "Dingo", "Dinosaur", "Dolphin", "Duck",
+        "Elephant", "Ferret", "Fox", "Frog", "Giraffe", "Gopher", "Grizzly", "Hedgehog",
+        "Hippo", "Hyena", "Ibex", "Ifrit", "Iguana", "Jackal", "Kangaroo", "Koala",
+        "Kraken", "Lemur", "Leopard", "Liger", "Llama", "Manatee", "Mink", "Monkey",
+        "Moose", "Narwhal", "Orangutan", "Otter", "Panda", "Penguin", "Platypus", "Pumpkin",
+        "Python", "Quagga", "Rabbit", "Raccoon", "Rhino", "Sheep", "Shrew", "Skunk",
+        "Squirrel", "Tiger", "Turtle", "Walrus", "Wolf", "Wolverine", "Wombat"
+    ]
 
     def __init__(
         self,
@@ -36,22 +50,32 @@ class UserService:
         self.xp = xp_service
         self.audit_log = audit_log_repo
 
+    @staticmethod
+    def _get_random_avatar() -> str:
+        """Return a random animal avatar name."""
+        return random.choice(UserService.VALID_AVATARS)
+
     def register(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
         email = (payload.get("email") or "").strip()
+        avatar_name = (payload.get("avatar_name") or "").strip()
         
         if not username or not password:
             raise ValidationError("username and password required")
         if not email:
             raise ValidationError("email is required")
+        if not avatar_name:
+            raise ValidationError("avatar_name is required")
+        if avatar_name not in self.VALID_AVATARS:
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
         if self.user_repo.get_by_username(username):
             raise ValidationError("username already exists")
         if self.user_repo.get_by_email(email):
             raise ValidationError("email already exists")
 
         # Domain objects require a truthy id; repo will replace it on insert.
-        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name)
         try:
             created = self.user_repo.create(user, password=password)
         except sqlite3.IntegrityError:
@@ -303,8 +327,10 @@ class UserService:
         if self.user_repo.get_by_username(username):
             raise ValidationError("username already exists")
 
-        # Create new user with username, email, and password
-        new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+        # Create new user with username, email, password, and random avatar
+        avatar_name = self._get_random_avatar()
+        avatar_color = "#38bdf8"  # default cyan color
+        new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name, avatar_color=avatar_color)
         try:
             user = self.user_repo.create(new_user, password=password)
         except sqlite3.IntegrityError:
@@ -429,3 +455,27 @@ class UserService:
         conn.commit()
         
         return {"ok": True, "bio": bio}
+
+    def update_user_avatar(self, user_id: int, avatar_name: str, avatar_color: str) -> dict:
+        """Update user avatar and color"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        
+        # Validate avatar name
+        if avatar_name not in self.VALID_AVATARS:
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
+        
+        # Validate color format (hex color)
+        if not avatar_color or len(avatar_color) != 7 or not avatar_color.startswith("#"):
+            raise ValidationError("invalid avatar_color format")
+        
+        # Update in database
+        conn = self.user_repo.conn
+        conn.execute(
+            "UPDATE users SET avatar_name = ?, avatar_color = ? WHERE id = ?",
+            (avatar_name, avatar_color, user_id)
+        )
+        conn.commit()
+        
+        return {"ok": True, "avatar_name": avatar_name, "avatar_color": avatar_color}

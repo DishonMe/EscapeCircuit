@@ -10,6 +10,7 @@ import { useNotifications } from '@/components/ui/notifications';
 import { useUser } from '@/lib/auth';
 import { Reply } from '@/types/api';
 import { cn } from '@/utils/cn';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 
 import { useAcceptReply } from '../api/accept-reply';
 import { useDeleteReply } from '../api/delete-reply';
@@ -124,9 +125,18 @@ export const ReplyItem = ({
 
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground">
-              {reply.author?.username || 'Unknown'}
-            </span>
+            <div className="flex items-center gap-2">
+              {reply.author && (
+                <AvatarDisplay
+                  avatarName={reply.author.avatar_name}
+                  avatarColor={reply.author.avatar_color}
+                  size="sm"
+                />
+              )}
+              <span className="font-medium text-foreground">
+                {reply.author?.username || 'Unknown'}
+              </span>
+            </div>
             <UserBadge user={reply.author} />
             <span>{timeAgo(reply.createdAt)}</span>
           </div>
