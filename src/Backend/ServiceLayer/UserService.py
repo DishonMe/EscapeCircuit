@@ -60,6 +60,7 @@ class UserService:
         password = payload.get("password") or ""
         email = (payload.get("email") or "").strip()
         avatar_name = (payload.get("avatar_name") or "").strip()
+        avatar_color = (payload.get("avatar_color") or "#38bdf8").strip()
         
         if not username or not password:
             raise ValidationError("username and password required")
@@ -75,7 +76,7 @@ class UserService:
             raise ValidationError("email already exists")
 
         # Domain objects require a truthy id; repo will replace it on insert.
-        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name)
+        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name, avatar_color=avatar_color)
         try:
             created = self.user_repo.create(user, password=password)
         except sqlite3.IntegrityError:
@@ -478,4 +479,9 @@ class UserService:
         )
         conn.commit()
         
-        return {"ok": True, "avatar_name": avatar_name, "avatar_color": avatar_color}
+        # Get updated user
+        updated_user = self.user_repo.get_by_id(user_id)
+        if not updated_user:
+            raise ValidationError("failed to retrieve updated user")
+        
+        return updated_user.to_dict()

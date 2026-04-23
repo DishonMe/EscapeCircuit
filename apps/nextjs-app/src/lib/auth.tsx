@@ -110,6 +110,7 @@ export const registerInputSchema = z.object({
   username: z.string().min(1, 'Required'),
   password: z.string().min(5, 'Required'),
   avatar_name: z.string().min(1, 'Avatar selection is required'),
+  avatar_color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format'),
 });
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;

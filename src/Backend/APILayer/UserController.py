@@ -13,6 +13,7 @@ class RegisterReq(BaseModel):
     password: str
     email: str = ""
     avatar_name: str = "Dinosaur"
+    avatar_color: str = "#38bdf8"
 
 
 class LoginReq(BaseModel):

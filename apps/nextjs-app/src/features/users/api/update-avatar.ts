@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
 import { MutationConfig } from '@/lib/react-query';
+import { User } from '@/types/api';
 
 export const updateAvatarInputSchema = z.object({
   avatar_name: z.string().min(1, 'Avatar is required'),
@@ -29,10 +30,15 @@ export const useUpdateAvatar = ({
   const { onSuccess, ...restConfig } = mutationConfig || {};
 
   return useMutation({
-    onSuccess: (...args) => {
+    onSuccess: (data, ...args) => {
+      // Sync immediately so UI updates without waiting for refetch timing.
+      if (data && typeof data === 'object' && 'id' in data) {
+        queryClient.setQueryData(['user'], data as User);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['user'] });
       refetchUser();
-      onSuccess?.(...args);
+      onSuccess?.(data, ...args);
     },
     ...restConfig,
     mutationFn: updateAvatar,
