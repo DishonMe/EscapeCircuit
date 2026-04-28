@@ -4,7 +4,7 @@
     "description": "Design a logic circuit that detects if a 6-bit input sequence X is a palindrome (reads the same forwards and backwards)",
     "budget": 20,
     "creator_budget": 8,
-    "time_limit_seconds": 210,
+    "time_limit_seconds": 420,
     "difficulty": "HARD",
     "default_gate_set": [
       "AND",
@@ -30,7 +30,7 @@
       "rows": 15,
       "cols": 30
     },
-    "riddle_base_name": "riddle_17_3_bit_synchronous_counter"
+    "riddle_base_name": "riddle_10_3_bit_synchronous_counter"
   },
   "test_cases": [
     {

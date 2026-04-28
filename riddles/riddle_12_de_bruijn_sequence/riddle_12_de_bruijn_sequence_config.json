@@ -4,7 +4,7 @@
     "description": "Generate a 16-bit De Bruijn sequence autonomously using sequential logic",
     "budget": 40,
     "creator_budget": 15,
-    "time_limit_seconds": 240,
+    "time_limit_seconds": 480,
     "difficulty": "HARD",
     "default_gate_set": [
       "AND",
@@ -31,7 +31,7 @@
       "rows": 20,
       "cols": 40
     },
-    "riddle_base_name": "riddle_19_de_bruijn_sequence"
+    "riddle_base_name": "riddle_12_de_bruijn_sequence"
   },
   "test_cases": []
 }
