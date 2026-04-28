@@ -154,6 +154,8 @@ def register_user(client: TestClient, username: str = "testuser", password: str 
         "username": username,
         "password": password,
         "email": f"{username}@test.com",
+        "avatar_name": "Dinosaur",
+        "avatar_color": "#38bdf8",
     })
     assert resp.status_code == 200, resp.text
     return resp.json()

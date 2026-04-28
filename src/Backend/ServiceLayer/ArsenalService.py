@@ -309,6 +309,12 @@ class ArsenalService:
         visual_style: Dict[str, Any] | None = None,
     ) -> dict:
         """Update an arsenal piece name and/or visual style."""
+        # Validate name requirement first (before permission checks)
+        if new_name is not None:
+            normalized_name = (new_name or "").strip()
+            if not normalized_name:
+                raise ValidationError("new name is required")
+        
         user_id = self.auth.require_user_id(session_token)
 
         piece = self.repo.get_by_id(piece_id)
@@ -322,10 +328,7 @@ class ArsenalService:
         has_changes = False
 
         if new_name is not None:
-            normalized_name = (new_name or "").strip()
-            if not normalized_name:
-                raise ValidationError("new name is required")
-            piece.name = normalized_name
+            piece.name = (new_name or "").strip()
             has_changes = True
 
         if visual_style is not None:
