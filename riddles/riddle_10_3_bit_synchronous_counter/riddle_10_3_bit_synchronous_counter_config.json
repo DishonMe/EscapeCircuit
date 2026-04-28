@@ -1,7 +1,7 @@
 {
   "puzzle": {
     "name": "3-Bit Synchronous Counter",
-    "description": "Design a logic circuit that detects if a 6-bit input sequence X is a palindrome (reads the same forwards and backwards)",
+    "description": "Design a 3-bit synchronous counter circuit that counts through values 0-7 based on the input clock signal using DFF gates for state management.",
     "budget": 20,
     "creator_budget": 8,
     "time_limit_seconds": 420,
