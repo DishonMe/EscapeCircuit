@@ -210,13 +210,13 @@ export default function LoginPage() {
               className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
               style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.6)' }}
             >
-              Username
+              Email or Username
             </label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="your_handle"
+              placeholder="your_handle or you@example.com"
               autoComplete="username"
               className="w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-400/30"
               style={{
