@@ -59,6 +59,8 @@ class SolveRepo:
             "xp_earned INTEGER DEFAULT 0",
             "highest_medal INTEGER DEFAULT 0",
             "solution_hash TEXT",
+            "clues_used INTEGER DEFAULT 0",
+            "clue_penalty_seconds INTEGER DEFAULT 0",
         ]:
             self._add_column_if_missing("solve_attempts", coldef)
 
@@ -115,8 +117,12 @@ class SolveRepo:
     def create_attempt(self, attempt: SolveAttempt) -> SolveAttempt:
         cur = self.conn.execute(
             """
-            INSERT INTO solve_attempts(puzzle_id, user_id, circuit_id, started_at, submitted_at, passed, fail_reason, time_used_seconds, cost_used)
-            VALUES(?,?,?,?,?,?,?,?,?)
+            INSERT INTO solve_attempts(
+                puzzle_id, user_id, circuit_id, started_at, submitted_at,
+                passed, fail_reason, time_used_seconds, cost_used,
+                clues_used, clue_penalty_seconds
+            )
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 int(attempt.puzzle_id),
@@ -128,6 +134,8 @@ class SolveRepo:
                 attempt.fail_reason,
                 attempt.time_used_seconds,
                 attempt.cost_used,
+                int(getattr(attempt, "clues_used", 0) or 0),
+                int(getattr(attempt, "clue_penalty_seconds", 0) or 0),
             ),
         )
         attempt.id = int(cur.lastrowid)
@@ -142,7 +150,9 @@ class SolveRepo:
                 passed=?,
                 fail_reason=?,
                 time_used_seconds=?,
-                cost_used=?
+                cost_used=?,
+                clues_used=?,
+                clue_penalty_seconds=?
             WHERE id=?
             """,
             (
@@ -152,6 +162,8 @@ class SolveRepo:
                 attempt.fail_reason,
                 attempt.time_used_seconds,
                 attempt.cost_used,
+                int(getattr(attempt, "clues_used", 0) or 0),
+                int(getattr(attempt, "clue_penalty_seconds", 0) or 0),
                 int(attempt.id),
             ),
         )
@@ -341,27 +353,59 @@ class SolveRepo:
         return dict(row) if row else None
         return row
 
-    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0, solution_json: str = None) -> int:
+    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0, solution_json: str = None, clues_used: int = 0, clue_penalty_seconds: int = 0) -> int:
         """Convenience: insert a passed attempt with time/xp/medal/cost metadata and return its id."""
         import hashlib
         from Backend.DomainLayer.Utils import utcnow
         now = utcnow()
-        
+
         # Compute solution hash if solution is provided
         solution_hash = None
         if solution_json:
             solution_hash = hashlib.md5(solution_json.encode()).hexdigest()
-        
+
         cur = self.conn.execute(
             """
             INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed,
-                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used, solution_hash)
-            VALUES(?,?,?,?,1,?,?,?,?,?,?)
+                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used, solution_hash,
+                                       clues_used, clue_penalty_seconds)
+            VALUES(?,?,?,?,1,?,?,?,?,?,?,?,?)
             """,
             (int(puzzle_id), int(user_id), now.isoformat(), now.isoformat(),
-             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used), solution_hash),
+             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used), solution_hash,
+             int(clues_used or 0), int(clue_penalty_seconds or 0)),
         )
         return int(cur.lastrowid)
+
+    def close_attempt(self, attempt_id: int) -> None:
+        """Mark an open attempt as submitted so it can no longer accumulate clue requests.
+        Used after a successful validate_solution() to prevent the closed attempt from
+        being reused by /attempts/start or /clue."""
+        from Backend.DomainLayer.Utils import utcnow
+        self.conn.execute(
+            "UPDATE solve_attempts SET submitted_at=? WHERE id=? AND submitted_at IS NULL",
+            (utcnow().isoformat(), int(attempt_id)),
+        )
+
+    def get_attempt_by_id(self, attempt_id: int) -> Optional[SolveAttempt]:
+        row = self.conn.execute(
+            "SELECT * FROM solve_attempts WHERE id=? LIMIT 1",
+            (int(attempt_id),),
+        ).fetchone()
+        if not row:
+            return None
+        return SolveAttempt.from_dict(
+            {
+                "id": int(row["id"]),
+                "puzzle_id": int(row["puzzle_id"]),
+                "user_id": int(row["user_id"]),
+                "circuit_id": row["circuit_id"],
+                "started_at": row["started_at"],
+                "submitted_at": row["submitted_at"],
+                "passed": None if row["passed"] is None else bool(int(row["passed"])),
+                "fail_reason": row["fail_reason"],
+            }
+        )
 
     def get_leaderboard(self, puzzle_id: int, limit: int = 50) -> list[dict]:
         """Return the leaderboard for a puzzle: best (fastest) passed solve per user, ranked by time."""

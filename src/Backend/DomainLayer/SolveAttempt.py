@@ -21,6 +21,9 @@ class SolveAttempt:
     passed: Optional[bool] = None
     fail_reason: Optional[str] = None
 
+    clues_used: int = 0
+    clue_penalty_seconds: int = 0
+
     def __post_init__(self) -> None:
         self.id = ensure_non_negative_int("SolveAttempt.id", self.id)
         self.puzzle_id = ensure_non_negative_int("SolveAttempt.puzzle_id", self.puzzle_id)
@@ -54,6 +57,8 @@ class SolveAttempt:
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
             "passed": self.passed,
             "fail_reason": self.fail_reason,
+            "clues_used": int(self.clues_used or 0),
+            "clue_penalty_seconds": int(self.clue_penalty_seconds or 0),
         }
 
     @staticmethod

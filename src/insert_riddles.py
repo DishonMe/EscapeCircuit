@@ -349,6 +349,10 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     # Check if puzzle already exists by name — preserve its ID for solve_attempts
     existing = c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],)).fetchone()
     
+    clues_payload = puzzle_data.get('clues')
+    clues_json = json.dumps(clues_payload) if isinstance(clues_payload, list) and clues_payload else None
+    clue_penalty_seconds = puzzle_data.get('clue_penalty_seconds')
+
     if existing:
         puzzle_id = existing[0]
         # Update description/budget/creator_budget/instructions/config but keep the same ID
@@ -358,7 +362,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 default_gate_set=?, difficulty=?,
                 min_gate_count=?, total_gate_count=?, min_cycles=?, max_cycles=?,
                 board_rows=?, board_cols=?,
-                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?, riddle_base_name=?, initial_board_json=?
+                allow_arsenal=?, allowed_arsenal_component_ids=?, arsenal_component_display_modes=?, riddle_base_name=?, initial_board_json=?,
+                clues_json=?, clue_penalty_seconds=?
             WHERE id=?
         """, (
             description,
@@ -379,6 +384,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             json.dumps(puzzle_data.get('arsenal_component_display_modes')) if puzzle_data.get('arsenal_component_display_modes') else None,
             puzzle_data.get('riddle_base_name'),
             initial_board_json,
+            clues_json,
+            clue_penalty_seconds,
             puzzle_id
         ))
         # Clear old test cases for this puzzle (they get re-imported below)
@@ -388,13 +395,14 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         c.execute("""
             INSERT INTO puzzles (
                 name, creator_user_id, description, instructions, status, budget, creator_budget,
-                time_limit_seconds, difficulty, default_gate_set, rating_count, 
+                time_limit_seconds, difficulty, default_gate_set, rating_count,
                 avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 board_rows, board_cols, riddle_base_name, initial_board_json,
+                clues_json, clue_penalty_seconds,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -418,6 +426,8 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             puzzle_data.get('board', {}).get('cols'),
             puzzle_data.get('riddle_base_name'),
             initial_board_json,
+            clues_json,
+            clue_penalty_seconds,
             utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid
@@ -644,17 +654,21 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
     if existing:
         puzzle_id = existing[0]
     else:
+        clues_payload2 = puzzle_data.get('clues')
+        clues_json2 = json.dumps(clues_payload2) if isinstance(clues_payload2, list) and clues_payload2 else None
+        clue_penalty_seconds2 = puzzle_data.get('clue_penalty_seconds')
         # INSERT new puzzle
         c.execute("""
             INSERT INTO puzzles (
                 name, creator_user_id, description, instructions, status, budget, creator_budget,
-                time_limit_seconds, difficulty, default_gate_set, rating_count, 
+                time_limit_seconds, difficulty, default_gate_set, rating_count,
                 avg_difficulty, avg_fun, avg_clearness,
                 min_gate_count, total_gate_count, min_cycles, max_cycles,
                 allow_arsenal, allowed_arsenal_component_ids, arsenal_component_display_modes,
                 board_rows, board_cols, riddle_base_name,
+                clues_json, clue_penalty_seconds,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             puzzle_data['name'],
             creator_id,
@@ -677,6 +691,8 @@ def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator
             puzzle_data.get('board', {}).get('rows'),
             puzzle_data.get('board', {}).get('cols'),
             puzzle_data.get('riddle_base_name'),
+            clues_json2,
+            clue_penalty_seconds2,
             utcnow().isoformat()
         ))
         puzzle_id = c.lastrowid
