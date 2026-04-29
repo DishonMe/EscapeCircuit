@@ -83,6 +83,9 @@ class TestSolvingServiceStartAttempt:
         puzzle = Puzzle(id=1, name="Test", creator_user_id=2, status=PuzzleStatus.PUBLISHED)
         self.mock_puzzle_repo.get_by_id.return_value = puzzle
 
+        # No prior open attempt → idempotency path falls through to create_attempt.
+        self.mock_solve_repo.get_open_attempt.return_value = None
+
         # The repo returns the attempt with id assigned by DB
 
         saved_attempt = Mock(spec=SolveAttempt)

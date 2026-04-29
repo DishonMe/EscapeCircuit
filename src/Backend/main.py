@@ -14,6 +14,7 @@ from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.RatingRepo import RatingRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
+from Backend.PersistantLayer.CluesRepo import CluesRepo
 from Backend.PersistantLayer.NotificationRepo import NotificationRepo
 from Backend.PersistantLayer.AuditLogRepo import AuditLogRepo
 from Backend.PersistantLayer.DiscussionRepo import DiscussionRepo
@@ -29,6 +30,7 @@ from Backend.ServiceLayer.CircuitService import CircuitService
 from Backend.ServiceLayer.ArsenalService import ArsenalService
 from Backend.ServiceLayer.PuzzleService import PuzzleService
 from Backend.ServiceLayer.SolvingService import SolvingService
+from Backend.ServiceLayer.CluesService import CluesService
 from Backend.ServiceLayer.RatingService import RatingService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
 from Backend.ServiceLayer.NotificationService import NotificationService
@@ -66,6 +68,7 @@ def create_app() -> FastAPI:
     puzzle_repo = PuzzleRepo(conn)
     rating_repo = RatingRepo(conn)
     solve_repo = SolveRepo(conn)
+    clues_repo = CluesRepo(conn)
     notification_repo = NotificationRepo(conn)
     audit_log_repo = AuditLogRepo(conn)
     discussion_repo = DiscussionRepo(conn)
@@ -124,6 +127,16 @@ def create_app() -> FastAPI:
         xp_service,
         user_repo,
         notification_service,
+        clues_repo=clues_repo,
+    )
+
+    # Clues Service
+    clues_service = CluesService(
+        conn=conn,
+        clues_repo=clues_repo,
+        puzzle_repo=puzzle_repo,
+        solve_repo=solve_repo,
+        auth=auth_service,
     )
 
     # Puzzle Service
@@ -205,7 +218,7 @@ def create_app() -> FastAPI:
     app.include_router(build_user_router(user_service, notification_service))
     app.include_router(build_circuit_router(circuit_service))
     app.include_router(build_arsenal_router(arsenal_service, solving_service))
-    app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service, admin_service))
+    app.include_router(build_puzzle_router(puzzle_service, solving_service, rating_service, admin_service, clues_service=clues_service))
     app.include_router(build_rating_router(rating_service))
     app.include_router(build_admin_router(admin_service))
     app.include_router(build_debugger_router(logic_engine, circuit_repo))

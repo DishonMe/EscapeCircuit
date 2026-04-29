@@ -170,6 +170,11 @@ export type Puzzle = Entity<{
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
   is_saved?: boolean; // Whether user has saved this puzzle
 
+  // Clue metadata (text intentionally NOT exposed — fetched via POST /puzzles/{id}/clue)
+  has_clues?: boolean;
+  clue_count?: number;
+  clue_penalty_seconds?: number;
+
   // Difficulty ratings (injected by backend)
   avg_difficulty?: number;
   // User's rating (injected by browse endpoint if user already rated)

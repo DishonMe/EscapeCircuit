@@ -13,7 +13,12 @@
     "min_cycles": null,
     "max_cycles": null,
     "allow_arsenal": true,
-    "riddle_base_name": "riddle_01_binary_adder"
+    "riddle_base_name": "riddle_01_binary_adder",
+    "clues": [
+      "S is the parity of A, B, and C_in — think XOR.",
+      "C_out is high whenever at least two of A, B, C_in are high — that's a majority function.",
+      "A 3-input XOR for S, plus AND/OR for the majority on C_out, fits the budget."
+    ]
   },
   "test_cases": [
     {

@@ -13,6 +13,7 @@ from Backend.ServiceLayer.SolvingService import SolvingService
 from Backend.ServiceLayer.RatingService import RatingService
 from Backend.ServiceLayer.AdminService import AdminService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
+from Backend.ServiceLayer.CluesService import CluesService, CluePuzzleHasNoClues, ClueAttemptInvalid, CluesAllConsumed
 from Backend.APILayer.auth_utils import verify_token
 from Backend.PersistantLayer._db import connect
 from insert_riddles import insert_riddle
@@ -88,6 +89,13 @@ class SolveReq(BaseModel):
 class ValidateSolutionReq(BaseModel):
     solution: Dict[str, Any]
     time_taken: int = 0
+    time_taken_raw: Optional[int] = None
+    attempt_id: Optional[int] = None
+
+
+class RequestClueReq(BaseModel):
+    attempt_id: int
+    request_id: Optional[str] = None
 
 
 class SimulateReq(BaseModel):
@@ -236,7 +244,7 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
     return puzzle_config
 
 
-def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None) -> APIRouter:
+def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingService, rating_service: RatingService | None = None, admin_service: AdminService | None = None, clues_service: CluesService | None = None) -> APIRouter:
     router = APIRouter(prefix="/puzzles", tags=["puzzles"])
 
     def _inject_rating_metrics(puzzle_payload: dict) -> None:
@@ -588,7 +596,35 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
     @router.post("/{puzzle_id}/validate")
     def validate(puzzle_id: int, req: ValidateSolutionReq, token: str = Depends(verify_token)):
         try:
-            return solving_service.validate_solution(token, puzzle_id, req.solution, time_taken=req.time_taken)
+            # Prefer time_taken_raw (new contract); fall back to legacy time_taken.
+            raw_time = req.time_taken_raw if req.time_taken_raw is not None else req.time_taken
+            return solving_service.validate_solution(
+                token,
+                puzzle_id,
+                req.solution,
+                time_taken=raw_time,
+                attempt_id=req.attempt_id,
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @router.post("/{puzzle_id}/clue")
+    def request_clue(puzzle_id: int, req: RequestClueReq, token: str = Depends(verify_token)):
+        if clues_service is None:
+            raise HTTPException(status_code=503, detail="clue service not available")
+        try:
+            return clues_service.request_clue(
+                token=token,
+                puzzle_id=puzzle_id,
+                attempt_id=req.attempt_id,
+                request_id=req.request_id,
+            )
+        except CluePuzzleHasNoClues as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except CluesAllConsumed as e:
+            raise HTTPException(status_code=410, detail=str(e))
+        except ClueAttemptInvalid as e:
+            raise HTTPException(status_code=403, detail=str(e))
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 

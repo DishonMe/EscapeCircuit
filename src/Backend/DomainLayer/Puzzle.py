@@ -41,6 +41,10 @@ class Puzzle:
     # Initial board configuration: JSON string containing locked placed components and wires
     initial_board_json: Optional[str] = None
 
+    # Optional progressive clues for in-puzzle hints. Stored server-side; never echoed to clients via to_dict().
+    clues: Optional[List[str]] = None
+    clue_penalty_seconds: Optional[int] = None
+
     rating_count: int = 0
     is_hall_of_fame: bool = False
     avg_difficulty: float = 0.0
@@ -91,6 +95,9 @@ class Puzzle:
             self.status = PuzzleStatus.UNPUBLISHED
 
     def to_dict(self) -> dict:
+        from .CluePenalty import resolve_clue_penalty
+
+        clue_count = len(self.clues) if self.clues else 0
         return {
             "id": str(self.id), # Frontend often expects string IDs or handles both
             "name": self.name,
@@ -136,6 +143,10 @@ class Puzzle:
             "avg_clearness": self.avg_clearness,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000), # Frontend expects timestamp (ms)
+            # Clue metadata: text is intentionally redacted; only counts and resolved penalty are exposed.
+            "has_clues": clue_count > 0,
+            "clue_count": clue_count,
+            "clue_penalty_seconds": resolve_clue_penalty(self),
         }
 
     @staticmethod
@@ -176,6 +187,8 @@ class Puzzle:
             allowed_arsenal_component_ids=d.get("allowed_arsenal_component_ids") or d.get("allowedArsenalComponentIds"),
             arsenal_component_display_modes=d.get("arsenal_component_display_modes") or d.get("arsenalComponentDisplayModes"),
             initial_board_json=initial_board_json,
+            clues=list(d["clues"]) if isinstance(d.get("clues"), list) else None,
+            clue_penalty_seconds=int(d["clue_penalty_seconds"]) if d.get("clue_penalty_seconds") is not None else None,
             rating_count=int(d.get("rating_count", 0)),
             is_hall_of_fame=bool(d.get("is_hall_of_fame", d.get("isHallOfFame", False))),
             avg_difficulty=float(d.get("avg_difficulty", 0.0)),
