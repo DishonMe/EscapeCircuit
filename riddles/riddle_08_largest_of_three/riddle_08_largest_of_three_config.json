@@ -4,7 +4,7 @@
     "description": "Repeat the largest number out of 3 inputs",
     "budget": 50,
     "creator_budget": 32,
-    "time_limit_seconds": 2400,
+    "time_limit_seconds": 4800,
     "difficulty": "HARD",
     "default_gate_set": [
       "XOR",
@@ -33,7 +33,7 @@
       "rows": 15,
       "cols": 30
     },
-    "riddle_base_name": "riddle_15_largest_of_three"
+    "riddle_base_name": "riddle_08_largest_of_three"
   },
   "test_cases": [
     {

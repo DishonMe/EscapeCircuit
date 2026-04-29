@@ -4,7 +4,7 @@
     "description": "Design a circuit that compares two 2-bit binary numbers A and B. Output 1 on the corresponding line if A > B (GT), A = B (EQ), or A < B (LT).",
     "budget": 250,
     "creator_budget": 15,
-    "time_limit_seconds": 90,
+    "time_limit_seconds": 180,
     "difficulty": "HARD",
     "default_gate_set": ["AND", "OR", "NOT", "XOR", "NAND", "NOR"],
     "inputs": ["A1", "A0", "B1", "B0"],

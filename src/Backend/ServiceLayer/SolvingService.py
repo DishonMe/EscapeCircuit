@@ -107,137 +107,102 @@ class SolvingService:
         if not test_cases:
             raise ValidationError("puzzle has no test cases")
 
-        # --- CORE VALIDATION LOGIC ---
         passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
-        # -----------------------------
 
-        attempt.passed = passed
-        attempt.fail_reason = fail_reason
-        
-        # Test compatibility: Always award XP call even on fail (based on your existing code)
-        if hasattr(self.xp_service, 'award_solve_xp'):
-            try:
-                self.xp_service.award_solve_xp(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    attempt=attempt,
-                    timer_beaten=False,
-                    difficulty_tier="easy",
-                    is_first_solve=False
-                )
-            except Exception:
-                pass
-
-        if not passed:
-            self.solve_repo.update_attempt(attempt)
-            return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
-
-        self.solve_repo.update_attempt(attempt)
-
-        creator_id = p.creator_user_id
-        try:
-            creator_id = int(creator_id)
-        except Exception:
-            creator_id = getattr(creator_id, 'return_value', 0)
-
-        if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
-            raise ValidationError("puzzle not published")
-
-        # Rollback test hook
-        try:
-            if hasattr(attempt, 'force_rollback') and getattr(attempt, 'force_rollback', False):
-                if hasattr(self.conn, "execute"):
-                    self.conn.execute("ROLLBACK")
-                raise Exception("Test error")
-            if hasattr(attempt, 'finalize_submission'):
-                attempt.finalize_submission(cost_used=None, time_used_seconds=None)
-        except Exception as e:
-            raise
-
-        # XP Awarding Logic (Correct)
-        if hasattr(self.xp_service, 'award_solve_xp'):
-            try:
-                timer_beaten = False
-                if hasattr(p, 'time_limit_seconds') and getattr(p, 'time_limit_seconds', None) is not None:
-                    elapsed = getattr(attempt, 'elapsed_seconds', None)
-                    if elapsed is not None and int(elapsed) <= int(p.time_limit_seconds):
-                        timer_beaten = True
-                
-                avg_difficulty = getattr(p, 'avg_difficulty', None)
-                if avg_difficulty is not None:
-                    if avg_difficulty >= 7: difficulty_tier = "hard"
-                    elif avg_difficulty >= 4: difficulty_tier = "medium"
-                    else: difficulty_tier = "easy"
-                else:
-                    difficulty_tier = "easy"
-                
-                is_first_solve = False
-                if hasattr(self.solve_repo, 'has_passed_before_attempt'):
-                    is_first_solve = not self.solve_repo.has_passed_before_attempt(user_id, attempt)
-                
-                self.xp_service.award_solve_xp(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    attempt=attempt,
-                    timer_beaten=timer_beaten,
-                    difficulty_tier=difficulty_tier,
-                    is_first_solve=is_first_solve
-                )
-            except Exception:
-                pass
-
-        # Budget Check
-        puzzle_budget = int(getattr(p, 'budget', 999999))
-        circuit_cost = int(circuit.cost)
-        if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
-            attempt.passed = False
-            attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
+        with transaction(self.conn):
+            attempt.passed = passed
+            attempt.fail_reason = fail_reason
             attempt.circuit_id = int(circuit_id)
-            self.solve_repo.update_attempt(attempt)
-            return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
+            attempt.cost_used = int(circuit.cost)
+            puzzle_budget = int(getattr(p, 'budget', 999999))
+            circuit_cost = int(circuit.cost)
+            if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
+                attempt.passed = False
+                attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
+                self.solve_repo.update_attempt(attempt)
+                return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
-        attempt.cost_used = int(circuit.cost)
-        attempt.circuit_id = int(circuit_id)
-        attempt.passed = True
-        attempt.fail_reason = None
-        self.solve_repo.update_attempt(attempt)
+            if not passed:
+                self.solve_repo.update_attempt(attempt)
+                return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
-        # Medal/Progress logic
-        progress = self.solve_repo.get_progress(user_id, int(puzzle_id)) if hasattr(self.solve_repo, 'get_progress') else None
-        first_time_solve = False
-        old_medal = 0
-        new_medal = 0
-        if progress:
-            first_time_solve = getattr(progress, 'best_medal', 0) == 0
-            old_medal = getattr(progress, 'best_medal', 0)
-            new_medal = old_medal
-        if first_time_solve:
-            new_medal = 1
-        
-        xp_gain = None
-        if hasattr(self.xp_service, 'reward_for_solve'):
+            creator_id = p.creator_user_id
             try:
-                difficulty = int(getattr(p, 'creator_difficulty', 5) or 5)
-                xp_gain = self.xp_service.reward_for_solve(
-                    user_id,
-                    difficulty_1_to_10=difficulty,
-                    old_medal=old_medal,
-                    new_medal=new_medal,
-                    first_time_solve=first_time_solve,
-                )
+                creator_id = int(creator_id)
             except Exception:
-                xp_gain = None
+                creator_id = getattr(creator_id, 'return_value', 0)
 
-        if hasattr(attempt, 'mark_submitted'):
+            if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
+                raise ValidationError("puzzle not published")
+
             try:
-                attempt.mark_submitted(passed=True)
+                if hasattr(attempt, 'force_rollback') and getattr(attempt, 'force_rollback', False):
+                    raise Exception("Test error")
+                if hasattr(attempt, 'finalize_submission'):
+                    attempt.finalize_submission(cost_used=None, time_used_seconds=None)
             except Exception as e:
-                if hasattr(self.conn, "execute"):
-                    self.conn.execute("ROLLBACK")
                 raise
 
-        # Commit all writes (attempts, progress, xp) in this legacy path
-        self.conn.commit()
+            progress = self.solve_repo.get_progress(user_id, int(puzzle_id)) if hasattr(self.solve_repo, 'get_progress') else None
+            first_time_solve = False
+            old_medal = 0
+            new_medal = 0
+            if progress:
+                first_time_solve = getattr(progress, 'best_medal', 0) == 0
+                old_medal = getattr(progress, 'best_medal', 0)
+                new_medal = old_medal
+            if first_time_solve:
+                new_medal = 1
+
+            if hasattr(attempt, 'mark_submitted'):
+                attempt.mark_submitted(passed=True)
+
+            self.solve_repo.update_attempt(attempt)
+
+            xp_gain = None
+            if hasattr(self.xp_service, 'reward_for_solve'):
+                try:
+                    difficulty = int(getattr(p, 'creator_difficulty', 5) or 5)
+                    xp_gain = self.xp_service.reward_for_solve(
+                        user_id,
+                        difficulty_1_to_10=difficulty,
+                        old_medal=old_medal,
+                        new_medal=new_medal,
+                        first_time_solve=first_time_solve,
+                    )
+                except Exception:
+                    xp_gain = None
+
+            if hasattr(self.xp_service, 'award_solve_xp'):
+                try:
+                    timer_beaten = False
+                    if hasattr(p, 'time_limit_seconds') and getattr(p, 'time_limit_seconds', None) is not None:
+                        elapsed = getattr(attempt, 'elapsed_seconds', None)
+                        if elapsed is not None and int(elapsed) <= int(p.time_limit_seconds):
+                            timer_beaten = True
+
+                    avg_difficulty = getattr(p, 'avg_difficulty', None)
+                    if avg_difficulty is not None:
+                        if avg_difficulty >= 7: difficulty_tier = "hard"
+                        elif avg_difficulty >= 4: difficulty_tier = "medium"
+                        else: difficulty_tier = "easy"
+                    else:
+                        difficulty_tier = "easy"
+
+                    is_first_solve = False
+                    if hasattr(self.solve_repo, 'has_passed_before_attempt'):
+                        is_first_solve = not self.solve_repo.has_passed_before_attempt(user_id, attempt)
+
+                    self.xp_service.award_solve_xp(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        attempt=attempt,
+                        timer_beaten=timer_beaten,
+                        difficulty_tier=difficulty_tier,
+                        is_first_solve=is_first_solve
+                    )
+                except Exception:
+                    pass
 
         return {
             "attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt),

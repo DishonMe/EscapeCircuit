@@ -4,7 +4,7 @@
     "description": "6 bit sequential is palindrome",
     "budget": 30,
     "creator_budget": 10,
-    "time_limit_seconds": 200,
+    "time_limit_seconds": 400,
     "difficulty": "EASY",
     "default_gate_set": [
       "AND",
@@ -31,7 +31,7 @@
       "rows": 20,
       "cols": 40
     },
-    "riddle_base_name": "riddle_18_sequential_palindrome"
+    "riddle_base_name": "riddle_11_sequential_palindrome"
   },
   "test_cases": [
     {

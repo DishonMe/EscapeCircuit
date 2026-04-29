@@ -4,7 +4,7 @@
     "description": "Can you write 2 bits twice using only 3 write once bits?",
     "budget": 50,
     "creator_budget": 37,
-    "time_limit_seconds": 2400,
+    "time_limit_seconds": 4800,
     "difficulty": "HARD",
     "default_gate_set": [
       "AND",
@@ -56,7 +56,7 @@
       "rows": 20,
       "cols": 30
     },
-    "riddle_base_name": "riddle_14_twice_2_bits_in_3_bits"
+    "riddle_base_name": "riddle_07_twice_2_bits_in_3_bits"
   },
   "test_cases": [
     {
