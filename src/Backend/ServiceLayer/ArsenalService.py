@@ -207,7 +207,7 @@ class ArsenalService:
         """List all arsenal pieces for the current user"""
         user_id = self.auth.require_user_id(session_token)
         pieces = self.repo.list_arsenal_by_user(user_id)
-        return [p.to_dict() for p in pieces]
+        return [p.to_circuit_component() for p in pieces]
 
     def get_arsenal_piece(self, session_token: str, piece_id: int) -> dict:
         """Get detailed info about an arsenal piece"""
@@ -219,7 +219,7 @@ class ArsenalService:
             raise ValidationError("forbidden")
         if not piece.is_arsenal:
             raise ValidationError("not an arsenal piece")
-        return piece.to_dict()
+        return piece.to_circuit_component()
 
     def _normalize_visual_style(self, visual_style: Any) -> dict:
         if visual_style is None:

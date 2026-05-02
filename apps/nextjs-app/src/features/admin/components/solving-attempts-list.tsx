@@ -34,13 +34,23 @@ export const SolvingAttemptsList = () => {
 
   const rows = useMemo<Row[]>(() => {
     const attempts = query.data?.data ?? [];
-    return attempts.map((attempt) => {
-      const ts = attempt.submitted_at || attempt.started_at;
-      return {
-        ...attempt,
-        createdAt: ts ? new Date(ts).getTime() : 0,
-      };
-    });
+    // Filter out attempts with no submitted_structure_json (never actually submitted a circuit)
+    return attempts
+      .filter((attempt) => attempt.submitted_structure_json !== null && attempt.submitted_structure_json !== undefined && String(attempt.submitted_structure_json).trim() !== '')
+      .map((attempt) => {
+        const ts = attempt.submitted_at || attempt.started_at;
+        return {
+          ...attempt,
+          createdAt: ts ? new Date(ts).getTime() : 0,
+        };
+      });
+  }, [query.data?.data]);
+
+  const filteredOutCount = useMemo(() => {
+    const attempts = query.data?.data ?? [];
+    return attempts.filter(
+      (attempt) => attempt.submitted_structure_json === null || attempt.submitted_structure_json === undefined || String(attempt.submitted_structure_json).trim() === ''
+    ).length;
   }, [query.data?.data]);
 
   if (query.isLoading) {
@@ -69,6 +79,13 @@ export const SolvingAttemptsList = () => {
 
   return (
     <>
+      {filteredOutCount > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-200/60 bg-amber-50/50 p-3">
+          <p className="text-[12px] text-amber-700">
+            {filteredOutCount} empty attempt{filteredOutCount !== 1 ? 's' : ''} (no circuit) hidden from view
+          </p>
+        </div>
+      )}
       <Table
         data={rows}
         columns={[
@@ -116,7 +133,10 @@ export const SolvingAttemptsList = () => {
             title: 'Reason',
             field: 'id',
             Cell({ entry }) {
-              return <span className="text-xs text-muted-foreground">{entry.fail_reason || '-'}</span>;
+              if (entry.passed === true) {
+                return <span className="text-xs text-emerald-600 font-medium">Passed</span>;
+              }
+              return <span className={`text-xs ${entry.passed === false ? 'text-rose-600 font-medium' : 'text-muted-foreground'}`}>{entry.fail_reason || '-'}</span>;
             },
           },
           {

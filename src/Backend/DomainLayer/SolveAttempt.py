@@ -31,6 +31,9 @@ class SolveAttempt:
         self.user_id = ensure_non_negative_int("SolveAttempt.user_id", self.user_id)
 
     def mark_submitted(self, passed: bool, circuit_id: Optional[str] = None, fail_reason: Optional[str] = None) -> None:
+        # Safety check: don't mark as submitted if no circuit_id is set
+        if not circuit_id and not self.circuit_id:
+            raise ValueError("Cannot mark attempt as submitted without a circuit_id")
         self.submitted_at = utcnow()
         self.passed = bool(passed)
         self.circuit_id = circuit_id or self.circuit_id
