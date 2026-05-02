@@ -14,6 +14,7 @@ class SolveAttempt:
     circuit_id: Optional[int] = None
     time_used_seconds: Optional[int] = None
     cost_used: Optional[int] = None
+    submitted_structure_json: Optional[str] = None
 
     started_at: datetime = field(default_factory=utcnow)
     submitted_at: Optional[datetime] = None
@@ -30,6 +31,9 @@ class SolveAttempt:
         self.user_id = ensure_non_negative_int("SolveAttempt.user_id", self.user_id)
 
     def mark_submitted(self, passed: bool, circuit_id: Optional[str] = None, fail_reason: Optional[str] = None) -> None:
+        # Safety check: don't mark as submitted if no circuit_id is set
+        if not circuit_id and not self.circuit_id:
+            raise ValueError("Cannot mark attempt as submitted without a circuit_id")
         self.submitted_at = utcnow()
         self.passed = bool(passed)
         self.circuit_id = circuit_id or self.circuit_id
@@ -57,6 +61,7 @@ class SolveAttempt:
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
             "passed": self.passed,
             "fail_reason": self.fail_reason,
+            "submitted_structure_json": self.submitted_structure_json,
             "clues_used": int(self.clues_used or 0),
             "clue_penalty_seconds": int(self.clue_penalty_seconds or 0),
         }
@@ -73,6 +78,7 @@ class SolveAttempt:
             submitted_at=datetime.fromisoformat(d["submitted_at"]) if d.get("submitted_at") else None,
             passed=d.get("passed"),
             fail_reason=d.get("fail_reason"),
+            submitted_structure_json=d.get("submitted_structure_json"),
         )
 
     # --- getters ---

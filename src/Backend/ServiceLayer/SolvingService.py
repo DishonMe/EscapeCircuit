@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
+from Backend.DomainLayer.Utils import utcnow
 from Backend.PersistantLayer._db import transaction
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
@@ -80,8 +81,14 @@ class SolvingService:
         if isinstance(existing, SolveAttempt):
             attempt_obj = existing
         else:
-            attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
-            attempt_obj = self.solve_repo.create_attempt(attempt)
+            try:
+                attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                attempt_obj = self.solve_repo.create_attempt(attempt)
+            except Exception:
+                # Race condition: another request created it simultaneously
+                attempt_obj = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+                if not attempt_obj:
+                    raise ValidationError("Failed to create solve attempt. Please try again.")
             self.conn.commit()
 
         result = attempt_obj.to_dict() if hasattr(attempt_obj, 'to_dict') else dict(attempt_obj)
@@ -117,11 +124,7 @@ class SolvingService:
         if not circuit_id:
             raise ValidationError("Circuit ID is required. Please provide your saved circuit to validate.")
 
-        attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
-        if not attempt:
-            attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
-            attempt = self.solve_repo.create_attempt(attempt)
-
+        # Validate circuit exists and belongs to user BEFORE creating attempt
         circuit = self.circuit_repo.get_by_id(int(circuit_id))
         if not circuit:
             raise ValidationError("Circuit not found. Please save your circuit design first.")
@@ -132,6 +135,19 @@ class SolvingService:
         if not test_cases:
             raise ValidationError("puzzle has no test cases")
 
+        # Now create/get attempt only after all early validation passes
+        # Use try-catch to handle race conditions where two requests create simultaneously
+        attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
+        if not attempt:
+            try:
+                attempt_obj = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                attempt = self.solve_repo.create_attempt(attempt_obj)
+            except Exception:
+                # Race condition: another request created it simultaneously, fetch it now
+                attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
+                if not attempt:
+                    raise ValidationError("Failed to create solve attempt. Please try again.")
+
         passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
 
         with transaction(self.conn):
@@ -139,15 +155,22 @@ class SolvingService:
             attempt.fail_reason = fail_reason
             attempt.circuit_id = int(circuit_id)
             attempt.cost_used = int(circuit.cost)
+            attempt.submitted_structure_json = circuit.structure_json
             puzzle_budget = int(getattr(p, 'budget', 999999))
             circuit_cost = int(circuit.cost)
             if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
                 attempt.passed = False
                 attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
+                # Set submission timestamp and time for failed budget check
+                attempt.submitted_at = utcnow() if not attempt.submitted_at else attempt.submitted_at
+                attempt.time_used_seconds = attempt.elapsed_seconds
                 self.solve_repo.update_attempt(attempt)
                 return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
             if not passed:
+                # Set submission timestamp and time for failed test cases
+                attempt.submitted_at = utcnow() if not attempt.submitted_at else attempt.submitted_at
+                attempt.time_used_seconds = attempt.elapsed_seconds
                 self.solve_repo.update_attempt(attempt)
                 return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
@@ -181,6 +204,9 @@ class SolvingService:
 
             if hasattr(attempt, 'mark_submitted'):
                 attempt.mark_submitted(passed=True)
+
+            # Set time_used_seconds after mark_submitted sets the final submitted_at
+            attempt.time_used_seconds = attempt.elapsed_seconds
 
             self.solve_repo.update_attempt(attempt)
 
@@ -269,8 +295,18 @@ class SolvingService:
             if int(attempt_row.user_id) != int(user_id) or int(attempt_row.puzzle_id) != int(puzzle_id):
                 raise ValidationError("attempt does not belong to this user/puzzle")
             if attempt_row.submitted_at is not None:
-                raise ValidationError("attempt already submitted")
-            resolved_attempt_id = int(attempt_row.id)
+                # The client may hold a stale attempt id after a completed solve.
+                # Recover by reusing/creating a fresh open attempt so users can solve again.
+                existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+                if isinstance(existing_open, SolveAttempt):
+                    resolved_attempt_id = int(existing_open.id)
+                else:
+                    fresh_attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                    fresh_attempt = self.solve_repo.create_attempt(fresh_attempt)
+                    self.conn.commit()
+                    resolved_attempt_id = int(fresh_attempt.id)
+            else:
+                resolved_attempt_id = int(attempt_row.id)
         else:
             existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
             resolved_attempt_id = int(existing_open.id) if isinstance(existing_open, SolveAttempt) else None
@@ -564,6 +600,7 @@ class SolvingService:
                     passed=False,
                     fail_reason=fail_msg or "wrong answer",
                     time_used_seconds=effective_time_taken_s,
+                    submitted_structure_json=json.dumps(solution_payload),
                     clues_used=int(persisted_clues_used),
                     clue_penalty_seconds=int(persisted_clue_penalty),
                 )

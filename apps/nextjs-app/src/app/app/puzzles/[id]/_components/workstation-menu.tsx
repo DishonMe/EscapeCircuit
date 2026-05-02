@@ -405,7 +405,7 @@ export const WorkstationMenu = ({
         id: component.id,
         name: component.type,
         usedBasicTypes: getUsedBasicTypes(component),
-        solution: (component as any).solution || { structure: {} },
+        solution: (component as any).solution || { structure: { placed: [], wires: [] } },
         description: (component as any).description,
       };
       setViewingCircuitPreviewFor(arsenalCircuit);

@@ -10,6 +10,7 @@ from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.PersistantLayer._db import transaction
 
 from Backend.PersistantLayer.UserRepo import UserRepo
+from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.SolveRepo import SolveRepo
 from Backend.PersistantLayer.RatingRepo import RatingRepo
@@ -33,14 +34,25 @@ class AdminService:
         audit_log_repo: AuditLogRepo,
         notification_repo: NotificationRepo,
         auth_service: AuthService,
+        circuit_repo: Optional[CircuitRepo] = None,
     ):
         self.user_repo = user_repo
+        self.circuit_repo = circuit_repo
         self.puzzle_repo = puzzle_repo
         self.solve_repo = solve_repo
         self.rating_repo = rating_repo
         self.audit_log = audit_log_repo
         self.notification_repo = notification_repo
         self.auth = auth_service
+
+    def _get_online_user_ids(self) -> set[int]:
+        if not hasattr(self.auth, "_sessions") or not hasattr(self.auth, "_lock"):
+            return set()
+        try:
+            with self.auth._lock:
+                return {int(s.user_id) for s in self.auth._sessions.values()}
+        except Exception:
+            return set()
 
     def _require_admin(self, session_token: str) -> int:
         """Validate session and ensure user is admin. Returns admin user_id."""
@@ -558,4 +570,142 @@ class AdminService:
             limit=limit,
             offset=offset,
             action_type=action_type,
+        )
+
+    def get_user_profile(self, session_token: str, user_id: int) -> dict:
+        self._require_admin(session_token)
+
+        target = self.user_repo.get_by_id(user_id)
+        if not target:
+            raise ValidationError("target user not found")
+
+        d = target.to_dict()
+        conn = self.user_repo.conn
+
+        medal_rows = conn.execute(
+            """
+            SELECT best_medal, COUNT(*) AS count
+            FROM puzzle_progress
+            WHERE user_id = ?
+            GROUP BY best_medal
+            """,
+            (int(user_id),),
+        ).fetchall()
+        medal_counts = {"bronze": 0, "silver": 0, "gold": 0}
+        for row in medal_rows:
+            best_medal = int(row["best_medal"])
+            count = int(row["count"])
+            if best_medal == 1:
+                medal_counts["bronze"] += count
+            elif best_medal == 2:
+                medal_counts["silver"] += count
+            elif best_medal == 3:
+                medal_counts["gold"] += count
+        d["medals"] = {
+            **medal_counts,
+            "total": medal_counts["bronze"] + medal_counts["silver"] + medal_counts["gold"],
+        }
+
+        saved_rows = conn.execute(
+            """
+            SELECT p.id, p.name, p.status, sp.created_at
+            FROM saved_puzzles sp
+            JOIN puzzles p ON p.id = sp.puzzle_id
+            WHERE sp.user_id = ?
+            ORDER BY sp.created_at DESC
+            """,
+            (int(user_id),),
+        ).fetchall()
+        d["saved_puzzles"] = [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "status": row["status"],
+                "saved_at": row["created_at"],
+            }
+            for row in saved_rows
+        ]
+
+        created_rows = conn.execute(
+            """
+            SELECT id, name, status, created_at
+            FROM puzzles
+            WHERE creator_user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (int(user_id),),
+        ).fetchall()
+        d["created_puzzles"] = [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+            }
+            for row in created_rows
+        ]
+
+        d["is_online"] = int(user_id) in self._get_online_user_ids()
+
+        d["arsenal"] = [
+            {
+                "id": str(piece.id),
+                "name": piece.name,
+                "cost": piece.cost,
+                "is_arsenal": piece.is_arsenal,
+                "num_inputs": piece.num_inputs,
+                "num_outputs": piece.num_outputs,
+                "basic_gates": piece.basic_gates,
+                "truth_table": piece.truth_table,
+                "structure_json": piece.structure_json,
+                "description": piece.description,
+            }
+            for piece in (self.circuit_repo.list_arsenal_by_user(int(user_id)) if self.circuit_repo else [])
+        ]
+
+        return d
+
+    def list_solving_attempts(
+        self,
+        session_token: str,
+        limit: int = 100,
+        offset: int = 0,
+        user_id: Optional[int] = None,
+        puzzle_id: Optional[int] = None,
+        passed: Optional[bool] = None,
+    ) -> dict:
+        self._require_admin(session_token)
+        data = self.solve_repo.list_attempts_for_admin(
+            limit=limit,
+            offset=offset,
+            user_id=user_id,
+            puzzle_id=puzzle_id,
+            passed=passed,
+        )
+        total = self.solve_repo.count_attempts_for_admin(
+            user_id=user_id,
+            puzzle_id=puzzle_id,
+            passed=passed,
+        )
+        return {
+            "data": data,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    def list_auth_attempts(
+        self,
+        session_token: str,
+        limit: int = 100,
+        offset: int = 0,
+        action: Optional[str] = None,
+        success: Optional[bool] = None,
+    ) -> List[dict]:
+        self._require_admin(session_token)
+        return self.user_repo.list_auth_attempts(
+            limit=limit,
+            offset=offset,
+            action=action,
+            success=success,
         )

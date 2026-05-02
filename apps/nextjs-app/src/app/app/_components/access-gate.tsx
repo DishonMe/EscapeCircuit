@@ -11,7 +11,7 @@ import { useUser } from '@/lib/auth';
 const normalizeRole = (role: string | undefined) => (role || '').toLowerCase();
 
 type AccessGateProps = {
-  allowedRoles: Array<'admin' | 'creator'>;
+  allowedRoles: Array<'admin' | 'creator' | 'solver'>;
   children: ReactNode;
 };
 
@@ -20,7 +20,9 @@ export const AccessGate = ({ allowedRoles, children }: AccessGateProps) => {
   const router = useRouter();
 
   const normalizedRole = normalizeRole(user.data?.role);
-  const hasAccess = !!user.data && allowedRoles.includes(normalizedRole as 'admin' | 'creator');
+  const hasAccess =
+    !!user.data &&
+    allowedRoles.includes(normalizedRole as 'admin' | 'creator' | 'solver');
 
   useEffect(() => {
     if (user.status === 'success' && user.data && !hasAccess) {
