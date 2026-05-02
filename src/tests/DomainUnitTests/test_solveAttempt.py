@@ -64,7 +64,7 @@ class TestSolveAttemptSubmission:
             puzzle_id=1,
             user_id=1
         )
-        attempt.mark_submitted(passed=False, fail_reason="Budget exceeded")
+        attempt.mark_submitted(passed=False, circuit_id=1, fail_reason="Budget exceeded")
         assert attempt.passed is False
         assert attempt.fail_reason == "Budget exceeded"
 
@@ -74,7 +74,7 @@ class TestSolveAttemptSubmission:
             puzzle_id=1,
             user_id=1
         )
-        attempt.mark_submitted(passed=False)
+        attempt.mark_submitted(passed=False, circuit_id=1)
         assert attempt.passed is False
         assert attempt.fail_reason == "unknown"
 
@@ -84,7 +84,7 @@ class TestSolveAttemptSubmission:
             puzzle_id=1,
             user_id=1
         )
-        attempt.mark_submitted(passed=False, fail_reason="Initial failure")
+        attempt.mark_submitted(passed=False, circuit_id=1, fail_reason="Initial failure")
         attempt.mark_submitted(passed=True, circuit_id=2)
         assert attempt.passed is True
         assert attempt.fail_reason is None
@@ -346,15 +346,15 @@ class TestSolveAttemptBranches:
     def test_mark_submitted_passed_false_no_fail_reason(self):
         """Test mark_submitted with passed=False but no fail_reason"""
         attempt = SolveAttempt(id=1, puzzle_id=1, user_id=1)
-        attempt.mark_submitted(False)
+        attempt.mark_submitted(False, circuit_id=1)
         assert attempt.passed is False
         assert attempt.fail_reason == "unknown"  # Default reason
     
     def test_mark_submitted_no_circuit_id(self):
-        """Test mark_submitted without circuit_id"""
-        attempt = SolveAttempt(id=1, puzzle_id=1, user_id=1)
+        """Test mark_submitted without circuit_id parameter but with existing circuit_id"""
+        attempt = SolveAttempt(id=1, puzzle_id=1, user_id=1, circuit_id=1)
         attempt.mark_submitted(True)
-        assert attempt.circuit_id is None  # Should remain None
+        assert attempt.circuit_id == 1  # Should preserve existing circuit_id
     
     def test_mark_submitted_preserves_circuit_id(self):
         """Test mark_submitted preserves existing circuit_id if None passed"""
