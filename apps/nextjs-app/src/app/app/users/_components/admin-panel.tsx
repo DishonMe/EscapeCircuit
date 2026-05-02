@@ -7,6 +7,8 @@ import {
   ClipboardList,
   Flag,
   ShieldCheck,
+  LogIn,
+  CheckSquare,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -15,9 +17,11 @@ import { UsersList } from '@/features/users/components/users-list';
 import { AdminPuzzlesList } from '@/features/admin/components/admin-puzzles-list';
 import { AuditLogList } from '@/features/admin/components/audit-log-list';
 import { ReportsList } from '@/features/admin/components/reports-list';
+import { SolvingAttemptsList } from '@/features/admin/components/solving-attempts-list';
+import { AuthAttemptsList } from '@/features/admin/components/auth-attempts-list';
 import { cn } from '@/utils/cn';
 
-type Tab = 'users' | 'puzzles' | 'audit' | 'reports';
+type Tab = 'users' | 'puzzles' | 'attempts' | 'auth' | 'audit' | 'reports';
 
 const tabs: { id: Tab; label: string; icon: LucideIcon; description: string }[] = [
   {
@@ -31,6 +35,18 @@ const tabs: { id: Tab; label: string; icon: LucideIcon; description: string }[] 
     label: 'Puzzles',
     icon: Gamepad2,
     description: 'Review and moderate community puzzles.',
+  },
+  {
+    id: 'attempts',
+    label: 'Solving Attempts',
+    icon: CheckSquare,
+    description: 'See submitted attempts, outcomes, and boards.',
+  },
+  {
+    id: 'auth',
+    label: 'Login/Register Logs',
+    icon: LogIn,
+    description: 'Track login and registration attempts.',
   },
   {
     id: 'reports',
@@ -96,6 +112,8 @@ export const AdminPanel = () => {
       {/* Tab Content */}
       {activeTab === 'users' && <UsersList />}
       {activeTab === 'puzzles' && <AdminPuzzlesList />}
+      {activeTab === 'attempts' && <SolvingAttemptsList />}
+      {activeTab === 'auth' && <AuthAttemptsList />}
       {activeTab === 'reports' && <ReportsList />}
       {activeTab === 'audit' && <AuditLogList />}
     </div>

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent } from 'react';
-import { Filter, X, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Filter, X, AlertTriangle, Eye, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { Table } from '@/components/ui/table';
 import { formatDate } from '@/utils/format';
+import { PuzzleViewDialog } from '@/app/app/my-puzzles/_components/puzzle-view-dialog';
 
 import {
   useAdminPuzzles,
@@ -44,6 +45,7 @@ function useDebouncedValue<T>(value: T, delay: number = 400): T {
 export const AdminPuzzlesList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<AdminPuzzleFilters>({});
+  const [previewPuzzle, setPreviewPuzzle] = useState<any | null>(null);
   const activeFilterCount = Object.values(filters).filter((v) => v).length;
 
   // Debounce text inputs so the API isn't called on every keystroke
@@ -179,7 +181,15 @@ export const AdminPuzzlesList = () => {
             field: 'id',
             Cell({ entry }: { entry: any }) {
               return (
-                <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewPuzzle(entry)}
+                  >
+                    <Eye className="mr-1 size-4" />
+                    Preview
+                  </Button>
                   {entry.status === 'published' ? (
                     <AdminUnpublishPuzzle
                       puzzleId={Number(entry.id)}
@@ -191,6 +201,14 @@ export const AdminPuzzlesList = () => {
                       puzzleName={entry.name || entry.title || 'Unknown'}
                     />
                   )}
+
+                  <PuzzleViewDialog
+                    puzzle={previewPuzzle}
+                    open={!!previewPuzzle}
+                    onOpenChange={(open) => {
+                      if (!open) setPreviewPuzzle(null);
+                    }}
+                  />
                 </div>
               );
             },

@@ -36,6 +36,7 @@ import { DeleteUser } from './delete-user';
 import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
 import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
 import { CreatorPuzzleLimits } from '@/features/admin/components/creator-puzzle-limits';
+import { AdminUserProfileDialog } from '@/features/admin/components/admin-user-profile-dialog';
 
 // Debounce hook — delays value updates until user stops typing
 function useDebouncedValue<T>(value: T, delay: number = 400): T {
@@ -135,11 +136,35 @@ export const UsersList = () => {
             },
           },
           {
+            title: 'Online',
+            field: 'id',
+            Cell({ entry }: { entry: any }) {
+              if (typeof entry.is_online !== 'boolean') {
+                return <span className="text-xs text-muted-foreground">N/A</span>;
+              }
+              return (
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                    entry.is_online
+                      ? 'bg-emerald-50/70 text-emerald-700'
+                      : 'bg-secondary text-foreground/70'
+                  }`}
+                >
+                  {entry.is_online ? 'Online' : 'Offline'}
+                </span>
+              );
+            },
+          },
+          {
             title: 'Actions',
             field: 'id',
             Cell({ entry }: { entry: any }) {
               return (
                 <div className="flex gap-2 items-center">
+                  <AdminUserProfileDialog
+                    userId={Number(entry.id)}
+                    username={entry.username}
+                  />
                   {entry.role === 'solver' && (
                     <AssignCreatorButton
                       userId={Number(entry.id)}

@@ -139,6 +139,7 @@ class SolvingService:
             attempt.fail_reason = fail_reason
             attempt.circuit_id = int(circuit_id)
             attempt.cost_used = int(circuit.cost)
+            attempt.submitted_structure_json = circuit.structure_json
             puzzle_budget = int(getattr(p, 'budget', 999999))
             circuit_cost = int(circuit.cost)
             if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
@@ -269,8 +270,18 @@ class SolvingService:
             if int(attempt_row.user_id) != int(user_id) or int(attempt_row.puzzle_id) != int(puzzle_id):
                 raise ValidationError("attempt does not belong to this user/puzzle")
             if attempt_row.submitted_at is not None:
-                raise ValidationError("attempt already submitted")
-            resolved_attempt_id = int(attempt_row.id)
+                # The client may hold a stale attempt id after a completed solve.
+                # Recover by reusing/creating a fresh open attempt so users can solve again.
+                existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+                if isinstance(existing_open, SolveAttempt):
+                    resolved_attempt_id = int(existing_open.id)
+                else:
+                    fresh_attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                    fresh_attempt = self.solve_repo.create_attempt(fresh_attempt)
+                    self.conn.commit()
+                    resolved_attempt_id = int(fresh_attempt.id)
+            else:
+                resolved_attempt_id = int(attempt_row.id)
         else:
             existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
             resolved_attempt_id = int(existing_open.id) if isinstance(existing_open, SolveAttempt) else None
@@ -564,6 +575,7 @@ class SolvingService:
                     passed=False,
                     fail_reason=fail_msg or "wrong answer",
                     time_used_seconds=effective_time_taken_s,
+                    submitted_structure_json=json.dumps(solution_payload),
                     clues_used=int(persisted_clues_used),
                     clue_penalty_seconds=int(persisted_clue_penalty),
                 )

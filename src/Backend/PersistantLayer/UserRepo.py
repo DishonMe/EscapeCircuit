@@ -7,6 +7,7 @@ from Backend import settings
 from Backend.DomainLayer.User import User
 from Backend.DomainLayer.Enums import UserRole
 from Backend.DomainLayer.Exceptions import ValidationError
+from Backend.DomainLayer.Utils import utcnow
 
 
 class UserRepo:
@@ -32,6 +33,37 @@ class UserRepo:
             pw_hash BLOB
         );
         """)
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                username_or_email TEXT,
+                success INTEGER NOT NULL,
+                reason TEXT,
+                user_id INTEGER,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_auth_attempts_created_at
+            ON auth_attempts(created_at DESC);
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_auth_attempts_action
+            ON auth_attempts(action);
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_auth_attempts_success
+            ON auth_attempts(success);
+            """
+        )
         # Migration: add is_discussion_banned column if missing
         cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
         if "is_discussion_banned" not in cols:
@@ -283,3 +315,77 @@ class UserRepo:
             (max_published, max_unpublished, int(user_id)),
         )
         self.conn.commit()
+
+    def create_auth_attempt(
+        self,
+        action: str,
+        username_or_email: Optional[str],
+        success: bool,
+        reason: Optional[str] = None,
+        user_id: Optional[int] = None,
+    ) -> int:
+        cur = self.conn.execute(
+            """
+            INSERT INTO auth_attempts(
+                action,
+                username_or_email,
+                success,
+                reason,
+                user_id,
+                created_at
+            )
+            VALUES(?,?,?,?,?,?)
+            """,
+            (
+                str(action or "").strip() or "unknown",
+                (username_or_email or "").strip() or None,
+                1 if success else 0,
+                (reason or "").strip() or None,
+                int(user_id) if user_id is not None else None,
+                utcnow().isoformat(),
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def list_auth_attempts(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        action: Optional[str] = None,
+        success: Optional[bool] = None,
+    ) -> List[dict]:
+        where = []
+        params = []
+
+        if action:
+            where.append("action = ?")
+            params.append(action)
+        if success is not None:
+            where.append("success = ?")
+            params.append(1 if success else 0)
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        rows = self.conn.execute(
+            f"""
+            SELECT *
+            FROM auth_attempts
+            {where_sql}
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, int(limit), int(offset)],
+        ).fetchall()
+
+        return [
+            {
+                "id": int(row["id"]),
+                "action": row["action"],
+                "username_or_email": row["username_or_email"],
+                "success": bool(int(row["success"])),
+                "reason": row["reason"],
+                "user_id": int(row["user_id"]) if row["user_id"] is not None else None,
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]

@@ -184,6 +184,7 @@ def create_app() -> FastAPI:
     # Admin Service
     admin_service = AdminService(
         user_repo=user_repo,
+        circuit_repo=circuit_repo,
         puzzle_repo=puzzle_repo,
         solve_repo=solve_repo,
         rating_repo=rating_repo,

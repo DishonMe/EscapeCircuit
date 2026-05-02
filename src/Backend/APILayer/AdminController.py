@@ -251,6 +251,16 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 raise HTTPException(status_code=403, detail=msg)
             raise HTTPException(status_code=400, detail=msg)
 
+    @router.get("/users/{user_id}/profile")
+    def get_user_profile(user_id: int, token: str = Depends(verify_token)):
+        try:
+            return admin_service.get_user_profile(token, user_id)
+        except ValidationError as e:
+            msg = str(e)
+            if "admin required" in msg:
+                raise HTTPException(status_code=403, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+
     # ------------------------------------------------------------------ #
     #  Admin puzzle listing (moderation view)
     # ------------------------------------------------------------------ #
@@ -301,6 +311,46 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
         try:
             return admin_service.list_audit_log(
                 token, limit=limit, offset=offset, action_type=action_type
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.get("/solving-attempts")
+    def solving_attempts(
+        limit: int = 100,
+        offset: int = 0,
+        user_id: Optional[int] = None,
+        puzzle_id: Optional[int] = None,
+        passed: Optional[bool] = None,
+        token: str = Depends(verify_token),
+    ):
+        try:
+            return admin_service.list_solving_attempts(
+                token,
+                limit=limit,
+                offset=offset,
+                user_id=user_id,
+                puzzle_id=puzzle_id,
+                passed=passed,
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+    @router.get("/auth-attempts")
+    def auth_attempts(
+        limit: int = 100,
+        offset: int = 0,
+        action: Optional[str] = None,
+        success: Optional[bool] = None,
+        token: str = Depends(verify_token),
+    ):
+        try:
+            return admin_service.list_auth_attempts(
+                token,
+                limit=limit,
+                offset=offset,
+                action=action,
+                success=success,
             )
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
