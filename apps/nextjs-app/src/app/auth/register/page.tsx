@@ -13,6 +13,31 @@ import { useGoogleLogin, useRegister } from '@/lib/auth';
 
 const puzzlesPath = paths.app.puzzles.getHref();
 
+const AVATAR_LIST = [
+  'Alligator', 'Anteater', 'Armadillo', 'Auroch', 'Axolotl', 'Badger', 'Bat', 'Beaver',
+  'Buffalo', 'Camel', 'Capybara', 'Chameleon', 'Cheetah', 'Chinchilla', 'Chipmunk',
+  'Chupacabra', 'Cormorant', 'Coyote', 'Crow', 'Dingo', 'Dinosaur', 'Dolphin', 'Duck',
+  'Elephant', 'Ferret', 'Fox', 'Frog', 'Giraffe', 'Gopher', 'Grizzly', 'Hedgehog',
+  'Hippo', 'Hyena', 'Ibex', 'Ifrit', 'Iguana', 'Jackal', 'Kangaroo', 'Koala',
+  'Kraken', 'Lemur', 'Leopard', 'Liger', 'Llama', 'Manatee', 'Mink', 'Monkey',
+  'Moose', 'Narwhal', 'Orangutan', 'Otter', 'Panda', 'Penguin', 'Platypus', 'Pumpkin',
+  'Python', 'Quagga', 'Rabbit', 'Raccoon', 'Rhino', 'Sheep', 'Shrew', 'Skunk',
+  'Squirrel', 'Tiger', 'Turtle', 'Walrus', 'Wolf', 'Wolverine', 'Wombat'
+];
+
+const COLOR_PRESETS = [
+  '#38bdf8', // cyan
+  '#ef4444', // red
+  '#f97316', // orange
+  '#eab308', // yellow
+  '#22c55e', // green
+  '#06b6d4', // cyan-2
+  '#3b82f6', // blue
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#64748b', // slate
+];
+
 function getStrength(password: string): { score: number; label: string } {
   let score = 0;
   if (password.length >= 6) score += 1;
@@ -34,6 +59,10 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState('#38bdf8');
+  const [customColor, setCustomColor] = useState('#38bdf8');
+  const [useCustomColor, setUseCustomColor] = useState(false);
   const [error, setError] = useState('');
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -90,13 +119,19 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!selectedAvatar) {
+      setError('Please select an avatar to continue.');
+      return;
+    }
+
     if (strength.score < 2) {
       setError('Please choose a stronger password.');
       return;
     }
 
+    const finalColor = useCustomColor ? customColor : selectedColor;
     register.mutate(
-      { username: username.trim(), email: email.trim(), password },
+      { username: username.trim(), email: email.trim(), password, avatar_name: selectedAvatar, avatar_color: finalColor },
       {
         onError: (registerError: any) => {
           const message = registerError?.message || 'Registration failed. Please try again.';
@@ -320,6 +355,133 @@ export default function RegisterPage() {
                 Password strength: {strength.label}
               </p>
             )}
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
+              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.6)' }}
+            >
+              Choose Your Anonymous Animal Avatar
+            </label>
+            <div
+              className="mt-2 max-h-72 overflow-y-auto rounded-lg border p-3"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderColor: 'rgba(56,189,248,0.2)',
+              }}
+            >
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {AVATAR_LIST.map((avatar) => (
+                  <button
+                    key={avatar}
+                    type="button"
+                    onClick={() => setSelectedAvatar(avatar)}
+                    className="relative overflow-hidden rounded-lg transition-all"
+                    style={{
+                      border: selectedAvatar === avatar ? '2px solid rgba(56,189,248,0.8)' : '1px solid rgba(56,189,248,0.2)',
+                      background: selectedAvatar === avatar ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.02)',
+                      transform: selectedAvatar === avatar ? 'scale(1.05)' : 'scale(1)',
+                      boxShadow: selectedAvatar === avatar ? '0 0 12px rgba(56,189,248,0.3)' : 'none',
+                    }}
+                    title={avatar}
+                  >
+                    <img
+                      src={`/avatars/${avatar}.png`}
+                      alt={avatar}
+                      className="w-full aspect-square object-cover"
+                      loading="lazy"
+                    />
+                    <div
+                      className="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[8px] font-medium text-slate-200 truncate"
+                      style={{
+                        background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.6))',
+                      }}
+                    >
+                      {avatar}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {!selectedAvatar && (
+              <p className="mt-1 text-[11px]" style={{ color: 'rgba(248,113,113,0.7)' }}>
+                ⚠ Avatar selection required
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
+              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.6)' }}
+            >
+              Choose Avatar Color
+            </label>
+            <div
+              className="mt-2 rounded-lg border p-3"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderColor: 'rgba(56,189,248,0.2)',
+              }}
+            >
+              <div className="flex flex-wrap gap-2 mb-3">
+                {COLOR_PRESETS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => {
+                      setSelectedColor(color);
+                      setUseCustomColor(false);
+                    }}
+                    className="w-8 h-8 rounded-lg border-2 transition-all"
+                    style={{
+                      backgroundColor: color,
+                      borderColor: !useCustomColor && selectedColor === color ? 'rgba(56,189,248,0.8)' : 'rgba(56,189,248,0.2)',
+                      boxShadow: !useCustomColor && selectedColor === color ? '0 0 8px rgba(56,189,248,0.4)' : 'none',
+                    }}
+                    title={color}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={customColor}
+                  onChange={(e) => {
+                    setCustomColor(e.target.value);
+                    setUseCustomColor(true);
+                  }}
+                  className="w-8 h-8 rounded-lg cursor-pointer border"
+                  style={{ borderColor: 'rgba(56,189,248,0.2)' }}
+                />
+                <input
+                  type="text"
+                  value={customColor}
+                  onChange={(e) => {
+                    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                      setCustomColor(e.target.value);
+                      setUseCustomColor(true);
+                    }
+                  }}
+                  placeholder="#000000"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg border text-[12px] text-slate-100 outline-none transition-colors"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    borderColor: 'rgba(56,189,248,0.15)',
+                    color: 'rgba(226,232,240,1)',
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.5)';
+                    e.currentTarget.style.background = 'rgba(56,189,248,0.04)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.15)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           {error && (

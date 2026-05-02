@@ -1,6 +1,6 @@
 import sqlite3
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 
@@ -59,6 +59,9 @@ class SolveRepo:
             "xp_earned INTEGER DEFAULT 0",
             "highest_medal INTEGER DEFAULT 0",
             "solution_hash TEXT",
+            "submitted_structure_json TEXT",
+            "clues_used INTEGER DEFAULT 0",
+            "clue_penalty_seconds INTEGER DEFAULT 0",
         ]:
             self._add_column_if_missing("solve_attempts", coldef)
 
@@ -115,8 +118,12 @@ class SolveRepo:
     def create_attempt(self, attempt: SolveAttempt) -> SolveAttempt:
         cur = self.conn.execute(
             """
-            INSERT INTO solve_attempts(puzzle_id, user_id, circuit_id, started_at, submitted_at, passed, fail_reason, time_used_seconds, cost_used)
-            VALUES(?,?,?,?,?,?,?,?,?)
+            INSERT INTO solve_attempts(
+                puzzle_id, user_id, circuit_id, started_at, submitted_at,
+                passed, fail_reason, time_used_seconds, cost_used,
+                clues_used, clue_penalty_seconds, submitted_structure_json
+            )
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 int(attempt.puzzle_id),
@@ -128,6 +135,9 @@ class SolveRepo:
                 attempt.fail_reason,
                 attempt.time_used_seconds,
                 attempt.cost_used,
+                int(getattr(attempt, "clues_used", 0) or 0),
+                int(getattr(attempt, "clue_penalty_seconds", 0) or 0),
+                getattr(attempt, "submitted_structure_json", None),
             ),
         )
         attempt.id = int(cur.lastrowid)
@@ -142,7 +152,10 @@ class SolveRepo:
                 passed=?,
                 fail_reason=?,
                 time_used_seconds=?,
-                cost_used=?
+                cost_used=?,
+                clues_used=?,
+                clue_penalty_seconds=?,
+                submitted_structure_json=?
             WHERE id=?
             """,
             (
@@ -152,6 +165,9 @@ class SolveRepo:
                 attempt.fail_reason,
                 attempt.time_used_seconds,
                 attempt.cost_used,
+                int(getattr(attempt, "clues_used", 0) or 0),
+                int(getattr(attempt, "clue_penalty_seconds", 0) or 0),
+                getattr(attempt, "submitted_structure_json", None),
                 int(attempt.id),
             ),
         )
@@ -339,29 +355,154 @@ class SolveRepo:
             (int(user_id), int(puzzle_id), cutoff, solution_hash),
         ).fetchone()
         return dict(row) if row else None
-        return row
 
-    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0, solution_json: str = None) -> int:
+    def add_solve(self, user_id: int, puzzle_id: int, time_taken_seconds: int, xp_earned: int, medal: int = 0, cost_used: int = 0, solution_json: str = None, clues_used: int = 0, clue_penalty_seconds: int = 0) -> int:
         """Convenience: insert a passed attempt with time/xp/medal/cost metadata and return its id."""
         import hashlib
         from Backend.DomainLayer.Utils import utcnow
         now = utcnow()
-        
+
         # Compute solution hash if solution is provided
         solution_hash = None
         if solution_json:
             solution_hash = hashlib.md5(solution_json.encode()).hexdigest()
-        
+
         cur = self.conn.execute(
             """
             INSERT INTO solve_attempts(puzzle_id, user_id, started_at, submitted_at, passed,
-                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used, solution_hash)
-            VALUES(?,?,?,?,1,?,?,?,?,?,?)
+                                       time_used_seconds, time_taken_seconds, xp_earned, highest_medal, cost_used, solution_hash,
+                                    clues_used, clue_penalty_seconds, submitted_structure_json)
+              VALUES(?,?,?,?,1,?,?,?,?,?,?,?,?,?)
             """,
             (int(puzzle_id), int(user_id), now.isoformat(), now.isoformat(),
-             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used), solution_hash),
+             int(time_taken_seconds), int(time_taken_seconds), int(xp_earned), int(medal), int(cost_used), solution_hash,
+               int(clues_used or 0), int(clue_penalty_seconds or 0), solution_json),
         )
         return int(cur.lastrowid)
+
+    def list_attempts_for_admin(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        user_id: Optional[int] = None,
+        puzzle_id: Optional[int] = None,
+        passed: Optional[bool] = None,
+    ) -> List[dict]:
+        where = []
+        params = []
+
+        if user_id is not None:
+            where.append("sa.user_id = ?")
+            params.append(int(user_id))
+        if puzzle_id is not None:
+            where.append("sa.puzzle_id = ?")
+            params.append(int(puzzle_id))
+        if passed is not None:
+            where.append("sa.passed = ?")
+            params.append(1 if passed else 0)
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        rows = self.conn.execute(
+            f"""
+            SELECT
+                sa.id,
+                sa.user_id,
+                u.username,
+                sa.puzzle_id,
+                p.name AS puzzle_name,
+                sa.circuit_id,
+                sa.started_at,
+                sa.submitted_at,
+                sa.passed,
+                sa.fail_reason,
+                sa.time_used_seconds,
+                sa.cost_used,
+                COALESCE(sa.submitted_structure_json, c.structure_json) AS submitted_structure_json
+            FROM solve_attempts sa
+            LEFT JOIN users u ON u.id = sa.user_id
+            LEFT JOIN puzzles p ON p.id = sa.puzzle_id
+            LEFT JOIN circuits c ON c.id = sa.circuit_id
+            {where_sql}
+            ORDER BY COALESCE(sa.submitted_at, sa.started_at) DESC, sa.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, int(limit), int(offset)],
+        ).fetchall()
+
+        return [
+            {
+                "id": int(row["id"]),
+                "user_id": int(row["user_id"]),
+                "username": row["username"],
+                "puzzle_id": int(row["puzzle_id"]),
+                "puzzle_name": row["puzzle_name"],
+                "circuit_id": int(row["circuit_id"]) if row["circuit_id"] is not None else None,
+                "started_at": row["started_at"],
+                "submitted_at": row["submitted_at"],
+                "passed": None if row["passed"] is None else bool(int(row["passed"])),
+                "fail_reason": row["fail_reason"],
+                "time_used_seconds": row["time_used_seconds"],
+                "cost_used": row["cost_used"],
+                "submitted_structure_json": row["submitted_structure_json"],
+            }
+            for row in rows
+        ]
+
+    def count_attempts_for_admin(
+        self,
+        user_id: Optional[int] = None,
+        puzzle_id: Optional[int] = None,
+        passed: Optional[bool] = None,
+    ) -> int:
+        where = []
+        params = []
+
+        if user_id is not None:
+            where.append("user_id = ?")
+            params.append(int(user_id))
+        if puzzle_id is not None:
+            where.append("puzzle_id = ?")
+            params.append(int(puzzle_id))
+        if passed is not None:
+            where.append("passed = ?")
+            params.append(1 if passed else 0)
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        row = self.conn.execute(
+            f"SELECT COUNT(*) AS total FROM solve_attempts {where_sql}",
+            params,
+        ).fetchone()
+        return int(row["total"]) if row else 0
+
+    def close_attempt(self, attempt_id: int) -> None:
+        """Mark an open attempt as submitted so it can no longer accumulate clue requests.
+        Used after a successful validate_solution() to prevent the closed attempt from
+        being reused by /attempts/start or /clue."""
+        from Backend.DomainLayer.Utils import utcnow
+        self.conn.execute(
+            "UPDATE solve_attempts SET submitted_at=? WHERE id=? AND submitted_at IS NULL",
+            (utcnow().isoformat(), int(attempt_id)),
+        )
+
+    def get_attempt_by_id(self, attempt_id: int) -> Optional[SolveAttempt]:
+        row = self.conn.execute(
+            "SELECT * FROM solve_attempts WHERE id=? LIMIT 1",
+            (int(attempt_id),),
+        ).fetchone()
+        if not row:
+            return None
+        return SolveAttempt.from_dict(
+            {
+                "id": int(row["id"]),
+                "puzzle_id": int(row["puzzle_id"]),
+                "user_id": int(row["user_id"]),
+                "circuit_id": row["circuit_id"],
+                "started_at": row["started_at"],
+                "submitted_at": row["submitted_at"],
+                "passed": None if row["passed"] is None else bool(int(row["passed"])),
+                "fail_reason": row["fail_reason"],
+            }
+        )
 
     def get_leaderboard(self, puzzle_id: int, limit: int = 50) -> list[dict]:
         """Return the leaderboard for a puzzle: best (fastest) passed solve per user, ranked by time."""

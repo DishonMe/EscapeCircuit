@@ -109,6 +109,8 @@ export const registerInputSchema = z.object({
   email: z.string().min(1, 'Required').email('Invalid email'),
   username: z.string().min(1, 'Required'),
   password: z.string().min(5, 'Required'),
+  avatar_name: z.string().min(1, 'Avatar selection is required'),
+  avatar_color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format'),
 });
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
@@ -129,6 +131,8 @@ const completeGoogleRegistration = (data: {
   token: string;
   username: string;
   password: string;
+  avatar_name: string;
+  avatar_color: string;
 }): Promise<AuthResponse> => {
   return api.post('/users/google-complete-registration', data, { suppressErrorNotification: true });
 };

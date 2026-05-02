@@ -34,7 +34,13 @@ class TestUserServiceRegister:
         self.service = UserService(self.mock_user_repo, self.mock_auth, self.mock_xp)
 
     def test_register_success(self):
-        payload = {"username": "newuser", "password": "secure123", "email": "newuser@example.com"}
+        payload = {
+            "username": "newuser",
+            "password": "secure123",
+            "email": "newuser@example.com",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
 
         # Mock the User creation to avoid validation issues with id=0
         mock_user = Mock(spec=User)
@@ -87,7 +93,12 @@ class TestUserServiceRegister:
         assert "username and password required" in str(exc_info.value)
 
     def test_register_username_already_exists(self):
-        payload = {"username": "existing", "password": "secure123", "email": "test@example.com"}
+        payload = {
+            "username": "existing",
+            "password": "secure123",
+            "email": "test@example.com",
+            "avatar_name": "Dinosaur",
+        }
         existing_user = User(id=1, username="existing")
 
         self.mock_user_repo.get_by_username.return_value = existing_user
@@ -579,7 +590,13 @@ class TestUserServiceGoogleCompleteRegistration:
 
     @patch.dict(os.environ, {}, clear=True)
     def test_google_complete_registration_disabled(self):
-        payload = {"token": "valid_token", "username": "newuser", "password": "secure123"}
+        payload = {
+            "token": "valid_token",
+            "username": "newuser",
+            "password": "secure123",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.google_complete_registration(payload)
@@ -589,7 +606,13 @@ class TestUserServiceGoogleCompleteRegistration:
     @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test_client_id"})
     def test_google_complete_registration_invalid_token(self, mock_verify):
         mock_verify.side_effect = Exception("Invalid token")
-        payload = {"token": "invalid_token", "username": "newuser", "password": "secure123"}
+        payload = {
+            "token": "invalid_token",
+            "username": "newuser",
+            "password": "secure123",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.google_complete_registration(payload)
@@ -602,7 +625,7 @@ class TestUserServiceGoogleCompleteRegistration:
             "email": "newuser@example.com",
             "name": "New User"
         }
-        created_user = User(id=5, username="newuser", email="newuser@example.com", xp=0)
+        created_user = User(id=5, username="newuser", email="newuser@example.com", xp=0, avatar_name="Dinosaur", avatar_color="#38bdf8")
         self.mock_user_repo.get_by_email.side_effect = [None, None]
         self.mock_user_repo.get_by_username.return_value = None
         self.mock_user_repo.create.return_value = created_user
@@ -610,7 +633,13 @@ class TestUserServiceGoogleCompleteRegistration:
         self.mock_xp.calculate_level.return_value = 1
         self.mock_xp.is_experienced.return_value = False
 
-        payload = {"token": "valid_token", "username": "newuser", "password": "secure123"}
+        payload = {
+            "token": "valid_token",
+            "username": "newuser",
+            "password": "secure123",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
         result = self.service.google_complete_registration(payload)
 
         assert "token" in result
@@ -630,7 +659,13 @@ class TestUserServiceGoogleCompleteRegistration:
         self.mock_xp.calculate_level.return_value = 3
         self.mock_xp.is_experienced.return_value = True
 
-        payload = {"token": "valid_token", "username": "anyusername", "password": "secure123"}
+        payload = {
+            "token": "valid_token",
+            "username": "anyusername",
+            "password": "secure123",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
         result = self.service.google_complete_registration(payload)
 
         assert "token" in result
@@ -647,7 +682,13 @@ class TestUserServiceGoogleCompleteRegistration:
         self.mock_user_repo.get_by_email.return_value = None
         self.mock_user_repo.get_by_username.return_value = User(id=2, username="newuser")
 
-        payload = {"token": "valid_token", "username": "newuser", "password": "secure123"}
+        payload = {
+            "token": "valid_token",
+            "username": "newuser",
+            "password": "secure123",
+            "avatar_name": "Dinosaur",
+            "avatar_color": "#38bdf8",
+        }
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.google_complete_registration(payload)

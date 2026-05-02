@@ -1,0 +1,376 @@
+{
+  "puzzle": {
+    "name": "Largest of Three",
+    "description": "Repeat the largest number out of 3 inputs",
+    "budget": 50,
+    "creator_budget": 32,
+    "time_limit_seconds": 4800,
+    "difficulty": "HARD",
+    "default_gate_set": [
+      "XOR",
+      "NAND",
+      "DFF",
+      "NOT",
+      "OR",
+      "AND",
+      "NOR",
+      "XNOR"
+    ],
+    "inputs": [
+      "num_1",
+      "num_2",
+      "num_3"
+    ],
+    "outputs": [
+      "biggest_num"
+    ],
+    "min_cycles": null,
+    "max_cycles": null,
+    "min_gate_count": null,
+    "total_gate_count": null,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 15,
+      "cols": 30
+    },
+    "riddle_base_name": "riddle_08_largest_of_three"
+  },
+  "test_cases": [
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 1
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 0
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          1,
+          1,
+          0,
+          1,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 0
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 1,
+          "num_2": 1,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 1
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          0,
+          1,
+          0,
+          1,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 0
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "kind": "stream",
+      "input_stream": [
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 1,
+          "num_3": 1
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 1,
+          "num_2": 0,
+          "num_3": 0
+        },
+        {
+          "num_1": 0,
+          "num_2": 0,
+          "num_3": 1
+        }
+      ],
+      "expected_output_stream": {
+        "biggest_num": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

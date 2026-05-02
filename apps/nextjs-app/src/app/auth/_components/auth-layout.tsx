@@ -20,7 +20,9 @@ export const AuthLayout = ({ children }: LayoutProps) => {
   const hasShownNotificationRef = useRef(false);
   const isLoginPage = pathname === paths.auth.login.getHref();
   const isRegisterPage = pathname === paths.auth.register.getHref();
-  const useStandalonePageLayout = isLoginPage || isRegisterPage;
+  const isCompleteGooglePage = pathname === paths.auth.completeGoogle.getHref();
+  const useStandalonePageLayout =
+    isLoginPage || isRegisterPage || isCompleteGooglePage;
   const title = isLoginPage
     ? 'Log in to your account'
     : 'Register your account';

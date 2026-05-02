@@ -33,7 +33,12 @@
     "min_cycles": 3,
     "max_cycles": 3,
     "allow_arsenal": true,
-    "riddle_base_name": "riddle_03_sequential_adder"
+    "riddle_base_name": "riddle_03_sequential_adder",
+    "clues": [
+      "Use the two DFF outputs (D1, D2) as your previous-bit memory — that's the carry from the prior cycle.",
+      "OUT each cycle is X XOR carry_in. The new carry is the majority of X and carry_in.",
+      "Two DFFs are enough: one for the saved carry, one optional for input parity tracking."
+    ]
   },
   "test_cases": [
     {

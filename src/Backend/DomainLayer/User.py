@@ -16,6 +16,8 @@ class User:
     bio: str = ""
     xp: int = 0
     is_discussion_banned: bool = False
+    avatar_name: str = "Dinosaur"
+    avatar_color: str = "#38bdf8"
     created_at: datetime = field(default_factory=utcnow)
     # Admin-set overrides for puzzle capacity (None = use level-based default)
     max_published_puzzles: Optional[int] = None
@@ -92,6 +94,8 @@ class User:
             "bio": self.bio,
             "xp": self.xp,
             "level": self.level,
+            "avatar_name": self.avatar_name,
+            "avatar_color": self.avatar_color,
             "is_discussion_banned": self.is_discussion_banned,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
@@ -112,6 +116,8 @@ class User:
             bio=d.get("bio", ""),
             xp=int(d.get("xp", 0)),
             is_discussion_banned=bool(d.get("is_discussion_banned", False)),
+            avatar_name=d.get("avatar_name", "Dinosaur"),
+            avatar_color=d.get("avatar_color", "#38bdf8"),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
             max_published_puzzles=d.get("max_published_puzzles"),
             max_unpublished_puzzles=d.get("max_unpublished_puzzles"),

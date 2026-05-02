@@ -1,5 +1,6 @@
 import sqlite3
 from typing import Dict, Any, List, Optional
+import random
 
 from Backend import settings
 
@@ -23,6 +24,19 @@ class UserService:
     Controller talks only to UserService.
     UserService internally uses AuthService + UserRepo + XPService.
     """
+    
+    # List of valid animal avatars (must match files in public/avatars/)
+    VALID_AVATARS = [
+        "Alligator", "Anteater", "Armadillo", "Auroch", "Axolotl", "Badger", "Bat", "Beaver",
+        "Buffalo", "Camel", "Capybara", "Chameleon", "Cheetah", "Chinchilla", "Chipmunk",
+        "Chupacabra", "Cormorant", "Coyote", "Crow", "Dingo", "Dinosaur", "Dolphin", "Duck",
+        "Elephant", "Ferret", "Fox", "Frog", "Giraffe", "Gopher", "Grizzly", "Hedgehog",
+        "Hippo", "Hyena", "Ibex", "Ifrit", "Iguana", "Jackal", "Kangaroo", "Koala",
+        "Kraken", "Lemur", "Leopard", "Liger", "Llama", "Manatee", "Mink", "Monkey",
+        "Moose", "Narwhal", "Orangutan", "Otter", "Panda", "Penguin", "Platypus", "Pumpkin",
+        "Python", "Quagga", "Rabbit", "Raccoon", "Rhino", "Sheep", "Shrew", "Skunk",
+        "Squirrel", "Tiger", "Turtle", "Walrus", "Wolf", "Wolverine", "Wombat"
+    ]
 
     def __init__(
         self,
@@ -36,31 +50,79 @@ class UserService:
         self.xp = xp_service
         self.audit_log = audit_log_repo
 
+    def _log_auth_attempt(
+        self,
+        action: str,
+        username_or_email: Optional[str],
+        success: bool,
+        reason: Optional[str] = None,
+        user_id: Optional[int] = None,
+    ) -> None:
+        try:
+            self.user_repo.create_auth_attempt(
+                action=action,
+                username_or_email=username_or_email,
+                success=success,
+                reason=reason,
+                user_id=user_id,
+            )
+        except Exception:
+            # Logging must never break auth flows.
+            pass
+
+    def _get_online_user_ids(self) -> set[int]:
+        if not hasattr(self.auth, "_sessions") or not hasattr(self.auth, "_lock"):
+            return set()
+        try:
+            with self.auth._lock:
+                return {int(s.user_id) for s in self.auth._sessions.values()}
+        except Exception:
+            return set()
+
+    @staticmethod
+    def _get_random_avatar() -> str:
+        """Return a random animal avatar name."""
+        return random.choice(UserService.VALID_AVATARS)
+
     def register(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
         email = (payload.get("email") or "").strip()
+        avatar_name = (payload.get("avatar_name") or "").strip()
+        avatar_color = (payload.get("avatar_color") or "#38bdf8").strip()
         
         if not username or not password:
+            self._log_auth_attempt("register", username or email, False, "username and password required")
             raise ValidationError("username and password required")
         if not email:
+            self._log_auth_attempt("register", username, False, "email is required")
             raise ValidationError("email is required")
+        if not avatar_name:
+            self._log_auth_attempt("register", username, False, "avatar_name is required")
+            raise ValidationError("avatar_name is required")
+        if avatar_name not in self.VALID_AVATARS:
+            self._log_auth_attempt("register", username, False, f"invalid avatar_name: {avatar_name}")
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
         if self.user_repo.get_by_username(username):
+            self._log_auth_attempt("register", username, False, "username already exists")
             raise ValidationError("username already exists")
         if self.user_repo.get_by_email(email):
+            self._log_auth_attempt("register", email, False, "email already exists")
             raise ValidationError("email already exists")
 
         # Domain objects require a truthy id; repo will replace it on insert.
-        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+        user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name, avatar_color=avatar_color)
         try:
             created = self.user_repo.create(user, password=password)
         except sqlite3.IntegrityError:
             # Concurrent registration with same username/email beat our check
+            self._log_auth_attempt("register", username, False, "username or email already exists")
             raise ValidationError("username or email already exists")
         self.user_repo.conn.commit()
         
         # Auto login
         token, _ = self.auth.login(username, password)
+        self._log_auth_attempt("register", username, True, user_id=created.id)
 
         d = created.to_dict()
         d["level"] = self.xp.calculate_level(created.xp)
@@ -70,7 +132,13 @@ class UserService:
     def login(self, payload: Dict[str, Any]) -> dict:
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
-        token, user = self.auth.login(username, password)
+        try:
+            token, user = self.auth.login(username, password)
+        except ValidationError as e:
+            self._log_auth_attempt("login", username, False, str(e))
+            raise
+
+        self._log_auth_attempt("login", username, True, user_id=user.id)
 
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
@@ -204,12 +272,14 @@ class UserService:
             **filter_kwargs,
         )
         total = self.user_repo.count_all(**filter_kwargs)
+        online_ids = self._get_online_user_ids()
 
         out = []
         for u in users:
             d = u.to_dict()
             d["level"] = self.xp.calculate_level(u.xp)
             d["is_experienced"] = self.xp.is_experienced(u.xp)
+            d["is_online"] = int(u.id) in online_ids
             out.append(d)
 
         return {"data": out, "total": total, "limit": limit, "offset": offset}
@@ -217,10 +287,12 @@ class UserService:
     def google_login(self, token: str) -> dict:
         """Verify a Google id_token, find-or-create the user, and return a session."""
         if not token:
+            self._log_auth_attempt("login_google", None, False, "token is required")
             raise ValidationError("token is required")
 
         google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
         if not google_client_id:
+            self._log_auth_attempt("login_google", None, False, "google_login_disabled")
             raise ValidationError("google_login_disabled")
 
         try:
@@ -228,17 +300,20 @@ class UserService:
                 token, google_requests.Request(), audience=google_client_id
             )
         except Exception as e:
+            self._log_auth_attempt("login_google", None, False, f"invalid google token: {e}")
             raise ValidationError(f"invalid google token: {e}")
 
         email = idinfo.get("email")
         name = idinfo.get("name", "")
         if not email:
+            self._log_auth_attempt("login_google", None, False, "google token missing email")
             raise ValidationError("google token missing email")
 
         # Look up existing user by email
         user = self.user_repo.get_by_email(email)
 
         if not user:
+            self._log_auth_attempt("login_google", email, False, "requires_password")
             # User doesn't exist - need to set up password
             # Return info for frontend to redirect to password setup
             return {
@@ -250,6 +325,7 @@ class UserService:
 
         # User exists - log in normally
         session_token = self.auth.login_external(user.id)
+        self._log_auth_attempt("login_google", email, True, user_id=user.id)
 
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
@@ -266,15 +342,29 @@ class UserService:
         token = payload.get("token") or ""
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
+        avatar_name = (payload.get("avatar_name") or "").strip()
+        avatar_color = (payload.get("avatar_color") or "#38bdf8").strip()
 
         if not token:
+            self._log_auth_attempt("register_google", username, False, "token is required")
             raise ValidationError("token is required")
         if not username or not password:
+            self._log_auth_attempt("register_google", username, False, "username and password required")
             raise ValidationError("username and password required")
+        if not avatar_name:
+            self._log_auth_attempt("register_google", username, False, "avatar_name is required")
+            raise ValidationError("avatar_name is required")
+        if avatar_name not in self.VALID_AVATARS:
+            self._log_auth_attempt("register_google", username, False, f"invalid avatar_name: {avatar_name}")
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
+        if not avatar_color or len(avatar_color) != 7 or not avatar_color.startswith("#"):
+            self._log_auth_attempt("register_google", username, False, "invalid avatar_color format")
+            raise ValidationError("invalid avatar_color format")
 
         # Verify the Google token again
         google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
         if not google_client_id:
+            self._log_auth_attempt("register_google", username, False, "google_login_disabled")
             raise ValidationError("google_login_disabled")
 
         try:
@@ -282,11 +372,13 @@ class UserService:
                 token, google_requests.Request(), audience=google_client_id
             )
         except Exception as e:
+            self._log_auth_attempt("register_google", username, False, f"invalid google token: {e}")
             raise ValidationError(f"invalid google token: {e}")
 
         email = idinfo.get("email")
         name = idinfo.get("name", "")
         if not email:
+            self._log_auth_attempt("register_google", username, False, "google token missing email")
             raise ValidationError("google token missing email")
 
         # Check if user with this email already exists (link to existing account)
@@ -294,6 +386,7 @@ class UserService:
         if existing_user:
             # Link to existing account by logging in
             session_token = self.auth.login_external(existing_user.id)
+            self._log_auth_attempt("register_google", email, True, user_id=existing_user.id)
             d = existing_user.to_dict()
             d["level"] = self.xp.calculate_level(existing_user.xp)
             d["is_experienced"] = self.xp.is_experienced(existing_user.xp)
@@ -301,18 +394,21 @@ class UserService:
 
         # Email doesn't exist yet. Check if username is available
         if self.user_repo.get_by_username(username):
+            self._log_auth_attempt("register_google", username, False, "username already exists")
             raise ValidationError("username already exists")
 
-        # Create new user with username, email, and password
-        new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0)
+        # Create new user with username, email, password, and selected avatar
+        new_user = User(id=0, username=username, email=email, role=UserRole.SOLVER, xp=0, avatar_name=avatar_name, avatar_color=avatar_color)
         try:
             user = self.user_repo.create(new_user, password=password)
         except sqlite3.IntegrityError:
+            self._log_auth_attempt("register_google", username, False, "username or email already exists")
             raise ValidationError("username or email already exists")
         self.user_repo.conn.commit()
 
         # Log in via trusted external path
         session_token = self.auth.login_external(user.id)
+        self._log_auth_attempt("register_google", email, True, user_id=user.id)
 
         d = user.to_dict()
         d["level"] = self.xp.calculate_level(user.xp)
@@ -429,3 +525,32 @@ class UserService:
         conn.commit()
         
         return {"ok": True, "bio": bio}
+
+    def update_user_avatar(self, user_id: int, avatar_name: str, avatar_color: str) -> dict:
+        """Update user avatar and color"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        
+        # Validate avatar name
+        if avatar_name not in self.VALID_AVATARS:
+            raise ValidationError(f"invalid avatar_name: {avatar_name}")
+        
+        # Validate color format (hex color)
+        if not avatar_color or len(avatar_color) != 7 or not avatar_color.startswith("#"):
+            raise ValidationError("invalid avatar_color format")
+        
+        # Update in database
+        conn = self.user_repo.conn
+        conn.execute(
+            "UPDATE users SET avatar_name = ?, avatar_color = ? WHERE id = ?",
+            (avatar_name, avatar_color, user_id)
+        )
+        conn.commit()
+        
+        # Get updated user
+        updated_user = self.user_repo.get_by_id(user_id)
+        if not updated_user:
+            raise ValidationError("failed to retrieve updated user")
+        
+        return updated_user.to_dict()

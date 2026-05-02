@@ -42,22 +42,37 @@ class AuthService:
     def login(self, username: str, password: str):
         """Authenticate and return (token, user).  The caller gets the User
         object for free, avoiding a second DB lookup."""
-        username = (username or "").strip()
+        identifier = (username or "").strip()
         password = password or ""
-        if not username or not password:
+        if not identifier or not password:
             raise ValidationError("Username and password are required for login.")
 
-        user = self.user_repo.get_by_username(username)
+        # Allow login by username OR by email. If identifier looks like an email,
+        # prefer email lookup; otherwise use username lookup.
+        if "@" in identifier:
+            user = self.user_repo.get_by_email(identifier)
+        else:
+            user = self.user_repo.get_by_username(identifier)
+
+        # For security, do NOT reveal whether the account exists. Return the
+        # same generic error for both non-existent users and bad passwords.
+        GENERIC_ERROR = "Invalid username/email or password"
+
         if not user:
-            raise ValidationError("user not found")
+            # Optional: do a dummy hash to reduce timing differences (best-effort)
+            try:
+                _ = UserRepo._hash_password(password, "deadbeef")
+            except Exception:
+                pass
+            raise ValidationError(GENERIC_ERROR)
 
         # Verify password
         row = self.user_repo.conn.execute("SELECT pw_salt, pw_hash FROM users WHERE id=?", (user.id,)).fetchone()
         if not row or row["pw_salt"] is None or row["pw_hash"] is None:
-            raise ValidationError("invalid password")
+            raise ValidationError(GENERIC_ERROR)
         got = UserRepo._hash_password(password, row["pw_salt"])
         if got != row["pw_hash"]:
-            raise ValidationError("invalid password")
+            raise ValidationError(GENERIC_ERROR)
 
         token = secrets.token_urlsafe(32)
         now = time.time()

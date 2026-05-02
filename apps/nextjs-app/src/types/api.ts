@@ -22,10 +22,13 @@ export type User = Entity<{
   bio: string;
   xp: number;
   level: number;
+  avatar_name: string;
+  avatar_color: string;
   max_published_override?: number | null;
   max_unpublished_override?: number | null;
   effective_max_published?: number;
   effective_max_unpublished?: number;
+  is_online?: boolean;
   medals?: {
     bronze: number;
     silver: number;
@@ -168,6 +171,11 @@ export type Puzzle = Entity<{
   best_medal?: number; // 0=none, 1=bronze, 2=silver, 3=gold
   is_saved?: boolean; // Whether user has saved this puzzle
 
+  // Clue metadata (text intentionally NOT exposed — fetched via POST /puzzles/{id}/clue)
+  has_clues?: boolean;
+  clue_count?: number;
+  clue_penalty_seconds?: number;
+
   // Difficulty ratings (injected by backend)
   avg_difficulty?: number;
   // User's rating (injected by browse endpoint if user already rated)
@@ -291,6 +299,62 @@ export type AuditLogEntry = {
   target_user_id: number | null;
   target_puzzle_id: number | null;
   details: Record<string, any>;
+  created_at: string;
+};
+
+export type AdminArsenalPiece = {
+  id: string;
+  name: string;
+  cost: number;
+  is_arsenal: boolean;
+  num_inputs?: number;
+  num_outputs?: number;
+  basic_gates?: string;
+  truth_table?: string;
+  structure_json: string;
+  description?: string;
+};
+
+export type AdminUserProfile = User & {
+  is_online?: boolean;
+  saved_puzzles?: Array<{
+    id: string;
+    name: string;
+    status: string;
+    saved_at: string;
+  }>;
+  created_puzzles?: Array<{
+    id: string;
+    name: string;
+    status: string;
+    created_at: string;
+  }>;
+  arsenal?: AdminArsenalPiece[];
+};
+
+export type AdminSolvingAttempt = {
+  id: string;
+  user_id: number;
+  username: string;
+  puzzle_id: number;
+  puzzle_name: string;
+  circuit_id: number | null;
+  started_at: string;
+  submitted_at: string | null;
+  passed: boolean | null;
+  fail_reason: string | null;
+  time_used_seconds: number | null;
+  cost_used: number | null;
+  submitted_structure_json: string | null;
+};
+
+export type AdminAuthAttempt = {
+  id: number;
+  action: string;
+  username_or_email: string | null;
+  success: boolean;
+  reason: string | null;
+  user_id: number | null;
   created_at: string;
 };
 

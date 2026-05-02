@@ -4,7 +4,7 @@
     "description": "Design a circuit that detects if a 4-bit input sequence is a palindrome (reads the same forwards and backwards).",
     "budget": 200,
     "creator_budget": 10,
-    "time_limit_seconds": 60,
+    "time_limit_seconds": 120,
     "difficulty": "HARD",
     "default_gate_set": ["AND", "OR", "NOT", "XOR"],
     "inputs": ["b1", "b2", "b3", "b4"],

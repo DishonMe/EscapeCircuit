@@ -73,7 +73,7 @@ class TestAuthServiceLogin:
 
         with pytest.raises(ValidationError) as exc_info:
             self.service.login("testuser", "wrongpassword")
-        assert "user not found" in str(exc_info.value)
+        assert "Invalid username/email or password" in str(exc_info.value)
 
     def test_login_missing_username(self):
         with pytest.raises(ValidationError) as exc_info:

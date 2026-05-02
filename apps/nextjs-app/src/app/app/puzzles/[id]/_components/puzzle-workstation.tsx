@@ -1,15 +1,18 @@
 'use client';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 import { Button } from '@/components/ui/button';
-import { useAudio } from '@/hooks/useAudio';
-import { useSettings } from '@/context/settings-context';
 import {
   Dialog,
   DialogContent,
@@ -18,26 +21,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
+import { useSettings } from '@/context/settings-context';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
-import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
-import { useUser } from '@/lib/auth';
+import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
+import { useAudio } from '@/hooks/useAudio';
 import { api } from '@/lib/api-client';
+import { useUser } from '@/lib/auth';
 import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 
+import { ClueButton, type RevealedClue } from './clue-button';
+import { extractVisualStyleFromComponentLike } from './piece-visual-style';
 import {
   WorkstationGrid,
   type ComponentDef,
   type PlacedGridComponent,
   type SelectedComponentState,
 } from './workstation-grid';
-import { extractVisualStyleFromComponentLike } from './piece-visual-style';
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
+
 const CircuitDebugger = dynamic(
   () =>
     import('@/components/circuit-debugger').then((mod) => ({
@@ -55,8 +63,8 @@ const CircuitDebugger = dynamic(
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
-import { InfoPopup } from '@/components/ui/info-popup';
 import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
+
 import {
   Bug,
   ChevronDown,
@@ -68,6 +76,7 @@ import {
   CircuitBoard,
   Medal,
 } from 'lucide-react';
+
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { workstationTourSteps } from '@/config/tourSteps';
 import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
@@ -285,6 +294,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     string | null
   >(null);
 
+  // Clue-penalty state (server is the source of truth — these mirror what /attempts/start
+  // and /clue tell us, so a refresh hydrates back to a consistent UI).
+  const [attemptId, setAttemptId] = useState<number | null>(null);
+  const [cluesRevealed, setCluesRevealed] = useState<RevealedClue[]>([]);
+  const cluePenaltySeconds = cluesRevealed.reduce(
+    (sum, c) => sum + c.penalty,
+    0,
+  );
+
   // Sync isSolved from API data (so page refresh preserves solved state)
   useEffect(() => {
     if (puzzle?.is_solved) {
@@ -351,7 +369,29 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const startAttempt = async () => {
       try {
         if (!puzzle?.id) return;
-        await startPuzzleAttempt({ puzzleId: puzzle.id });
+        const response = await startPuzzleAttempt({ puzzleId: puzzle.id });
+        if (cancelled) return;
+        setAttemptId(typeof response.id === 'number' ? response.id : null);
+        // Hydrate raw timer from server's started_at so a refresh doesn't reset
+        // the user's elapsed time.
+        if (response.started_at) {
+          const parsed = Date.parse(response.started_at);
+          if (Number.isFinite(parsed)) {
+            startTime.current = parsed;
+          }
+        }
+        // Restore clues already paid for so the user doesn't lose access to them.
+        if (Array.isArray(response.revealed_clues)) {
+          setCluesRevealed(
+            response.revealed_clues.map((c) => ({
+              index: c.index,
+              text: c.text,
+              penalty: c.penalty_seconds,
+            })),
+          );
+        } else {
+          setCluesRevealed([]);
+        }
       } catch {
         // Best-effort only: rating still falls back to client elapsed on submit.
       }
@@ -1571,6 +1611,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         puzzleId: puzzle.id,
         solution: buildSolution(),
         timeTaken,
+        attemptId,
       });
 
       setIsPowerSurge(false);
@@ -1605,11 +1646,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         open: true,
         solved: res.solved,
         message: res.solved
-          ? Boolean(
-              (res as any).is_first_solve ??
-              (res as any).first_solve ??
-              (res.xp_earned ?? 0) > 0,
-            )
+          ? ((res as any).is_first_solve ??
+            (res as any).first_solve ??
+            (res.xp_earned ?? 0) > 0)
             ? res.message || 'You earned XP!'
             : 'Correct! You rebuilt it.'
           : res.message,
@@ -1689,8 +1728,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const onSolveAgain = () => {
     const shouldResetBoard = postCheck.open && postCheck.solved;
 
-    // For "Try again" after a failed check, keep the user's board.
-    // For "Solve again" after success, start from a clean board.
+    // For "Try again" after a failed check, keep the user's board AND the
+    // accumulated clue penalty / attempt id — the student keeps working in the
+    // same attempt. For "Solve again" after success, start a fresh attempt:
+    // the previous one was closed server-side and clue requests must restart.
     if (shouldResetBoard) {
       clearDraft();
       setPlaced([]);
@@ -1699,6 +1740,34 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       // Re-enable save/flush for the fresh attempt.
       solvedRef.current = false;
       startTime.current = Date.now();
+      // Tear down the old attempt's state and request a new one.
+      setAttemptId(null);
+      setCluesRevealed([]);
+      if (puzzle?.id) {
+        startPuzzleAttempt({ puzzleId: puzzle.id })
+          .then((response) => {
+            setAttemptId(typeof response.id === 'number' ? response.id : null);
+            if (response.started_at) {
+              const parsed = Date.parse(response.started_at);
+              if (Number.isFinite(parsed)) {
+                startTime.current = parsed;
+              }
+            }
+            if (Array.isArray(response.revealed_clues)) {
+              setCluesRevealed(
+                response.revealed_clues.map((c) => ({
+                  index: c.index,
+                  text: c.text,
+                  penalty: c.penalty_seconds,
+                })),
+              );
+            }
+          })
+          .catch(() => {
+            // Best-effort: validate path will still work via the back-compat
+            // open-attempt fallback when attempt_id is null.
+          });
+      }
     }
 
     // Always reset interaction/UI state
@@ -1921,10 +1990,54 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <WorkstationTimer
+                elapsedSeconds={elapsedSeconds}
+                extraSeconds={cluePenaltySeconds}
                 timeLimitSeconds={
                   puzzle.timeLimit ?? (puzzle as any).time_limit_seconds
                 }
               />
+              {(() => {
+                const limit =
+                  puzzle.timeLimit ?? (puzzle as any).time_limit_seconds;
+                const hasCountdown = typeof limit === 'number' && limit > 0;
+                if (hasCountdown && cluePenaltySeconds > 0) {
+                  return (
+                    <div
+                      className="rounded-lg border border-red-200/60 bg-red-50/50 px-3 py-1.5 text-[13px] font-medium text-red-700 backdrop-blur-sm"
+                      title="Added to your recorded time on submit (medals & leaderboard). The countdown is not affected."
+                    >
+                      <span className="mr-1 opacity-70">
+                        Time-taken penalty:
+                      </span>
+                      <span className="font-semibold tabular-nums tracking-tight">
+                        +{cluePenaltySeconds}s
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              {puzzle.has_clues && (puzzle.clue_count ?? 0) > 0 ? (
+                <ClueButton
+                  puzzleId={puzzle.id}
+                  attemptId={attemptId}
+                  totalClues={puzzle.clue_count ?? 0}
+                  cluePenaltySeconds={puzzle.clue_penalty_seconds ?? 30}
+                  hasCountdown={(() => {
+                    const limit =
+                      puzzle.timeLimit ?? (puzzle as any).time_limit_seconds;
+                    return typeof limit === 'number' && limit > 0;
+                  })()}
+                  revealedClues={cluesRevealed}
+                  onClueRevealed={(clue) =>
+                    setCluesRevealed((prev) =>
+                      prev.some((c) => c.index === clue.index)
+                        ? prev
+                        : [...prev, clue],
+                    )
+                  }
+                />
+              ) : null}
               {!isInlineDebugger ? (
                 <div className="relative">
                   <Button
@@ -2032,16 +2145,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               {budgetLimit}
               {creatorBudget !== null && (
                 <>
-                  <span className="text-muted-foreground ml-2">
+                  <span className="ml-2 text-muted-foreground">
                     Creator Cost:
                   </span>{' '}
                   {creatorBudget}
                 </>
               )}
-              <span className="text-muted-foreground ml-2">Cost:</span>{' '}
+              <span className="ml-2 text-muted-foreground">Cost:</span>{' '}
               {currentCost}
               <InfoPopup>
-                <p className="font-medium text-foreground mb-1">
+                <p className="mb-1 font-medium text-foreground">
                   Circuit Cost Limits
                 </p>
                 <p>
@@ -2265,22 +2378,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       return (
                         <li
                           key={w.id}
-                          className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:bg-secondary/70 hover:border-border"
+                          className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:border-border hover:bg-secondary/70"
                         >
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
                             {/* From Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-blue-600/80 bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+                            <div className="inline-flex shrink-0 items-center rounded-md border border-blue-600/80 bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {fromLabel}
                             </div>
 
                             {/* Arrow Icon */}
                             <ArrowRight
                               size={12}
-                              className="text-muted-foreground flex-shrink-0"
+                              className="shrink-0 text-muted-foreground"
                             />
 
                             {/* To Badge */}
-                            <div className="flex-shrink-0 inline-flex items-center rounded-md border border-yellow-600/80 bg-yellow-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+                            <div className="inline-flex shrink-0 items-center rounded-md border border-yellow-600/80 bg-yellow-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                               {toLabel}
                             </div>
                           </div>
@@ -2288,7 +2401,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                           {/* Delete Button */}
                           <button
                             type="button"
-                            className="hidden rounded-sm p-0.5 text-muted-foreground transition-all group-hover:flex items-center justify-center hover:scale-110 hover:bg-red-100 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
+                            className="hidden items-center justify-center rounded-sm p-0.5 text-muted-foreground transition-all hover:scale-110 hover:bg-red-100 hover:text-red-700 group-hover:flex dark:hover:bg-red-950/40 dark:hover:text-red-300"
                             onClick={() =>
                               setWires((prev) =>
                                 prev.filter((x) => x.id !== w.id),
@@ -2365,7 +2478,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
                     <div className="space-y-3">
                       <div>
-                        <label className="text-[11px] font-medium text-foreground block mb-2">
+                        <label className="mb-2 block text-[11px] font-medium text-foreground">
                           Inputs
                         </label>
                         <select
@@ -2373,7 +2486,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                           onChange={(e) =>
                             setSandboxNumInputs(parseInt(e.target.value))
                           }
-                          className="w-full border border-border rounded-lg bg-card text-foreground px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                             <option key={n} value={n}>
@@ -2384,7 +2497,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-medium text-foreground block mb-2">
+                        <label className="mb-2 block text-[11px] font-medium text-foreground">
                           Outputs
                         </label>
                         <select
@@ -2392,7 +2505,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                           onChange={(e) =>
                             setSandboxNumOutputs(parseInt(e.target.value))
                           }
-                          className="w-full border border-border rounded-lg bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="w-full rounded-lg border border-border bg-transparent px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                             <option key={n} value={n}>
@@ -2445,7 +2558,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       size="sm"
                       variant="outline"
                       onClick={() => setShowSandboxDebugger(true)}
-                      className="w-full mt-3"
+                      className="mt-3 w-full"
                     >
                       Debug
                     </Button>
@@ -2579,13 +2692,13 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       }}
                     />
                   ) : (
-                    <div className="text-muted-foreground text-[13px]">
+                    <div className="text-[13px] text-muted-foreground">
                       Loading instructions...
                     </div>
                   )}
                 </>
               ) : (
-                <div className="text-muted-foreground text-[13px]">
+                <div className="text-[13px] text-muted-foreground">
                   No instructions provided.
                 </div>
               )}
@@ -2727,7 +2840,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                         You have reached the maximum XP for this puzzle.
                       </p>
                     )}
-                  <p className="font-medium text-foreground mt-4">
+                  <p className="mt-4 font-medium text-foreground">
                     Congrats! Your solution passed all test cases.
                   </p>
                 </div>
@@ -2966,7 +3079,7 @@ const InspectionDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <svg
@@ -2996,7 +3109,7 @@ const InspectionDialog = ({
               <h3 className="mb-2 text-[13px] font-semibold text-foreground">
                 Description
               </h3>
-              <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed font-normal">
+              <p className="whitespace-pre-wrap text-[13px] font-normal leading-relaxed text-foreground">
                 {mappedDescriptionContent}
               </p>
             </div>
@@ -3033,7 +3146,7 @@ const InspectionDialog = ({
               </div>
 
               {/* Port details table */}
-              <div className="mt-4 rounded-md border border-border/40 overflow-hidden">
+              <div className="mt-4 overflow-hidden rounded-md border border-border/40">
                 <table className="w-full text-[12px]">
                   <thead className="bg-secondary">
                     <tr>
@@ -3083,7 +3196,7 @@ const InspectionDialog = ({
               </h3>
 
               {isHidden ? (
-                <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
                   <p className="inline-flex items-start gap-2 text-[12px] font-medium text-amber-900">
                     <CircleAlert
                       className="mt-0.5 size-4 shrink-0"
@@ -3100,14 +3213,14 @@ const InspectionDialog = ({
                   {/* Show basic gates list */}
                   {hasUsedBasicTypes && (
                     <div>
-                      <p className="text-[12px] font-medium text-foreground mb-2">
+                      <p className="mb-2 text-[12px] font-medium text-foreground">
                         Gates Used:
                       </p>
-                      <div className="pl-3 space-y-1">
+                      <div className="space-y-1 pl-3">
                         {((catalogEntry as any).used_basic_types || []).map(
                           (gate: string) => (
                             <div key={gate} className="flex items-center gap-2">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                              <span className="inline-block size-1.5 rounded-full bg-blue-500"></span>
                               <span className="text-[12px] text-muted-foreground">
                                 {gate}
                               </span>
@@ -3123,17 +3236,17 @@ const InspectionDialog = ({
                     parsedSolution &&
                     (parsedSolution.placed.length > 0 ||
                       parsedSolution.wires.length > 0) && (
-                      <div className="mt-4 pt-4 border-t border-cyan-200">
-                        <p className="text-[12px] font-medium text-foreground mb-2">
+                      <div className="mt-4 border-t border-cyan-200 pt-4">
+                        <p className="mb-2 text-[12px] font-medium text-foreground">
                           Circuit Preview:
                         </p>
                         <div
-                          className="relative w-full bg-slate-50 rounded border border-slate-200 overflow-auto"
+                          className="relative w-full overflow-auto rounded border border-slate-200 bg-slate-50"
                           style={{ minHeight: '200px', maxHeight: '300px' }}
                         >
                           {/* Mini grid canvas */}
                           <svg
-                            className="absolute inset-0 pointer-events-none"
+                            className="pointer-events-none absolute inset-0"
                             width="100%"
                             height="100%"
                             style={{ minWidth: '100%', minHeight: '100%' }}
@@ -3196,7 +3309,7 @@ const InspectionDialog = ({
 
                           {/* Render mini gates */}
                           <div
-                            className="absolute inset-0 pointer-events-none"
+                            className="pointer-events-none absolute inset-0"
                             style={{ perspective: '1000px' }}
                           >
                             {(parsedSolution.placed || []).map(
@@ -3217,7 +3330,7 @@ const InspectionDialog = ({
                                 return (
                                   <div
                                     key={placed.id}
-                                    className="absolute border border-border bg-card rounded text-[9px] font-bold text-foreground flex items-center justify-center pointer-events-none"
+                                    className="pointer-events-none absolute flex items-center justify-center rounded border border-border bg-card text-[9px] font-bold text-foreground"
                                     style={{
                                       left: `${left}px`,
                                       top: `${top}px`,
@@ -3235,7 +3348,7 @@ const InspectionDialog = ({
                             )}
                           </div>
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-2 italic">
+                        <p className="mt-2 text-[11px] italic text-muted-foreground">
                           This component contains{' '}
                           {parsedSolution.placed?.length || 0} gate(s) connected
                           by {parsedSolution.wires?.length || 0} wire(s).
@@ -3244,7 +3357,7 @@ const InspectionDialog = ({
                     )}
                 </div>
               ) : (
-                <div className="rounded-md bg-slate-50 border border-slate-200 p-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                   <p className="text-[12px] text-muted-foreground">
                     No internal structure information available.
                   </p>

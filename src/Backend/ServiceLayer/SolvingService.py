@@ -4,12 +4,14 @@ from collections import defaultdict
 
 from Backend.DomainLayer.Exceptions import ValidationError
 from Backend.DomainLayer.Circuit import Circuit
+from Backend.DomainLayer.Utils import utcnow
 from Backend.PersistantLayer._db import transaction
 from Backend.DomainLayer.SolveAttempt import SolveAttempt
 from Backend.PersistantLayer.SolveRepo import SolveRepo, PuzzleProgress
 from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.CircuitRepo import CircuitRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
+from Backend.PersistantLayer.CluesRepo import CluesRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.ServiceLayer.XPService import XPService
 from Backend.ServiceLayer.logicEngineService import logicEngineService
@@ -37,6 +39,7 @@ class SolvingService:
         xp_service: XPService,
         user_repo: UserRepo | None = None,
         notification_service=None,
+        clues_repo: CluesRepo | None = None,
     ):
         self.conn = conn
         self.solve_repo = solve_repo
@@ -47,6 +50,7 @@ class SolvingService:
         self.logic_engine = logic_engine
         self.xp_service = xp_service
         self.notification_service = notification_service
+        self.clues_repo = clues_repo
 
     @property
     def engine(self):
@@ -71,15 +75,43 @@ class SolvingService:
         if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
             raise ValidationError("puzzle not published")
 
-        attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
-        created_attempt = self.solve_repo.create_attempt(attempt)
-        # Persist the started attempt so later requests (e.g., rating eligibility)
-        # can read elapsed attempt time from the database.
-        self.conn.commit()
-        
-        result = created_attempt.to_dict() if hasattr(created_attempt, 'to_dict') else dict(created_attempt)
+        # Idempotency: reuse an existing open attempt so a refresh doesn't strand
+        # accumulated clue requests against a freshly created attempt id.
+        existing = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+        if isinstance(existing, SolveAttempt):
+            attempt_obj = existing
+        else:
+            try:
+                attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                attempt_obj = self.solve_repo.create_attempt(attempt)
+            except Exception:
+                # Race condition: another request created it simultaneously
+                attempt_obj = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+                if not attempt_obj:
+                    raise ValidationError("Failed to create solve attempt. Please try again.")
+            self.conn.commit()
+
+        result = attempt_obj.to_dict() if hasattr(attempt_obj, 'to_dict') else dict(attempt_obj)
         if 'puzzle_id' not in result: result['puzzle_id'] = int(puzzle_id)
         if 'user_id' not in result: result['user_id'] = int(user_id)
+
+        # Hydration payload: paid-for clue text + cumulative penalty.
+        revealed_clues: list[dict] = []
+        total_penalty = 0
+        if self.clues_repo is not None and getattr(p, 'clues', None):
+            recorded = self.clues_repo.list_for_attempt(int(attempt_obj.id))
+            clue_texts = list(p.clues or [])
+            for entry in recorded:
+                idx = int(entry["clue_index"])
+                if 0 <= idx < len(clue_texts):
+                    revealed_clues.append({
+                        "index": idx,
+                        "text": clue_texts[idx],
+                        "penalty_seconds": int(entry["penalty_seconds"]),
+                    })
+                total_penalty += int(entry["penalty_seconds"])
+        result["revealed_clues"] = revealed_clues
+        result["total_clue_penalty_seconds"] = int(total_penalty)
         return result
 
     def submit_solution(self, token: str, puzzle_id: int, payload) -> Dict[str, Any]:
@@ -92,11 +124,7 @@ class SolvingService:
         if not circuit_id:
             raise ValidationError("Circuit ID is required. Please provide your saved circuit to validate.")
 
-        attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
-        if not attempt:
-            attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
-            attempt = self.solve_repo.create_attempt(attempt)
-
+        # Validate circuit exists and belongs to user BEFORE creating attempt
         circuit = self.circuit_repo.get_by_id(int(circuit_id))
         if not circuit:
             raise ValidationError("Circuit not found. Please save your circuit design first.")
@@ -107,137 +135,125 @@ class SolvingService:
         if not test_cases:
             raise ValidationError("puzzle has no test cases")
 
-        # --- CORE VALIDATION LOGIC ---
+        # Now create/get attempt only after all early validation passes
+        # Use try-catch to handle race conditions where two requests create simultaneously
+        attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
+        if not attempt:
+            try:
+                attempt_obj = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                attempt = self.solve_repo.create_attempt(attempt_obj)
+            except Exception:
+                # Race condition: another request created it simultaneously, fetch it now
+                attempt = self.solve_repo.get_open_attempt(user_id, int(puzzle_id))
+                if not attempt:
+                    raise ValidationError("Failed to create solve attempt. Please try again.")
+
         passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
-        # -----------------------------
 
-        attempt.passed = passed
-        attempt.fail_reason = fail_reason
-        
-        # Test compatibility: Always award XP call even on fail (based on your existing code)
-        if hasattr(self.xp_service, 'award_solve_xp'):
-            try:
-                self.xp_service.award_solve_xp(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    attempt=attempt,
-                    timer_beaten=False,
-                    difficulty_tier="easy",
-                    is_first_solve=False
-                )
-            except Exception:
-                pass
-
-        if not passed:
-            self.solve_repo.update_attempt(attempt)
-            return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
-
-        self.solve_repo.update_attempt(attempt)
-
-        creator_id = p.creator_user_id
-        try:
-            creator_id = int(creator_id)
-        except Exception:
-            creator_id = getattr(creator_id, 'return_value', 0)
-
-        if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
-            raise ValidationError("puzzle not published")
-
-        # Rollback test hook
-        try:
-            if hasattr(attempt, 'force_rollback') and getattr(attempt, 'force_rollback', False):
-                if hasattr(self.conn, "execute"):
-                    self.conn.execute("ROLLBACK")
-                raise Exception("Test error")
-            if hasattr(attempt, 'finalize_submission'):
-                attempt.finalize_submission(cost_used=None, time_used_seconds=None)
-        except Exception as e:
-            raise
-
-        # XP Awarding Logic (Correct)
-        if hasattr(self.xp_service, 'award_solve_xp'):
-            try:
-                timer_beaten = False
-                if hasattr(p, 'time_limit_seconds') and getattr(p, 'time_limit_seconds', None) is not None:
-                    elapsed = getattr(attempt, 'elapsed_seconds', None)
-                    if elapsed is not None and int(elapsed) <= int(p.time_limit_seconds):
-                        timer_beaten = True
-                
-                avg_difficulty = getattr(p, 'avg_difficulty', None)
-                if avg_difficulty is not None:
-                    if avg_difficulty >= 7: difficulty_tier = "hard"
-                    elif avg_difficulty >= 4: difficulty_tier = "medium"
-                    else: difficulty_tier = "easy"
-                else:
-                    difficulty_tier = "easy"
-                
-                is_first_solve = False
-                if hasattr(self.solve_repo, 'has_passed_before_attempt'):
-                    is_first_solve = not self.solve_repo.has_passed_before_attempt(user_id, attempt)
-                
-                self.xp_service.award_solve_xp(
-                    user_id=user_id,
-                    puzzle_id=puzzle_id,
-                    attempt=attempt,
-                    timer_beaten=timer_beaten,
-                    difficulty_tier=difficulty_tier,
-                    is_first_solve=is_first_solve
-                )
-            except Exception:
-                pass
-
-        # Budget Check
-        puzzle_budget = int(getattr(p, 'budget', 999999))
-        circuit_cost = int(circuit.cost)
-        if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
-            attempt.passed = False
-            attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
+        with transaction(self.conn):
+            attempt.passed = passed
+            attempt.fail_reason = fail_reason
             attempt.circuit_id = int(circuit_id)
-            self.solve_repo.update_attempt(attempt)
-            return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
+            attempt.cost_used = int(circuit.cost)
+            attempt.submitted_structure_json = circuit.structure_json
+            puzzle_budget = int(getattr(p, 'budget', 999999))
+            circuit_cost = int(circuit.cost)
+            if hasattr(p, 'budget') and circuit_cost > puzzle_budget:
+                attempt.passed = False
+                attempt.fail_reason = f"Circuit cost {circuit_cost} exceeds puzzle budget {puzzle_budget}"
+                # Set submission timestamp and time for failed budget check
+                attempt.submitted_at = utcnow() if not attempt.submitted_at else attempt.submitted_at
+                attempt.time_used_seconds = attempt.elapsed_seconds
+                self.solve_repo.update_attempt(attempt)
+                return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
-        attempt.cost_used = int(circuit.cost)
-        attempt.circuit_id = int(circuit_id)
-        attempt.passed = True
-        attempt.fail_reason = None
-        self.solve_repo.update_attempt(attempt)
+            if not passed:
+                # Set submission timestamp and time for failed test cases
+                attempt.submitted_at = utcnow() if not attempt.submitted_at else attempt.submitted_at
+                attempt.time_used_seconds = attempt.elapsed_seconds
+                self.solve_repo.update_attempt(attempt)
+                return {"attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt), "passed": False, "fail_reason": attempt.fail_reason}
 
-        # Medal/Progress logic
-        progress = self.solve_repo.get_progress(user_id, int(puzzle_id)) if hasattr(self.solve_repo, 'get_progress') else None
-        first_time_solve = False
-        old_medal = 0
-        new_medal = 0
-        if progress:
-            first_time_solve = getattr(progress, 'best_medal', 0) == 0
-            old_medal = getattr(progress, 'best_medal', 0)
-            new_medal = old_medal
-        if first_time_solve:
-            new_medal = 1
-        
-        xp_gain = None
-        if hasattr(self.xp_service, 'reward_for_solve'):
+            creator_id = p.creator_user_id
             try:
-                difficulty = int(getattr(p, 'creator_difficulty', 5) or 5)
-                xp_gain = self.xp_service.reward_for_solve(
-                    user_id,
-                    difficulty_1_to_10=difficulty,
-                    old_medal=old_medal,
-                    new_medal=new_medal,
-                    first_time_solve=first_time_solve,
-                )
+                creator_id = int(creator_id)
             except Exception:
-                xp_gain = None
+                creator_id = getattr(creator_id, 'return_value', 0)
 
-        if hasattr(attempt, 'mark_submitted'):
+            if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
+                raise ValidationError("puzzle not published")
+
             try:
-                attempt.mark_submitted(passed=True)
+                if hasattr(attempt, 'force_rollback') and getattr(attempt, 'force_rollback', False):
+                    raise Exception("Test error")
+                if hasattr(attempt, 'finalize_submission'):
+                    attempt.finalize_submission(cost_used=None, time_used_seconds=None)
             except Exception as e:
-                if hasattr(self.conn, "execute"):
-                    self.conn.execute("ROLLBACK")
                 raise
 
-        # Commit all writes (attempts, progress, xp) in this legacy path
-        self.conn.commit()
+            progress = self.solve_repo.get_progress(user_id, int(puzzle_id)) if hasattr(self.solve_repo, 'get_progress') else None
+            first_time_solve = False
+            old_medal = 0
+            new_medal = 0
+            if progress:
+                first_time_solve = getattr(progress, 'best_medal', 0) == 0
+                old_medal = getattr(progress, 'best_medal', 0)
+                new_medal = old_medal
+            if first_time_solve:
+                new_medal = 1
+
+            if hasattr(attempt, 'mark_submitted'):
+                attempt.mark_submitted(passed=True)
+
+            # Set time_used_seconds after mark_submitted sets the final submitted_at
+            attempt.time_used_seconds = attempt.elapsed_seconds
+
+            self.solve_repo.update_attempt(attempt)
+
+            xp_gain = None
+            if hasattr(self.xp_service, 'reward_for_solve'):
+                try:
+                    difficulty = int(getattr(p, 'creator_difficulty', 5) or 5)
+                    xp_gain = self.xp_service.reward_for_solve(
+                        user_id,
+                        difficulty_1_to_10=difficulty,
+                        old_medal=old_medal,
+                        new_medal=new_medal,
+                        first_time_solve=first_time_solve,
+                    )
+                except Exception:
+                    xp_gain = None
+
+            if hasattr(self.xp_service, 'award_solve_xp'):
+                try:
+                    timer_beaten = False
+                    if hasattr(p, 'time_limit_seconds') and getattr(p, 'time_limit_seconds', None) is not None:
+                        elapsed = getattr(attempt, 'elapsed_seconds', None)
+                        if elapsed is not None and int(elapsed) <= int(p.time_limit_seconds):
+                            timer_beaten = True
+
+                    avg_difficulty = getattr(p, 'avg_difficulty', None)
+                    if avg_difficulty is not None:
+                        if avg_difficulty >= 7: difficulty_tier = "hard"
+                        elif avg_difficulty >= 4: difficulty_tier = "medium"
+                        else: difficulty_tier = "easy"
+                    else:
+                        difficulty_tier = "easy"
+
+                    is_first_solve = False
+                    if hasattr(self.solve_repo, 'has_passed_before_attempt'):
+                        is_first_solve = not self.solve_repo.has_passed_before_attempt(user_id, attempt)
+
+                    self.xp_service.award_solve_xp(
+                        user_id=user_id,
+                        puzzle_id=puzzle_id,
+                        attempt=attempt,
+                        timer_beaten=timer_beaten,
+                        difficulty_tier=difficulty_tier,
+                        is_first_solve=is_first_solve
+                    )
+                except Exception:
+                    pass
 
         return {
             "attempt": attempt.to_dict() if hasattr(attempt, 'to_dict') else dict(attempt),
@@ -248,17 +264,58 @@ class SolvingService:
         }
 
     # ---------- New Validation Logic (Stateless) ----------
-    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], time_taken: int = 0) -> Dict[str, Any]:
+    def validate_solution(self, token: str, puzzle_id: int, solution_payload: Dict[str, Any], time_taken: int = 0, attempt_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Stateless validation of a solution attempt.
         If the solution passes, calculate medal, persist solve with delta XP, award creator XP.
+
+        Clue penalty contract (server-authoritative):
+          - `time_taken` is the raw client elapsed time. The server adds the sum of
+            persisted clue penalties for `attempt_id` (or the user's open attempt
+            if `attempt_id` is omitted) to compute the effective time used for medal
+            calculation and persisted on the solved row.
+          - On success the open attempt is closed so further clue requests fail.
         """
         print(f"[SOLVING_SERVICE] validate_solution called with puzzle_id={puzzle_id}")
         user_id = self.auth.require_user_id(token)
-        
+
         p = self.puzzle_repo.get_by_id(puzzle_id)
         if not p:
             raise ValidationError("puzzle not found")
+
+        # Resolve the attempt this validate is being recorded against.
+        # - If attempt_id is provided, validate ownership/puzzle/open-state strictly.
+        # - If absent, reuse the user's open attempt (back-compat for legacy callers
+        #   that don't track attempt ids); penalty stays 0 if there are no clue requests.
+        resolved_attempt_id: Optional[int] = None
+        if attempt_id is not None:
+            attempt_row = self.solve_repo.get_attempt_by_id(int(attempt_id)) if hasattr(self.solve_repo, 'get_attempt_by_id') else None
+            if attempt_row is None:
+                raise ValidationError("attempt not found")
+            if int(attempt_row.user_id) != int(user_id) or int(attempt_row.puzzle_id) != int(puzzle_id):
+                raise ValidationError("attempt does not belong to this user/puzzle")
+            if attempt_row.submitted_at is not None:
+                # The client may hold a stale attempt id after a completed solve.
+                # Recover by reusing/creating a fresh open attempt so users can solve again.
+                existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+                if isinstance(existing_open, SolveAttempt):
+                    resolved_attempt_id = int(existing_open.id)
+                else:
+                    fresh_attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
+                    fresh_attempt = self.solve_repo.create_attempt(fresh_attempt)
+                    self.conn.commit()
+                    resolved_attempt_id = int(fresh_attempt.id)
+            else:
+                resolved_attempt_id = int(attempt_row.id)
+        else:
+            existing_open = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+            resolved_attempt_id = int(existing_open.id) if isinstance(existing_open, SolveAttempt) else None
+
+        persisted_clue_penalty = 0
+        persisted_clues_used = 0
+        if resolved_attempt_id is not None and self.clues_repo is not None:
+            persisted_clue_penalty = int(self.clues_repo.total_penalty_for_attempt(resolved_attempt_id))
+            persisted_clues_used = int(self.clues_repo.count_for_attempt(resolved_attempt_id))
             
         test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
         if not test_cases:
@@ -310,7 +367,10 @@ class SolvingService:
         
         if passed:
             cost_used = int(solution_payload.get("totalCost", 0))
-            time_taken_s = max(0, int(time_taken))
+            time_taken_raw_s = max(0, int(time_taken))
+            # Effective time used everywhere downstream (medal, leaderboard, persisted row)
+            # is raw + persisted clue penalty. Server is the source of truth.
+            time_taken_s = time_taken_raw_s + int(persisted_clue_penalty)
 
             # --- Determine difficulty tier for XP ---
             # Use creator-set puzzle difficulty first so XP/medal rewards stay
@@ -412,9 +472,9 @@ class SolvingService:
                             "first_time_solve": False,
                         }
                 
-                attempt_id = None
+                solved_attempt_id = None
                 if hasattr(self.solve_repo, 'add_solve'):
-                    attempt_id = self.solve_repo.add_solve(
+                    solved_attempt_id = self.solve_repo.add_solve(
                         user_id=user_id,
                         puzzle_id=puzzle_id,
                         time_taken_seconds=time_taken_s,
@@ -422,7 +482,15 @@ class SolvingService:
                         medal=medal.value if isinstance(medal, Medal) else int(medal),
                         cost_used=cost_used,
                         solution_json=solution_json,
+                        clues_used=int(persisted_clues_used),
+                        clue_penalty_seconds=int(persisted_clue_penalty),
                     )
+
+                # Close the open attempt so it cannot be reused for further clue
+                # requests. The /attempts/start path will create a fresh attempt
+                # for any subsequent solve-again flow.
+                if resolved_attempt_id is not None and hasattr(self.solve_repo, 'close_attempt'):
+                    self.solve_repo.close_attempt(int(resolved_attempt_id))
 
                 if hasattr(self.solve_repo, 'upsert_progress'):
                     new_best_medal = medal.value if isinstance(medal, Medal) else int(medal)
@@ -455,9 +523,9 @@ class SolvingService:
                 xp_earned = max(0, xp_earned)
 
                 # Prefer attempt-history truth for first-time solve detection.
-                if hasattr(self.solve_repo, 'has_passed_before_attempt') and attempt_id is not None:
+                if hasattr(self.solve_repo, 'has_passed_before_attempt') and solved_attempt_id is not None:
                     try:
-                        is_first_time_solve = not self.solve_repo.has_passed_before_attempt(user_id, puzzle_id, attempt_id)
+                        is_first_time_solve = not self.solve_repo.has_passed_before_attempt(user_id, puzzle_id, solved_attempt_id)
                     except Exception:
                         pass
 
@@ -514,11 +582,15 @@ class SolvingService:
                 "medal_value": medal.value if isinstance(medal, Medal) else int(medal),
             }
         else:
-            # Record failed attempt so time accumulates for rating eligibility
+            # Record failed attempt so time accumulates for rating eligibility.
+            # NOTE: per the clue-penalty contract, this is a separate analytics row
+            # — the open attempt that owns clue_requests stays open so the student
+            # keeps their accumulated penalty when they retry without leaving.
             try:
                 from Backend.DomainLayer.Utils import utcnow
                 now = utcnow()
-                time_taken_s = max(0, int(time_taken))
+                time_taken_raw_s = max(0, int(time_taken))
+                effective_time_taken_s = time_taken_raw_s + int(persisted_clue_penalty)
                 attempt = SolveAttempt(
                     id=0,
                     puzzle_id=int(puzzle_id),
@@ -527,7 +599,10 @@ class SolvingService:
                     submitted_at=now,
                     passed=False,
                     fail_reason=fail_msg or "wrong answer",
-                    time_used_seconds=time_taken_s,
+                    time_used_seconds=effective_time_taken_s,
+                    submitted_structure_json=json.dumps(solution_payload),
+                    clues_used=int(persisted_clues_used),
+                    clue_penalty_seconds=int(persisted_clue_penalty),
                 )
                 self.solve_repo.create_attempt(attempt)
                 self.conn.commit()

@@ -54,7 +54,7 @@ class TestLogin:
         resp = client.post("/users/login", json={
             "username": "nobody", "password": "pw"
         })
-        assert resp.status_code == 404
+        assert resp.status_code == 401
 
 
 class TestMe:
