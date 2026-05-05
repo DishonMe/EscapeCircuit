@@ -354,3 +354,127 @@ class TestCircuitServiceDeleteCircuit:
 
         with pytest.raises(ValidationError):
             self.service.delete_circuit("invalid_token", 1)
+
+
+class TestCircuitServiceSaveCircuitEdgeCases:
+    def setup_method(self):
+        self.mock_repo = Mock(spec=CircuitRepo)
+        self.mock_repo.list_by_user.return_value = []
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (0,)
+        self.mock_repo.conn = Mock()
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
+        self.mock_user_repo = Mock()
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+        self.mock_xp.calculate_level.return_value = 1
+        self.service = CircuitService(
+            self.mock_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_save_circuit_empty_name(self):
+        """Test that empty name raises ValidationError"""
+        self.mock_auth.require_user_id.return_value = 1
+        payload = {
+            "name": "   ",  # Whitespace-only name
+            "structure_json": '{"gates": []}',
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "name is required" in str(exc_info.value).lower()
+
+    def test_save_circuit_empty_structure_json(self):
+        """Test that empty structure_json raises ValidationError"""
+        self.mock_auth.require_user_id.return_value = 1
+        payload = {
+            "name": "Test Circuit",
+            "structure_json": "   ",  # Whitespace-only
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "structure" in str(exc_info.value).lower()
+
+    def test_save_circuit_none_structure_json(self):
+        """Test that None structure_json raises ValidationError"""
+        self.mock_auth.require_user_id.return_value = 1
+        payload = {
+            "name": "Test Circuit",
+            "structure_json": None,
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "structure" in str(exc_info.value).lower()
+
+    def test_save_circuit_user_not_found(self):
+        """Test that user not found raises ValidationError"""
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_user_repo.get_by_id.return_value = None
+        payload = {
+            "name": "Test Circuit",
+            "structure_json": '{"gates": []}',
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "user account" in str(exc_info.value).lower()
+
+    def test_save_circuit_arsenal_capacity_exceeded(self):
+        """Test that exceeding arsenal capacity raises ValidationError"""
+        from Backend.DomainLayer.User import User
+        
+        self.mock_auth.require_user_id.return_value = 1
+        user = User(id=1, username="test")
+        self.mock_user_repo.get_by_id.return_value = user
+        self.mock_engine.validate_gate_usage.return_value = None
+        self.mock_engine.compute_cost.return_value = 5  # Mock cost calculation
+        
+        # Mock COUNT(*) to return capacity limit reached
+        mock_count_cursor = Mock()
+        mock_count_cursor.fetchone.return_value = (10,)  # Already at limit
+        self.mock_repo.conn.execute.return_value = mock_count_cursor
+        
+        payload = {
+            "name": "Over Limit Circuit",
+            "structure_json": '{"gates": []}',
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "capacity" in str(exc_info.value).lower()
+
+    def test_save_circuit_duplicate_name_raises_integrity_error(self):
+        """Test that duplicate circuit name raises ValidationError"""
+        from Backend.DomainLayer.User import User
+        import sqlite3
+        
+        self.mock_auth.require_user_id.return_value = 1
+        user = User(id=1, username="test")
+        self.mock_user_repo.get_by_id.return_value = user
+        self.mock_engine.validate_gate_usage.return_value = None
+        self.mock_engine.compute_cost.return_value = 5  # Mock cost calculation
+        
+        # Mock create to raise IntegrityError
+        self.mock_repo.create.side_effect = sqlite3.IntegrityError("UNIQUE constraint failed")
+        
+        payload = {
+            "name": "Duplicate Circuit",
+            "structure_json": '{"gates": []}',
+            "description": ""
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.save_circuit("valid_token", payload)
+        assert "already exists" in str(exc_info.value).lower()

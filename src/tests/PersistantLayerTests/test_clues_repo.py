@@ -348,6 +348,80 @@ class TestCluesRepoIntegration:
         
         with pytest.raises(CluesExhausted):
             repo.record_next_clue(1, 1, 1, 30, 2)
+
+
+class TestCluesRepoConcurrency:
+    """Test concurrent access and retry logic"""
+    
+    def test_record_next_clue_concurrent_integrity_retry(self, conn, repo):
+        """Test that concurrent clue requests retry and return replayed result"""
+        # First request records clue 0
+        result1 = repo.record_next_clue(1, 1, 1, 10, 3)
+        assert result1["clue_index"] == 0
+        assert result1["replayed"] == False
+        
+        # Simulate another request trying to record clue 0 simultaneously
+        # by inserting directly (racing condition)
+        conn.execute(
+            """INSERT INTO clue_requests(attempt_id, user_id, puzzle_id, clue_index, penalty_seconds, request_id, requested_at)
+               VALUES(?,?,?,?,?,?,?)""",
+            (1, 1, 1, 1, 20, "race-req", datetime.now(timezone.utc).isoformat())
+        )
+        
+        # Now request again - should retry and find that clue 0 is taken, advance to clue 1
+        result2 = repo.record_next_clue(1, 1, 1, 30, 3)
+        assert result2["clue_index"] == 2  # Should get clue 2 since 0 and 1 are taken
+        assert result2["replayed"] == False
+        
+    def test_record_next_clue_idempotent_request_id(self, repo):
+        """Test that same request_id returns replayed result"""
+        # First call with request_id
+        result1 = repo.record_next_clue(1, 1, 1, 10, 5, request_id="unique-req-1")
+        assert result1["clue_index"] == 0
+        assert result1["replayed"] == False
+        
+        # Same request_id should return cached result
+        result2 = repo.record_next_clue(1, 1, 1, 99, 5, request_id="unique-req-1")
+        assert result2["clue_index"] == 0  # Same index
+        assert result2["penalty_seconds"] == 10  # Same penalty (from first call)
+        assert result2["replayed"] == True
+
+
+class TestCluesRepoDelete:
+    """Test delete operations"""
+    
+    def test_delete_for_puzzle(self, repo):
+        """Test deleting all clues for a puzzle"""
+        # Add clues for puzzle 1 across multiple attempts
+        repo.record_next_clue(1, 1, 1, 10, 3)
+        repo.record_next_clue(2, 1, 1, 20, 3)
+        repo.record_next_clue(3, 1, 1, 30, 3)
+        
+        # Add clues for puzzle 2
+        repo.record_next_clue(4, 1, 2, 15, 3)
+        repo.record_next_clue(5, 1, 2, 25, 3)
+        
+        # Verify initial state
+        assert repo.count_for_attempt(1) == 1
+        assert repo.count_for_attempt(4) == 1
+        
+        # Delete clues for puzzle 1
+        repo.delete_for_puzzle(1)
+        
+        # Puzzle 1 clues should be gone
+        assert repo.count_for_attempt(1) == 0
+        assert repo.count_for_attempt(2) == 0
+        assert repo.count_for_attempt(3) == 0
+        
+        # Puzzle 2 clues should remain
+        assert repo.count_for_attempt(4) == 1
+        assert repo.count_for_attempt(5) == 1
+    
+    def test_delete_for_puzzle_empty(self, repo):
+        """Test delete_for_puzzle when puzzle has no clues"""
+        # Should not raise error
+        repo.delete_for_puzzle(999)
+        assert repo.count_for_attempt(1) == 0
         
         # Attempt 2 should still work
         result = repo.record_next_clue(2, 1, 1, 10, 3)
