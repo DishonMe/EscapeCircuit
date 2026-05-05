@@ -577,7 +577,7 @@ export default function ArsenalCreatorPage() {
       </div>
 
       {/* Workstation - Main grid layout (stretches full remaining height) */}
-      <div className="flex-1 px-6 pb-3 flex gap-4 min-h-0">
+      <div className="flex min-h-[calc(100vh-9rem)] flex-1 gap-4 px-6 pb-3">
         <WorkstationMenu
           basic={BASIC_COMPONENTS}
           custom={[]}
@@ -610,6 +610,7 @@ export default function ArsenalCreatorPage() {
           onWiresChange={setWires}
           draggedPaletteComponentId={draggedPaletteComponentId}
           viewportClassName="h-full"
+          emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
         />
       </div>
 
