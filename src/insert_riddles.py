@@ -35,10 +35,10 @@ def latex_to_html(latex_text: str) -> str:
     
     # Convert \textit{...} to <em>...</em>
     html = re.sub(r'\\textit\s*\{([^}]+)\}', r'<em>\1</em>', html)
-    
+
     # Convert \texttt{...} to <code>...</code>
     html = re.sub(r'\\texttt\s*\{([^}]+)\}', r'<code>\1</code>', html)
-    
+
     # Handle \begin{itemize}...\end{itemize}
     html = re.sub(r'\\begin\{itemize\}', '<ul>', html)
     html = re.sub(r'\\end\{itemize\}', '</ul>', html)
@@ -339,8 +339,16 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     # Get description from config file or use instructions_text as fallback
     description = puzzle_data.get('description', instructions_text)
     
+    raw_allowed_arsenal_ids = puzzle_data.get('allowed_arsenal_component_ids') or []
+    if not raw_allowed_arsenal_ids and shared_arsenal_pieces:
+        raw_allowed_arsenal_ids = [
+            piece.get('name')
+            for piece in shared_arsenal_pieces
+            if isinstance(piece, dict) and piece.get('name')
+        ]
+
     allowed_arsenal_component_ids = resolve_shared_arsenal_ids(
-        puzzle_data.get('allowed_arsenal_component_ids') or [],
+        raw_allowed_arsenal_ids,
         shared_piece_ids_by_name,
         conn,
         creator_id,
@@ -595,13 +603,11 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
                 ),
             )
 
-    if allowed_arsenal_component_ids and puzzle_data.get('allowed_arsenal_component_ids'):
-        resolved_allowed_ids = allowed_arsenal_component_ids
-        if existing:
-            c.execute(
-                "UPDATE puzzles SET allowed_arsenal_component_ids=? WHERE id=?",
-                (json.dumps(resolved_allowed_ids), puzzle_id),
-            )
+    if allowed_arsenal_component_ids and existing:
+        c.execute(
+            "UPDATE puzzles SET allowed_arsenal_component_ids=? WHERE id=?",
+            (json.dumps(allowed_arsenal_component_ids), puzzle_id),
+        )
         
     conn.commit()
     print(f"Inserted: {puzzle_data['name']}")
