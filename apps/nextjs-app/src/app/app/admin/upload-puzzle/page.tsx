@@ -208,6 +208,23 @@ export default function UploadPuzzlePage() {
     "inputs": ["A", "B", "C_in"],
     "outputs": ["S", "C_out"]
   },
+  "shared_arsenal_pieces": [
+    {
+      "name": "wonce",
+      "description": "Write once bit",
+      "cost": 2,
+      "num_inputs": 1,
+      "num_outputs": 1,
+      "structure": {
+        "numInputs": 1,
+        "numOutputs": 1,
+        "placed": [],
+        "wires": []
+      },
+      "basic_gates": ["OR", "DFF"],
+      "truth_table": {}
+    }
+  ],
   "test_cases": [
     {
       "inputs": {"A": 0, "B": 0, "C_in": 0},
@@ -245,6 +262,17 @@ export default function UploadPuzzlePage() {
                   min_gate_limit (min, optional)
                 </li>
               </ul>
+              <p>
+                Shared arsenal pieces can be bundled in
+                <code className="bg-black/20 px-1 rounded ml-1">
+                  shared_arsenal_pieces
+                </code>{' '}
+                and referenced by name in
+                <code className="bg-black/20 px-1 rounded ml-1">
+                  allowed_arsenal_component_ids
+                </code>
+                .
+              </p>
             </div>
           </details>
 

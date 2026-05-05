@@ -31,26 +31,10 @@
     },
     "allow_arsenal": true,
     "allowed_arsenal_component_ids": [
-      "40",
-      "41",
-      "43",
-      "44",
-      "45",
-      "46",
-      "47",
-      "48",
-      "49"
+      "wonce"
     ],
     "arsenal_component_display_modes": {
-      "40": "circuit",
-      "41": "circuit",
-      "43": "circuit",
-      "44": "circuit",
-      "45": "circuit",
-      "46": "circuit",
-      "47": "circuit",
-      "48": "circuit",
-      "49": "circuit"
+      "wonce": "circuit"
     },
     "board": {
       "rows": 20,
@@ -58,6 +42,116 @@
     },
     "riddle_base_name": "riddle_07_twice_2_bits_in_3_bits"
   },
+  "shared_arsenal_pieces": [
+    {
+      "name": "wonce",
+      "description": "Write once bit",
+      "cost": 2,
+      "num_inputs": 1,
+      "num_outputs": 1,
+      "structure": {
+        "numInputs": 1,
+        "numOutputs": 1,
+        "placed": [
+          {
+            "id": "IO:IN:IN0",
+            "componentId": "IO:IN:IN0",
+            "origin": {
+              "row": 0,
+              "col": 0
+            },
+            "rotation": 0
+          },
+          {
+            "id": "OR:1",
+            "componentId": "OR",
+            "origin": {
+              "row": 0,
+              "col": 4
+            },
+            "rotation": 0
+          },
+          {
+            "id": "DFF:1",
+            "componentId": "DFF",
+            "origin": {
+              "row": 0,
+              "col": 8
+            },
+            "rotation": 0
+          },
+          {
+            "id": "IO:OUT:OUT0",
+            "componentId": "IO:OUT:OUT0",
+            "origin": {
+              "row": 0,
+              "col": 12
+            },
+            "rotation": 0
+          }
+        ],
+        "wires": [
+          {
+            "id": "wire:in-to-or",
+            "from": {
+              "componentId": "IO:IN:IN0",
+              "pinIndex": 0,
+              "portId": "P0"
+            },
+            "to": {
+              "componentId": "OR:1",
+              "pinIndex": 0,
+              "portId": "IN0"
+            }
+          },
+          {
+            "id": "wire:feedback",
+            "from": {
+              "componentId": "DFF:1",
+              "pinIndex": 1,
+              "portId": "OUT0"
+            },
+            "to": {
+              "componentId": "OR:1",
+              "pinIndex": 1,
+              "portId": "IN1"
+            }
+          },
+          {
+            "id": "wire:or-to-dff",
+            "from": {
+              "componentId": "OR:1",
+              "pinIndex": 2,
+              "portId": "OUT0"
+            },
+            "to": {
+              "componentId": "DFF:1",
+              "pinIndex": 0,
+              "portId": "IN0"
+            }
+          },
+          {
+            "id": "wire:dff-to-out",
+            "from": {
+              "componentId": "DFF:1",
+              "pinIndex": 1,
+              "portId": "OUT0"
+            },
+            "to": {
+              "componentId": "IO:OUT:OUT0",
+              "pinIndex": 0,
+              "portId": "P0"
+            }
+          }
+        ]
+      },
+      "basic_gates": [
+        "OR",
+        "DFF"
+      ],
+      "truth_table": {}
+    }
+  ],
   "test_cases": [
     {
       "kind": "stream",
