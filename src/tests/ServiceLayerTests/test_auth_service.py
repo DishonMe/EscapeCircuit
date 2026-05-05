@@ -478,3 +478,113 @@ class TestExpiration:
 
         # Token should be removed
         assert token not in self.service._sessions
+
+
+class TestAuthServiceLoginWithEmail:
+    """Test login() method with email identification"""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        # Mock conn for password verification
+        mock_conn = Mock()
+        mock_row = {"pw_salt": b"salt", "pw_hash": UserRepo._hash_password("password123", b"salt")}
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        self.mock_user_repo.conn = mock_conn
+        self.service = AuthService(self.mock_user_repo)
+
+    def test_login_with_email_address(self):
+        """Test login using email address instead of username"""
+        user = User(id=1, username="testuser", email="test@example.com")
+        self.mock_user_repo.get_by_email.return_value = user
+
+        token, returned_user = self.service.login("test@example.com", "password123")
+
+        assert isinstance(token, str)
+        assert len(token) > 0
+        assert token in self.service._sessions
+        assert self.service._sessions[token].user_id == 1
+        # Verify get_by_email was called (not get_by_username)
+        self.mock_user_repo.get_by_email.assert_called_once_with("test@example.com")
+        self.mock_user_repo.get_by_username.assert_not_called()
+        assert returned_user.id == 1
+
+    def test_login_email_user_not_found(self):
+        """Test login with email that doesn't exist"""
+        self.mock_user_repo.get_by_email.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.login("nonexistent@example.com", "password123")
+        assert "Invalid username/email or password" in str(exc_info.value)
+
+    def test_login_email_invalid_password(self):
+        """Test login with email but wrong password"""
+        user = User(id=1, username="testuser", email="test@example.com")
+        self.mock_user_repo.get_by_email.return_value = user
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.login("test@example.com", "wrongpassword")
+        assert "Invalid username/email or password" in str(exc_info.value)
+
+    def test_login_email_with_whitespace(self):
+        """Test login with email that has leading/trailing whitespace"""
+        user = User(id=1, username="testuser", email="test@example.com")
+        self.mock_user_repo.get_by_email.return_value = user
+
+        token, _ = self.service.login("  test@example.com  ", "password123")
+
+        assert token in self.service._sessions
+        # Verify the email was stripped before lookup
+        self.mock_user_repo.get_by_email.assert_called_once_with("test@example.com")
+
+
+class TestAuthServiceLoginExternal:
+    """Test login_external() method for OAuth/external auth"""
+
+    def setup_method(self):
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.service = AuthService(self.mock_user_repo)
+
+    def test_login_external_success(self):
+        """Test external login for existing user"""
+        user = User(id=42, username="oauth_user")
+        self.mock_user_repo.get_by_id.return_value = user
+
+        token = self.service.login_external(42)
+
+        assert isinstance(token, str)
+        assert len(token) > 0
+        assert token in self.service._sessions
+        assert self.service._sessions[token].user_id == 42
+        self.mock_user_repo.get_by_id.assert_called_once_with(42)
+
+    def test_login_external_user_not_found(self):
+        """Test external login for non-existent user"""
+        self.mock_user_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.login_external(999)
+        assert "user not found" in str(exc_info.value)
+
+    def test_login_external_creates_unique_tokens(self):
+        """Test that multiple external logins create unique tokens"""
+        user = User(id=42, username="oauth_user")
+        self.mock_user_repo.get_by_id.return_value = user
+
+        token1 = self.service.login_external(42)
+        token2 = self.service.login_external(42)
+
+        assert token1 != token2
+        assert token1 in self.service._sessions
+        assert token2 in self.service._sessions
+
+    def test_login_external_session_has_correct_user_id(self):
+        """Test that external login session contains correct user_id"""
+        user = User(id=99, username="oauth_user")
+        self.mock_user_repo.get_by_id.return_value = user
+
+        token = self.service.login_external(99)
+
+        session = self.service._sessions[token]
+        assert session.user_id == 99
+        assert session.created_at > 0
+        assert session.last_seen > 0
