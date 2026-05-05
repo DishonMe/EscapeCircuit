@@ -517,6 +517,111 @@ class TestUpsertProgress:
         )
         repo.upsert_progress(progress)
         # No error means success
+
+
+class TestGetDuplicateSubmission:
+    """Test get_duplicate_submission for network retry detection"""
+    
+    def test_get_duplicate_submission_no_match(self, repo):
+        """Test get_duplicate_submission returns None when no match"""
+        result = repo.get_duplicate_submission(1, 1, "{}")
+        assert result is None
+    
+    def test_get_duplicate_submission_exact_match(self, repo):
+        """Test get_duplicate_submission finds exact solution match"""
+        attempt_id = repo.add_solve(1, 1, 100, 50, solution_json='{"gates":["AND"]}')
+        result = repo.get_duplicate_submission(1, 1, '{"gates":["AND"]}', seconds=5)
+        assert result is not None
+    
+    def test_get_duplicate_submission_different_json(self, repo):
+        """Test get_duplicate_submission returns None for different JSON"""
+        repo.add_solve(1, 1, 100, 50, solution_json='{"gates":["AND"]}')
+        result = repo.get_duplicate_submission(1, 1, '{"gates":["OR"]}', seconds=5)
+        assert result is None
+
+
+class TestCountAttemptsForAdmin:
+    """Test count_attempts_for_admin filtering"""
+    
+    def test_count_attempts_for_admin_empty(self, repo):
+        """Test count_attempts_for_admin with no attempts"""
+        result = repo.count_attempts_for_admin()
+        assert result == 0
+    
+    def test_count_attempts_for_admin_all(self, repo):
+        """Test count_attempts_for_admin counts all attempts"""
+        for i in range(5):
+            repo.add_solve(1, i, 100, 50)
+        result = repo.count_attempts_for_admin()
+        assert result == 5
+    
+    def test_count_attempts_for_admin_filter_user(self, repo):
+        """Test count_attempts_for_admin filters by user"""
+        repo.add_solve(1, 1, 100, 50)
+        repo.add_solve(2, 1, 100, 50)
+        result = repo.count_attempts_for_admin(user_id=1)
+        assert result >= 1
+
+
+class TestCloseAttempt:
+    """Test close_attempt method"""
+    
+    def test_close_attempt_marks_submitted(self, repo):
+        """Test close_attempt sets submitted_at on open attempt"""
+        a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        assert a.submitted_at is None
+        
+        repo.close_attempt(a.id)
+        
+        closed = repo.get_attempt_by_id(a.id)
+        assert closed is not None
+        assert closed.submitted_at is not None
+    
+    def test_close_attempt_idempotent(self, repo):
+        """Test close_attempt is idempotent (calling twice is safe)"""
+        a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        repo.close_attempt(a.id)
+        first_submitted_at = repo.get_attempt_by_id(a.id).submitted_at
+        
+        repo.close_attempt(a.id)
+        second_submitted_at = repo.get_attempt_by_id(a.id).submitted_at
+        
+        assert first_submitted_at == second_submitted_at
+
+
+class TestGetAttemptById:
+    """Test get_attempt_by_id method"""
+    
+    def test_get_attempt_by_id_exists(self, repo):
+        """Test get_attempt_by_id returns attempt when it exists"""
+        a = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        fetched = repo.get_attempt_by_id(a.id)
+        assert fetched is not None
+        assert fetched.id == a.id
+        assert fetched.puzzle_id == 1
+        assert fetched.user_id == 1
+    
+    def test_get_attempt_by_id_not_found(self, repo):
+        """Test get_attempt_by_id returns None when not found"""
+        fetched = repo.get_attempt_by_id(9999)
+        assert fetched is None
+
+
+
+
+class TestFirstAttemptStartedAt:
+    """Test first_attempt_started_at returns oldest attempt"""
+    
+    def test_first_attempt_started_at_returns_first(self, repo):
+        """Test first_attempt_started_at returns the FIRST (oldest) attempt"""
+        from datetime import datetime, timezone, timedelta
+        
+        a1 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        a2 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        a3 = repo.create_attempt(make_attempt(puzzle_id=1, user_id=1))
+        
+        ts = repo.first_attempt_started_at(user_id=1, puzzle_id=1)
+        assert ts == a1.started_at.isoformat()
     
     def test_upsert_progress_with_xp_delta(self, repo):
         """Test upsert_progress with XP delta"""

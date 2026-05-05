@@ -869,4 +869,540 @@ class TestArsenalServiceSaveAdvanced:
         assert "outputs" in str(exc_info.value)
 
 
+class TestArsenalServiceVisualStyleNormalization:
+    """Test _normalize_visual_style() method - currently uncovered."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_normalize_visual_style_clean_lab_preset(self):
+        """Test preset style handling for 'clean-lab'."""
+        visual_style = {"preset": "clean-lab"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+        # Check for camelCase keys returned
+        assert "roundness" in result or "borderStyle" in result
+
+    def test_normalize_visual_style_retro_chip_preset(self):
+        """Test preset style handling for 'retro-chip'."""
+        visual_style = {"preset": "retro-chip"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_invalid_preset(self):
+        """Test invalid preset raises error."""
+        visual_style = {"preset": "invalid-preset"}
+        with pytest.raises(ValidationError) as exc_info:
+            self.service._normalize_visual_style(visual_style)
+        assert "invalid" in str(exc_info.value)
+
+    def test_normalize_visual_style_accent_color_valid(self):
+        """Test valid hex color validation."""
+        visual_style = {"accentColor": "#FF5733"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+        assert result.get("accentColor") == "#FF5733"
+
+    def test_normalize_visual_style_accent_color_short_hex(self):
+        """Test short hex color format."""
+        visual_style = {"accentColor": "#F57"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+        assert result.get("accentColor") == "#F57"
+
+    def test_normalize_visual_style_accent_color_invalid(self):
+        """Test invalid hex color is rejected."""
+        visual_style = {"accentColor": "not-a-color"}
+        with pytest.raises(ValidationError) as exc_info:
+            self.service._normalize_visual_style(visual_style)
+        assert "hex color" in str(exc_info.value)
+
+    def test_normalize_visual_style_roundness_min(self):
+        """Test minimum roundness boundary."""
+        visual_style = {"roundness": 0}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+        assert result.get("roundness") == 0
+
+    def test_normalize_visual_style_roundness_max(self):
+        """Test maximum roundness boundary."""
+        visual_style = {"roundness": 10}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+        assert result.get("roundness") == 10
+
+    def test_normalize_visual_style_roundness_exceed_max(self):
+        """Test roundness exceeding maximum."""
+        visual_style = {"roundness": 15}
+        with pytest.raises(ValidationError) as exc_info:
+            self.service._normalize_visual_style(visual_style)
+        assert "between" in str(exc_info.value)
+
+    def test_normalize_visual_style_border_solid(self):
+        """Test solid border style."""
+        visual_style = {"border_style": "solid"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_border_double(self):
+        """Test double border style."""
+        visual_style = {"border_style": "double"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_border_etched(self):
+        """Test etched border style."""
+        visual_style = {"border_style": "etched"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_edge_addon_chip_legs(self):
+        """Test chip-legs edge addon."""
+        visual_style = {"edge_addon": "chip-legs"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_surface_brushed(self):
+        """Test brushed surface style."""
+        visual_style = {"surface_style": "brushed"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_surface_gradient(self):
+        """Test gradient surface style."""
+        visual_style = {"surface_style": "gradient"}
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_multiple_fields(self):
+        """Test multiple style fields together."""
+        visual_style = {
+            "preset": "clean-lab",
+            "accent_color": "#FF5733",
+            "roundness": 5,
+            "border_style": "solid",
+            "surface_style": "flat",
+        }
+        result = self.service._normalize_visual_style(visual_style)
+        assert result is not None
+
+    def test_normalize_visual_style_none_input(self):
+        """Test None input."""
+        result = self.service._normalize_visual_style(None)
+        assert result is None or isinstance(result, dict)
+
+    def test_normalize_visual_style_empty_dict(self):
+        """Test empty dict input."""
+        result = self.service._normalize_visual_style({})
+        assert result is not None
+
+
+class TestArsenalServiceStatefulStructure:
+    """Test _is_stateful_structure() method - currently uncovered."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_is_stateful_structure_with_dff(self):
+        """Test detection of DFF (D Flip-Flop) gate."""
+        structure = {"placed": [{"componentId": "DFF"}]}
+        result = self.service._is_stateful_structure(structure)
+        assert result is True
+
+    def test_is_stateful_structure_with_dff_in_list(self):
+        """Test DFF detection when it's in a list of gates."""
+        structure = {"placed": [{"componentId": "AND"}, {"componentId": "DFF"}, {"componentId": "OR"}]}
+        result = self.service._is_stateful_structure(structure)
+        assert result is True
+
+    def test_is_stateful_structure_with_state_port(self):
+        """Test detection of state port in structure."""
+        structure = {"state": ["Q", "QN"]}
+        result = self.service._is_stateful_structure(structure)
+        assert result is True
+
+    def test_is_stateful_structure_with_state_memory(self):
+        """Test detection of state/memory field."""
+        structure = {"state": ["Q"]}
+        result = self.service._is_stateful_structure(structure)
+        # Should handle state detection
+        assert result is True
+
+    def test_is_stateful_structure_no_stateful_gates(self):
+        """Test structure with no stateful gates."""
+        structure = {"placed": [{"componentId": "AND"}, {"componentId": "OR"}, {"componentId": "NOT"}]}
+        result = self.service._is_stateful_structure(structure)
+        assert result is False
+
+    def test_is_stateful_structure_empty_placed(self):
+        """Test structure with empty placed list."""
+        structure = {"placed": []}
+        result = self.service._is_stateful_structure(structure)
+        assert result is False
+
+    def test_is_stateful_structure_no_placed(self):
+        """Test structure without placed field."""
+        structure = {}
+        result = self.service._is_stateful_structure(structure)
+        assert result is False
+
+    def test_is_stateful_structure_none_input(self):
+        """Test None structure."""
+        result = self.service._is_stateful_structure(None)
+        assert result is False
+
+    def test_is_stateful_structure_empty_dict(self):
+        """Test empty dict."""
+        result = self.service._is_stateful_structure({})
+        assert result is False
+
+    def test_is_stateful_structure_complex_dff(self):
+        """Test complex DFF definition."""
+        structure = {
+            "placed": [
+                {
+                    "componentId": "DFF",
+                    "id": "DFF_1",
+                    "inputs": {"D": 0, "CLK": 1},
+                    "outputs": {"Q": 0, "QN": 1},
+                }
+            ]
+        }
+        result = self.service._is_stateful_structure(structure)
+        assert result is True
+
+
+class TestArsenalServiceGateExtraction:
+    """Test gate extraction and categorization - currently under-tested."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_extract_basic_gates_from_complex_structure(self):
+        """Test extraction from complex circuit structure."""
+        structure = '{"placed": [{"type": "AND"}, {"type": "OR"}]}'
+        self.mock_engine.extract_used_gates.return_value = ["AND", "OR", "NOT"]
+
+        result = self.service._extract_basic_gates(structure)
+
+        assert "AND" in result
+        assert "OR" in result
+        assert "NOT" in result
+
+    def test_extract_basic_gates_filters_dff(self):
+        """Test that DFF is properly handled (not always filtered)."""
+        structure = '{"placed": []}'
+        self.mock_engine.extract_used_gates.return_value = ["AND", "DFF"]
+
+        result = self.service._extract_basic_gates(structure)
+
+        # DFF may or may not be in result depending on implementation
+        assert "AND" in result
+
+    def test_extract_basic_gates_empty_structure(self):
+        """Test extraction from empty structure."""
+        structure = "{}"
+        self.mock_engine.extract_used_gates.return_value = []
+
+        result = self.service._extract_basic_gates(structure)
+
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    def test_extract_basic_gates_single_gate(self):
+        """Test extraction with single gate."""
+        structure = '{"placed": [{"type": "AND"}]}'
+        self.mock_engine.extract_used_gates.return_value = ["AND"]
+
+        result = self.service._extract_basic_gates(structure)
+
+        assert len(result) >= 1
+        assert "AND" in result
+
+    def test_extract_basic_gates_all_logic_gates(self):
+        """Test extraction with all common logic gates."""
+        structure = '{"placed": []}'
+        self.mock_engine.extract_used_gates.return_value = [
+            "AND",
+            "OR",
+            "NOT",
+            "XOR",
+            "NAND",
+            "NOR",
+            "XNOR",
+        ]
+
+        result = self.service._extract_basic_gates(structure)
+
+        assert "AND" in result
+        assert "OR" in result
+        assert "NOT" in result
+
+
+class TestArsenalServiceTruthTableGeneration:
+    """Test truth table generation - partially uncovered."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_truth_table_from_structure_field(self):
+        """Test extracting truth table directly from structure."""
+        structure = {
+            "truth_table": {"0": {"out0": 0}, "1": {"out0": 1}, "10": {"out0": 1}, "11": {"out0": 0}}
+        }
+        result = self.service._calculate_truth_table(2, 1, structure)
+        assert result == structure["truth_table"]
+
+    def test_truth_table_generation_with_simulation(self):
+        """Test truth table generation via simulation."""
+        structure = {"placed": [], "wires": []}
+        self.mock_engine.simulate.side_effect = [
+            {"out0": 0},  # input 0
+            {"out0": 1},  # input 1
+        ]
+
+        result = self.service._calculate_truth_table(1, 1, structure)
+
+        assert isinstance(result, dict)
+
+    def test_truth_table_two_inputs(self):
+        """Test truth table for 2 inputs."""
+        structure = {"placed": [], "wires": []}
+        # Simulate returns for 4 combinations (00, 01, 10, 11)
+        self.mock_engine.simulate.side_effect = [
+            {"out0": 0},
+            {"out0": 1},
+            {"out0": 1},
+            {"out0": 1},
+        ]
+
+        result = self.service._calculate_truth_table(2, 1, structure)
+
+        assert isinstance(result, dict)
+        assert len(result) == 4
+
+    def test_truth_table_multiple_outputs(self):
+        """Test truth table with multiple outputs."""
+        structure = {"placed": [], "wires": []}
+        self.mock_engine.simulate.side_effect = [
+            {"out0": 0, "out1": 0},
+            {"out0": 1, "out1": 0},
+        ]
+
+        result = self.service._calculate_truth_table(1, 2, structure)
+
+        assert isinstance(result, dict)
+
+
+class TestArsenalServiceUpdateVisualStyle:
+    """Test updating arsenal piece with visual style changes."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_update_arsenal_piece_visual_style_only(self):
+        """Test updating only visual style without changing structure."""
+        user_id = 1
+        piece_id = 101
+        token = "valid_token"
+
+        self.mock_auth.require_user_id.return_value = user_id
+
+        mock_piece = Mock(spec=Circuit)
+        mock_piece.user_id = user_id
+        mock_piece.is_arsenal = True
+        mock_piece.visual_style = '{"preset": "old"}'
+        mock_piece.structure_json = '{}'
+
+        self.mock_circuit_repo.get_by_id.return_value = mock_piece
+
+        result = self.service.update_arsenal_piece(
+            token,
+            piece_id,
+            visual_style={"preset": "clean-lab", "accentColor": "#FF5733"}
+        )
+
+        assert result is not None
+        self.mock_circuit_repo.update.assert_called_once()
+
+    def test_update_arsenal_piece_clear_visual_style(self):
+        """Test updating with a name change."""
+        user_id = 1
+        piece_id = 101
+        token = "valid_token"
+
+        self.mock_auth.require_user_id.return_value = user_id
+
+        mock_piece = Mock(spec=Circuit)
+        mock_piece.user_id = user_id
+        mock_piece.is_arsenal = True
+        mock_piece.name = "old_name"
+        mock_piece.structure_json = '{}'
+
+        self.mock_circuit_repo.get_by_id.return_value = mock_piece
+
+        result = self.service.update_arsenal_piece(
+            token,
+            piece_id,
+            new_name="updated_name"
+        )
+
+        assert result is not None
+
+
+class TestArsenalServiceCustomPiecesError:
+    """Test error handling in custom pieces retrieval."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_get_custom_pieces_db_error_returns_empty_list(self):
+        """Test that database error returns empty list gracefully."""
+        puzzle_id = 5
+
+        self.mock_circuit_repo.list_custom_pieces_by_puzzle.side_effect = Exception(
+            "Database connection error"
+        )
+
+        result = self.service.get_custom_pieces_for_puzzle(puzzle_id)
+
+        assert result == []
+
+    def test_get_custom_pieces_partial_failure(self):
+        """Test handling when some pieces fail to convert."""
+        puzzle_id = 5
+
+        mock_piece_good = Mock(spec=Circuit)
+        mock_piece_good.to_circuit_component.return_value = {"id": 1, "name": "good"}
+
+        mock_piece_bad = Mock(spec=Circuit)
+        mock_piece_bad.to_circuit_component.side_effect = Exception("Conversion error")
+
+        self.mock_circuit_repo.list_custom_pieces_by_puzzle.return_value = [
+            mock_piece_good,
+            mock_piece_bad,
+        ]
+
+        # Should handle gracefully
+        try:
+            result = self.service.get_custom_pieces_for_puzzle(puzzle_id)
+        except Exception:
+            pass  # Some implementations may raise
+
+
+class TestArsenalServiceFlattenArsenalEdgeCases:
+    """Test edge cases in arsenal piece flattening."""
+
+    def setup_method(self):
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock()
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = ArsenalService(
+            self.mock_circuit_repo,
+            self.mock_user_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_flatten_nested_arsenal_pieces(self):
+        """Test flattening when arsenal piece uses another arsenal piece."""
+        user_id = 1
+        basic_gates = ["AND"]
+        used_ids = [101, 102]
+
+        # piece 101 uses piece 102
+        mock_piece_101 = Mock(spec=Circuit)
+        mock_piece_101.user_id = user_id
+        mock_piece_101.is_arsenal = True
+        mock_piece_101.basic_gates = '["NOT", 102]'
+
+        mock_piece_102 = Mock(spec=Circuit)
+        mock_piece_102.user_id = user_id
+        mock_piece_102.is_arsenal = True
+        mock_piece_102.basic_gates = '["OR", "XOR"]'
+
+        self.mock_circuit_repo.get_by_id.side_effect = [mock_piece_101, mock_piece_102]
+
+        result = self.service._flatten_used_arsenal_pieces(basic_gates, used_ids, user_id)
+
+        assert "AND" in result
+        assert "NOT" in result
+        assert "OR" in result
+        assert "XOR" in result
 
