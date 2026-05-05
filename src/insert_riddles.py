@@ -127,7 +127,24 @@ def normalize_truth_table(truth_table):
     return normalized
 
 def resolve_shared_arsenal_ids(raw_ids, shared_piece_ids_by_name, conn, creator_id):
+    """
+    Resolve shared arsenal piece IDs from config references (names or IDs).
+    
+    Args:
+        raw_ids: List of piece references (names, IDs, or None)
+        shared_piece_ids_by_name: Dict mapping piece names to their newly-created IDs
+        conn: Database connection
+        creator_id: ID of the puzzle creator (arsenal piece owner)
+    
+    Returns:
+        List of resolved piece IDs
+    
+    Raises:
+        ValueError: If a referenced piece cannot be found
+    """
     resolved_ids = []
+    failed_names = []
+    
     for raw_id in raw_ids or []:
         if raw_id is None:
             continue
@@ -141,16 +158,33 @@ def resolve_shared_arsenal_ids(raw_ids, shared_piece_ids_by_name, conn, creator_
             resolved_ids.append(int(raw_text))
             continue
 
+        # Try to find the piece by name in the just-created pieces
         if raw_text in shared_piece_ids_by_name:
-            resolved_ids.append(int(shared_piece_ids_by_name[raw_text]))
+            piece_id = int(shared_piece_ids_by_name[raw_text])
+            resolved_ids.append(piece_id)
+            print(f"  ✓ Resolved arsenal piece '{raw_text}' -> ID {piece_id}")
             continue
 
+        # Fallback: search database for existing piece with this name
         row = conn.execute(
             "SELECT id FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1 ORDER BY id DESC LIMIT 1",
             (int(creator_id), raw_text),
         ).fetchone()
         if row:
-            resolved_ids.append(int(row[0]))
+            piece_id = int(row[0])
+            resolved_ids.append(piece_id)
+            print(f"  ✓ Found existing arsenal piece '{raw_text}' -> ID {piece_id}")
+            continue
+        
+        # Piece not found - record error
+        failed_names.append(raw_text)
+    
+    # If any pieces couldn't be resolved, raise an error
+    if failed_names:
+        raise ValueError(
+            f"Could not resolve shared arsenal pieces: {', '.join(failed_names)}. "
+            f"These pieces must be created before the puzzle can reference them."
+        )
 
     return resolved_ids
 
@@ -240,6 +274,9 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
+    puzzle_name = config.get('puzzle', {}).get('name', 'Unknown')
+    print(f"\n📖 Loading puzzle: {puzzle_name}")
+
     c = conn.cursor()
 
     shared_arsenal_pieces = config.get('shared_arsenal_pieces') or []
@@ -248,18 +285,22 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
 
     shared_piece_ids_by_name = {}
     if shared_arsenal_pieces:
+        print(f"  Creating {len(shared_arsenal_pieces)} shared arsenal piece(s)...")
         for shared_piece in shared_arsenal_pieces:
             if not isinstance(shared_piece, dict):
                 continue
             name = (shared_piece.get('name') or '').strip()
             if not name:
+                print(f"  ⚠ Skipping shared arsenal piece with missing name")
                 continue
 
+            # Check if this piece already exists
             existing_shared = conn.execute(
                 "SELECT id FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1",
                 (int(creator_id), name),
             ).fetchone()
             if existing_shared:
+                print(f"  → Replacing existing arsenal piece '{name}' (ID {existing_shared[0]})")
                 conn.execute(
                     "DELETE FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1",
                     (int(creator_id), name),
@@ -272,27 +313,47 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             structure_json = structure if isinstance(structure, str) else json.dumps(structure)
             basic_gates = shared_piece.get('basic_gates', shared_piece.get('basicGates', []))
             truth_table = normalize_truth_table(shared_piece.get('truth_table', {}))
+            
+            # Validate required fields
+            if not isinstance(basic_gates, list):
+                basic_gates = []
+            
+            num_inputs = int(shared_piece.get('num_inputs', 0) or 0)
+            num_outputs = int(shared_piece.get('num_outputs', 0) or 0)
+            
+            if num_inputs < 1 or num_inputs > 5:
+                raise ValueError(f"Shared arsenal piece '{name}' has invalid num_inputs: {num_inputs} (must be 1-5)")
+            if num_outputs < 1 or num_outputs > 3:
+                raise ValueError(f"Shared arsenal piece '{name}' has invalid num_outputs: {num_outputs} (must be 1-3)")
 
-            c.execute(
-                """
-                INSERT INTO circuits(
-                    user_id, name, cost, structure_json, is_arsenal,
-                    basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
-                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, NULL, ?)
-                """,
-                (
-                    int(creator_id),
-                    name,
-                    int(shared_piece.get('cost', shared_piece.get('value', 0)) or 0),
-                    structure_json,
-                    json.dumps(basic_gates if isinstance(basic_gates, list) else []),
-                    json.dumps(truth_table),
-                    int(shared_piece.get('num_inputs', 0) or 0),
-                    int(shared_piece.get('num_outputs', 0) or 0),
-                    (shared_piece.get('description') or '').strip(),
-                ),
-            )
-            shared_piece_ids_by_name[name] = c.lastrowid
+            try:
+                c.execute(
+                    """
+                    INSERT INTO circuits(
+                        user_id, name, cost, structure_json, is_arsenal,
+                        basic_gates, truth_table, num_inputs, num_outputs, puzzle_id, description
+                    ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, NULL, ?)
+                    """,
+                    (
+                        int(creator_id),
+                        name,
+                        int(shared_piece.get('cost', shared_piece.get('value', 0)) or 0),
+                        structure_json,
+                        json.dumps(basic_gates),
+                        json.dumps(truth_table),
+                        num_inputs,
+                        num_outputs,
+                        (shared_piece.get('description') or '').strip(),
+                    ),
+                )
+                piece_id = c.lastrowid
+                if not piece_id:
+                    raise RuntimeError(f"Failed to insert shared arsenal piece '{name}' - no row ID returned")
+                
+                shared_piece_ids_by_name[name] = piece_id
+                print(f"  ✓ Created shared arsenal piece '{name}' (ID {piece_id}, inputs={num_inputs}, outputs={num_outputs})")
+            except Exception as e:
+                raise RuntimeError(f"Failed to create shared arsenal piece '{name}': {str(e)}")
     
     instructions_text = ""
     if os.path.exists(instructions_path):
@@ -346,13 +407,22 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
             for piece in shared_arsenal_pieces
             if isinstance(piece, dict) and piece.get('name')
         ]
+        if raw_allowed_arsenal_ids:
+            print(f"  Auto-including {len(raw_allowed_arsenal_ids)} shared arsenal piece(s) for this puzzle")
 
-    allowed_arsenal_component_ids = resolve_shared_arsenal_ids(
-        raw_allowed_arsenal_ids,
-        shared_piece_ids_by_name,
-        conn,
-        creator_id,
-    )
+    allowed_arsenal_component_ids = []
+    if raw_allowed_arsenal_ids:
+        try:
+            allowed_arsenal_component_ids = resolve_shared_arsenal_ids(
+                raw_allowed_arsenal_ids,
+                shared_piece_ids_by_name,
+                conn,
+                creator_id,
+            )
+            print(f"  ✓ Resolved {len(allowed_arsenal_component_ids)} allowed arsenal component(s)")
+        except ValueError as e:
+            print(f"  ✗ ERROR resolving arsenal components: {str(e)}")
+            raise
 
     # Check if puzzle already exists by name — preserve its ID for solve_attempts
     existing = c.execute("SELECT id FROM puzzles WHERE name = ?", (puzzle_data['name'],)).fetchone()
@@ -610,7 +680,42 @@ def insert_riddle(conn, config_path, instructions_path, creator_id, status='publ
         )
         
     conn.commit()
-    print(f"Inserted: {puzzle_data['name']}")
+    
+    # Validation: Verify all shared arsenal pieces were created successfully
+    if shared_arsenal_pieces:
+        print(f"  Validating {len(shared_arsenal_pieces)} shared arsenal piece(s)...")
+        for shared_piece in shared_arsenal_pieces:
+            name = (shared_piece.get('name') or '').strip()
+            if not name:
+                continue
+            
+            # Verify piece exists in database
+            row = c.execute(
+                "SELECT id FROM circuits WHERE user_id=? AND name=? AND is_arsenal=1 LIMIT 1",
+                (int(creator_id), name)
+            ).fetchone()
+            
+            if not row:
+                raise RuntimeError(f"Shared arsenal piece '{name}' was not found in database after insertion. This indicates a database persistence issue.")
+            
+            print(f"  ✓ Verified: '{name}' (ID {row[0]})")
+    
+    # Validation: Verify all allowed arsenal components exist
+    if allowed_arsenal_component_ids:
+        print(f"  Validating {len(allowed_arsenal_component_ids)} allowed arsenal component ID(s)...")
+        for component_id in allowed_arsenal_component_ids:
+            row = c.execute(
+                "SELECT name FROM circuits WHERE id=? AND is_arsenal=1 LIMIT 1",
+                (int(component_id),)
+            ).fetchone()
+            
+            if not row:
+                raise RuntimeError(f"Allowed arsenal component ID {component_id} not found in database. This indicates a configuration error.")
+            
+            print(f"  ✓ Verified: Component ID {component_id} ('{row[0]}')")
+    
+    print(f"✓ Puzzle loaded: {puzzle_data['name']}")
+
 
 
 def insert_puzzle_to_db(conn, config_data: dict, instructions_text: str, creator_id=999, status='published') -> int:
