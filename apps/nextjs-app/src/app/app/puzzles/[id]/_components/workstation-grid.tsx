@@ -204,6 +204,7 @@ export const WorkstationGrid = ({
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
+  emptyHoleClassName,
 }: {
   puzzleId: string;
   inputs: string[];
@@ -237,6 +238,7 @@ export const WorkstationGrid = ({
   isEditMode?: boolean;
   viewportClassName?: string;
   disableZoomPersistence?: boolean;
+  emptyHoleClassName?: string;
 }) => {
   const gridRows = Math.max(1, boardRows ?? DEFAULT_GRID_ROWS);
   const gridCols = Math.max(1, boardCols ?? DEFAULT_GRID_COLS);
@@ -2334,7 +2336,7 @@ export const WorkstationGrid = ({
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-muted-foreground/50'
-                              : 'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50',
+                              : (emptyHoleClassName ?? 'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50'),
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();

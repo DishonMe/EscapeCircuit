@@ -8,6 +8,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useNavigationLoading } from '@/components/ui/navigation-loading/navigation-loading';
 import { useNotifications } from '@/components/ui/notifications';
 import { CircuitBackground } from '@/components/ui/circuit-background/CircuitBackground';
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { paths } from '@/config/paths';
 import { useGoogleLogin, useRegister } from '@/lib/auth';
 
@@ -186,7 +187,7 @@ export default function RegisterPage() {
       />
 
       <div
-        className="relative mx-4 w-full max-w-[380px] rounded-2xl px-8 py-10"
+        className="relative mx-4 my-6 w-full max-w-5xl rounded-2xl px-6 py-8 md:px-10 md:py-10"
         style={{
           background: 'rgba(255,255,255,0.03)',
           border: '0.5px solid rgba(56,189,248,0.2)',
@@ -264,7 +265,11 @@ export default function RegisterPage() {
           Join and start solving circuits
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            {/* Left column: credentials */}
+            <div className="flex h-full flex-col">
+              <div className="flex flex-1 flex-col justify-center space-y-4">
           <div>
             <label
               className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
@@ -357,6 +362,37 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {error && (
+            <p
+              className="rounded-lg border px-3 py-2 text-[12px]"
+              style={{
+                borderColor: 'rgba(248,113,113,0.35)',
+                background: 'rgba(127,29,29,0.2)',
+                color: 'rgb(254 202 202)',
+              }}
+            >
+              {error}
+            </p>
+          )}
+              </div>
+            </div>
+
+            {/* Right column: identity picker */}
+            <div className="flex flex-col space-y-4">
+          <div className="flex justify-center pt-1">
+            {selectedAvatar ? (
+              <AvatarDisplay
+                avatarName={selectedAvatar}
+                avatarColor={useCustomColor ? customColor : selectedColor}
+                size="xl"
+              />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-sky-400/30 bg-white/5 text-[11px] text-slate-400">
+                Choose avatar
+              </div>
+            )}
+          </div>
+
           <div>
             <label
               className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
@@ -432,6 +468,7 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => {
                       setSelectedColor(color);
+                      setCustomColor(color);
                       setUseCustomColor(false);
                     }}
                     className="w-8 h-8 rounded-lg border-2 transition-all"
@@ -483,99 +520,90 @@ export default function RegisterPage() {
               </div>
             </div>
           </div>
+            </div>
+          </div>
 
-          {error && (
-            <p
-              className="rounded-lg border px-3 py-2 text-[12px]"
+          <div className="mx-auto mt-8 w-full max-w-sm space-y-3">
+            <button
+              type="submit"
+              disabled={register.isPending}
+              className="w-full rounded-lg border py-2.5 text-sm font-semibold tracking-[0.04em] text-sky-300 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               style={{
-                borderColor: 'rgba(248,113,113,0.35)',
-                background: 'rgba(127,29,29,0.2)',
-                color: 'rgb(254 202 202)',
+                background: 'rgba(56,189,248,0.12)',
+                borderColor: 'rgba(56,189,248,0.35)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(56,189,248,0.2)';
+                e.currentTarget.style.borderColor = 'rgba(56,189,248,0.6)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
+                e.currentTarget.style.borderColor = 'rgba(56,189,248,0.35)';
               }}
             >
-              {error}
-            </p>
-          )}
+              {register.isPending ? 'Registering...' : 'Register →'}
+            </button>
 
-          <button
-            type="submit"
-            disabled={register.isPending}
-            className="mt-2 w-full rounded-lg border py-2.5 text-sm font-semibold tracking-[0.04em] text-sky-300 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            style={{
-              background: 'rgba(56,189,248,0.12)',
-              borderColor: 'rgba(56,189,248,0.35)',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(56,189,248,0.2)';
-              e.currentTarget.style.borderColor = 'rgba(56,189,248,0.6)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-              e.currentTarget.style.borderColor = 'rgba(56,189,248,0.35)';
-            }}
-          >
-            {register.isPending ? 'Registering...' : 'Register →'}
-          </button>
-        </form>
+            {isGoogleLoginEnabled && (
+              <>
+                <div className="my-1 flex items-center gap-3">
+                  <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
+                  <span
+                    className="text-[11px] tracking-wider"
+                    style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(148,163,184,0.4)' }}
+                  >
+                    or
+                  </span>
+                  <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
+                </div>
 
-        {isGoogleLoginEnabled && (
-          <>
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
-              <span
-                className="text-[11px] tracking-wider"
-                style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(148,163,184,0.4)' }}
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={credentialResponse => {
+                      const credential = credentialResponse.credential;
+                      if (credential) {
+                        setError('');
+                        googleLogin.mutate(credential);
+                      }
+                    }}
+                    onError={() => {
+                      const message = 'Google sign-up failed. Please try again.';
+                      setError(message);
+                      addNotification({
+                        type: 'error',
+                        title: 'Google Sign-Up Failed',
+                        message,
+                      });
+                    }}
+                    theme="filled_black"
+                    shape="rectangular"
+                    text="signup_with"
+                    size="large"
+                    width="240"
+                    locale="en"
+                  />
+                </div>
+              </>
+            )}
+
+            <p className="text-center text-[13px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
+              Already have an account?{' '}
+              <Link
+                href={paths.auth.login.getHref()}
+                className="transition-colors"
+                style={{ color: 'rgba(56,189,248,0.8)' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = 'rgba(56,189,248,1)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'rgba(56,189,248,0.8)';
+                }}
               >
-                or
-              </span>
-              <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
-            </div>
-
-            <div className="flex justify-center">
-              <GoogleLogin
-                onSuccess={credentialResponse => {
-                  const credential = credentialResponse.credential;
-                  if (credential) {
-                    setError('');
-                    googleLogin.mutate(credential);
-                  }
-                }}
-                onError={() => {
-                  const message = 'Google sign-up failed. Please try again.';
-                  setError(message);
-                  addNotification({
-                    type: 'error',
-                    title: 'Google Sign-Up Failed',
-                    message,
-                  });
-                }}
-                theme="filled_black"
-                shape="rectangular"
-                text="signup_with"
-                size="large"
-                width="240"
-                locale="en"
-              />
-            </div>
-          </>
-        )}
-
-        <p className="mt-6 text-center text-[13px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
-          Already have an account?{' '}
-          <Link
-            href={paths.auth.login.getHref()}
-            className="transition-colors"
-            style={{ color: 'rgba(56,189,248,0.8)' }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'rgba(56,189,248,1)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(56,189,248,0.8)';
-            }}
-          >
-            Log in
-          </Link>
-        </p>
+                Log in
+              </Link>
+            </p>
+          </div>
+        </form>
       </div>
 
       <style>{`

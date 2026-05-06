@@ -675,6 +675,7 @@ export default function CreatePuzzleForm() {
       return {
         id: piece.id,
         name: piece.name,
+        description: piece.description,
         cost: piece.cost,
         // Prefer persisted metadata from backend; fallback to derived values.
         num_inputs: Number(pieceMeta.num_inputs ?? num_inputs),
@@ -1760,6 +1761,7 @@ export default function CreatePuzzleForm() {
       const configData: {
         puzzle: Record<string, unknown>;
         test_cases: unknown[];
+        shared_arsenal_pieces?: Array<Record<string, unknown>>;
         custom_pieces?: Array<{
           name: string;
           cost: number;
@@ -1788,9 +1790,11 @@ export default function CreatePuzzleForm() {
               : undefined,
           allow_arsenal: data.basic.allowArsenal,
           allowed_arsenal_component_ids:
-            data.basic.allowedArsenalComponentIds.length > 0
-              ? data.basic.allowedArsenalComponentIds
-              : undefined,
+            selectedArsenalPieces.length > 0
+              ? selectedArsenalPieces.map((piece) => piece.name)
+              : data.basic.allowedArsenalComponentIds.length > 0
+                ? data.basic.allowedArsenalComponentIds
+                : undefined,
           arsenal_component_display_modes:
             Object.keys(data.basic.arsenalComponentDisplayModes).length > 0
               ? data.basic.arsenalComponentDisplayModes
@@ -1823,6 +1827,41 @@ export default function CreatePuzzleForm() {
                 }
               : undefined,
         },
+        shared_arsenal_pieces:
+          selectedArsenalPieces.length > 0
+            ? selectedArsenalPieces.map((piece) => {
+                let structure: Record<string, unknown> = {};
+                let basicGates: string[] = [];
+
+                try {
+                  structure = piece.structure_json
+                    ? JSON.parse(piece.structure_json)
+                    : {};
+                } catch {
+                  structure = {};
+                }
+
+                try {
+                  basicGates = piece.basic_gates
+                    ? JSON.parse(piece.basic_gates)
+                    : [];
+                } catch {
+                  basicGates = [];
+                }
+
+                return {
+                  name: piece.name,
+                  description: piece.description || 'Shared arsenal piece',
+                  cost: Number(piece.cost ?? 0),
+                  num_inputs: Number(piece.num_inputs ?? 1),
+                  num_outputs: Number(piece.num_outputs ?? 1),
+                  structure,
+                  basic_gates: basicGates,
+                  truth_table: piece.truth_table || {},
+                  visual_style: piece.visual_style || undefined,
+                };
+              })
+            : undefined,
         test_cases: convertedTestCases,
       };
 
