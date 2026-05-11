@@ -426,3 +426,25 @@ class TestCluesRepoDelete:
         # Attempt 2 should still work
         result = repo.record_next_clue(2, 1, 1, 10, 3)
         assert result["clue_index"] == 0
+
+    def test_record_next_clue_exhausted_after_retry(self, repo):
+        """Test that after exhausted clues, no more can be added"""
+        repo.record_next_clue(1, 1, 1, 10, 1)
+        
+        # Try to exceed total clues
+        with pytest.raises(CluesExhausted):
+            repo.record_next_clue(1, 1, 1, 20, 1)
+        
+        # Verify count is still 1
+        assert repo.count_for_attempt(1) == 1
+
+    def test_record_next_clue_with_none_request_id(self, repo):
+        """Test record_next_clue with explicitly None request_id"""
+        result = repo.record_next_clue(1, 1, 1, 10, 3, request_id=None)
+        assert result["clue_index"] == 0
+        assert result["replayed"] is False
+        
+        # Next call should increment index
+        result2 = repo.record_next_clue(1, 1, 1, 20, 3, request_id=None)
+        assert result2["clue_index"] == 1
+
