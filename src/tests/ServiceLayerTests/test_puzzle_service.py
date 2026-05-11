@@ -1945,6 +1945,421 @@ class TestPuzzleServiceMainMethods:
         assert result == []
 
 
+class TestPuzzleServiceNormalizeCreatorSolution:
+    """Tests for _normalize_creator_solution_payload (solution format normalization)."""
+
+    def setup_method(self):
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_puzzle_repo.conn = Mock()
+        self.mock_user_repo = Mock(spec=UserRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.service = PuzzleService(self.mock_puzzle_repo, self.mock_user_repo, self.mock_auth)
+
+    def test_normalize_none_input(self):
+        """Normalize returns None for None input."""
+        result = self.service._normalize_creator_solution_payload(None)
+        assert result is None
+
+    def test_normalize_non_dict_input(self):
+        """Normalize returns None for non-dict input."""
+        result = self.service._normalize_creator_solution_payload("not a dict")
+        assert result is None
+
+    def test_normalize_empty_dict(self):
+        """Normalize returns None when dict has no circuit data."""
+        result = self.service._normalize_creator_solution_payload({})
+        assert result is None
+
+    def test_normalize_basic_placed_and_wires(self):
+        """Normalize handles basic placed components and wires."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "origin": {"row": 5, "col": 10}, "rotation": 0}
+            ],
+            "wires": [
+                {
+                    "id": "wire1",
+                    "from": {"componentId": "INPUT1", "pinIndex": 0},
+                    "to": {"componentId": "AND", "pinIndex": 0}
+                }
+            ],
+            "totalCost": 10
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["totalCost"] == 10
+        assert len(result["circuit"]["placed"]) == 1
+        assert result["circuit"]["placed"][0]["componentId"] == "AND"
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 5
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 10
+        assert len(result["circuit"]["wires"]) == 1
+
+    def test_normalize_legacy_placedComponents_format(self):
+        """Normalize handles legacy placedComponents format."""
+        payload = {
+            "placedComponents": [
+                {"componentId": "OR", "id": "comp1", "origin": {"row": 0, "col": 0}}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+        assert result["circuit"]["placed"][0]["componentId"] == "OR"
+
+    def test_normalize_legacy_placed_components_snake_case(self):
+        """Normalize handles snake_case placed_components."""
+        payload = {
+            "placed_components": [
+                {"componentId": "XOR", "id": "comp1"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+
+    def test_normalize_components_format(self):
+        """Normalize handles components array format."""
+        payload = {
+            "components": [
+                {"componentId": "NOT", "id": "comp1"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+
+    def test_normalize_placed_as_dict_with_values(self):
+        """Normalize handles placed as dict (extracts values)."""
+        payload = {
+            "placed": {
+                "comp1": {"componentId": "AND", "id": "comp1"},
+                "comp2": {"componentId": "OR", "id": "comp2"}
+            },
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 2
+
+    def test_normalize_wires_as_dict(self):
+        """Normalize handles wires as dict (extracts values)."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": {
+                "wire1": {
+                    "from": {"componentId": "INPUT1", "pinIndex": 0},
+                    "to": {"componentId": "AND", "pinIndex": 0}
+                }
+            }
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["wires"]) == 1
+
+    def test_normalize_legacy_wire_list_format(self):
+        """Normalize handles legacy wire_list format."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wire_list": [
+                {
+                    "from": {"componentId": "INPUT1", "pinIndex": 0},
+                    "to": {"componentId": "AND", "pinIndex": 0}
+                }
+            ]
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["wires"]) == 1
+
+    def test_normalize_nested_circuit_wrapper(self):
+        """Normalize extracts circuit from circuit wrapper."""
+        payload = {
+            "circuit": {
+                "placed": [{"componentId": "AND", "id": "comp1"}],
+                "wires": []
+            }
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+
+    def test_normalize_solution_wrapper(self):
+        """Normalize extracts circuit from solution wrapper."""
+        payload = {
+            "solution": {
+                "placed": [{"componentId": "AND", "id": "comp1"}],
+                "wires": []
+            }
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+
+    def test_normalize_structure_wrapper(self):
+        """Normalize extracts circuit from structure wrapper."""
+        payload = {
+            "structure": {
+                "placed": [{"componentId": "AND", "id": "comp1"}],
+                "wires": []
+            }
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+
+    def test_normalize_component_without_explicit_position(self):
+        """Normalize spreads components without explicit positions."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1"},
+                {"componentId": "OR", "id": "comp2"},
+                {"componentId": "NOT", "id": "comp3"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 3
+        # Verify auto-positioned (should be spread across rows/cols)
+        # Formula: row = (i % 6) * 2, col = (i // 6) * 4 + 2
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 0  # (0 % 6) * 2
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 2  # (0 // 6) * 4 + 2
+        assert result["circuit"]["placed"][1]["origin"]["row"] == 2  # (1 % 6) * 2
+        assert result["circuit"]["placed"][1]["origin"]["col"] == 2  # (1 // 6) * 4 + 2
+        assert result["circuit"]["placed"][2]["origin"]["row"] == 4  # (2 % 6) * 2
+        assert result["circuit"]["placed"][2]["origin"]["col"] == 2  # (2 // 6) * 4 + 2
+
+    def test_normalize_component_with_position_object(self):
+        """Normalize extracts position from position object."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "position": {"row": 10, "col": 20}}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 10
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 20
+
+    def test_normalize_component_position_xy_coordinates(self):
+        """Normalize handles x,y coordinates (converts to row,col)."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "origin": {"x": 5, "y": 15}}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 5
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 15
+
+    def test_normalize_component_rotation_90_degrees(self):
+        """Normalize preserves 90-degree rotations."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "rotation": 90}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["rotation"] == 90
+
+    def test_normalize_component_rotation_other_values(self):
+        """Normalize normalizes non-90 rotations to 0."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "rotation": 45}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["rotation"] == 0
+
+    def test_normalize_component_without_componentid(self):
+        """Normalize skips components without componentId."""
+        payload = {
+            "placed": [
+                {"id": "comp1"},  # No componentId
+                {"componentId": "AND", "id": "comp2"}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["placed"]) == 1
+        assert result["circuit"]["placed"][0]["componentId"] == "AND"
+
+    def test_normalize_wire_with_source_target(self):
+        """Normalize handles source/target instead of from/to."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": [
+                {
+                    "id": "wire1",
+                    "source": {"componentId": "INPUT1", "pinIndex": 0},
+                    "target": {"componentId": "AND", "pinIndex": 0}
+                }
+            ]
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["wires"]) == 1
+        assert result["circuit"]["wires"][0]["from"]["componentId"] == "INPUT1"
+        assert result["circuit"]["wires"][0]["to"]["componentId"] == "AND"
+
+    def test_normalize_wire_with_legacy_field_names(self):
+        """Normalize handles legacy fromComponentId/toComponentId."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": [
+                {
+                    "id": "wire1",
+                    "fromComponentId": "INPUT1",
+                    "toComponentId": "AND",
+                    "fromPinIndex": 0,
+                    "toPinIndex": 1
+                }
+            ]
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["wires"]) == 1
+        assert result["circuit"]["wires"][0]["from"]["componentId"] == "INPUT1"
+        assert result["circuit"]["wires"][0]["to"]["componentId"] == "AND"
+        assert result["circuit"]["wires"][0]["from"]["pinIndex"] == 0
+        assert result["circuit"]["wires"][0]["to"]["pinIndex"] == 1
+
+    def test_normalize_total_cost_from_payload(self):
+        """Normalize extracts totalCost from payload root."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": [],
+            "totalCost": 42
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["totalCost"] == 42
+
+    def test_normalize_total_cost_snake_case(self):
+        """Normalize extracts total_cost from snake_case."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": [],
+            "total_cost": 25
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["totalCost"] == 25
+
+    def test_normalize_eval_map_preserved(self):
+        """Normalize preserves eval_map field."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "wires": [],
+            "eval_map": {"INPUT1": 1, "OUTPUT": 0}
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert "eval_map" in result
+        assert result["eval_map"] == {"INPUT1": 1, "OUTPUT": 0}
+
+    def test_normalize_invalid_position_values(self):
+        """Normalize handles invalid position values gracefully."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "origin": {"row": "invalid", "col": "bad"}}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 0
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 0
+
+    def test_normalize_negative_position_values_clamped(self):
+        """Normalize clamps negative position values to 0."""
+        payload = {
+            "placed": [
+                {"componentId": "AND", "id": "comp1", "origin": {"row": -5, "col": -10}}
+            ],
+            "wires": []
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert result["circuit"]["placed"][0]["origin"]["row"] == 0
+        assert result["circuit"]["placed"][0]["origin"]["col"] == 0
+
+    def test_normalize_connections_format(self):
+        """Normalize handles connections format for wires."""
+        payload = {
+            "placed": [{"componentId": "AND", "id": "comp1"}],
+            "connections": [
+                {
+                    "from": {"componentId": "INPUT1", "pinIndex": 0},
+                    "to": {"componentId": "AND", "pinIndex": 0}
+                }
+            ]
+        }
+        
+        result = self.service._normalize_creator_solution_payload(payload)
+        
+        assert result is not None
+        assert len(result["circuit"]["wires"]) == 1
+
+
 class TestPuzzleServiceEdgeCases:
     """Test edge cases and error conditions."""
     
