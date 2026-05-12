@@ -330,3 +330,44 @@ class TestBanEnforcementReply:
 
         with pytest.raises(ValidationError, match="banned"):
             svc.create_reply("token", 1, {"body": "I am banned"})
+
+
+class TestReplyServiceCreateReplyEdgeCases:
+    """Additional edge case tests for create_reply"""
+    
+    def test_create_reply_parent_not_found(self):
+        """Test when parent_reply_id doesn't exist"""
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user(user_id=1)
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1)
+        svc.reply_repo.get_by_id.return_value = None  # Parent not found
+        
+        with pytest.raises(ValidationError, match="invalid parent"):
+            svc.create_reply("token", 1, {
+                "body": "Reply to non-existent",
+                "parent_reply_id": 999
+            })
+    
+    def test_create_reply_parent_wrong_discussion(self):
+        """Test when parent_reply_id belongs to different discussion"""
+        from Backend.DomainLayer.Reply import Reply
+        svc = make_service()
+        svc.auth.require_user_id.return_value = 1
+        svc.user_repo.get_by_id.return_value = make_user(user_id=1)
+        svc.discussion_repo.get_by_id.return_value = make_discussion(discussion_id=1)
+        
+        # Parent reply exists but belongs to discussion_id 2, not 1
+        parent_reply = Reply(
+            id=100,
+            discussion_id=2,  # Different discussion
+            author_id=1,
+            body="Original"
+        )
+        svc.reply_repo.get_by_id.return_value = parent_reply
+        
+        with pytest.raises(ValidationError, match="invalid parent"):
+            svc.create_reply("token", 1, {
+                "body": "Reply to wrong discussion",
+                "parent_reply_id": 100
+            })

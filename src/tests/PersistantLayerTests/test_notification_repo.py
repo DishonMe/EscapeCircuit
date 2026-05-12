@@ -135,6 +135,32 @@ class TestGetUnread:
         assert len(repo.get_unread(user_id=1)) == 1
         assert len(repo.get_unread(user_id=2)) == 1
 
+    def test_filter_by_date_from(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="msg1")
+        all_notifs = repo.get_unread(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        filtered = repo.get_unread(user_id=1, date_from=created_at)
+        assert len(filtered) == 1
+        assert filtered[0]["message"] == "msg1"
+
+    def test_filter_by_date_to(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="msg1")
+        all_notifs = repo.get_unread(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        filtered = repo.get_unread(user_id=1, date_to=created_at)
+        assert len(filtered) == 1
+        assert filtered[0]["message"] == "msg1"
+
+    def test_filter_by_date_range(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="msg1")
+        all_notifs = repo.get_unread(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        filtered = repo.get_unread(user_id=1, date_from=created_at, date_to=created_at)
+        assert len(filtered) == 1
+
 
 class TestGetAll:
     def test_includes_read_and_unread(self, repo):
@@ -172,6 +198,31 @@ class TestGetAll:
         assert results[0]["xp_amount"] == 10
         assert results[1]["xp_amount"] == 100
 
+    def test_filter_by_date_from(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="msg1")
+        all_notifs = repo.get_all(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        filtered = repo.get_all(user_id=1, date_from=created_at)
+        assert len(filtered) == 1
+        assert filtered[0]["message"] == "msg1"
+
+    def test_filter_by_date_to(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="msg1")
+        all_notifs = repo.get_all(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        filtered = repo.get_all(user_id=1, date_to=created_at)
+        assert len(filtered) == 1
+
+    def test_filter_by_actor_username(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="m1", actor_username="alice")
+        repo.create(user_id=1, notif_type="solve", message="m2", actor_username="bob")
+
+        filtered = repo.get_all(user_id=1, actor_username="alice")
+        assert len(filtered) == 1
+        assert filtered[0]["actor_username"] == "alice"
+
 
 class TestCountNotifications:
     def test_count_all(self, repo):
@@ -207,6 +258,30 @@ class TestCountNotifications:
 
     def test_count_empty(self, repo):
         assert repo.count_notifications(user_id=999) == 0
+
+    def test_count_by_date_from(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="m1")
+        all_notifs = repo.get_all(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        count = repo.count_notifications(user_id=1, date_from=created_at)
+        assert count == 1
+
+    def test_count_by_date_to(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="m1")
+        all_notifs = repo.get_all(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        count = repo.count_notifications(user_id=1, date_to=created_at)
+        assert count == 1
+
+    def test_count_by_date_range(self, repo):
+        repo.create(user_id=1, notif_type="solve", message="m1")
+        all_notifs = repo.get_all(user_id=1)
+        created_at = all_notifs[0]["created_at"]
+        
+        count = repo.count_notifications(user_id=1, date_from=created_at, date_to=created_at)
+        assert count == 1
 
 
 class TestMarkAllRead:
