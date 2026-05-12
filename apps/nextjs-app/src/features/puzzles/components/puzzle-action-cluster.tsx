@@ -17,6 +17,8 @@ import {
 import type { Puzzle } from '@/types/api';
 import { cn } from '@/utils/cn';
 
+import { useInstructionsGlow } from '../hooks/use-instructions-glow';
+
 interface PuzzleActionClusterProps {
   puzzle: Puzzle;
   onInstructions: () => void;
@@ -59,16 +61,27 @@ export const PuzzleActionCluster = ({
     hasRated,
     puzzle.rating_min_attempt_seconds,
   );
+  const { shouldGlow, markClicked } = useInstructionsGlow();
+
+  const handleInstructionsClick = () => {
+    markClicked();
+    onInstructions();
+  };
 
   if (variant === 'card') {
     return (
       <div className="relative z-10 flex items-center gap-1">
         <button
           type="button"
-          // eslint-disable-next-line tailwindcss/no-custom-classname
-          className={cn(iconButtonClass, 'puzzle-instructions-button')}
+          className={cn(
+            iconButtonClass,
+            // eslint-disable-next-line tailwindcss/no-custom-classname
+            'puzzle-instructions-button',
+            // eslint-disable-next-line tailwindcss/no-custom-classname
+            shouldGlow && 'puzzle-instructions-glow',
+          )}
           aria-label="Instructions"
-          onClick={onInstructions}
+          onClick={handleInstructionsClick}
         >
           <BookOpen className="size-4" aria-hidden />
         </button>
@@ -135,7 +148,7 @@ export const PuzzleActionCluster = ({
           <DropdownMenuItem
             // eslint-disable-next-line tailwindcss/no-custom-classname
             className="puzzle-instructions-button flex cursor-pointer items-center gap-2"
-            onSelect={onInstructions}
+            onSelect={handleInstructionsClick}
           >
             <BookOpen className="size-4" aria-hidden />
             Instructions

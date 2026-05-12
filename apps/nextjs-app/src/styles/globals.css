@@ -542,6 +542,49 @@
     background-color: hsl(var(--difficulty-hard-bg));
     border-color: hsl(var(--difficulty-hard-border));
   }
+
+  .puzzle-instructions-glow {
+    position: relative;
+    isolation: isolate;
+    color: hsl(var(--primary)) !important;
+    animation: puzzle-instructions-glow-ring 2.4s ease-in-out infinite;
+  }
+
+  .puzzle-instructions-glow::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 14px;
+    background: radial-gradient(closest-side, hsl(var(--primary) / 0.65), hsl(var(--primary) / 0.28) 55%, transparent 80%);
+    filter: blur(6px);
+    z-index: -1;
+    pointer-events: none;
+    animation: puzzle-instructions-glow-aura 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes puzzle-instructions-glow-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 0 8px 1px hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.6), 0 0 16px 3px hsl(var(--primary) / 0.65);
+  }
+}
+
+@keyframes puzzle-instructions-glow-aura {
+  0%, 100% { opacity: 0.55; transform: scale(0.9); }
+  50%      { opacity: 1;    transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-instructions-glow,
+  .puzzle-instructions-glow::before {
+    animation: none;
+  }
+  .puzzle-instructions-glow::before {
+    opacity: 0.85;
+  }
 }
 
 body {
