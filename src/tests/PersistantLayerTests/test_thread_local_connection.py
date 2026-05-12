@@ -623,18 +623,21 @@ class TestAsyncIsolation:
         setup.commit()
         setup.close()
 
-        conn_ids = []
+        # Hold the connections alive simultaneously so the GC can't free the
+        # first before the second is allocated — otherwise CPython readily
+        # reuses the freed address and `id()` collides even for distinct
+        # connections.
+        raw_conns = []
 
         def request_handler():
-            raw = proxy.get_raw_connection()
-            conn_ids.append(id(raw))
+            raw_conns.append(proxy.get_raw_connection())
 
         # Each copy_context().run() starts with _ctx_conn=None (default)
         contextvars.copy_context().run(request_handler)
         contextvars.copy_context().run(request_handler)
 
-        assert len(conn_ids) == 2
-        assert conn_ids[0] != conn_ids[1], (
+        assert len(raw_conns) == 2
+        assert raw_conns[0] is not raw_conns[1], (
             "Fresh contextvars contexts must get different connections"
         )
 
