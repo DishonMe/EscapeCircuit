@@ -580,7 +580,6 @@ export default function RegisterPage() {
                     text="signup_with"
                     size="large"
                     width="240"
-                    locale="en"
                   />
                 </div>
               </>
