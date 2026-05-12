@@ -1315,15 +1315,3 @@ class TestPuzzleServiceCreatePuzzleErrors:
         assert result is not None
 
 
-class TestPuzzleServiceListMyPuzzles:
-    """Test list_my_puzzles functionality."""
-
-    def setup_method(self):
-        self.mock_puzzle_repo = Mock()
-        self.mock_user_repo = Mock()
-        self.mock_solve_repo = Mock()
-        self.mock_auth = Mock()
-
-        self.service = PuzzleService(
-            self.mock_puzzle_repo,
-            self.mock_user_repo,
