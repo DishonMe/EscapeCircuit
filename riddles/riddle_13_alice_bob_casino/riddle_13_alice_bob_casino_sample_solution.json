@@ -1,0 +1,82 @@
+{
+  "totalCost": 2,
+  "eval_map": {},
+  "inputs": ["B", "C"],
+  "outputs": ["A"],
+  "circuit": {
+    "placed": [
+      {
+        "id": "AND:prev_match",
+        "componentId": "AND",
+        "origin": {
+          "row": 6,
+          "col": 12
+        },
+        "rotation": 0
+      },
+      {
+        "id": "DFF:alice_state",
+        "componentId": "DFF",
+        "origin": {
+          "row": 6,
+          "col": 20
+        },
+        "rotation": 0
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire:1",
+        "from": {
+          "componentId": "IO:IN:B",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:prev_match",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:2",
+        "from": {
+          "componentId": "IO:IN:C",
+          "pinIndex": 0,
+          "portId": "P0"
+        },
+        "to": {
+          "componentId": "AND:prev_match",
+          "pinIndex": 1,
+          "portId": "IN1"
+        }
+      },
+      {
+        "id": "wire:3",
+        "from": {
+          "componentId": "AND:prev_match",
+          "pinIndex": 2,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "DFF:alice_state",
+          "pinIndex": 0,
+          "portId": "IN0"
+        }
+      },
+      {
+        "id": "wire:4",
+        "from": {
+          "componentId": "DFF:alice_state",
+          "pinIndex": 1,
+          "portId": "OUT0"
+        },
+        "to": {
+          "componentId": "IO:OUT:A",
+          "pinIndex": 0,
+          "portId": "P0"
+        }
+      }
+    ]
+  }
+}
