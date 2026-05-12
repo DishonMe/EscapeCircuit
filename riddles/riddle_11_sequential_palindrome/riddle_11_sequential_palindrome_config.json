@@ -5,7 +5,7 @@
     "budget": 30,
     "creator_budget": 10,
     "time_limit_seconds": 400,
-    "difficulty": "EASY",
+    "difficulty": "MEDIUM",
     "default_gate_set": [
       "AND",
       "OR",
