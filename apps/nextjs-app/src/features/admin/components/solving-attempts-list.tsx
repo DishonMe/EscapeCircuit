@@ -159,7 +159,7 @@ export const SolvingAttemptsList = () => {
       />
 
       <Dialog open={!!selectedAttempt} onOpenChange={(open) => !open && setSelectedAttempt(null)}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Submitted Board</DialogTitle>
             <DialogDescription>

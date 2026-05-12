@@ -488,6 +488,61 @@ class ArsenalService:
         except Exception as e:
             return []
 
+    def get_all_arsenal_filtered_by_gates(self, allowed_gates: Set[str]) -> List[dict]:
+        """Get all arsenal pieces from all users, filtered by allowed gates.
+        
+        Used by admins to view submitted solutions that may have used any user's arsenal.
+        Returns only pieces whose basic gates are all in the allowed set.
+        
+        Args:
+            allowed_gates: Set of allowed gate types
+            
+        Returns:
+            List of CircuitComponent dicts that use only allowed gates
+        """
+        try:
+            # Get all arsenal pieces from all users
+            all_arsenal = self.repo.conn.execute("""
+                SELECT * FROM circuits WHERE is_arsenal=1 ORDER BY id DESC
+            """).fetchall()
+            
+            available = []
+            seen_ids = set()  # Deduplicate by component ID
+            
+            for row in all_arsenal:
+                try:
+                    # Parse the basic gates for this piece
+                    gates = json.loads(row["basic_gates"]) if row["basic_gates"] else []
+                    gates_set = set(gates)
+                    
+                    # Include this piece only if ALL its gates are allowed and not yet seen
+                    if gates_set.issubset(allowed_gates) and row["id"] not in seen_ids:
+                        # Create a Circuit object and convert to circuit component format
+                        circuit = Circuit(
+                            id=int(row["id"]),
+                            user_id=int(row["user_id"]),
+                            name=row["name"],
+                            cost=int(row["cost"]),
+                            structure_json=row["structure_json"],
+                            is_arsenal=bool(row["is_arsenal"]),
+                            basic_gates=row["basic_gates"] or "",
+                            truth_table=row["truth_table"] or "",
+                            num_inputs=int(row["num_inputs"] or 0),
+                            num_outputs=int(row["num_outputs"] or 0),
+                            puzzle_id=int(row["puzzle_id"]) if row["puzzle_id"] else None,
+                            description=row["description"] or "",
+                        )
+                        available.append(circuit.to_circuit_component())
+                        seen_ids.add(row["id"])
+                except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+                    # Skip pieces with invalid data
+                    continue
+            
+            return available
+        except Exception as e:
+            # If the query fails, return empty list rather than crash
+            return []
+
     def _resolve_max_slots_for_level(self, user_level: int) -> int:
         for max_level_inclusive, slot_count in ARSENAL_XP_LEVEL_TIERS:
             if user_level <= int(max_level_inclusive):
