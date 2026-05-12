@@ -20,7 +20,7 @@ const SOUND_MAP: Record<AudioSoundType, string[]> = {
   drop: ['/sounds/drop.mp3', '/sounds/drop-thud.mp3'],
   wire: ['/sounds/wire.mp3', '/sounds/wire-bloop.mp3'],
   error: ['/sounds/error.mp3', '/sounds/error-buzz.mp3'],
-  success: ['/sounds/success.mp3', '/sounds/success-chime.mp3'],
+  success: ['/sounds/success-chime.mp3'],
 };
 
 const resolvedSources = new Map<AudioSoundType, string | null>();

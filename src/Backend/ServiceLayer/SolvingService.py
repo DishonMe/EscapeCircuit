@@ -552,6 +552,7 @@ class SolvingService:
                                     solver_username=solver_name,
                                     puzzle_name=p.name,
                                     xp_amount=xp_awarded_creator,
+                                    commit=False,
                                 )
                     except Exception:
                         pass  # creator XP is best-effort
