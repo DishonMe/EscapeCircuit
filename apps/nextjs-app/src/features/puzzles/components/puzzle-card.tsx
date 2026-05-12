@@ -133,7 +133,7 @@ export const PuzzleCard = ({
       </p>
 
       {/* Stats row */}
-      <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[12px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[12px] font-semibold text-emerald-400">
         {puzzle.is_solved && puzzle.best_time != null && (
           <>
             <span>Best {formatTime(puzzle.best_time)}</span>
