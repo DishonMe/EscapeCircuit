@@ -14,8 +14,15 @@ class NotificationService:
     # --- Called by other services when creator earns XP ---
 
     def notify_creator_solve(self, creator_user_id: int, solver_username: str,
-                             puzzle_name: str, xp_amount: int) -> None:
-        """Create a notification: someone solved your puzzle."""
+                             puzzle_name: str, xp_amount: int,
+                             commit: bool = True) -> None:
+        """Create a notification: someone solved your puzzle.
+
+        Pass commit=False when calling from inside an active transaction
+        (e.g. SolvingService.validate_solution) — otherwise the inner
+        commit closes the outer BEGIN IMMEDIATE and the surrounding
+        context manager's COMMIT raises "no transaction is active".
+        """
         msg = f"🎉 {solver_username} solved your puzzle \"{puzzle_name}\"! You earned {xp_amount} XP."
         self.repo.create(
             user_id=creator_user_id,
@@ -24,6 +31,7 @@ class NotificationService:
             xp_amount=xp_amount,
             puzzle_name=puzzle_name,
             actor_username=solver_username,
+            commit=commit,
         )
 
     def notify_creator_rating(self, creator_user_id: int, rater_username: str,
