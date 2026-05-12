@@ -66,13 +66,16 @@ def sanitize_puzzle_name(name: str) -> str:
     return sanitized.lower()
 
 
-def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
-    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/."""
+def build_riddle_paths(riddles_dir: pathlib.Path, riddle_base_name: str, instructions_ext: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+    """Build canonical per-riddle file paths under riddles/<riddle_base_name>/. 
+    Returns: (config_path, instructions_path, solution_path, tests_path)
+    """
     riddle_dir = riddles_dir / riddle_base_name
     return (
         riddle_dir / f"{riddle_base_name}_config.json",
         riddle_dir / f"{riddle_base_name}_instructions{instructions_ext}",
         riddle_dir / f"{riddle_base_name}_sample_solution.json",
+        riddle_dir / f"{riddle_base_name}_tests.py",
     )
 
 
@@ -369,6 +372,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
         instructions_file: UploadFile = File(...),
         sample_solution_file: UploadFile = File(...),
         difficulty: str = Form("EASY"),
+        python_tests_file: UploadFile = File(None),
         token: str = Depends(verify_token),
     ):
         # Verify admin or creator
@@ -421,8 +425,9 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                     raise ValidationError("Puzzle must have 'default_gate_set'")
                 
                 test_cases = config_data.get('test_cases', [])
-                if not test_cases:
-                    raise ValidationError("Puzzle must have at least one test case")
+                allow_python_tests_only = python_tests_file is not None
+                if not test_cases and not allow_python_tests_only:
+                    raise ValidationError("Puzzle must have at least one test case or provide a Python tests file")
                 
                 # Load and validate sample solution using logic engine
                 with open(solution_path, 'r', encoding='utf-8') as sf:
@@ -458,7 +463,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 riddle_base_name = f'riddle_{puzzle_id}_{sanitized_name}'
                 
                 instructions_ext = pathlib.Path(instructions_file.filename or "").suffix or ".tex"
-                final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
+                final_config_path, final_instructions_path, final_solution_path, final_tests_path = build_riddle_paths(
                     riddles_dir,
                     riddle_base_name,
                     instructions_ext,
@@ -469,6 +474,11 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
+                
+                # ========== SAVE PYTHON TESTS FILE IF PROVIDED ==========
+                if python_tests_file is not None:
+                    tests_content = await python_tests_file.read()
+                    final_tests_path.write_bytes(tests_content)
                 
                 # ========== INSERT TEST CASES AND COMPLETE PUZZLE SETUP ==========
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), user_id)
@@ -491,6 +501,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
         instructions_file: UploadFile = File(...),
         sample_solution_file: UploadFile = File(...),
         difficulty: str = Form("EASY"),
+        python_tests_file: UploadFile = File(None),
         token: str = Depends(verify_token),
     ):
         # Verify admin and get their user_id
@@ -514,7 +525,8 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 config_data = json.loads(config_content)
                 instructions_content = await instructions_file.read()
                 instructions_text = instructions_content.decode('utf-8')
-                _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+                allow_python_tests_only = python_tests_file is not None
+                _validate_uploaded_puzzle_payload(conn, config_data, instructions_text, allow_python_tests_only=allow_python_tests_only)
 
                 solution_content = await sample_solution_file.read()
                 
@@ -531,7 +543,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
                     config_data = json.load(cf)
-                puzzle_config = _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+                puzzle_config = _validate_uploaded_puzzle_payload(conn, config_data, instructions_text, allow_python_tests_only=allow_python_tests_only)
                 test_cases = config_data.get('test_cases', [])
                 
                 # Load and validate sample solution using logic engine
@@ -568,7 +580,7 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 riddle_base_name = f'riddle_{puzzle_id}_{sanitized_name}'
                 
                 instructions_ext = pathlib.Path(instructions_file.filename or "").suffix or ".tex"
-                final_config_path, final_instructions_path, final_solution_path = build_riddle_paths(
+                final_config_path, final_instructions_path, final_solution_path, final_tests_path = build_riddle_paths(
                     riddles_dir,
                     riddle_base_name,
                     instructions_ext,
@@ -579,6 +591,11 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                 shutil.copy2(config_path, final_config_path)
                 shutil.copy2(instructions_path, final_instructions_path)
                 shutil.copy2(solution_path, final_solution_path)
+                
+                # ========== SAVE PYTHON TESTS FILE IF PROVIDED ==========
+                if python_tests_file is not None:
+                    tests_content = await python_tests_file.read()
+                    final_tests_path.write_bytes(tests_content)
                 
                 # ========== INSERT TEST CASES AND COMPLETE PUZZLE SETUP ==========
                 insert_riddle(conn, str(final_config_path), str(final_instructions_path), admin_id)

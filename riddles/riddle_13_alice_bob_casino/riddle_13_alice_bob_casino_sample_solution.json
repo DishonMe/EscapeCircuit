@@ -1,6 +1,8 @@
 {
-  "totalCost": 16,
-  "placedComponents": [
+  "eval_map": {},
+  "circuit": {
+    "totalCost": 16,
+    "placedComponents": [
     { "id": "DFF:b1", "componentId": "DFF" },
     { "id": "DFF:b2", "componentId": "DFF" },
     { "id": "DFF:b3", "componentId": "DFF" },
@@ -44,5 +46,6 @@
     { "id": "w23", "from": { "componentId": "AND:sel_delay", "pinIndex": 2 }, "to": { "componentId": "OR:final", "pinIndex": 0 } },
     { "id": "w24", "from": { "componentId": "AND:sel_decode", "pinIndex": 2 }, "to": { "componentId": "OR:final", "pinIndex": 1 } },
     { "id": "w25", "from": { "componentId": "OR:final", "pinIndex": 2 }, "to": { "componentId": "IO:OUT:A", "pinIndex": 0 } }
-  ]
+    ]
+  }
 }
