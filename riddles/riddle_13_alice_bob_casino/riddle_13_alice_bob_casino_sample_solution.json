@@ -1,82 +1,48 @@
 {
-  "totalCost": 2,
-  "eval_map": {},
-  "inputs": ["B", "C"],
-  "outputs": ["A"],
-  "circuit": {
-    "placed": [
-      {
-        "id": "AND:prev_match",
-        "componentId": "AND",
-        "origin": {
-          "row": 6,
-          "col": 12
-        },
-        "rotation": 0
-      },
-      {
-        "id": "DFF:alice_state",
-        "componentId": "DFF",
-        "origin": {
-          "row": 6,
-          "col": 20
-        },
-        "rotation": 0
-      }
-    ],
-    "wires": [
-      {
-        "id": "wire:1",
-        "from": {
-          "componentId": "IO:IN:B",
-          "pinIndex": 0,
-          "portId": "P0"
-        },
-        "to": {
-          "componentId": "AND:prev_match",
-          "pinIndex": 0,
-          "portId": "IN0"
-        }
-      },
-      {
-        "id": "wire:2",
-        "from": {
-          "componentId": "IO:IN:C",
-          "pinIndex": 0,
-          "portId": "P0"
-        },
-        "to": {
-          "componentId": "AND:prev_match",
-          "pinIndex": 1,
-          "portId": "IN1"
-        }
-      },
-      {
-        "id": "wire:3",
-        "from": {
-          "componentId": "AND:prev_match",
-          "pinIndex": 2,
-          "portId": "OUT0"
-        },
-        "to": {
-          "componentId": "DFF:alice_state",
-          "pinIndex": 0,
-          "portId": "IN0"
-        }
-      },
-      {
-        "id": "wire:4",
-        "from": {
-          "componentId": "DFF:alice_state",
-          "pinIndex": 1,
-          "portId": "OUT0"
-        },
-        "to": {
-          "componentId": "IO:OUT:A",
-          "pinIndex": 0,
-          "portId": "P0"
-        }
-      }
-    ]
-  }
+  "totalCost": 16,
+  "placedComponents": [
+    { "id": "DFF:b1", "componentId": "DFF" },
+    { "id": "DFF:b2", "componentId": "DFF" },
+    { "id": "DFF:b3", "componentId": "DFF" },
+    { "id": "DFF:c0", "componentId": "DFF" },
+    { "id": "DFF:c1", "componentId": "DFF" },
+    { "id": "DFF:c2", "componentId": "DFF" },
+    { "id": "NOT:nc0", "componentId": "NOT" },
+    { "id": "XOR:cx1", "componentId": "XOR" },
+    { "id": "AND:carry", "componentId": "AND" },
+    { "id": "XOR:cx2", "componentId": "XOR" },
+    { "id": "XOR:bx1", "componentId": "XOR" },
+    { "id": "XOR:decoded", "componentId": "XOR" },
+    { "id": "NOT:nc2", "componentId": "NOT" },
+    { "id": "AND:sel_delay", "componentId": "AND" },
+    { "id": "AND:sel_decode", "componentId": "AND" },
+    { "id": "OR:final", "componentId": "OR" }
+  ],
+  "wires": [
+    { "id": "w1", "from": { "componentId": "IO:IN:B", "pinIndex": 0 }, "to": { "componentId": "DFF:b1", "pinIndex": 0 } },
+    { "id": "w2", "from": { "componentId": "DFF:b1", "pinIndex": 1 }, "to": { "componentId": "DFF:b2", "pinIndex": 0 } },
+    { "id": "w3", "from": { "componentId": "DFF:b2", "pinIndex": 1 }, "to": { "componentId": "DFF:b3", "pinIndex": 0 } },
+    { "id": "w4", "from": { "componentId": "DFF:c0", "pinIndex": 1 }, "to": { "componentId": "NOT:nc0", "pinIndex": 0 } },
+    { "id": "w5", "from": { "componentId": "NOT:nc0", "pinIndex": 1 }, "to": { "componentId": "DFF:c0", "pinIndex": 0 } },
+    { "id": "w6", "from": { "componentId": "DFF:c1", "pinIndex": 1 }, "to": { "componentId": "XOR:cx1", "pinIndex": 0 } },
+    { "id": "w7", "from": { "componentId": "DFF:c0", "pinIndex": 1 }, "to": { "componentId": "XOR:cx1", "pinIndex": 1 } },
+    { "id": "w8", "from": { "componentId": "XOR:cx1", "pinIndex": 2 }, "to": { "componentId": "DFF:c1", "pinIndex": 0 } },
+    { "id": "w9", "from": { "componentId": "DFF:c1", "pinIndex": 1 }, "to": { "componentId": "AND:carry", "pinIndex": 0 } },
+    { "id": "w10", "from": { "componentId": "DFF:c0", "pinIndex": 1 }, "to": { "componentId": "AND:carry", "pinIndex": 1 } },
+    { "id": "w11", "from": { "componentId": "DFF:c2", "pinIndex": 1 }, "to": { "componentId": "XOR:cx2", "pinIndex": 0 } },
+    { "id": "w12", "from": { "componentId": "AND:carry", "pinIndex": 2 }, "to": { "componentId": "XOR:cx2", "pinIndex": 1 } },
+    { "id": "w13", "from": { "componentId": "XOR:cx2", "pinIndex": 2 }, "to": { "componentId": "DFF:c2", "pinIndex": 0 } },
+    { "id": "w14", "from": { "componentId": "DFF:b2", "pinIndex": 1 }, "to": { "componentId": "XOR:bx1", "pinIndex": 0 } },
+    { "id": "w15", "from": { "componentId": "DFF:b1", "pinIndex": 1 }, "to": { "componentId": "XOR:bx1", "pinIndex": 1 } },
+    { "id": "w16", "from": { "componentId": "XOR:bx1", "pinIndex": 2 }, "to": { "componentId": "XOR:decoded", "pinIndex": 0 } },
+    { "id": "w17", "from": { "componentId": "DFF:b3", "pinIndex": 1 }, "to": { "componentId": "XOR:decoded", "pinIndex": 1 } },
+    { "id": "w18", "from": { "componentId": "DFF:c2", "pinIndex": 1 }, "to": { "componentId": "NOT:nc2", "pinIndex": 0 } },
+    { "id": "w19", "from": { "componentId": "NOT:nc2", "pinIndex": 1 }, "to": { "componentId": "AND:sel_delay", "pinIndex": 0 } },
+    { "id": "w20", "from": { "componentId": "DFF:b1", "pinIndex": 1 }, "to": { "componentId": "AND:sel_delay", "pinIndex": 1 } },
+    { "id": "w21", "from": { "componentId": "DFF:c2", "pinIndex": 1 }, "to": { "componentId": "AND:sel_decode", "pinIndex": 0 } },
+    { "id": "w22", "from": { "componentId": "XOR:decoded", "pinIndex": 2 }, "to": { "componentId": "AND:sel_decode", "pinIndex": 1 } },
+    { "id": "w23", "from": { "componentId": "AND:sel_delay", "pinIndex": 2 }, "to": { "componentId": "OR:final", "pinIndex": 0 } },
+    { "id": "w24", "from": { "componentId": "AND:sel_decode", "pinIndex": 2 }, "to": { "componentId": "OR:final", "pinIndex": 1 } },
+    { "id": "w25", "from": { "componentId": "OR:final", "pinIndex": 2 }, "to": { "componentId": "IO:OUT:A", "pinIndex": 0 } }
+  ]
 }

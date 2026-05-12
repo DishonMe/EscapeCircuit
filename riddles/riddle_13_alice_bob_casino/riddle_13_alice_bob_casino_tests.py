@@ -128,7 +128,7 @@ def test_known_streams(solution):
             {"B": 1, "C": 1},
             {"B": 0, "C": 0},
         ],
-        [0, 0, 1, 0, 1, 0, 1],
+        [0, 0, 1, 0, 0, 1, 0],
     )
 
 
@@ -140,31 +140,43 @@ def _clear_circuit_cache():
 
 def test_all_bob_sequences(solution):
     """
-    Exhaustively test all 2^7 Bob sequences × 2^7 Casino sequences = 2^14 combinations.
-    For each combination, verify the output is always binary with exactly 7 cycles.
+    For each of the 2^7 casino sequences, find the best Bob sequence.
+    Verify that Alice's circuit achieves at least 4 wins with the optimal Bob strategy.
     
-    Optimized to:
-    - Cache Circuit and engine (created once, not per test)
-    - Pre-compute all bit sequences
-    - Minimize dict allocations in hot loop
+    Bob's strategy:
+    - B₀ = majority(C₁, C₂, C₃) — encodes which bit to use for rounds 1-3
+    - B₁, B₂, B₃ — may be all the same (unanimous) or have 1 different (outlier)
+      The differing bit signals Alice what to output for rounds 4-6
+    - B₄ = majority(C₄, C₅, C₆) — encodes signal for final rounds
+    - B₅, B₆ — may be unanimous or have 1 outlier
+    
+    Alice's decoding:
+    - A₁-A₃: output delayed Bob (A_i = B_{i-1})
+    - A₄-A₆: decode B₁,B₂,B₃
+      - If unanimous: output that value
+      - If one outlier: output the outlier value
+    
+    This validates that Alice's circuit correctly interprets Bob's encoded signal.
     """
     _clear_circuit_cache()
     circuit, engine = _get_or_create_circuit_and_engine(solution)
-    total_tested = 0
 
-    # Pre-compute all bit sequences (avoid recomputing each iteration)
-    bit_sequences = {i: [(i >> j) & 1 for j in range(7)] for i in range(128)}
+    # Pre-compute all bit sequences (MSB-first: bit 0 is leftmost/most significant)
+    bit_sequences = {i: [(i >> (6 - j)) & 1 for j in range(7)] for i in range(128)}
 
-    # Generate all 2^7 Casino sequences (outer loop)
+    # Generate all 2^7 Casino sequences
     for casino_int in range(128):
         casino_bits = bit_sequences[casino_int]
+        best_wins = 0
+        best_bob_int = -1
 
-        # Generate all 2^7 Bob sequences (inner loop)
+        # Try all 2^7 Bob sequences for this casino
         for bob_int in range(128):
             bob_bits = bit_sequences[bob_int]
 
-            # Evaluate circuit inline to minimize allocations
+            # Evaluate circuit for this (bob, casino) pair
             state = {}
+            wins = 0
             try:
                 for i in range(7):
                     # Prepare input for this cycle
@@ -174,24 +186,39 @@ def test_all_bob_sequences(solution):
                     # Evaluate circuit
                     result = engine.evaluate(circuit, step_inputs)
                     
-                    # Verify output is binary
+                    # Get output and verify binary
                     output_bit = int(result.get("A", 0))
                     if output_bit not in (0, 1):
-                        raise Exception(f"Output {output_bit} is not binary at cycle {i}")
+                        raise Exception(
+                            f"Output {output_bit} is not binary at cycle {i} "
+                            f"(bob={bob_int:07b}, casino={casino_int:07b})"
+                        )
+                    
+                    # Count wins: round is won if A == B == C
+                    if output_bit == bob_bits[i] == casino_bits[i]:
+                        wins += 1
                     
                     # Update state for next cycle
                     for key, value in result.items():
                         if isinstance(key, str) and key.endswith("_next"):
                             state[key[:-5]] = int(value) if value is not None else 0
 
-                total_tested += 1
-
             except Exception as e:
-                raise Exception(f"Exhaustive test failed: {str(e)}")
+                raise Exception(
+                    f"Circuit evaluation failed for bob={bob_int:07b}, casino={casino_int:07b}: {str(e)}"
+                )
 
-    # Sanity check: we should have tested exactly 2^14 combinations
-    if total_tested != 16384:
-        raise Exception(f"Expected 16384 tests, but only ran {total_tested}")
+            # Track best Bob sequence for this casino
+            if wins > best_wins:
+                best_wins = wins
+                best_bob_int = bob_int
+
+        # Verify this casino has at least one Bob sequence achieving 4+ wins
+        if best_wins < 4:
+            raise Exception(
+                f"Casino sequence {casino_int:07b} has no Bob strategy winning 4+/7 "
+                f"(best achievable: {best_wins}/7 with Bob={best_bob_int:07b})"
+            )
     
     _clear_circuit_cache()
 
