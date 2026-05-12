@@ -5,7 +5,7 @@
     "budget": 250,
     "creator_budget": 15,
     "time_limit_seconds": 180,
-    "difficulty": "HARD",
+    "difficulty": "MEDIUM",
     "default_gate_set": ["AND", "OR", "NOT", "XOR", "NAND", "NOR"],
     "inputs": ["A1", "A0", "B1", "B0"],
     "outputs": ["GT", "EQ", "LT"],
