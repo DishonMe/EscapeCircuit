@@ -609,3 +609,182 @@ class TestCircuitMigration:
                 os.unlink(tmp_path)
             except:
                 pass
+
+
+class TestListCustomPiecesByPuzzle:
+    """Test list_custom_pieces_by_puzzle() method"""
+
+    def test_list_custom_pieces_empty_no_circuits(self, repo):
+        """No circuits for given puzzle returns empty list"""
+        assert repo.list_custom_pieces_by_puzzle(999) == []
+
+    def test_list_custom_pieces_single_custom_piece(self, repo):
+        """Single custom piece for puzzle is returned"""
+        circuit = repo.create(Circuit(
+            id=0, user_id=1, name="custom1", cost=5,
+            structure_json=structure_json("custom"), puzzle_id=10
+        ))
+        result = repo.list_custom_pieces_by_puzzle(10)
+        assert len(result) == 1
+        assert result[0].id == circuit.id
+        assert result[0].puzzle_id == 10
+
+    def test_list_custom_pieces_multiple_pieces(self, repo):
+        """Multiple custom pieces for same puzzle are returned"""
+        ids = []
+        for i in range(3):
+            circuit = repo.create(Circuit(
+                id=0, user_id=1, name=f"custom{i}", cost=5,
+                structure_json=structure_json(f"custom{i}"), puzzle_id=20
+            ))
+            ids.append(circuit.id)
+        
+        result = repo.list_custom_pieces_by_puzzle(20)
+        assert len(result) == 3
+        assert [c.id for c in result] == sorted(ids, reverse=True)  # Ordered DESC
+
+    def test_list_custom_pieces_different_puzzles_isolated(self, repo):
+        """Custom pieces are isolated by puzzle_id"""
+        circuit1 = repo.create(Circuit(
+            id=0, user_id=1, name="custom1", cost=5,
+            structure_json=structure_json("x"), puzzle_id=30
+        ))
+        circuit2 = repo.create(Circuit(
+            id=0, user_id=1, name="custom2", cost=5,
+            structure_json=structure_json("y"), puzzle_id=40
+        ))
+        
+        result1 = repo.list_custom_pieces_by_puzzle(30)
+        result2 = repo.list_custom_pieces_by_puzzle(40)
+        
+        assert len(result1) == 1
+        assert result1[0].id == circuit1.id
+        assert len(result2) == 1
+        assert result2[0].id == circuit2.id
+
+    def test_list_custom_pieces_ignores_arsenal(self, repo):
+        """Custom pieces query doesn't return arsenal pieces"""
+        # Create an arsenal piece (must include basic_gates and truth_table)
+        repo.create(Circuit(
+            id=0, user_id=1, name="arsenal1", cost=5,
+            structure_json=structure_json("x"), is_arsenal=True, 
+            basic_gates='["AND"]', truth_table='{"0": "1"}'
+        ))
+        # Create a custom piece
+        circuit = repo.create(Circuit(
+            id=0, user_id=1, name="custom1", cost=5,
+            structure_json=structure_json("y"), puzzle_id=50
+        ))
+        
+        result = repo.list_custom_pieces_by_puzzle(50)
+        assert len(result) == 1
+        assert result[0].id == circuit.id
+
+
+class TestCountUserComponents:
+    """Test count_user_components() method"""
+
+    def test_count_user_components_no_components(self, repo):
+        """User with no arsenal pieces returns 0"""
+        assert repo.count_user_components(999) == 0
+
+    def test_count_user_components_single_arsenal(self, repo):
+        """Single arsenal piece is counted"""
+        repo.create(Circuit(
+            id=0, user_id=1, name="arsenal1", cost=5,
+            structure_json=structure_json("x"), is_arsenal=True,
+            basic_gates='["AND"]', truth_table='{"0": "1"}'
+        ))
+        assert repo.count_user_components(1) == 1
+
+    def test_count_user_components_multiple_arsenal(self, repo):
+        """Multiple arsenal pieces are counted"""
+        for i in range(3):
+            repo.create(Circuit(
+                id=0, user_id=1, name=f"arsenal{i}", cost=5,
+                structure_json=structure_json(f"x{i}"), is_arsenal=True,
+                basic_gates='["AND"]', truth_table='{"0": "1"}'
+            ))
+        assert repo.count_user_components(1) == 3
+
+    def test_count_user_components_ignores_non_arsenal(self, repo):
+        """Non-arsenal pieces (custom or puzzles) are not counted"""
+        # Arsenal pieces
+        for i in range(2):
+            repo.create(Circuit(
+                id=0, user_id=1, name=f"arsenal{i}", cost=5,
+                structure_json=structure_json(f"x{i}"), is_arsenal=True,
+                basic_gates='["AND"]', truth_table='{"0": "1"}'
+            ))
+        # Custom pieces (puzzle_id set)
+        for i in range(2):
+            repo.create(Circuit(
+                id=0, user_id=1, name=f"custom{i}", cost=5,
+                structure_json=structure_json(f"y{i}"), puzzle_id=10, is_arsenal=False
+            ))
+        
+        assert repo.count_user_components(1) == 2
+
+    def test_count_user_components_different_users_isolated(self, repo):
+        """Component counts are isolated by user"""
+        repo.create(Circuit(
+            id=0, user_id=1, name="arsenal1", cost=5,
+            structure_json=structure_json("x"), is_arsenal=True,
+            basic_gates='["AND"]', truth_table='{"0": "1"}'
+        ))
+        for i in range(3):
+            repo.create(Circuit(
+                id=0, user_id=2, name=f"arsenal{i}", cost=5,
+                structure_json=structure_json(f"x{i}"), is_arsenal=True,
+                basic_gates='["AND"]', truth_table='{"0": "1"}'
+            ))
+        
+        assert repo.count_user_components(1) == 1
+        assert repo.count_user_components(2) == 3
+
+
+class TestUpdateFalseBranch:
+    """Test update() method false branch (no matching rows)"""
+
+    def test_update_wrong_user_returns_false(self, repo):
+        """Update returns False when circuit doesn't belong to user"""
+        circuit = repo.create(Circuit(
+            id=0, user_id=1, name="circuit1", cost=5,
+            structure_json=structure_json("x")
+        ))
+        circuit.user_id = 2  # Change owner
+        result = repo.update(circuit)
+        assert result is False
+
+    def test_update_nonexistent_circuit_returns_false(self, repo):
+        """Update returns False for non-existent circuit"""
+        circuit = Circuit(
+            id=99999, user_id=1, name="nonexistent", cost=5,
+            structure_json=structure_json("x")
+        )
+        result = repo.update(circuit)
+        assert result is False
+
+    def test_update_puzzle_id_field_persists(self, repo):
+        """Updated puzzle_id persists correctly"""
+        circuit = repo.create(Circuit(
+            id=0, user_id=1, name="c", cost=5,
+            structure_json=structure_json("x"), puzzle_id=10
+        ))
+        circuit.puzzle_id = 20
+        repo.update(circuit)
+        
+        fetched = repo.get_by_id(circuit.id)
+        assert fetched.puzzle_id == 20
+
+    def test_update_description_field_persists(self, repo):
+        """Updated description persists correctly"""
+        circuit = repo.create(Circuit(
+            id=0, user_id=1, name="c", cost=5,
+            structure_json=structure_json("x"), description="old"
+        ))
+        circuit.description = "new description"
+        repo.update(circuit)
+        
+        fetched = repo.get_by_id(circuit.id)
+        assert fetched.description == "new description"

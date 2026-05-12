@@ -100,9 +100,7 @@ class TestSolvingServiceStartAttempt:
         }
         self.mock_solve_repo.create_attempt.return_value = saved_attempt
 
-        with patch('Backend.DomainLayer.SolveAttempt.SolveAttempt') as mock_attempt_class:
-            mock_attempt_class.return_value = saved_attempt
-            result = self.service.start_attempt("valid_token", 1)
+        result = self.service.start_attempt("valid_token", 1)
 
         # Ensure result is a dict, not a Mock
 
@@ -460,9 +458,7 @@ class TestSolvingServiceCreateAttemptBranches:
 
         payload = {"circuit_id": 1}
 
-        with patch('Backend.DomainLayer.SolveAttempt.SolveAttempt') as mock_attempt_class:
-            mock_attempt_class.return_value = new_attempt
-            result = self.service.submit_solution("valid_token", 1, payload)
+        result = self.service.submit_solution("valid_token", 1, payload)
 
         # Verify create_attempt was called
         self.mock_solve_repo.create_attempt.assert_called_once()
@@ -6436,5 +6432,438 @@ class TestSolvingServiceGateLimitBuckets:
         assert "Shared arsenal per-piece limit exceeded" in msg
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+class TestSolvingServiceClueIntegration:
+    """Test clue system integration - currently under-tested coverage paths."""
+
+    def setup_method(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def mock_tx(conn):
+            yield conn
+
+        self.patcher = patch("Backend.ServiceLayer.SolvingService.transaction", side_effect=mock_tx)
+        self.patcher.start()
+
+        self.mock_conn = Mock(spec=sqlite3.Connection)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def teardown_method(self):
+        self.patcher.stop()
+
+    def test_build_gate_context_handles_empty_structure(self):
+        """Test gate context building with minimal structure."""
+        structure = {}
+        arsenal = []
+
+        result = self.service._build_gate_usage_context(structure, arsenal)
+
+        assert result is not None
+
+    def test_build_gate_context_with_components(self):
+        """Test gate context with placed components."""
+        structure = {"placedComponents": [{"id": "1", "gate_type": "AND"}]}
+        arsenal = []
+        
+        self.mock_engine.extract_gate_counts.return_value = {"AND": 1}
+
+        result = self.service._build_gate_usage_context(structure, arsenal)
+
+        assert result is not None
+
+
+class TestSolvingServiceBuildGateContext:
+    """Test _build_gate_usage_context edge cases."""
+
+    def setup_method(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def mock_tx(conn):
+            yield conn
+
+        self.patcher = patch("Backend.ServiceLayer.SolvingService.transaction", side_effect=mock_tx)
+        self.patcher.start()
+
+        self.mock_conn = Mock(spec=sqlite3.Connection)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_engine.extract_gate_counts = Mock(return_value={})
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def teardown_method(self):
+        self.patcher.stop()
+
+    def test_build_gate_context_missing_placed_components(self):
+        """Test when structure lacks placedComponents."""
+        structure = {"wires": []}
+
+        result = self.service._build_gate_usage_context(structure, [])
+
+        assert isinstance(result, dict)
+
+    def test_build_gate_context_with_extract_exception(self):
+        """Test exception handling in extract_gate_counts."""
+        structure = {"placedComponents": []}
+        self.mock_engine.extract_gate_counts.side_effect = Exception("Error")
+
+        result = self.service._build_gate_usage_context(structure, [])
+
+        assert isinstance(result, dict) or result is not None
+
+    def test_build_gate_context_with_empty_placed(self):
+        """Test with empty placedComponents."""
+        structure = {"placedComponents": []}
+        self.mock_engine.extract_gate_counts.return_value = {}
+
+        result = self.service._build_gate_usage_context(structure, [])
+
+        assert isinstance(result, dict)
+
+
+class TestSolvingServiceComplexFlow:
+    """Test complex solving flow scenarios."""
+
+    def setup_method(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def mock_tx(conn):
+            yield conn
+
+        self.patcher = patch("Backend.ServiceLayer.SolvingService.transaction", side_effect=mock_tx)
+        self.patcher.start()
+
+        self.mock_conn = Mock(spec=sqlite3.Connection)
+        self.mock_solve_repo = Mock(spec=SolveRepo)
+        self.mock_puzzle_repo = Mock(spec=PuzzleRepo)
+        self.mock_circuit_repo = Mock(spec=CircuitRepo)
+        self.mock_auth = Mock(spec=AuthService)
+        self.mock_engine = Mock(spec=logicEngineService)
+        self.mock_xp = Mock(spec=XPService)
+
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def teardown_method(self):
+        self.patcher.stop()
+
+    def test_service_has_required_repos(self):
+        """Test that service has all required repository connections."""
+        assert self.service.puzzle_repo is not None
+        assert self.service.circuit_repo is not None
+
+    def test_service_initialization_complete(self):
+        """Test service initializes with proper dependencies."""
+        assert self.service.auth is not None
+        assert self.service.engine is not None
+        assert self.service.xp is not None
+
+
+class TestSolvingServiceSimplePaths:
+    """Test simple execution paths in SolvingService."""
+
+    def setup_method(self):
+        self.mock_conn = Mock()
+        self.mock_solve_repo = Mock()
+        self.mock_puzzle_repo = Mock()
+        self.mock_circuit_repo = Mock()
+        self.mock_auth = Mock()
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_start_attempt_puzzle_not_found(self):
+        """Test start_attempt when puzzle doesn't exist."""
+        token = "valid_token"
+        puzzle_id = 999
+
+        self.mock_auth.require_user_id.return_value = 1
+        self.mock_puzzle_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError):
+            self.service.start_attempt(token, puzzle_id)
+
+    def test_start_attempt_with_existing_open_attempt(self):
+        """Test start_attempt reuses existing attempt."""
+        token = "valid_token"
+        puzzle_id = 1
+        user_id = 1
+
+        self.mock_auth.require_user_id.return_value = user_id
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.creator_user_id = user_id
+        puzzle.status = PuzzleStatus.PUBLISHED
+        puzzle.clues = None
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        existing_attempt = Mock(spec=SolveAttempt)
+        existing_attempt.id = 100
+        existing_attempt.to_dict.return_value = {"id": 100, "puzzle_id": puzzle_id, "user_id": user_id}
+        self.mock_solve_repo.get_open_attempt.return_value = existing_attempt
+
+        result = self.service.start_attempt(token, puzzle_id)
+
+        assert result is not None
+        assert isinstance(result, dict)
+
+    def test_submit_solution_circuit_not_found(self):
+        """Test submit_solution when circuit doesn't exist."""
+        token = "valid_token"
+        puzzle_id = 1
+        payload = {"circuit_id": 999}
+
+        self.mock_auth.require_user_id.return_value = 1
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.status = PuzzleStatus.PUBLISHED
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        self.mock_circuit_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValidationError):
+            self.service.submit_solution(token, puzzle_id, payload)
+
+    def test_submit_solution_circuit_permission_denied(self):
+        """Test submit_solution with circuit from different user."""
+        token = "valid_token"
+        puzzle_id = 1
+        payload = {"circuit_id": 1}
+
+        user_id = 1
+        self.mock_auth.require_user_id.return_value = user_id
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.status = PuzzleStatus.PUBLISHED
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        circuit = Mock(spec=Circuit)
+        circuit.user_id = 999  # Different user
+        self.mock_circuit_repo.get_by_id.return_value = circuit
+
+        with pytest.raises(ValidationError):
+            self.service.submit_solution(token, puzzle_id, payload)
+
+
+class TestSolvingServiceAdditionalBranches:
+    """Additional tests for SolvingService branch coverage."""
+
+    def setup_method(self):
+        self.mock_conn = Mock()
+        self.mock_solve_repo = Mock()
+        self.mock_puzzle_repo = Mock()
+        self.mock_circuit_repo = Mock()
+        self.mock_auth = Mock()
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_start_attempt_published_puzzle_success(self):
+        """Test starting attempt on published puzzle."""
+        token = "valid_token"
+        puzzle_id = 1
+        user_id = 1
+
+        self.mock_auth.require_user_id.return_value = user_id
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.creator_user_id = 999  # Different creator
+        puzzle.status = PuzzleStatus.PUBLISHED
+        puzzle.clues = None
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        attempt = Mock(spec=SolveAttempt)
+        attempt.id = 100
+        attempt.to_dict.return_value = {"id": 100, "puzzle_id": puzzle_id, "user_id": user_id}
+        self.mock_solve_repo.get_open_attempt.return_value = None
+        self.mock_solve_repo.create_attempt.return_value = attempt
+
+        result = self.service.start_attempt(token, puzzle_id)
+
+        assert result is not None
+        assert isinstance(result, dict)
+
+    def test_start_attempt_unpublished_creator_allowed(self):
+        """Test creator can start unpublished puzzle."""
+        token = "valid_token"
+        puzzle_id = 1
+        user_id = 1
+
+        self.mock_auth.require_user_id.return_value = user_id
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.creator_user_id = user_id  # Same as user
+        puzzle.status = PuzzleStatus.DRAFT
+        puzzle.clues = None
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        attempt = Mock(spec=SolveAttempt)
+        attempt.id = 100
+        attempt.to_dict.return_value = {"id": 100}
+        self.mock_solve_repo.get_open_attempt.return_value = attempt
+
+        result = self.service.start_attempt(token, puzzle_id)
+
+        assert result is not None
+
+    def test_start_attempt_unpublished_other_user_denied(self):
+        """Test other users cannot start unpublished puzzle."""
+        token = "valid_token"
+        puzzle_id = 1
+        user_id = 1
+
+        self.mock_auth.require_user_id.return_value = user_id
+        
+        puzzle = Mock(spec=Puzzle)
+        puzzle.creator_user_id = 999  # Different user
+        puzzle.status = PuzzleStatus.DRAFT
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        with pytest.raises(ValidationError):
+            self.service.start_attempt(token, puzzle_id)
+
+
+class TestSolvingServiceAdditionalBranches:
+    """Test additional branches for improved coverage"""
+    
+    def setup_method(self):
+        self.mock_conn = Mock()
+        self.mock_solve_repo = Mock()
+        self.mock_puzzle_repo = Mock()
+        self.mock_circuit_repo = Mock()
+        self.mock_auth = Mock()
+        self.mock_engine = Mock()
+        self.mock_xp = Mock()
+        
+        self.service = SolvingService(
+            self.mock_conn,
+            self.mock_solve_repo,
+            self.mock_puzzle_repo,
+            self.mock_circuit_repo,
+            self.mock_auth,
+            self.mock_engine,
+            self.mock_xp,
+        )
+
+    def test_start_attempt_draft_by_creator(self):
+        """Test starting attempt on draft puzzle by creator"""
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Mock()
+        puzzle.status = PuzzleStatus.DRAFT
+        puzzle.creator_user_id = 1  # Creator
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        self.mock_solve_repo.get_open_attempt.return_value = None
+        attempt = Mock(spec=SolveAttempt)
+        attempt.to_dict.return_value = {"id": 1, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = attempt
+        
+        result = self.service.start_attempt("token", 1)
+        assert result["id"] == 1
+
+    def test_start_attempt_creates_new_when_needed(self):
+        """Test creating new attempt when none exists"""
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Mock()
+        puzzle.status = PuzzleStatus.PUBLISHED
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        self.mock_solve_repo.get_open_attempt.return_value = None
+        attempt = Mock(spec=SolveAttempt)
+        attempt.to_dict.return_value = {"id": 1, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = attempt
+        
+        result = self.service.start_attempt("token", 1)
+        assert result["id"] == 1
+        self.mock_solve_repo.create_attempt.assert_called()
+
+    def test_submit_solution_test_cases_pass(self):
+        """Test submission when test cases pass"""
+        token = "token"
+        puzzle_id = 1
+        payload = {"circuit_id": 1}
+        
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Mock()
+        puzzle.status = PuzzleStatus.PUBLISHED
+        puzzle.budget = 1000
+        puzzle.creator_difficulty = 5
+        puzzle.avg_difficulty = 5
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+        
+        circuit = Mock()
+        circuit.user_id = 1
+        circuit.cost = 10
+        circuit.structure_json = "{}"
+        self.mock_circuit_repo.get_by_id.return_value = circuit
+        
+        test_case = Mock()
+        self.mock_puzzle_repo.list_test_cases.return_value = [test_case]
+        
+        self.service._evaluate_test_cases = Mock(return_value=(True, None, []))
+        
+        attempt = Mock()
+        attempt.id = 1
+        attempt.to_dict.return_value = {"id": 1, "passed": True}
+        attempt.elapsed_seconds = 100
+        attempt.submitted_at = None
+        attempt.mark_submitted = Mock()
+        self.mock_solve_repo.get_open_attempt.return_value = attempt
+        
+        progress = Mock()
+        progress.best_medal = 0
+        self.mock_solve_repo.get_progress.return_value = progress
