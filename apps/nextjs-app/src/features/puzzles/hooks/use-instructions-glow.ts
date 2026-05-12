@@ -1,55 +1,73 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 
-const STORAGE_KEY = 'puzzle-instructions-clicked';
+import { useUser } from '@/lib/auth';
+
+const STORAGE_PREFIX = 'puzzle-instructions-clicked:';
 
 type InstructionsGlowStore = {
-  hasClicked: boolean;
-  hydrated: boolean;
-  markClicked: () => void;
-  hydrate: () => void;
+  clickedByKey: Record<string, boolean>;
+  hydratedKeys: Record<string, boolean>;
+  markClicked: (key: string) => void;
+  hydrate: (key: string) => void;
 };
 
 const useStore = create<InstructionsGlowStore>((set, get) => ({
-  hasClicked: false,
-  hydrated: false,
-  markClicked: () => {
-    if (get().hasClicked) return;
+  clickedByKey: {},
+  hydratedKeys: {},
+  markClicked: (key) => {
+    if (get().clickedByKey[key]) return;
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.setItem(STORAGE_KEY, '1');
+        window.localStorage.setItem(key, '1');
       } catch {
         // ignore quota / privacy-mode errors
       }
     }
-    set({ hasClicked: true });
+    set((s) => ({
+      clickedByKey: { ...s.clickedByKey, [key]: true },
+    }));
   },
-  hydrate: () => {
-    if (get().hydrated) return;
+  hydrate: (key) => {
+    if (get().hydratedKeys[key]) return;
     let stored = false;
     if (typeof window !== 'undefined') {
       try {
-        stored = window.localStorage.getItem(STORAGE_KEY) === '1';
+        stored = window.localStorage.getItem(key) === '1';
       } catch {
         stored = false;
       }
     }
-    set({ hasClicked: stored, hydrated: true });
+    set((s) => ({
+      clickedByKey: { ...s.clickedByKey, [key]: stored },
+      hydratedKeys: { ...s.hydratedKeys, [key]: true },
+    }));
   },
 }));
 
 export const useInstructionsGlow = () => {
-  const hasClicked = useStore((s) => s.hasClicked);
-  const hydrated = useStore((s) => s.hydrated);
-  const markClicked = useStore((s) => s.markClicked);
-  const hydrate = useStore((s) => s.hydrate);
+  const user = useUser();
+  const username = user.data?.username;
+  const key = useMemo(
+    () => (username ? `${STORAGE_PREFIX}${username}` : null),
+    [username],
+  );
+
+  const hasClicked = useStore((s) => (key ? !!s.clickedByKey[key] : false));
+  const hydrated = useStore((s) => (key ? !!s.hydratedKeys[key] : false));
+  const markClickedFn = useStore((s) => s.markClicked);
+  const hydrateFn = useStore((s) => s.hydrate);
 
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    if (key) hydrateFn(key);
+  }, [key, hydrateFn]);
+
+  const markClicked = useCallback(() => {
+    if (key) markClickedFn(key);
+  }, [key, markClickedFn]);
 
   return {
-    shouldGlow: hydrated && !hasClicked,
+    shouldGlow: !!key && hydrated && !hasClicked,
     markClicked,
   };
 };
