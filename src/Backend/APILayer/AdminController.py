@@ -119,7 +119,12 @@ def _count_non_io_gates_in_solution(solution_data: dict) -> int:
     return gate_count
 
 
-def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
+def _validate_uploaded_puzzle_payload(
+    conn,
+    config_data: dict,
+    instructions_text: str,
+    allow_python_tests_only: bool = False,
+) -> dict:
     puzzle_config = config_data.get('puzzle', {})
     if not puzzle_config:
         raise ValidationError("Config missing 'puzzle' section")
@@ -158,7 +163,7 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
         raise ValidationError("Puzzle must have 'default_gate_set'")
 
     test_cases = config_data.get('test_cases', [])
-    if not test_cases:
+    if not test_cases and not allow_python_tests_only:
         raise ValidationError("Puzzle must have at least one test case")
 
     return puzzle_config
