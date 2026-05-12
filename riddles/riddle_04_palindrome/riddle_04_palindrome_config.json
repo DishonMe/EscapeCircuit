@@ -5,7 +5,7 @@
     "budget": 200,
     "creator_budget": 10,
     "time_limit_seconds": 120,
-    "difficulty": "HARD",
+    "difficulty": "EASY",
     "default_gate_set": ["AND", "OR", "NOT", "XOR"],
     "inputs": ["b1", "b2", "b3", "b4"],
     "outputs": ["is_palindrome"],
