@@ -132,7 +132,8 @@ class SolvingService:
             raise ValidationError("You do not have permission to use this circuit. Only your own circuits can be submitted.")
 
         test_cases = self.puzzle_repo.list_test_cases(int(puzzle_id))
-        if not test_cases:
+        has_python_tests = self._python_tests_file_exists(p)
+        if not test_cases and not has_python_tests:
             raise ValidationError("puzzle has no test cases")
 
         # Now create/get attempt only after all early validation passes
@@ -148,7 +149,10 @@ class SolvingService:
                 if not attempt:
                     raise ValidationError("Failed to create solve attempt. Please try again.")
 
-        passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
+        if test_cases:
+            passed, fail_reason, _ = self._evaluate_test_cases(circuit, test_cases, p)
+        else:
+            passed, fail_reason, _ = self._run_python_tests(p, expanded_solution)
 
         with transaction(self.conn):
             attempt.passed = passed
@@ -318,7 +322,8 @@ class SolvingService:
             persisted_clues_used = int(self.clues_repo.count_for_attempt(resolved_attempt_id))
             
         test_cases = self.puzzle_repo.list_test_cases(puzzle_id)
-        if not test_cases:
+        has_python_tests = self._python_tests_file_exists(p)
+        if not test_cases and not has_python_tests:
             raise ValidationError("This puzzle has no test cases configured. Please contact the puzzle creator.")
         
         # Check if solver personal arsenal pieces are allowed in this puzzle.
@@ -363,7 +368,10 @@ class SolvingService:
             structure_json=json.dumps(expanded_solution)
         )
         
-        passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p, expanded_solution)
+        if test_cases:
+            passed, fail_msg, details = self._evaluate_test_cases(tcircuit, test_cases, p, expanded_solution)
+        else:
+            passed, fail_msg, details = self._run_python_tests(p, expanded_solution)
         
         if passed:
             cost_used = int(solution_payload.get("totalCost", 0))
@@ -1297,6 +1305,23 @@ class SolvingService:
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }]
+
+    def _python_tests_file_exists(self, puzzle) -> bool:
+        """
+        Return True if the puzzle's Python test file exists on disk.
+        """
+        import pathlib
+
+        if not puzzle or not hasattr(puzzle, 'riddle_base_name'):
+            return False
+
+        riddle_base_name = getattr(puzzle, 'riddle_base_name', None)
+        if not isinstance(riddle_base_name, str) or not riddle_base_name:
+            return False
+
+        root_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+        tests_file_path = root_dir / 'riddles' / riddle_base_name / f"{riddle_base_name}_tests.py"
+        return tests_file_path.exists()
 
     def _validate_python_test_code(self, test_code_str: str, expanded_solution: Dict[str, Any]) -> Tuple[bool, Optional[str], List]:
         """
