@@ -199,7 +199,12 @@ def _count_non_io_gates_in_solution(solution_data: dict) -> int:
     return gate_count
 
 
-def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text: str) -> dict:
+def _validate_uploaded_puzzle_payload(
+    conn,
+    config_data: dict,
+    instructions_text: str,
+    allow_python_tests_only: bool = False,
+) -> dict:
     puzzle_config = config_data.get('puzzle', {})
     if not puzzle_config:
         raise ValidationError("Config missing 'puzzle' section")
@@ -238,7 +243,7 @@ def _validate_uploaded_puzzle_payload(conn, config_data: dict, instructions_text
         raise ValidationError("Puzzle must have 'default_gate_set'")
 
     test_cases = config_data.get('test_cases', [])
-    if not test_cases:
+    if not test_cases and not allow_python_tests_only:
         raise ValidationError("Puzzle must have at least one test case")
 
     return puzzle_config
@@ -708,7 +713,12 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 config_data = json.loads(config_content)
                 instructions_content = await instructions_file.read()
                 instructions_text = instructions_content.decode('utf-8')
-                _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+                _validate_uploaded_puzzle_payload(
+                    conn,
+                    config_data,
+                    instructions_text,
+                    allow_python_tests_only=python_tests_file is not None,
+                )
 
                 puzzle_name = config_data.get('puzzle', {}).get('name', 'puzzle')
                 puzzle_num = get_next_puzzle_number(riddles_dir)
@@ -756,7 +766,12 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
                 # ========== VALIDATION PHASE (in-memory with temp files) ==========
                 with open(config_path, 'r', encoding='utf-8') as cf:
                     config_data = json.load(cf)
-                puzzle_config = _validate_uploaded_puzzle_payload(conn, config_data, instructions_text)
+                puzzle_config = _validate_uploaded_puzzle_payload(
+                    conn,
+                    config_data,
+                    instructions_text,
+                    allow_python_tests_only=python_tests_file is not None,
+                )
                 test_cases = config_data.get('test_cases', [])
                 
                 # Load and validate sample solution using logic engine

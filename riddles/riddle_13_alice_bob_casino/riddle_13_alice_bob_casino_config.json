@@ -1,0 +1,42 @@
+{
+  "puzzle": {
+    "name": "Alice and Bob vs Casino",
+    "description": "Design a sequential circuit for Alice. On each round Bob and the casino each provide one bit. Alice's output is evaluated one round later, so the circuit must use state to turn the previous round's information into a winning response.",
+    "budget": 20,
+    "creator_budget": 2,
+    "time_limit_seconds": 120,
+    "difficulty": "HARD",
+    "default_gate_set": [
+      "AND",
+      "OR",
+      "NOT",
+      "XOR",
+      "NAND",
+      "NOR",
+      "XNOR",
+      "DFF"
+    ],
+    "inputs": [
+      "B",
+      "C"
+    ],
+    "outputs": [
+      "A"
+    ],
+    "total_gate_count": null,
+    "min_cycles": 7,
+    "max_cycles": 7,
+    "allow_arsenal": true,
+    "board": {
+      "rows": 20,
+      "cols": 40
+    },
+    "riddle_base_name": "riddle_13_alice_bob_casino",
+    "clues": [
+      "Bob knows the casino sequence ahead of time, so his stream can act as a message to Alice.",
+      "The circuit is sequential: use DFF state so round i can influence round i+1.",
+      "A win happens only when Alice, Bob, and the casino all match on the same round."
+    ]
+  },
+  "test_cases": []
+}
