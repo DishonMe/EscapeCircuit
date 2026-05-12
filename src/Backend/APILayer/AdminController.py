@@ -488,9 +488,9 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
         difficulty: str = Form("EASY"),
         token: str = Depends(verify_token),
     ):
-        # Verify admin
+        # Verify admin and get their user_id
         try:
-            admin_service._require_admin(token)
+            admin_id = admin_service._require_admin(token)
         except ValidationError as e:
             raise HTTPException(status_code=403, detail=str(e))
 
@@ -553,7 +553,6 @@ def build_admin_router(admin_service: AdminService) -> APIRouter:
                         json.dump(config_data, cf, indent=2)
 
                 # ========== DATABASE INSERTION FIRST (to get puzzle_id for naming) ==========
-                admin_id = 999
                 conn.execute("PRAGMA foreign_keys = OFF")
                 puzzle_id = insert_puzzle_to_db(conn, config_data, instructions_text, admin_id)
                 
