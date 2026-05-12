@@ -100,9 +100,7 @@ class TestSolvingServiceStartAttempt:
         }
         self.mock_solve_repo.create_attempt.return_value = saved_attempt
 
-        with patch('Backend.DomainLayer.SolveAttempt.SolveAttempt') as mock_attempt_class:
-            mock_attempt_class.return_value = saved_attempt
-            result = self.service.start_attempt("valid_token", 1)
+        result = self.service.start_attempt("valid_token", 1)
 
         # Ensure result is a dict, not a Mock
 
@@ -460,9 +458,7 @@ class TestSolvingServiceCreateAttemptBranches:
 
         payload = {"circuit_id": 1}
 
-        with patch('Backend.DomainLayer.SolveAttempt.SolveAttempt') as mock_attempt_class:
-            mock_attempt_class.return_value = new_attempt
-            result = self.service.submit_solution("valid_token", 1, payload)
+        result = self.service.submit_solution("valid_token", 1, payload)
 
         # Verify create_attempt was called
         self.mock_solve_repo.create_attempt.assert_called_once()

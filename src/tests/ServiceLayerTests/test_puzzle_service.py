@@ -1,5 +1,6 @@
 import contextlib
 import json
+import sys
 import pytest
 from unittest.mock import Mock, patch
 from typing import Dict, Any
@@ -14,6 +15,13 @@ from Backend.PersistantLayer.PuzzleRepo import PuzzleRepo
 from Backend.PersistantLayer.UserRepo import UserRepo
 from Backend.ServiceLayer.AuthService import AuthService
 from Backend.settings import PUZZLE_MAX_PUBLISHED_PER_USER
+
+# `Backend.DomainLayer.__init__` re-exports the `Puzzle`/`PuzzleTestCase` classes,
+# which shadows the same-named submodules on Python 3.10 when patching the
+# dotted path. Resolve the underlying modules via sys.modules so patch.object
+# works consistently across 3.10+.
+_puzzle_module = sys.modules["Backend.DomainLayer.Puzzle"]
+_puzzle_test_case_module = sys.modules["Backend.DomainLayer.PuzzleTestCase"]
 
 
 class TestPuzzleServiceCreation:
@@ -173,7 +181,7 @@ class TestPuzzleServiceCreatePuzzle:
         self.mock_puzzle_repo.create.return_value = created_puzzle
 
         # Patch Puzzle constructor to avoid id=0 validation error in service
-        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_puzzle_class:
+        with patch.object(_puzzle_module, 'Puzzle') as mock_puzzle_class:
             mock_instance = Mock(spec=Puzzle)
             mock_instance.to_dict.return_value = created_puzzle.to_dict()
             mock_puzzle_class.return_value = mock_instance
@@ -282,7 +290,7 @@ class TestPuzzleServiceCreatePuzzle:
         self.mock_puzzle_repo.create.return_value = created_puzzle
 
         # Patch Puzzle constructor to avoid id=0 validation error
-        with patch('Backend.DomainLayer.Puzzle.Puzzle') as mock_puzzle_class:
+        with patch.object(_puzzle_module, 'Puzzle') as mock_puzzle_class:
             mock_instance = Mock(spec=Puzzle)
             mock_instance.to_dict.return_value = created_puzzle.to_dict()
             mock_puzzle_class.return_value = mock_instance
@@ -468,7 +476,7 @@ class TestPuzzleServiceAddTestCase:
             "expected_outputs": {"Q": 1},
         }
 
-        with patch('Backend.DomainLayer.PuzzleTestCase.PuzzleTestCase') as mock_tc_class:
+        with patch.object(_puzzle_test_case_module, 'PuzzleTestCase') as mock_tc_class:
             mock_tc_class.return_value = saved_test_case
             result = self.service.add_test_case("valid_token", 1, payload)
 
@@ -622,7 +630,7 @@ class TestPuzzleServiceBranches:
             "expected_outputs": {"Q": 1},
         }
 
-        with patch('Backend.DomainLayer.PuzzleTestCase.PuzzleTestCase') as mock_tc_class:
+        with patch.object(_puzzle_test_case_module, 'PuzzleTestCase') as mock_tc_class:
             mock_tc_class.return_value = saved_test_case
             result = self.service.add_test_case("valid_token", 1, payload)
 
