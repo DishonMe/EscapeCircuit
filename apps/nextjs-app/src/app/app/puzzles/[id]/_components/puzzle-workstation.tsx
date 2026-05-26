@@ -1,6 +1,16 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  ChevronDown,
+  StepBack,
+  StepForward,
+  ArrowRight,
+  Trash2,
+  CircleAlert,
+  CircuitBoard,
+  Medal,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, {
@@ -10,7 +20,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,13 +32,20 @@ import {
 } from '@/components/ui/dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
+import { workstationTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
+import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
+import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
+import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { useAudio } from '@/hooks/useAudio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
@@ -47,6 +63,8 @@ import {
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 
+const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
+
 const CircuitDebugger = dynamic(
   () =>
     import('@/components/circuit-debugger').then((mod) => ({
@@ -61,26 +79,6 @@ const CircuitDebugger = dynamic(
     ),
   },
 );
-import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
-import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
-import { RatingDialog } from '@/features/ratings/components/rating-dialog';
-import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
-
-import {
-  Bug,
-  ChevronDown,
-  StepBack,
-  StepForward,
-  ArrowRight,
-  Trash2,
-  CircleAlert,
-  CircuitBoard,
-  Medal,
-} from 'lucide-react';
-
-import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
-import { workstationTourSteps } from '@/config/tourSteps';
-import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -2280,65 +2278,65 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-card/40 p-3 shadow-subtle md:min-h-[60vh] md:grid-cols-[240px_1fr]">
             <div className="workstation-component-menu">
               <WorkstationMenu
-              basic={visibleBasics}
-              custom={customComponents}
-              sharedArsenal={sharedArsenalComponents}
-              solverArsenal={solverArsenalComponents}
-              componentDefs={uiCatalog}
-              allowArsenal={allowArsenal}
-              filteredBasicTypes={filteredBasicTypes}
-              selectedComponentId={
-                selectedComponent.mode === 'placing'
-                  ? selectedComponent.componentId
-                  : undefined
-              }
-              onSelectComponent={(componentId) =>
-                setSelectedComponent({
-                  mode: 'placing',
-                  componentId,
-                  rotation: 0,
-                })
-              }
-              onDragStart={setDraggedPaletteComponentId}
-              onDragEnd={() => setDraggedPaletteComponentId(null)}
-            />
-          </div>
+                basic={visibleBasics}
+                custom={customComponents}
+                sharedArsenal={sharedArsenalComponents}
+                solverArsenal={solverArsenalComponents}
+                componentDefs={uiCatalog}
+                allowArsenal={allowArsenal}
+                filteredBasicTypes={filteredBasicTypes}
+                selectedComponentId={
+                  selectedComponent.mode === 'placing'
+                    ? selectedComponent.componentId
+                    : undefined
+                }
+                onSelectComponent={(componentId) =>
+                  setSelectedComponent({
+                    mode: 'placing',
+                    componentId,
+                    rotation: 0,
+                  })
+                }
+                onDragStart={setDraggedPaletteComponentId}
+                onDragEnd={() => setDraggedPaletteComponentId(null)}
+              />
+            </div>
 
-          <div className="workstation-grid">
-            <WorkstationGrid
-              puzzleId={puzzle.id}
-              inputs={inputs}
-              outputs={outputs}
-              catalog={uiCatalog}
-              placed={placed}
-              wires={wires}
-              selectedComponent={selectedComponent}
-              onSelectedComponentChange={setSelectedComponent}
-              onPlacedChange={onPlacedChange}
-              onWiresChange={(next: Wire[]) => {
-                commitHistory();
-                setWires(next);
-              }}
-              draggedPaletteComponentId={draggedPaletteComponentId}
-              isChecking={isChecking}
-              isPowerSurge={isPowerSurge}
-              boardFeedback={boardFeedback}
-              showSolvedSlam={showSolvedSlam}
-              boardRows={puzzle.board_rows ?? 15}
-              boardCols={puzzle.board_cols ?? 30}
-              debuggerActive={isInlineDebugger}
-              debuggerStepIndex={debugStepIndex}
-              debuggerStepCount={stepCount}
-              debuggerInputBits={currentInputBits}
-              debuggerOutputBits={currentOutputBits}
-              debuggerGateBits={currentGateBits}
-              debuggerSequences={debugSequences}
-              onDebuggerSequenceChange={onInlineSequenceChange}
-              onInspectComponent={setInspectingPlacedId}
-              arsenalComponentDisplayModes={arsenalComponentDisplayModes}
-              disableZoomPersistence
-            />
-          </div>
+            <div className="workstation-grid">
+              <WorkstationGrid
+                puzzleId={puzzle.id}
+                inputs={inputs}
+                outputs={outputs}
+                catalog={uiCatalog}
+                placed={placed}
+                wires={wires}
+                selectedComponent={selectedComponent}
+                onSelectedComponentChange={setSelectedComponent}
+                onPlacedChange={onPlacedChange}
+                onWiresChange={(next: Wire[]) => {
+                  commitHistory();
+                  setWires(next);
+                }}
+                draggedPaletteComponentId={draggedPaletteComponentId}
+                isChecking={isChecking}
+                isPowerSurge={isPowerSurge}
+                boardFeedback={boardFeedback}
+                showSolvedSlam={showSolvedSlam}
+                boardRows={puzzle.board_rows ?? 15}
+                boardCols={puzzle.board_cols ?? 30}
+                debuggerActive={isInlineDebugger}
+                debuggerStepIndex={debugStepIndex}
+                debuggerStepCount={stepCount}
+                debuggerInputBits={currentInputBits}
+                debuggerOutputBits={currentOutputBits}
+                debuggerGateBits={currentGateBits}
+                debuggerSequences={debugSequences}
+                onDebuggerSequenceChange={onInlineSequenceChange}
+                onInspectComponent={setInspectingPlacedId}
+                arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+                disableZoomPersistence
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-3">

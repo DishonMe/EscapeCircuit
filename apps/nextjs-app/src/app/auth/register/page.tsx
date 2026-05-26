@@ -7,7 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 
 import { useNavigationLoading } from '@/components/ui/navigation-loading/navigation-loading';
 import { useNotifications } from '@/components/ui/notifications';
-import { CircuitBackground } from '@/components/ui/circuit-background/CircuitBackground';
+import { CircuitBackground } from '@/components/ui/circuit-background/circuit-background';
 import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { paths } from '@/config/paths';
 import { useGoogleLogin, useRegister } from '@/lib/auth';

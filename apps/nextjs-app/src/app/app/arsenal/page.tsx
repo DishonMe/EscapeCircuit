@@ -42,7 +42,7 @@ import {
 } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
 import type { Wire } from '@/types/api';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
-import { arsenalTourSteps } from '@/config/tourSteps';
+import { arsenalTourSteps } from '@/config/tour-steps';
 import { cn } from '@/utils/cn';
 
 const ARSENAL_LEVEL_TIERS: Array<[number, number]> = [

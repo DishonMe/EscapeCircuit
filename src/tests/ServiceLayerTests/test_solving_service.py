@@ -218,6 +218,55 @@ class TestSolvingServiceStartAttempt:
         assert "Failed to close stale attempt" in str(exc_info.value)
         self.mock_solve_repo.create_attempt.assert_not_called()
 
+    def test_start_attempt_reads_open_attempt_inside_transaction(self):
+        """The get_open_attempt call must happen inside the BEGIN IMMEDIATE
+        transaction so two racing start_attempt calls serialize on the SQLite
+        write lock. The second call must re-fetch the open attempt and observe
+        whatever the first call wrote, instead of acting on a stale read."""
+        from contextlib import contextmanager
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+
+        # Patch transaction so we can observe whether the body runs INSIDE it.
+        in_tx = []
+        original_transaction_module = __import__(
+            'Backend.ServiceLayer.SolvingService', fromlist=['transaction']
+        )
+
+        @contextmanager
+        def tracking_tx(conn):
+            in_tx.append(True)
+            try:
+                yield conn
+            finally:
+                in_tx.append(False)
+
+        with patch.object(original_transaction_module, 'transaction', tracking_tx):
+            self.mock_auth.require_user_id.return_value = 1
+            puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                            status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+            self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+            # get_open_attempt must only be invoked while in_tx is True.
+            def assert_in_tx(*_args, **_kwargs):
+                assert in_tx and in_tx[-1] is True, (
+                    "get_open_attempt was called OUTSIDE the transaction — "
+                    "this is the concurrency race the fix is meant to prevent"
+                )
+                return None
+
+            self.mock_solve_repo.get_open_attempt.side_effect = assert_in_tx
+
+            fresh = Mock(spec=SolveAttempt)
+            fresh.id = 99
+            fresh.puzzle_id = 1
+            fresh.user_id = 1
+            fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+            self.mock_solve_repo.create_attempt.return_value = fresh
+
+            self.service.start_attempt("valid_token", 1)
+            self.mock_solve_repo.get_open_attempt.assert_called_once()
+
     def test_start_attempt_with_restart_closes_open_attempt_regardless_of_age(self):
         from Backend.DomainLayer.Utils import utcnow
         self.mock_auth.require_user_id.return_value = 1

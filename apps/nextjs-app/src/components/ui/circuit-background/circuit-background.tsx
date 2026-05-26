@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
 const GRID = 48;
-const NODE_COLOR = "rgba(56,189,248,";
+const NODE_COLOR = 'rgba(56,189,248,';
 
 interface Node {
   x: number;
@@ -30,14 +30,13 @@ export function CircuitBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let nodes: Node[] = [];
     let edges: Edge[] = [];
     let pulses: Pulse[] = [];
     let animId: number;
-    let spawnId: ReturnType<typeof setInterval>;
     let last = 0;
 
     const init = () => {
@@ -62,11 +61,19 @@ export function CircuitBackground() {
 
       const totalCols = Math.ceil(canvas.width / GRID) + 1;
       for (let i = 0; i < nodes.length; i++) {
-        if (nodes[i + 1] && nodes[i].col < totalCols - 1 && Math.random() > 0.25) {
+        if (
+          nodes[i + 1] &&
+          nodes[i].col < totalCols - 1 &&
+          Math.random() > 0.25
+        ) {
           edges.push({ a: i, b: i + 1, alpha: 0.06 + Math.random() * 0.06 });
         }
         if (nodes[i + totalCols] && Math.random() > 0.25) {
-          edges.push({ a: i, b: i + totalCols, alpha: 0.06 + Math.random() * 0.06 });
+          edges.push({
+            a: i,
+            b: i + totalCols,
+            alpha: 0.06 + Math.random() * 0.06,
+          });
         }
       }
     };
@@ -98,7 +105,7 @@ export function CircuitBackground() {
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = NODE_COLOR + e.alpha + ")";
+        ctx.strokeStyle = NODE_COLOR + e.alpha + ')';
         ctx.lineWidth = 0.5;
         ctx.stroke();
       }
@@ -108,7 +115,9 @@ export function CircuitBackground() {
         if (p.t > 1) {
           nodes[p.edge.b].pulseAlpha = 0.7;
           if (Math.random() < 0.6) {
-            const next = edges.filter((e) => e.a === p.edge.b || e.b === p.edge.b);
+            const next = edges.filter(
+              (e) => e.a === p.edge.b || e.b === p.edge.b,
+            );
             if (next.length) {
               pulses.push({
                 edge: next[Math.floor(Math.random() * next.length)],
@@ -122,8 +131,15 @@ export function CircuitBackground() {
         const a = nodes[p.edge.a];
         const b = nodes[p.edge.b];
         ctx.beginPath();
-        ctx.arc(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = NODE_COLOR + 0.8 * (1 - Math.abs(p.t - 0.5) * 1.5) + ")";
+        ctx.arc(
+          a.x + (b.x - a.x) * p.t,
+          a.y + (b.y - a.y) * p.t,
+          2.5,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fillStyle =
+          NODE_COLOR + 0.8 * (1 - Math.abs(p.t - 0.5) * 1.5) + ')';
         ctx.fill();
         return true;
       });
@@ -131,7 +147,8 @@ export function CircuitBackground() {
       for (const n of nodes) {
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.size, 0, Math.PI * 2);
-        ctx.fillStyle = NODE_COLOR + Math.min(n.baseAlpha + n.pulseAlpha, 1) + ")";
+        ctx.fillStyle =
+          NODE_COLOR + Math.min(n.baseAlpha + n.pulseAlpha, 1) + ')';
         ctx.fill();
       }
 
@@ -139,7 +156,7 @@ export function CircuitBackground() {
     };
 
     resize();
-    spawnId = setInterval(spawnPulse, 120);
+    const spawnId = setInterval(spawnPulse, 120);
     animId = requestAnimationFrame((ts) => {
       last = ts;
       draw(ts);
@@ -158,7 +175,7 @@ export function CircuitBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      className="pointer-events-none absolute inset-0 size-full"
       aria-hidden="true"
     />
   );

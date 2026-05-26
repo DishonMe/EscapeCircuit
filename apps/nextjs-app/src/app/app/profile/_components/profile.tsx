@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-
 import {
   Boxes,
   CircuitBoard,
@@ -12,9 +10,15 @@ import {
   Eye,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type {
+  PlacedGridComponent,
+  ComponentDef,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { AvatarDisplay } from '@/components/ui/avatar-display';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -22,17 +26,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { getLevelInfo } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
+import { profileTourSteps } from '@/config/tour-steps';
 import { useMyArsenal, ArsenalPiece } from '@/features/arsenal/api';
 import { EditBio } from '@/features/users/components/edit-bio';
 import { UpdateAvatar } from '@/features/users/components/update-avatar';
 import { useUser } from '@/lib/auth';
-import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type {
-  PlacedGridComponent,
-  ComponentDef,
-} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type { Wire } from '@/types/api';
 
 type EntryProps = {
@@ -163,11 +164,12 @@ const getPlaced = (structure: ArsenalStructure) => {
   return [];
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future re-use; intentional dead code outside this PR's scope
 const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
   const parsed = parseStructure(structureRaw);
   if (!parsed) {
     return (
-      <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-dashed border-border bg-secondary" />
+      <div className="pointer-events-none relative h-40 w-full overflow-hidden rounded-xl border border-dashed border-border bg-secondary" />
     );
   }
 
@@ -176,7 +178,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
   const nodeById = new Map(placed.map((node) => [node.id, node]));
 
   return (
-    <div className="relative overflow-hidden w-full h-40 pointer-events-none rounded-xl border border-border bg-secondary">
+    <div className="pointer-events-none relative h-40 w-full overflow-hidden rounded-xl border border-border bg-secondary">
       <div
         className="absolute inset-0 origin-top-left scale-[0.5]"
         style={{ width: '200%', height: '200%' }}
@@ -194,7 +196,7 @@ const MiniCircuitPreview = ({ structureRaw }: { structureRaw: string }) => {
           const d = `M ${x1} ${y1} C ${x1 + control} ${y1}, ${x2 - control} ${y2}, ${x2} ${y2}`;
 
           return (
-            <svg key={wire.id} className="absolute inset-0 h-full w-full">
+            <svg key={wire.id} className="absolute inset-0 size-full">
               <path
                 d={d}
                 fill="none"
@@ -241,7 +243,6 @@ export const Profile = () => {
   };
 
   const displayName = userData.username ?? 'Operator';
-  const initials = displayName.slice(0, 2).toUpperCase();
   const medals = userData.medals ?? {};
   const goldMedals = Number(medals.gold ?? 0);
   const silverMedals = Number(medals.silver ?? 0);
@@ -251,6 +252,13 @@ export const Profile = () => {
 
   return (
     <div className="space-y-5">
+      <PageTourLauncher
+        tourName="profile"
+        pageTitle="Profile"
+        pageDescription="See where your Level, XP, and medal collection live, and how each panel updates as you solve."
+        steps={profileTourSteps}
+        side="right"
+      />
       <section className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -289,7 +297,7 @@ export const Profile = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
+          <div className="tour-profile-stats col-span-2 rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CircuitBoard size={16} />
@@ -332,7 +340,7 @@ export const Profile = () => {
               {currentXp}/{levelInfo.nextThreshold} total XP
             </p>
           </div>
-          <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
+          <div className="tour-profile-medals rounded-2xl border border-border bg-card/80 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Trophy size={16} /> Medals
             </div>
@@ -407,7 +415,7 @@ export const Profile = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-shrink-0"
+                  className="shrink-0"
                   onClick={() => setPreviewPiece(piece)}
                 >
                   <Eye size={16} className="mr-1" />
@@ -453,7 +461,7 @@ export const Profile = () => {
           open={!!previewPiece}
           onOpenChange={(open) => !open && setPreviewPiece(null)}
         >
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{previewPiece.name} - Circuit Preview</DialogTitle>
               <DialogDescription>
@@ -713,40 +721,40 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
     <div className="space-y-4">
       {/* Description */}
       {piece.description && (
-        <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
+        <div className="rounded-lg border border-border/40 bg-foreground/5 p-3">
           <p className="text-sm text-foreground">{piece.description}</p>
         </div>
       )}
 
       {/* Circuit Stats */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Inputs</p>
           <p className="text-lg font-semibold text-foreground">
             {structure.numInputs}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Outputs</p>
           <p className="text-lg font-semibold text-foreground">
             {structure.numOutputs}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Components</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Components</p>
           <p className="text-lg font-semibold text-foreground">
             {placed.length}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Cost</p>
           <p className="text-lg font-semibold text-foreground">{piece.cost}</p>
         </div>
       </div>
 
       {/* Circuit Grid - Read-only Workstation */}
       <div
-        className="border border-border/60 rounded-lg bg-background overflow-hidden relative"
+        className="relative overflow-hidden rounded-lg border border-border/60 bg-background"
         style={{ height: '500px' }}
       >
         <style>{`
@@ -788,8 +796,8 @@ function CircuitPreviewContent({ piece }: { piece: ArsenalPiece }) {
 
       {/* Component Legend */}
       {placed.length > 0 && (
-        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground/70">
             Components Used:
           </p>
           <div className="flex flex-wrap gap-2">

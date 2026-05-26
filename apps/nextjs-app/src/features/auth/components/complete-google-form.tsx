@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { CircuitBackground } from '@/components/ui/circuit-background/CircuitBackground';
+import { CircuitBackground } from '@/components/ui/circuit-background/circuit-background';
 import { paths } from '@/config/paths';
 import { useCompleteGoogleRegistration } from '@/lib/auth';
 import { useNotifications } from '@/components/ui/notifications';

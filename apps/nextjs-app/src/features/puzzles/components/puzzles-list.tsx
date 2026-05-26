@@ -37,7 +37,7 @@ import { PuzzlesToolbar } from './puzzles-toolbar';
 // Re-export the canonical, refreshed tour copy from src/config/tourSteps.ts
 // so the Puzzles page picks up the same upgraded tone + step titles as the
 // rest of the app's tours.
-export { browsePuzzlesTourSteps as puzzlesTourSteps } from '@/config/tourSteps';
+export { browsePuzzlesTourSteps as puzzlesTourSteps } from '@/config/tour-steps';
 
 export const PuzzlesList = () => {
   // ── Dialog open-state ──────────────────────────────────────────────
@@ -353,7 +353,6 @@ export const PuzzlesList = () => {
           }}
         />
       )}
-
     </>
   );
 };

@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, HelpCircle, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
-import GuidedTour from '@/components/ui/guided-tour';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import GuidedTour from '@/components/ui/guided-tour';
 import { cn } from '@/utils/cn';
 
 type PageTourLauncherProps = {
@@ -55,7 +55,7 @@ function TourTooltip({
     <div
       {...tooltipProps}
       key={index}
-      className="w-[min(92vw,26rem)] origin-top scale-100 rounded-2xl border border-border/70 bg-card/95 p-5 text-card-foreground opacity-100 shadow-2xl backdrop-blur-md animate-in fade-in-50 slide-in-from-bottom-2 duration-200"
+      className="w-[min(92vw,26rem)] origin-top scale-100 rounded-2xl border border-border/70 bg-card/95 p-5 text-card-foreground opacity-100 shadow-2xl backdrop-blur-md duration-200 animate-in fade-in-50 slide-in-from-bottom-2"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -91,7 +91,12 @@ function TourTooltip({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" {...skipProps} className="px-3 text-sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          {...skipProps}
+          className="px-3 text-sm"
+        >
           Skip
         </Button>
         <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
@@ -147,7 +152,8 @@ export function PageTourLauncher({
 
   const normalizedSteps = (steps || []).map((step: any) => {
     const isDialogCloseStep =
-      typeof step.target === 'string' && step.target.includes('dialog-close-button');
+      typeof step.target === 'string' &&
+      step.target.includes('dialog-close-button');
 
     return {
       ...step,
@@ -155,7 +161,9 @@ export function PageTourLauncher({
       // Open the instructions dialog before showing the close-button step
       ...(isDialogCloseStep && {
         after: () => {
-          const closeBtn = document.querySelector(step.target) as HTMLElement | null;
+          const closeBtn = document.querySelector(
+            step.target,
+          ) as HTMLElement | null;
           if (closeBtn) {
             closeBtn.click();
           }
@@ -168,10 +176,12 @@ export function PageTourLauncher({
               return;
             }
             // Click the instructions button to open the dialog
-            const instructionsBtn = (
-              document.querySelector('.puzzle-instructions-button') ??
-              document.querySelector('.workstation-instructions-button')
-            ) as HTMLElement | null;
+            const instructionsBtn = (document.querySelector(
+              '.puzzle-instructions-button',
+            ) ??
+              document.querySelector(
+                '.workstation-instructions-button',
+              )) as HTMLElement | null;
             if (instructionsBtn) {
               instructionsBtn.click();
             }
@@ -249,7 +259,8 @@ export function PageTourLauncher({
   const currentStep = normalizedSteps[currentStepIndex];
 
   const isInstructionStep =
-    typeof currentStep?.target === 'string' && currentStep.target.includes('instructions-button');
+    typeof currentStep?.target === 'string' &&
+    currentStep.target.includes('instructions-button');
 
   const handleTourAdvanceClick = (event: MouseEvent) => {
     // Ignore programmatic clicks (e.g. from the before hook opening the dialog)
@@ -257,14 +268,17 @@ export function PageTourLauncher({
 
     const target = event.target as HTMLElement;
     const isInstructionButtonClick =
-      target.closest('.puzzle-instructions-button') || target.closest('.workstation-instructions-button');
+      target.closest('.puzzle-instructions-button') ||
+      target.closest('.workstation-instructions-button');
 
     if (!runTour || !isInstructionStep || !isInstructionButtonClick) {
       return;
     }
 
     window.setTimeout(() => {
-      const primaryButton = document.querySelector('[data-action="primary"]') as HTMLButtonElement | null;
+      const primaryButton = document.querySelector(
+        '[data-action="primary"]',
+      ) as HTMLButtonElement | null;
       primaryButton?.click();
     }, 120);
   };
@@ -275,7 +289,8 @@ export function PageTourLauncher({
     }
 
     window.addEventListener('click', handleTourAdvanceClick, true);
-    return () => window.removeEventListener('click', handleTourAdvanceClick, true);
+    return () =>
+      window.removeEventListener('click', handleTourAdvanceClick, true);
   }, [runTour, currentStepIndex, normalizedSteps]);
 
   // When a page opts into `disableScrolling`, make sure NOTHING moves the scroll
@@ -292,7 +307,10 @@ export function PageTourLauncher({
     // 1. Patch focus() so any focus() call during the tour passes preventScroll:true.
     const originalFocus = HTMLElement.prototype.focus;
     HTMLElement.prototype.focus = function patchedFocus(options) {
-      return originalFocus.call(this, { ...(options || {}), preventScroll: true });
+      return originalFocus.call(this, {
+        ...(options || {}),
+        preventScroll: true,
+      });
     };
 
     // 2. Neutralise programmatic scroll methods on Window and Element.
@@ -308,7 +326,9 @@ export function PageTourLauncher({
     (window as unknown as { scrollTo: typeof noop }).scrollTo = noop;
     (window as unknown as { scrollBy: typeof noop }).scrollBy = noop;
     (window as unknown as { scroll: typeof noop }).scroll = noop;
-    (Element.prototype as unknown as { scrollIntoView: typeof noop }).scrollIntoView = noop;
+    (
+      Element.prototype as unknown as { scrollIntoView: typeof noop }
+    ).scrollIntoView = noop;
     (Element.prototype as unknown as { scrollTo: typeof noop }).scrollTo = noop;
     (Element.prototype as unknown as { scrollBy: typeof noop }).scrollBy = noop;
     (Element.prototype as unknown as { scroll: typeof noop }).scroll = noop;
@@ -325,7 +345,8 @@ export function PageTourLauncher({
     //    setter on the instance (not the prototype) keeps overflow:auto child
     //    containers — e.g. scrollable content inside a dialog — fully functional.
     const scrollEl =
-      (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+      (document.scrollingElement as HTMLElement | null) ??
+      document.documentElement;
     const bodyEl = document.body;
 
     const scrollTopProto = Object.getOwnPropertyDescriptor(
@@ -370,10 +391,12 @@ export function PageTourLauncher({
 
     return () => {
       HTMLElement.prototype.focus = originalFocus;
-      (window as unknown as { scrollTo: typeof originalWindowScrollTo }).scrollTo =
-        originalWindowScrollTo;
-      (window as unknown as { scrollBy: typeof originalWindowScrollBy }).scrollBy =
-        originalWindowScrollBy;
+      (
+        window as unknown as { scrollTo: typeof originalWindowScrollTo }
+      ).scrollTo = originalWindowScrollTo;
+      (
+        window as unknown as { scrollBy: typeof originalWindowScrollBy }
+      ).scrollBy = originalWindowScrollBy;
       (window as unknown as { scroll: typeof originalWindowScroll }).scroll =
         originalWindowScroll;
       (
@@ -382,10 +405,14 @@ export function PageTourLauncher({
         }
       ).scrollIntoView = originalElementScrollIntoView;
       (
-        Element.prototype as unknown as { scrollTo: typeof originalElementScrollTo }
+        Element.prototype as unknown as {
+          scrollTo: typeof originalElementScrollTo;
+        }
       ).scrollTo = originalElementScrollTo;
       (
-        Element.prototype as unknown as { scrollBy: typeof originalElementScrollBy }
+        Element.prototype as unknown as {
+          scrollBy: typeof originalElementScrollBy;
+        }
       ).scrollBy = originalElementScrollBy;
       (
         Element.prototype as unknown as { scroll: typeof originalElementScroll }
@@ -444,7 +471,11 @@ export function PageTourLauncher({
           </DialogHeader>
 
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDialogOpen(false)}
+            >
               Not now
             </Button>
             <Button type="button" onClick={handleStartTour}>

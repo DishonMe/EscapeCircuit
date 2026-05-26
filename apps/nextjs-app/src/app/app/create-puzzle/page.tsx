@@ -39,7 +39,7 @@ import { extractVisualStyleFromComponentLike } from '@/app/app/puzzles/[id]/_com
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
-import { createPuzzleTourSteps } from '@/config/tourSteps';
+import { createPuzzleTourSteps } from '@/config/tour-steps';
 
 type TabName =
   | 'basic'
