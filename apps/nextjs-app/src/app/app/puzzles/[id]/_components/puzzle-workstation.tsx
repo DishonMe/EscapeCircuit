@@ -1951,13 +1951,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const visibleBasics = basicComponents;
 
+  const effectiveSteps = useMemo(() => {
+    if (!puzzle?.creatorComment?.trim()) {
+      return workstationTourSteps.filter(
+        (step) => step.target !== '.workstation-creator-comment-button'
+      );
+    }
+    return workstationTourSteps;
+  }, [puzzle?.creatorComment]);
+
   return (
     <>
       <PageTourLauncher
         tourName="puzzle-workstation"
         pageTitle="Puzzle Workstation"
         pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
-        steps={workstationTourSteps}
+        steps={effectiveSteps}
         side="left"
       />
       <div className="flex w-full flex-col gap-3">
@@ -2125,6 +2134,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="workstation-creator-comment-button"
                   title="View creator comment"
                   onClick={() => setShowCreatorComment(true)}
                 >

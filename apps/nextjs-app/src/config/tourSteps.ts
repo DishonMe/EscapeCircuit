@@ -5,12 +5,6 @@ import { Step } from 'react-joyride';
  */
 export const browsePuzzlesTourSteps: Step[] = [
   {
-    target: '.puzzle-filters-button',
-    content:
-      'Use the Filters button to search for puzzles by name, difficulty, fun rating, clearness rating, and solve status. You can also sort results to find puzzles that match your skill level.',
-    placement: 'bottom',
-  },
-  {
     target: '.puzzle-instructions-button',
     content:
       'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
@@ -46,12 +40,36 @@ export const browsePuzzlesTourSteps: Step[] = [
       'After solving or spending time on a puzzle, you can rate it for fun and clarity. This helps other players find great puzzles and helps creators improve!',
     placement: 'top',
   },
+  {
+    target: '.puzzle-filters-button',
+    content:
+      'Use the Filters button to search for puzzles by name, difficulty, fun rating, clearness rating, and solve status. You can also sort results to find puzzles that match your skill level.',
+    placement: 'bottom',
+  },
 ];
 
 /**
  * Puzzle Workstation Tour - /app/puzzles/[id]
  */
 export const workstationTourSteps: Step[] = [
+  {
+    target: '.workstation-instructions-button',
+    content:
+      'Refer back to the puzzle instructions to understand the problem statement, constraints, and hints from the puzzle creator.',
+    placement: 'left',
+  },
+  {
+    target: '.dialog-close-button',
+    content:
+      'Use the Close button to exit the instructions and return to the workstation.',
+    placement: 'left',
+  },
+  {
+    target: '.workstation-creator-comment-button',
+    content:
+      'Read additional context or tips from the puzzle creator. This button appears when a creator comment is available.',
+    placement: 'left',
+  },
   {
     target: '.workstation-component-menu',
     content:
@@ -74,18 +92,6 @@ export const workstationTourSteps: Step[] = [
     target: '.workstation-debugger-button',
     content:
       'Stuck? Use the Debugger to trace signal flow through your circuit step-by-step. This helps you find logic errors and understand how your gates interact.',
-    placement: 'left',
-  },
-  {
-    target: '.workstation-instructions-button',
-    content:
-      'Refer back to the puzzle instructions to understand the problem statement, constraints, and hints from the puzzle creator.',
-    placement: 'left',
-  },
-  {
-    target: '.dialog-close-button',
-    content:
-      'Use the Close button to exit the instructions and return to the workstation.',
     placement: 'left',
   },
   {
