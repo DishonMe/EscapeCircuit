@@ -1,6 +1,16 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  ChevronDown,
+  StepBack,
+  StepForward,
+  ArrowRight,
+  Trash2,
+  CircleAlert,
+  CircuitBoard,
+  Medal,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, {
@@ -10,7 +20,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,12 +32,20 @@ import {
 } from '@/components/ui/dialog';
 import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
+import { workstationTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
+import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
+import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
+import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
+import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { useAudio } from '@/hooks/useAudio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
@@ -46,6 +63,8 @@ import {
 import { WorkstationMenu } from './workstation-menu';
 import { WorkstationTimer } from './workstation-timer';
 
+const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
+
 const CircuitDebugger = dynamic(
   () =>
     import('@/components/circuit-debugger').then((mod) => ({
@@ -60,26 +79,6 @@ const CircuitDebugger = dynamic(
     ),
   },
 );
-import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
-import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderboard';
-import { RatingDialog } from '@/features/ratings/components/rating-dialog';
-import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
-
-import {
-  Bug,
-  ChevronDown,
-  StepBack,
-  StepForward,
-  ArrowRight,
-  Trash2,
-  CircleAlert,
-  CircuitBoard,
-  Medal,
-} from 'lucide-react';
-
-import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
-import { workstationTourSteps } from '@/config/tourSteps';
-import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 
 const BASIC_COMPONENTS: CircuitComponent[] = [
   { id: 'AND', type: 'AND', cost: 1, pins: 3 },
@@ -211,6 +210,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
   const startTime = useRef(Date.now());
+  // Per-puzzle guard: prevents the mount-time start-attempt effect from racing
+  // with beginSolveAgain when isSolved flips back to false. Reset by navigating
+  // to a different puzzle (the ref value no longer matches puzzle.id).
+  const initializedPuzzleIdRef = useRef<string | null>(null);
   const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
@@ -269,7 +272,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [showFirstSolveCelebration, setShowFirstSolveCelebration] =
     useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [typedInstructionText, setTypedInstructionText] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
@@ -354,6 +356,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [puzzle?.initial_board, placed.length, wires.length]);
 
   useEffect(() => {
+    // Stop ticking the visible elapsed counter once the puzzle is solved.
+    // Take one final snapshot so the displayed value is the solve time, not
+    // a frozen stale value from the previous tick.
+    if (isSolved) {
+      setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
+      return;
+    }
+
     const tick = () => {
       setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
     };
@@ -361,7 +371,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     tick();
     const intervalId = window.setInterval(tick, 1000);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [isSolved]);
 
   useEffect(() => {
     let cancelled = false;
@@ -369,14 +379,37 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const startAttempt = async () => {
       try {
         if (!puzzle?.id) return;
+        // Don't silently open a new attempt for an already-solved puzzle.
+        // The "Solve again" CTA is the only path to a fresh attempt; calling
+        // beginSolveAgain will manage the network request and state reset.
+        if (puzzle.is_solved || isSolved) {
+          initializedPuzzleIdRef.current = puzzle.id;
+          return;
+        }
+        // Per-puzzle guard: if beginSolveAgain already ran for this puzzle,
+        // the mount-time effect must not fire a duplicate start request.
+        if (initializedPuzzleIdRef.current === puzzle.id) {
+          return;
+        }
         const response = await startPuzzleAttempt({ puzzleId: puzzle.id });
         if (cancelled) return;
+        initializedPuzzleIdRef.current = puzzle.id;
         setAttemptId(typeof response.id === 'number' ? response.id : null);
         // Hydrate raw timer from server's started_at so a refresh doesn't reset
-        // the user's elapsed time.
+        // the user's elapsed time — but only if the server timestamp is
+        // plausible. (Backend now closes stale open attempts, so this guard is
+        // belt-and-braces protection against unusual races.)
         if (response.started_at) {
           const parsed = Date.parse(response.started_at);
-          if (Number.isFinite(parsed)) {
+          const timeLimit =
+            puzzle.timeLimit ??
+            (puzzle as { time_limit_seconds?: number | null })
+              .time_limit_seconds ??
+            null;
+          if (
+            Number.isFinite(parsed) &&
+            isPlausibleStartedAt(parsed, Date.now(), timeLimit)
+          ) {
             startTime.current = parsed;
           }
         }
@@ -404,7 +437,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => {
       cancelled = true;
     };
-  }, [puzzle?.id]);
+    // We intentionally depend only on the puzzle identity / solved-state.
+    // The full `puzzle` object is read inside (for timeLimit, etc.) but is a
+    // new reference on every render, so listing it would re-fire the effect
+    // every keystroke. Identity changes are the only signals that matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puzzle?.id, puzzle?.is_solved, isSolved]);
 
   const notifications = useNotifications();
 
@@ -433,56 +471,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  const normalizedInstructionText = useMemo(() => {
-    const normalizeInstructions = (raw: string) =>
-      raw
-        .replace(/\\section\*\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\subsection\*\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\textbf\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\textit\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\begin\{itemize\}|\\end\{itemize\}/g, '')
-        .replace(/\\item\s+/g, '- ')
-        .replace(/\\\\/g, '\n')
-        .replace(/\r\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-    const instructionsRaw = puzzle?.instructions?.trim();
-    if (!instructionsRaw) return '';
-
-    const normalizedInstructions = normalizeInstructions(instructionsRaw);
-    const description = puzzle?.description?.trim() ?? '';
-
-    if (!normalizedInstructions || normalizedInstructions === description) {
-      return '';
-    }
-
-    return normalizedInstructions;
-  }, [puzzle?.instructions, puzzle?.description]);
-
-  const terminalInstructionText = useMemo(
-    () => puzzle?.description?.trim() ?? '',
-    [puzzle?.description],
-  );
-
-  useEffect(() => {
-    if (!showPuzzleInfo) return;
-
-    setTypedInstructionText('');
-    if (!terminalInstructionText) return;
-
-    let index = 0;
-    const tick = window.setInterval(() => {
-      index += 1;
-      setTypedInstructionText(terminalInstructionText.slice(0, index));
-      if (index >= terminalInstructionText.length) {
-        window.clearInterval(tick);
-      }
-    }, 14);
-
-    return () => window.clearInterval(tick);
-  }, [showPuzzleInfo, terminalInstructionText]);
-
   // Render instructions HTML with markdown and KaTeX support
   useEffect(() => {
     if (!showPuzzleInfo || !puzzle?.instructions) {
@@ -501,10 +489,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       const md = new MarkdownIt({ html: true }).use(markdownItKatex);
       const markdown = latexToMarkdown(puzzle.instructions!);
-      const html = md.render(markdown);
+      // eslint-disable-next-line testing-library/render-result-naming-convention -- md.render is markdown-it, not RTL
+      const renderedHtml = md.render(markdown);
 
       setRenderedInstructionsHtml(
-        DOMPurify.sanitize(html, {
+        DOMPurify.sanitize(renderedHtml, {
           ALLOWED_TAGS: [
             'p',
             'strong',
@@ -949,10 +938,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }, 0);
   }, [componentCatalog, placed]);
 
-  const canAddCost = (extraCost: number) => {
-    return currentCost + extraCost <= budgetLimit;
-  };
-
   const ioUsage = useMemo(() => {
     const usedInputs = new Set<string>();
     const usedOutputs = new Set<string>();
@@ -982,64 +967,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       missingOutputs,
     };
   }, [inputs, outputs, wires]);
-
-  const buildHoleState = useCallback(() => {
-    const holes: Record<
-      string,
-      | { kind: 'empty' }
-      | { kind: 'component'; placedId: string; componentId: string }
-      | {
-          kind: 'port';
-          placedId: string;
-          componentId: string;
-          portIndex: number;
-          portKind: 'input' | 'output';
-        }
-    > = {};
-
-    const rotateOffset = (
-      offset: { row: number; col: number },
-      size: { w: number; h: number },
-      rotation: 0 | 90,
-    ) => {
-      if (rotation === 0) return offset;
-      return { row: offset.col, col: size.h - 1 - offset.row };
-    };
-
-    const rotatedSize = (size: { w: number; h: number }, rotation: 0 | 90) =>
-      rotation === 0 ? size : { w: size.h, h: size.w };
-
-    for (const inst of placed) {
-      const def = uiCatalog[inst.componentId];
-      if (!def) continue;
-
-      const size = rotatedSize(def.size, inst.rotation);
-      for (let r = 0; r < size.h; r++) {
-        for (let c = 0; c < size.w; c++) {
-          const key = `r${inst.origin.row + r}c${inst.origin.col + c}`;
-          holes[key] = {
-            kind: 'component',
-            placedId: inst.id,
-            componentId: inst.componentId,
-          };
-        }
-      }
-
-      def.ports.forEach((p, idx) => {
-        const rot = rotateOffset(p.offset, def.size, inst.rotation);
-        const key = `r${inst.origin.row + rot.row}c${inst.origin.col + rot.col}`;
-        holes[key] = {
-          kind: 'port',
-          placedId: inst.id,
-          componentId: inst.componentId,
-          portIndex: idx,
-          portKind: p.kind,
-        };
-      });
-    }
-
-    return holes;
-  }, [placed, uiCatalog]);
 
   const applyParsedState = useCallback(
     (parsed: any) => {
@@ -1544,28 +1471,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return issues;
   };
 
-  const exportWorkingAreaJson = () => {
-    const payload = {
-      version: 1,
-      grid: { rows: 10, cols: 14 },
-      puzzle: { id: puzzle.id, inputs, outputs },
-      placed,
-      wires,
-      holes: buildHoleState(),
-      totalCost: currentCost,
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `puzzle-${puzzle.id}-circuit.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const checkSolution = async () => {
     const issues = validateConnectivity();
     if (issues.length) {
@@ -1725,49 +1630,67 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   };
 
+  const beginSolveAgain = () => {
+    // Single source of truth for "start a brand-new attempt": resets local
+    // state, then calls startPuzzleAttempt({ restart: true }) so the backend
+    // closes the previous attempt (if any) and returns a fresh attempt id.
+    clearDraft();
+    setPlaced([]);
+    setWires([]);
+    setIsSolved(false);
+    solvedRef.current = false;
+    startTime.current = Date.now();
+    setElapsedSeconds(0);
+    setAttemptId(null);
+    setCluesRevealed([]);
+    if (!puzzle?.id) return;
+    // Set the per-puzzle guard BEFORE the network call so the mount-time
+    // start-attempt effect (which re-runs when isSolved flips back to false)
+    // short-circuits instead of firing a duplicate start request.
+    initializedPuzzleIdRef.current = puzzle.id;
+    startPuzzleAttempt({ puzzleId: puzzle.id, restart: true })
+      .then((response) => {
+        setAttemptId(typeof response.id === 'number' ? response.id : null);
+        if (response.started_at) {
+          const parsed = Date.parse(response.started_at);
+          const timeLimit =
+            puzzle.timeLimit ??
+            (puzzle as { time_limit_seconds?: number | null })
+              .time_limit_seconds ??
+            null;
+          if (
+            Number.isFinite(parsed) &&
+            isPlausibleStartedAt(parsed, Date.now(), timeLimit)
+          ) {
+            startTime.current = parsed;
+          }
+        }
+        if (Array.isArray(response.revealed_clues)) {
+          setCluesRevealed(
+            response.revealed_clues.map((c) => ({
+              index: c.index,
+              text: c.text,
+              penalty: c.penalty_seconds,
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        // Best-effort: validate path will still work via the back-compat
+        // open-attempt fallback when attempt_id is null.
+      });
+  };
+
   const onSolveAgain = () => {
     const shouldResetBoard = postCheck.open && postCheck.solved;
 
     // For "Try again" after a failed check, keep the user's board AND the
     // accumulated clue penalty / attempt id — the student keeps working in the
-    // same attempt. For "Solve again" after success, start a fresh attempt:
-    // the previous one was closed server-side and clue requests must restart.
+    // same attempt. For "Solve again" after success, delegate to
+    // beginSolveAgain so the previous attempt is explicitly closed server-side
+    // and a fresh one is recorded for medals / leaderboard / XP.
     if (shouldResetBoard) {
-      clearDraft();
-      setPlaced([]);
-      setWires([]);
-      setIsSolved(false);
-      // Re-enable save/flush for the fresh attempt.
-      solvedRef.current = false;
-      startTime.current = Date.now();
-      // Tear down the old attempt's state and request a new one.
-      setAttemptId(null);
-      setCluesRevealed([]);
-      if (puzzle?.id) {
-        startPuzzleAttempt({ puzzleId: puzzle.id })
-          .then((response) => {
-            setAttemptId(typeof response.id === 'number' ? response.id : null);
-            if (response.started_at) {
-              const parsed = Date.parse(response.started_at);
-              if (Number.isFinite(parsed)) {
-                startTime.current = parsed;
-              }
-            }
-            if (Array.isArray(response.revealed_clues)) {
-              setCluesRevealed(
-                response.revealed_clues.map((c) => ({
-                  index: c.index,
-                  text: c.text,
-                  penalty: c.penalty_seconds,
-                })),
-              );
-            }
-          })
-          .catch(() => {
-            // Best-effort: validate path will still work via the back-compat
-            // open-attempt fallback when attempt_id is null.
-          });
-      }
+      beginSolveAgain();
     }
 
     // Always reset interaction/UI state
@@ -1977,6 +1900,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     </svg>
                     Solved
                   </span>
+                )}
+                {isSolved && !postCheck.open && (
+                  <button
+                    type="button"
+                    onClick={beginSolveAgain}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-sky-200/70 bg-sky-50/60 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 transition-colors hover:bg-sky-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  >
+                    Solve again
+                  </button>
                 )}
               </div>
               <div className="text-[13px] text-muted-foreground">
@@ -2208,67 +2140,74 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_250px]">
-          <div className="workstation-component-menu">
-            <WorkstationMenu
-              basic={visibleBasics}
-              custom={customComponents}
-              sharedArsenal={sharedArsenalComponents}
-              solverArsenal={solverArsenalComponents}
-              componentDefs={uiCatalog}
-              allowArsenal={allowArsenal}
-              filteredBasicTypes={filteredBasicTypes}
-              selectedComponentId={
-                selectedComponent.mode === 'placing'
-                  ? selectedComponent.componentId
-                  : undefined
-              }
-              onSelectComponent={(componentId) =>
-                setSelectedComponent({
-                  mode: 'placing',
-                  componentId,
-                  rotation: 0,
-                })
-              }
-              onDragStart={setDraggedPaletteComponentId}
-              onDragEnd={() => setDraggedPaletteComponentId(null)}
-            />
-          </div>
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[1fr_250px]">
+          {/*
+            Work area shell — visually separates the palette + circuit canvas
+            from the surrounding header / sidebar / sandbox so the user reads
+            the central canvas as a dedicated work surface.
+          */}
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-card/40 p-3 shadow-subtle md:min-h-[60vh] md:grid-cols-[240px_1fr]">
+            <div className="workstation-component-menu">
+              <WorkstationMenu
+                basic={visibleBasics}
+                custom={customComponents}
+                sharedArsenal={sharedArsenalComponents}
+                solverArsenal={solverArsenalComponents}
+                componentDefs={uiCatalog}
+                allowArsenal={allowArsenal}
+                filteredBasicTypes={filteredBasicTypes}
+                selectedComponentId={
+                  selectedComponent.mode === 'placing'
+                    ? selectedComponent.componentId
+                    : undefined
+                }
+                onSelectComponent={(componentId) =>
+                  setSelectedComponent({
+                    mode: 'placing',
+                    componentId,
+                    rotation: 0,
+                  })
+                }
+                onDragStart={setDraggedPaletteComponentId}
+                onDragEnd={() => setDraggedPaletteComponentId(null)}
+              />
+            </div>
 
-          <div className="workstation-grid">
-            <WorkstationGrid
-              puzzleId={puzzle.id}
-              inputs={inputs}
-              outputs={outputs}
-              catalog={uiCatalog}
-              placed={placed}
-              wires={wires}
-              selectedComponent={selectedComponent}
-              onSelectedComponentChange={setSelectedComponent}
-              onPlacedChange={onPlacedChange}
-              onWiresChange={(next: Wire[]) => {
-                commitHistory();
-                setWires(next);
-              }}
-              draggedPaletteComponentId={draggedPaletteComponentId}
-              isChecking={isChecking}
-              isPowerSurge={isPowerSurge}
-              boardFeedback={boardFeedback}
-              showSolvedSlam={showSolvedSlam}
-              boardRows={puzzle.board_rows ?? 15}
-              boardCols={puzzle.board_cols ?? 30}
-              debuggerActive={isInlineDebugger}
-              debuggerStepIndex={debugStepIndex}
-              debuggerStepCount={stepCount}
-              debuggerInputBits={currentInputBits}
-              debuggerOutputBits={currentOutputBits}
-              debuggerGateBits={currentGateBits}
-              debuggerSequences={debugSequences}
-              onDebuggerSequenceChange={onInlineSequenceChange}
-              onInspectComponent={setInspectingPlacedId}
-              arsenalComponentDisplayModes={arsenalComponentDisplayModes}
-              disableZoomPersistence
-            />
+            <div className="workstation-grid">
+              <WorkstationGrid
+                puzzleId={puzzle.id}
+                inputs={inputs}
+                outputs={outputs}
+                catalog={uiCatalog}
+                placed={placed}
+                wires={wires}
+                selectedComponent={selectedComponent}
+                onSelectedComponentChange={setSelectedComponent}
+                onPlacedChange={onPlacedChange}
+                onWiresChange={(next: Wire[]) => {
+                  commitHistory();
+                  setWires(next);
+                }}
+                draggedPaletteComponentId={draggedPaletteComponentId}
+                isChecking={isChecking}
+                isPowerSurge={isPowerSurge}
+                boardFeedback={boardFeedback}
+                showSolvedSlam={showSolvedSlam}
+                boardRows={puzzle.board_rows ?? 15}
+                boardCols={puzzle.board_cols ?? 30}
+                debuggerActive={isInlineDebugger}
+                debuggerStepIndex={debugStepIndex}
+                debuggerStepCount={stepCount}
+                debuggerInputBits={currentInputBits}
+                debuggerOutputBits={currentOutputBits}
+                debuggerGateBits={currentGateBits}
+                debuggerSequences={debugSequences}
+                onDebuggerSequenceChange={onInlineSequenceChange}
+                onInspectComponent={setInspectingPlacedId}
+                arsenalComponentDisplayModes={arsenalComponentDisplayModes}
+                disableZoomPersistence
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -2478,10 +2417,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
                     <div className="space-y-3">
                       <div>
-                        <label className="mb-2 block text-[11px] font-medium text-foreground">
+                        <label
+                          htmlFor="sandbox-num-inputs"
+                          className="mb-2 block text-[11px] font-medium text-foreground"
+                        >
                           Inputs
                         </label>
                         <select
+                          id="sandbox-num-inputs"
                           value={sandboxNumInputs}
                           onChange={(e) =>
                             setSandboxNumInputs(parseInt(e.target.value))
@@ -2497,10 +2440,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-[11px] font-medium text-foreground">
+                        <label
+                          htmlFor="sandbox-num-outputs"
+                          className="mb-2 block text-[11px] font-medium text-foreground"
+                        >
                           Outputs
                         </label>
                         <select
+                          id="sandbox-num-outputs"
                           value={sandboxNumOutputs}
                           onChange={(e) =>
                             setSandboxNumOutputs(parseInt(e.target.value))
@@ -2974,12 +2921,33 @@ const InspectionDialog = ({
   arsenalComponentDisplayModes,
 }: InspectionDialogProps) => {
   const placedComponent = placed.find((p) => p.id === placedId);
-  if (!placedComponent) return null;
+  const uiDef = placedComponent
+    ? uiCatalog[placedComponent.componentId]
+    : undefined;
+  const catalogEntry = placedComponent
+    ? componentCatalog.get(placedComponent.componentId)
+    : undefined;
 
-  const uiDef = uiCatalog[placedComponent.componentId];
-  const catalogEntry = componentCatalog.get(placedComponent.componentId);
+  // Parse internal structure for circuit preview — must be a hook called
+  // unconditionally on every render (no early-return before this).
+  const parsedSolution = useMemo(() => {
+    if (!catalogEntry) return null;
+    try {
+      const solution = (catalogEntry as any).solution;
+      if (!solution) return null;
+      const parsed =
+        typeof solution === 'string' ? JSON.parse(solution) : solution;
+      return {
+        placed: parsed.placed || [],
+        wires: parsed.wires || [],
+      };
+    } catch (e) {
+      console.error('Failed to parse solution:', e);
+      return null;
+    }
+  }, [catalogEntry]);
 
-  if (!uiDef || !catalogEntry) return null;
+  if (!placedComponent || !uiDef || !catalogEntry) return null;
 
   // Determine visibility mode for this component (if it's an Arsenal piece in a puzzle context)
   const componentId = String(placedComponent.componentId);
@@ -3015,23 +2983,6 @@ const InspectionDialog = ({
 
   const isDFF = catalogEntry.type === 'DFF';
   const showIOMap = !isArsenal && !isDFF; // I/O Map for basic gates EXCEPT DFF
-
-  // Parse internal structure for circuit preview
-  const parsedSolution = useMemo(() => {
-    try {
-      const solution = (catalogEntry as any).solution;
-      if (!solution) return null;
-      const parsed =
-        typeof solution === 'string' ? JSON.parse(solution) : solution;
-      return {
-        placed: parsed.placed || [],
-        wires: parsed.wires || [],
-      };
-    } catch (e) {
-      console.error('Failed to parse solution:', e);
-      return null;
-    }
-  }, [(catalogEntry as any).solution]);
 
   // Map description from both camelCase and snake_case for API compatibility
   const getDescriptionContent = () => {

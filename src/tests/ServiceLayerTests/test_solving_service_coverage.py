@@ -97,25 +97,33 @@ class TestStartAttemptCoverage:
         # Penalty includes both even though only one was rendered
         assert result["total_clue_penalty_seconds"] == 35
 
-    def test_race_condition_creates_then_fetches(self):
+    def test_creates_fresh_attempt_when_no_open_attempt_exists(self):
+        """With BEGIN IMMEDIATE serialization, concurrent start_attempt calls
+        cannot both observe 'no open attempt' — SQLite blocks the second
+        until the first commits. So the optimistic-concurrency IntegrityError
+        path is no longer reachable; this test verifies the straight-line
+        create-when-empty behavior inside the transaction."""
         svc, *_ = _make_service()
         svc.auth.require_user_id.return_value = 1
         svc.puzzle_repo.get_by_id.return_value = _make_puzzle()
-        # No open attempt initially → create_attempt raises (race) → second get_open returns the winner
-        winner = SolveAttempt(id=99, puzzle_id=1, user_id=1)
-        svc.solve_repo.get_open_attempt.side_effect = [None, winner]
-        svc.solve_repo.create_attempt.side_effect = sqlite3.IntegrityError("race")
+        svc.solve_repo.get_open_attempt.return_value = None
+        fresh = SolveAttempt(id=99, puzzle_id=1, user_id=1)
+        svc.solve_repo.create_attempt.return_value = fresh
         svc.clues_repo = None
         result = svc.start_attempt("tok", 1)
         assert result["id"] == 99
+        svc.solve_repo.create_attempt.assert_called_once()
 
-    def test_race_condition_no_winner_raises(self):
+    def test_propagates_db_error_from_create_attempt(self):
+        """Unexpected DB errors during create_attempt must NOT be swallowed —
+        they propagate out so the caller surfaces a real failure instead of a
+        misleading fake attempt id."""
         svc, *_ = _make_service()
         svc.auth.require_user_id.return_value = 1
         svc.puzzle_repo.get_by_id.return_value = _make_puzzle()
-        svc.solve_repo.get_open_attempt.side_effect = [None, None]
-        svc.solve_repo.create_attempt.side_effect = sqlite3.IntegrityError("race")
-        with pytest.raises(ValidationError, match="Failed to create solve attempt"):
+        svc.solve_repo.get_open_attempt.return_value = None
+        svc.solve_repo.create_attempt.side_effect = sqlite3.IntegrityError("db down")
+        with pytest.raises(sqlite3.IntegrityError):
             svc.start_attempt("tok", 1)
 
     def test_unpublished_creator_can_start(self):

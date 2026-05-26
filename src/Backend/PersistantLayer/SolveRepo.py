@@ -484,6 +484,28 @@ class SolveRepo:
             (utcnow().isoformat(), int(attempt_id)),
         )
 
+    def abandon_stale_attempt(self, attempt_id: int) -> None:
+        """Close an open attempt that has been inactive past its staleness threshold.
+
+        Sets submitted_at=now, passed=0, fail_reason='abandoned_stale', and
+        time_used_seconds to the elapsed seconds since started_at, so that the
+        leaderboard / medal / XP code paths never reuse the stale row's started_at
+        when the user opens the same puzzle later.
+        """
+        from Backend.DomainLayer.Utils import utcnow
+        now = utcnow()
+        self.conn.execute(
+            """
+            UPDATE solve_attempts
+            SET submitted_at=?,
+                passed=0,
+                fail_reason=COALESCE(fail_reason, 'abandoned_stale'),
+                time_used_seconds=MAX(0, CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER))
+            WHERE id=? AND submitted_at IS NULL
+            """,
+            (now.isoformat(), now.isoformat(), int(attempt_id)),
+        )
+
     def get_attempt_by_id(self, attempt_id: int) -> Optional[SolveAttempt]:
         row = self.conn.execute(
             "SELECT * FROM solve_attempts WHERE id=? LIMIT 1",

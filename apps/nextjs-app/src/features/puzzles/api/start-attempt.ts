@@ -17,10 +17,15 @@ export type StartAttemptResponse = {
 
 export const startPuzzleAttempt = ({
   puzzleId,
+  restart,
 }: {
   puzzleId: string;
+  restart?: boolean;
 }): Promise<StartAttemptResponse> => {
-  return api.post(`/puzzles/${puzzleId}/attempts/start`, undefined, {
+  const url = restart
+    ? `/puzzles/${puzzleId}/attempts/start?restart=true`
+    : `/puzzles/${puzzleId}/attempts/start`;
+  return api.post(url, undefined, {
     suppressErrorNotification: true,
   });
 };
