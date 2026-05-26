@@ -1655,6 +1655,21 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       await wait(res.solved ? 1000 : 700);
       setBoardFeedback('idle');
 
+      // Extract first failed test from details array if present
+      let firstFailedTest: { inputs: Record<string, any>; expected: Record<string, any>; actual: Record<string, any> } | undefined;
+      if (!res.solved && (res as any).details && Array.isArray((res as any).details) && (res as any).details.length > 0) {
+        const firstDetail = (res as any).details[0];
+        if (firstDetail.inputs && firstDetail.expected && firstDetail.actual) {
+          firstFailedTest = {
+            inputs: firstDetail.inputs,
+            expected: firstDetail.expected,
+            actual: firstDetail.actual,
+          };
+        }
+      } else if (!res.solved && (res as any).first_failed_test) {
+        firstFailedTest = (res as any).first_failed_test;
+      }
+
       setPostCheck({
         open: true,
         solved: res.solved,
@@ -1669,7 +1684,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         xpEarned: res.xp_earned,
         puzzleTotalXP: res.puzzle_total_xp,
         xpLeftForMax: res.xp_left_for_max,
-        firstFailedTest: !res.solved && (res as any).first_failed_test ? (res as any).first_failed_test : undefined,
+        firstFailedTest,
       });
 
       if (res.solved) {
@@ -2106,19 +2121,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               >
                 Leaderboard
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!puzzle?.creatorComment?.trim()}
-                title={
-                  puzzle?.creatorComment?.trim()
-                    ? 'View creator comment'
-                    : 'No creator comment available'
-                }
-                onClick={() => setShowCreatorComment(true)}
-              >
-                Creator Comment
-              </Button>
+              {puzzle?.creatorComment?.trim() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="View creator comment"
+                  onClick={() => setShowCreatorComment(true)}
+                >
+                  Creator Comment
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

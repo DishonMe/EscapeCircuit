@@ -389,7 +389,7 @@ export const Profile = () => {
                 />
               </div>
               <span className="text-xs font-semibold text-muted-foreground">
-                100%
+                {Math.round((userData.solved_puzzles?.length || 0) / (userData.total_puzzles || 1) * 100)}%
               </span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
