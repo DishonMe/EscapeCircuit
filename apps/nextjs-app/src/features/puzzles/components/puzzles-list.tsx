@@ -36,11 +36,6 @@ import { PuzzlesToolbar } from './puzzles-toolbar';
 
 export const puzzlesTourSteps = [
   {
-    target: '.puzzle-filters-button',
-    content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
-    disableBeacon: true,
-  },
-  {
     target: '.puzzle-instructions-button',
     content:
       'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
@@ -56,6 +51,11 @@ export const puzzlesTourSteps = [
   {
     target: '.puzzle-card-action',
     content: 'Click to start solving!',
+  },
+  {
+    target: '.puzzle-filters-button',
+    content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
+    disableBeacon: true,
   },
 ];
 

@@ -6,7 +6,7 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Lock } from 'lucide-react';
+import { ChevronRight, Lock, ZoomIn, ZoomOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -190,6 +190,7 @@ export const WorkstationGrid = ({
   showSolvedSlam = false,
   activeWireIds = [],
   activeComponentIds = [],
+  highlightedWireIds = [],
   boardRows,
   boardCols,
   debuggerActive = false,
@@ -223,6 +224,7 @@ export const WorkstationGrid = ({
   showSolvedSlam?: boolean;
   activeWireIds?: string[];
   activeComponentIds?: string[];
+  highlightedWireIds?: string[];
   boardRows?: number | null;
   boardCols?: number | null;
   debuggerActive?: boolean;
@@ -1777,9 +1779,9 @@ export const WorkstationGrid = ({
     );
   };
 
-  // Calculate highlighted wire IDs based on selected component
+  // Calculate highlighted wire IDs based on selected component or passed prop
   // Note: Wire highlighting is disabled for puzzle INPUT nodes
-  const highlightedWireIds = useMemo(() => {
+  const computedHighlightedWireIds = useMemo(() => {
     const highlighted = new Set<string>();
 
     if (selectedEntity.type === 'component') {
@@ -1809,6 +1811,15 @@ export const WorkstationGrid = ({
 
     return highlighted;
   }, [selectedEntity, wires]);
+
+  // Use the passed highlightedWireIds prop if provided (for cross-highlighting from debugger),
+  // otherwise use the computed highlighting based on selected component
+  const resolvedHighlightedWireIds = useMemo(() => {
+    if (highlightedWireIds && highlightedWireIds.length > 0) {
+      return new Set(highlightedWireIds);
+    }
+    return computedHighlightedWireIds;
+  }, [highlightedWireIds, computedHighlightedWireIds]);
 
   return (
     <div className="flex flex-1 flex-col gap-2 min-h-0">
@@ -2052,6 +2063,30 @@ export const WorkstationGrid = ({
                 <path d="M6 6l1 16h10l1-16" />
               </svg>
             </button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.min(z * 1.15, 3));
+              }}
+              title="Zoom in (Scroll up)"
+            >
+              <ZoomIn className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.max(z / 1.15, minZoom));
+              }}
+              title="Zoom out (Scroll down)"
+            >
+              <ZoomOut className="size-4" />
+            </Button>
           </div>
         </div>
 
@@ -2095,7 +2130,7 @@ export const WorkstationGrid = ({
             const isRecentlyConnected = recentlyConnectedWireId === w.id;
             const isHighSignal = activeWireIdsSet.has(w.id);
             const isDeleteWarn = hoveredDeleteWireId === w.id;
-            const isHighlighted = highlightedWireIds.has(w.id);
+            const isHighlighted = resolvedHighlightedWireIds.has(w.id);
             const wirePath = getCurvedWirePath(a, b);
             const isSurgePowered =
               isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
@@ -2137,13 +2172,13 @@ export const WorkstationGrid = ({
                   stroke={strokeColor}
                   strokeWidth={
                     isPowerSurge
-                      ? 4.2
+                      ? 5.5
                       : isSelected
-                        ? 3
+                        ? 4
                         : isHighlighted
-                          ? 4
+                          ? 5
                           : isRecentlyConnected
-                            ? 4
+                            ? 5
                             : 2
                   }
                   strokeDasharray={isWireLocked ? '6,3' : undefined}
@@ -2191,12 +2226,12 @@ export const WorkstationGrid = ({
                   stroke={flowColor}
                   strokeWidth={
                     isPowerSurge
-                      ? 3.2
+                      ? 4.2
                       : isHighlighted
-                        ? 3
+                        ? 4
                         : isHighSignal
-                          ? 2.4
-                          : 1.4
+                          ? 3
+                          : 2
                   }
                   strokeDasharray={
                     isHighlighted ? '5 5' : isHighSignal ? '9 7' : '7 9'
@@ -2246,7 +2281,7 @@ export const WorkstationGrid = ({
                 )}
                 fill="none"
                 stroke="#bfdbfe"
-                strokeWidth={1.4}
+                strokeWidth={2}
                 strokeDasharray="8 6"
                 className="workstation-wire-flow-fast"
                 style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
@@ -2268,7 +2303,7 @@ export const WorkstationGrid = ({
                 d={getCurvedWirePath(wireSnapBack.from, wireSnapBack.current)}
                 fill="none"
                 stroke="#bfdbfe"
-                strokeWidth={1.4}
+                strokeWidth={2}
                 strokeDasharray="8 6"
                 className="workstation-wire-flow-fast workstation-wire-snapback"
                 style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
@@ -2600,7 +2635,7 @@ export const WorkstationGrid = ({
               >
                 {/* Selected Action Buttons: Delete (Outside) */}
                 {isSelected && !isDragging && (
-                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
+                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1 items-center">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
                       <button
@@ -2636,6 +2671,10 @@ export const WorkstationGrid = ({
                         </svg>
                       </button>
                     )}
+                    {/* Component Name Label */}
+                    <span className="ml-1 text-xs font-medium text-foreground bg-card/90 px-2 py-1 rounded shadow-sm ring-1 ring-border whitespace-nowrap">
+                      {def.label}
+                    </span>
                   </div>
                 )}
 
