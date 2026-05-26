@@ -437,6 +437,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => {
       cancelled = true;
     };
+    // We intentionally depend only on the puzzle identity / solved-state.
+    // The full `puzzle` object is read inside (for timeLimit, etc.) but is a
+    // new reference on every render, so listing it would re-fire the effect
+    // every keystroke. Identity changes are the only signals that matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puzzle?.id, puzzle?.is_solved, isSolved]);
 
   const notifications = useNotifications();

@@ -111,9 +111,11 @@ export const PuzzleActionCluster = ({
           className={cn(
             iconButtonClass,
             'transition-transform',
-            canRate && 'hover:scale-110 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40 dark:hover:text-amber-400',
+            canRate &&
+              'hover:scale-110 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40 dark:hover:text-amber-400',
             hasRated && 'text-amber-500',
-            !canRate && 'opacity-50 hover:bg-transparent hover:text-muted-foreground cursor-not-allowed',
+            !canRate &&
+              'opacity-50 hover:bg-transparent hover:text-muted-foreground cursor-not-allowed',
           )}
           aria-label={hasRated ? 'Update rating' : 'Rate puzzle'}
           aria-disabled={!canRate || undefined}
@@ -123,7 +125,10 @@ export const PuzzleActionCluster = ({
           }}
         >
           <Star
-            className={cn('size-4', hasRated && 'fill-amber-400 text-amber-500')}
+            className={cn(
+              'size-4',
+              hasRated && 'fill-amber-400 text-amber-500',
+            )}
             aria-hidden
           />
         </button>

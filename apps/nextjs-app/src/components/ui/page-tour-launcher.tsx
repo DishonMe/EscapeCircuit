@@ -291,6 +291,10 @@ export function PageTourLauncher({
     window.addEventListener('click', handleTourAdvanceClick, true);
     return () =>
       window.removeEventListener('click', handleTourAdvanceClick, true);
+    // handleTourAdvanceClick is recreated every render but closes over the
+    // same state used in the deps array, so the listener is functionally
+    // stable. Listing it would force a re-subscribe on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runTour, currentStepIndex, normalizedSteps]);
 
   // When a page opts into `disableScrolling`, make sure NOTHING moves the scroll

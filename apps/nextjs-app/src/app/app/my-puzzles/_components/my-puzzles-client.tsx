@@ -2,6 +2,7 @@
 
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { myPuzzlesTourSteps } from '@/config/tour-steps';
+
 import { MyPuzzles } from './my-puzzles';
 
 export const MyPuzzlesClient = () => {

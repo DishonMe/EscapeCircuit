@@ -5,41 +5,112 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 
+import { Button } from '@/components/ui/button';
 import { CircuitBackground } from '@/components/ui/circuit-background/circuit-background';
+import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { useCompleteGoogleRegistration } from '@/lib/auth';
-import { useNotifications } from '@/components/ui/notifications';
-import { Button } from '@/components/ui/button';
 
 type CompleteGoogleFormProps = {
   onSuccess: () => void;
 };
 
 const AVATAR_LIST = [
-  'Alligator','Anteater','Armadillo','Auroch','Axolotl','Badger','Bat','Beaver',
-  'Buffalo','Camel','Capybara','Chameleon','Cheetah','Chinchilla','Chipmunk',
-  'Chupacabra','Cormorant','Coyote','Crow','Dingo','Dinosaur','Dolphin','Duck',
-  'Elephant','Ferret','Fox','Frog','Giraffe','Gopher','Grizzly','Hedgehog',
-  'Hippo','Hyena','Ibex','Ifrit','Iguana','Jackal','Kangaroo','Koala',
-  'Kraken','Lemur','Leopard','Liger','Llama','Manatee','Mink','Monkey',
-  'Moose','Narwhal','Orangutan','Otter','Panda','Penguin','Platypus','Pumpkin',
-  'Python','Quagga','Rabbit','Raccoon','Rhino','Sheep','Shrew','Skunk',
-  'Squirrel','Tiger','Turtle','Walrus','Wolf','Wolverine','Wombat',
+  'Alligator',
+  'Anteater',
+  'Armadillo',
+  'Auroch',
+  'Axolotl',
+  'Badger',
+  'Bat',
+  'Beaver',
+  'Buffalo',
+  'Camel',
+  'Capybara',
+  'Chameleon',
+  'Cheetah',
+  'Chinchilla',
+  'Chipmunk',
+  'Chupacabra',
+  'Cormorant',
+  'Coyote',
+  'Crow',
+  'Dingo',
+  'Dinosaur',
+  'Dolphin',
+  'Duck',
+  'Elephant',
+  'Ferret',
+  'Fox',
+  'Frog',
+  'Giraffe',
+  'Gopher',
+  'Grizzly',
+  'Hedgehog',
+  'Hippo',
+  'Hyena',
+  'Ibex',
+  'Ifrit',
+  'Iguana',
+  'Jackal',
+  'Kangaroo',
+  'Koala',
+  'Kraken',
+  'Lemur',
+  'Leopard',
+  'Liger',
+  'Llama',
+  'Manatee',
+  'Mink',
+  'Monkey',
+  'Moose',
+  'Narwhal',
+  'Orangutan',
+  'Otter',
+  'Panda',
+  'Penguin',
+  'Platypus',
+  'Pumpkin',
+  'Python',
+  'Quagga',
+  'Rabbit',
+  'Raccoon',
+  'Rhino',
+  'Sheep',
+  'Shrew',
+  'Skunk',
+  'Squirrel',
+  'Tiger',
+  'Turtle',
+  'Walrus',
+  'Wolf',
+  'Wolverine',
+  'Wombat',
 ];
 
 const COLOR_PRESETS = [
-  '#38bdf8','#ef4444','#f97316','#eab308','#22c55e',
-  '#06b6d4','#3b82f6','#8b5cf6','#ec4899','#64748b',
+  '#38bdf8',
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#06b6d4',
+  '#3b82f6',
+  '#8b5cf6',
+  '#ec4899',
+  '#64748b',
 ];
 
-const completeGoogleSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().min(5, 'Password must be at least 5 characters'),
-  passwordConfirm: z.string().min(5, 'Please confirm your password'),
-}).refine((data) => data.password === data.passwordConfirm, {
-  message: "Passwords don't match",
-  path: ['passwordConfirm'],
-});
+const completeGoogleSchema = z
+  .object({
+    username: z.string().min(3, 'Username must be at least 3 characters'),
+    password: z.string().min(5, 'Password must be at least 5 characters'),
+    passwordConfirm: z.string().min(5, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.passwordConfirm, {
+    message: "Passwords don't match",
+    path: ['passwordConfirm'],
+  });
 
 export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
   const searchParams = useSearchParams();
@@ -47,7 +118,7 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
 
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState('#38bdf8');
-  const [customColor, setCustomColor] = useState('#38bdf8');
+  const customColor = '#38bdf8';
   const [useCustomColor, setUseCustomColor] = useState(false);
 
   const [username, setUsername] = useState('');
@@ -134,25 +205,23 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
     <div className="relative flex min-h-screen items-center justify-center bg-[hsl(224_30%_8%)]">
       <CircuitBackground />
 
-      <div className="relative w-full max-w-md rounded-2xl p-6 border border-sky-500/20 bg-white/5 backdrop-blur">
-
-        <h1 className="text-xl text-center text-white mb-2">
+      <div className="relative w-full max-w-md rounded-2xl border border-sky-500/20 bg-white/5 p-6 backdrop-blur">
+        <h1 className="mb-2 text-center text-xl text-white">
           Complete your account
         </h1>
 
-        <p className="text-center text-sm text-slate-400 mb-6">
+        <p className="mb-6 text-center text-sm text-slate-400">
           {name ? `Hi ${name}! ` : ''}Finish Google sign-up
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
           <div className="text-sm text-slate-300">{email}</div>
 
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Username"
-            className="w-full p-2 rounded bg-white/10 text-white"
+            className="w-full rounded bg-white/10 p-2 text-white"
           />
 
           <input
@@ -160,7 +229,7 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
-            className="w-full p-2 rounded bg-white/10 text-white"
+            className="w-full rounded bg-white/10 p-2 text-white"
           />
 
           <input
@@ -168,18 +237,18 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
             placeholder="Confirm Password"
-            className="w-full p-2 rounded bg-white/10 text-white"
+            className="w-full rounded bg-white/10 p-2 text-white"
           />
 
           <div>
-            <p className="text-sm mb-2 text-white">Choose Avatar</p>
-            <div className="grid grid-cols-6 gap-2 max-h-32 overflow-y-auto">
+            <p className="mb-2 text-sm text-white">Choose Avatar</p>
+            <div className="grid max-h-32 grid-cols-6 gap-2 overflow-y-auto">
               {AVATAR_LIST.map((avatar) => (
                 <button
                   key={avatar}
                   type="button"
                   onClick={() => setSelectedAvatar(avatar)}
-                  className={`border rounded ${
+                  className={`rounded border ${
                     selectedAvatar === avatar ? 'border-blue-500' : ''
                   }`}
                 >
@@ -190,8 +259,8 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
           </div>
 
           <div>
-            <p className="text-sm mb-2 text-white">Choose Color</p>
-            <div className="flex gap-2 flex-wrap">
+            <p className="mb-2 text-sm text-white">Choose Color</p>
+            <div className="flex flex-wrap gap-2">
               {COLOR_PRESETS.map((c) => (
                 <button
                   key={c}
@@ -201,15 +270,13 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
                     setUseCustomColor(false);
                   }}
                   style={{ background: c }}
-                  className="w-8 h-8 rounded"
+                  className="size-8 rounded"
                 />
               ))}
             </div>
           </div>
 
-          {error && (
-            <div className="text-red-400 text-sm">{error}</div>
-          )}
+          {error && <div className="text-sm text-red-400">{error}</div>}
 
           <Button
             isLoading={complete.isPending}
@@ -218,16 +285,14 @@ export const CompleteGoogleForm = ({ onSuccess }: CompleteGoogleFormProps) => {
           >
             Complete Registration
           </Button>
-
         </form>
 
-        <p className="text-center text-sm mt-4 text-slate-400">
+        <p className="mt-4 text-center text-sm text-slate-400">
           Already have an account?{' '}
           <Link href={paths.auth.login.getHref()} className="text-sky-400">
             Login
           </Link>
         </p>
-
       </div>
     </div>
   );
