@@ -60,7 +60,20 @@ class SolvingService:
     def xp(self):
         return self.xp_service
 
-    def start_attempt(self, token: str, puzzle_id: int) -> Dict[str, Any]:
+    @staticmethod
+    def _stale_open_attempt_threshold_seconds(time_limit_seconds: Optional[int]) -> int:
+        """Max age (in seconds) of an open attempt before start_attempt treats it as
+        abandoned and opens a fresh one. Tight bound for short puzzles, hard cap of 24h.
+
+        - timed puzzles: min(24h, time_limit_seconds * 4)
+        - no-limit puzzles: 24h
+        """
+        day = 24 * 3600
+        if time_limit_seconds and int(time_limit_seconds) > 0:
+            return min(day, int(time_limit_seconds) * 4)
+        return day
+
+    def start_attempt(self, token: str, puzzle_id: int, restart: bool = False) -> Dict[str, Any]:
         user_id = self.auth.require_user_id(token)
         p = self.puzzle_repo.get_by_id(int(puzzle_id))
         if not p:
@@ -78,9 +91,40 @@ class SolvingService:
         # Idempotency: reuse an existing open attempt so a refresh doesn't strand
         # accumulated clue requests against a freshly created attempt id.
         existing = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+        attempt_obj = None
         if isinstance(existing, SolveAttempt):
-            attempt_obj = existing
-        else:
+            # Decide whether to reuse or to close-and-replace.
+            # - restart=True (Solve again): always abandon and open a fresh attempt.
+            # - else: abandon only if the existing attempt is older than the staleness threshold.
+            should_abandon = False
+            if restart:
+                should_abandon = True
+            else:
+                try:
+                    started_at = existing.started_at
+                    if started_at is not None:
+                        age_seconds = (utcnow() - started_at).total_seconds()
+                        threshold = self._stale_open_attempt_threshold_seconds(
+                            getattr(p, "time_limit_seconds", None)
+                        )
+                        if age_seconds > threshold:
+                            should_abandon = True
+                except Exception:
+                    # Defensive: if we can't compute the age, treat it as reusable.
+                    should_abandon = False
+
+            if should_abandon:
+                try:
+                    self.solve_repo.abandon_stale_attempt(int(existing.id))
+                    self.conn.commit()
+                except Exception:
+                    pass
+                existing = None  # fall through to the create-new branch
+                attempt_obj = None
+            else:
+                attempt_obj = existing
+
+        if attempt_obj is None:
             try:
                 attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
                 attempt_obj = self.solve_repo.create_attempt(attempt)

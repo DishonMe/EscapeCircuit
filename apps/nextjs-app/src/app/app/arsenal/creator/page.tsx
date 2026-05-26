@@ -25,6 +25,9 @@ const OUTPUT_COUNT_OPTIONS = [1, 2, 3].map((n) => ({
   label: String(n),
 }));
 import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
+import { findUnconnectedPorts } from '@/features/arsenal/lib/validate-connections';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import { arsenalCreatorTourSteps } from '@/config/tourSteps';
 import { CircuitComponent, Wire } from '@/types/api';
 import {
   WorkstationGrid,
@@ -143,6 +146,12 @@ export default function ArsenalCreatorPage() {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ open: false });
+  // When non-null, the dialog renders a warning step listing the unwired ports
+  // and replaces the Save button with Cancel / Save anyway.
+  const [unwiredWarning, setUnwiredWarning] = useState<{
+    unconnectedInputs: string[];
+    unconnectedOutputs: string[];
+  } | null>(null);
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
@@ -419,34 +428,8 @@ export default function ArsenalCreatorPage() {
     return { gates, usedArsenalPieceIds };
   }, [placed, componentCatalog]);
 
-  const handleSave = async () => {
-    if (!pieceName.trim()) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Please enter a piece name',
-      });
-      return;
-    }
-
-    if (!pieceDescription.trim()) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'A description is required for Arsenal components.',
-      });
-      return;
-    }
-
-    if (placed.length === 0) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Please add at least one component to your circuit',
-      });
-      return;
-    }
-
+  const proceedToSave = async () => {
+    setUnwiredWarning(null);
     setSaveState({ open: true, saving: true });
 
     try {
@@ -499,19 +482,68 @@ export default function ArsenalCreatorPage() {
     }
   };
 
+  const handleSave = async () => {
+    if (!pieceName.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Please enter a piece name',
+      });
+      return;
+    }
+
+    if (!pieceDescription.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'A description is required for Arsenal components.',
+      });
+      return;
+    }
+
+    if (placed.length === 0) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Please add at least one component to your circuit',
+      });
+      return;
+    }
+
+    // Warn before saving if any declared input/output is left unwired.
+    // The user can still proceed via the warning's "Save anyway" action.
+    const unconnected = findUnconnectedPorts(inputs, outputs, wires);
+    if (
+      unconnected.unconnectedInputs.length > 0 ||
+      unconnected.unconnectedOutputs.length > 0
+    ) {
+      setUnwiredWarning(unconnected);
+      return;
+    }
+
+    await proceedToSave();
+  };
+
   const handlePlacedChange = useCallback((newPlaced: PlacedGridComponent[]) => {
     setPlaced(newPlaced);
   }, []);
 
   return (
     <div className="flex flex-col h-full gap-2">
+      <PageTourLauncher
+        tourName="arsenal-creator"
+        pageTitle="Arsenal Creator"
+        pageDescription="Walk through declaring inputs/outputs, dragging gates onto the grid, wiring them up, and saving your piece."
+        steps={arsenalCreatorTourSteps}
+        side="right"
+      />
       {/* Header + Compact Config Bar */}
       <div className="flex flex-wrap items-center gap-4 px-6 pt-3 pb-1">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           Create Arsenal Piece
         </h1>
 
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
+        <div className="tour-creator-io-config flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
           <span className="text-[12px] font-medium text-muted-foreground">
             Inputs
           </span>
@@ -534,7 +566,7 @@ export default function ArsenalCreatorPage() {
           />
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
+        <div className="tour-creator-cost flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
           <span className="text-muted-foreground">
             Components:{' '}
             <span className="font-medium text-foreground">{placed.length}</span>
@@ -561,6 +593,7 @@ export default function ArsenalCreatorPage() {
             onClick={() => setShowNameDialog(true)}
             disabled={placed.length === 0}
             size="sm"
+            className="tour-creator-save"
           >
             Save Piece
           </Button>
@@ -578,40 +611,48 @@ export default function ArsenalCreatorPage() {
 
       {/* Workstation - Main grid layout (stretches full remaining height) */}
       <div className="flex min-h-[calc(100vh-9rem)] flex-1 gap-4 px-6 pb-3">
-        <WorkstationMenu
-          basic={BASIC_COMPONENTS}
-          custom={[]}
-          sharedArsenal={[]}
-          solverArsenal={arsenalComponents}
-          allowArsenal={true}
-          filteredBasicTypes={[]}
-          selectedComponentId={
-            selectedComponent.mode === 'placing'
-              ? selectedComponent.componentId
-              : undefined
-          }
-          onSelectComponent={(componentId) =>
-            setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
-          }
-          onDragStart={setDraggedPaletteComponentId}
-          onDragEnd={() => setDraggedPaletteComponentId(null)}
-        />
+        <div className="tour-creator-palette">
+          <WorkstationMenu
+            basic={BASIC_COMPONENTS}
+            custom={[]}
+            sharedArsenal={[]}
+            solverArsenal={arsenalComponents}
+            allowArsenal={true}
+            filteredBasicTypes={[]}
+            selectedComponentId={
+              selectedComponent.mode === 'placing'
+                ? selectedComponent.componentId
+                : undefined
+            }
+            onSelectComponent={(componentId) =>
+              setSelectedComponent({
+                mode: 'placing',
+                componentId,
+                rotation: 0,
+              })
+            }
+            onDragStart={setDraggedPaletteComponentId}
+            onDragEnd={() => setDraggedPaletteComponentId(null)}
+          />
+        </div>
 
-        <WorkstationGrid
-          puzzleId="arsenal-creator"
-          inputs={inputs}
-          outputs={outputs}
-          catalog={uiCatalog}
-          placed={placed}
-          wires={wires}
-          selectedComponent={selectedComponent}
-          onSelectedComponentChange={setSelectedComponent}
-          onPlacedChange={handlePlacedChange}
-          onWiresChange={setWires}
-          draggedPaletteComponentId={draggedPaletteComponentId}
-          viewportClassName="h-full"
-          emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
-        />
+        <div className="tour-creator-grid flex-1">
+          <WorkstationGrid
+            puzzleId="arsenal-creator"
+            inputs={inputs}
+            outputs={outputs}
+            catalog={uiCatalog}
+            placed={placed}
+            wires={wires}
+            selectedComponent={selectedComponent}
+            onSelectedComponentChange={setSelectedComponent}
+            onPlacedChange={handlePlacedChange}
+            onWiresChange={setWires}
+            draggedPaletteComponentId={draggedPaletteComponentId}
+            viewportClassName="h-full"
+            emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
+          />
+        </div>
       </div>
 
       {/* Save Dialog */}
@@ -623,6 +664,15 @@ export default function ArsenalCreatorPage() {
               Give your custom logic piece a unique name and description.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="mb-3 rounded-md border border-border/60 bg-muted/40 p-3 text-[12px] leading-5 text-muted-foreground">
+            <p className="font-medium text-foreground">A few things to know</p>
+            <ul className="mt-1 list-disc pl-4">
+              <li>The name must be unique across your arsenal — you can rename later.</li>
+              <li>Visual styling (color, surface, edges) can be tweaked here and changed any time from the arsenal list.</li>
+              <li>If any declared input or output is left unwired, you&apos;ll see a warning before the piece is saved.</li>
+            </ul>
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -801,27 +851,75 @@ export default function ArsenalCreatorPage() {
             </div>
           </div>
 
+          {unwiredWarning ? (
+            <div className="mt-2 rounded-md border border-amber-200/70 bg-amber-50/60 p-3 text-[13px] text-amber-900">
+              <p className="font-semibold">Some ports are not wired</p>
+              <p className="mt-1 text-amber-900/80">
+                The piece will still save, but unwired ports will read as
+                constant inputs / unused outputs at evaluation time.
+              </p>
+              {unwiredWarning.unconnectedInputs.length > 0 ? (
+                <p className="mt-2">
+                  <span className="font-medium">Unwired inputs: </span>
+                  {unwiredWarning.unconnectedInputs.join(', ')}
+                </p>
+              ) : null}
+              {unwiredWarning.unconnectedOutputs.length > 0 ? (
+                <p className="mt-1">
+                  <span className="font-medium">Unwired outputs: </span>
+                  {unwiredWarning.unconnectedOutputs.join(', ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowNameDialog(false);
-                setSaveState({ open: false });
-              }}
-              disabled={saveState.open && saveState.saving}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={
-                (saveState.open && saveState.saving) ||
-                !pieceName.trim() ||
-                !pieceDescription.trim()
-              }
-            >
-              {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
-            </Button>
+            {unwiredWarning ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setUnwiredWarning(null)}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (saveState.open && saveState.saving) return;
+                    void proceedToSave();
+                  }}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  {saveState.open && saveState.saving
+                    ? 'Saving...'
+                    : 'Save anyway'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowNameDialog(false);
+                    setSaveState({ open: false });
+                    setUnwiredWarning(null);
+                  }}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={
+                    (saveState.open && saveState.saving) ||
+                    !pieceName.trim() ||
+                    !pieceDescription.trim()
+                  }
+                >
+                  {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

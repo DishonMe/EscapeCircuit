@@ -1,49 +1,61 @@
 import { Step } from 'react-joyride';
 
+// `react-joyride`'s Step type doesn't include `title`, but the underlying
+// tooltip API forwards it through. Cast to a permissive type so our custom
+// TourTooltip can render `step.title` for richer headers.
+type TourStep = Step & { title?: string };
+
 /**
  * Browse Puzzles Tour - /app/puzzles
  */
-export const browsePuzzlesTourSteps: Step[] = [
+export const browsePuzzlesTourSteps: TourStep[] = [
   {
+    title: 'Filter the gallery',
     target: '.puzzle-filters-button',
     content:
-      'Use the Filters button to search for puzzles by name, difficulty, fun rating, clearness rating, and solve status. You can also sort results to find puzzles that match your skill level.',
+      'Hunt for the right puzzle by difficulty, fun, clarity, or solve status. Try opening it now and slide a filter to see how the list reshuffles.',
     placement: 'bottom',
   },
   {
+    title: 'Peek at the brief',
     target: '.puzzle-instructions-button',
     content:
-      'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
+      'Open the instructions before diving in — they spell out the goal, constraints, and any creator notes.',
     placement: 'bottom',
   },
   {
+    title: 'Close the brief',
     target: '.dialog-close-button',
     content:
-      'Use the Close button to exit the instructions and return to the puzzle list.',
+      'Close the dialog whenever you are ready. The puzzle list is right behind it.',
     placement: 'bottom',
   },
   {
+    title: 'Sort to taste',
     target: '.puzzle-sort-dropdown',
     content:
-      'Sort puzzles by creation date, difficulty level, fun rating, or clarity. Find the perfect puzzle to work on next!',
+      'Sort by creation date, difficulty, fun, or clarity. A great way to surface puzzles that match your current mood.',
     placement: 'bottom',
   },
   {
+    title: 'Jump into the Workstation',
     target: '.puzzle-card-action',
     content:
-      'Click the "Solve Puzzle" button to enter the Workstation. Here you\'ll design your circuit logic, place gates, and test your solution against the challenge.',
+      'Click Solve Puzzle to enter the Workstation — that is where you wire your gates, run tests, and earn XP.',
     placement: 'left',
   },
   {
+    title: 'Bookmark for later',
     target: '.puzzle-save-button',
     content:
-      'Bookmark puzzles you want to tackle later by clicking the Save button. Your saved puzzles are easy to find on your dashboard.',
+      'Spotted something tempting but short on time? Save it — bookmarks are a click away from your dashboard.',
     placement: 'left',
   },
   {
+    title: 'Rate what you solve',
     target: '.puzzle-rating-section',
     content:
-      'After solving or spending time on a puzzle, you can rate it for fun and clarity. This helps other players find great puzzles and helps creators improve!',
+      'After you spend real time on a puzzle, rate it. Creators get feedback, and other players find the gems.',
     placement: 'top',
   },
 ];
@@ -51,47 +63,54 @@ export const browsePuzzlesTourSteps: Step[] = [
 /**
  * Puzzle Workstation Tour - /app/puzzles/[id]
  */
-export const workstationTourSteps: Step[] = [
+export const workstationTourSteps: TourStep[] = [
   {
+    title: 'Your component palette',
     target: '.workstation-component-menu',
     content:
-      'Your circuit component palette is here. Drag logic gates (AND, OR, NOT, XOR, etc.) onto the workspace to build your solution. You can also use saved Arsenal pieces if the puzzle allows them.',
+      'Every gate you can use lives here. Drag one onto the grid to start building — Arsenal pieces show up too when the puzzle allows them.',
     placement: 'right',
   },
   {
+    title: 'The work surface',
     target: '.workstation-grid',
     content:
-      'This is your workspace. Place components from the palette onto the grid, and then wire them together by connecting their input and output ports. The colored squares represent your inputs and outputs.',
+      'Drop components onto the grid and wire their ports. The colored squares on the edges are your inputs and outputs.',
     placement: 'top',
   },
   {
+    title: 'Run the tests',
     target: '.workstation-check-button',
     content:
-      'Once your circuit is complete, click "Test Solution" to run simulations against the puzzle\'s test cases. If you pass all tests, you\'ll earn XP and a medal based on your performance!',
+      'When your circuit looks right, hit Test Solution. Pass every test and you bank XP, a medal, and a leaderboard spot.',
     placement: 'top',
   },
   {
+    title: 'Inspect your circuit',
     target: '.workstation-debugger-button',
     content:
-      'Stuck? Use the Debugger to trace signal flow through your circuit step-by-step. This helps you find logic errors and understand how your gates interact.',
+      'Stuck? Open the Debugger and step through your signals one tick at a time to find the logic gap.',
     placement: 'left',
   },
   {
+    title: 'Re-read the puzzle',
     target: '.workstation-instructions-button',
     content:
-      'Refer back to the puzzle instructions to understand the problem statement, constraints, and hints from the puzzle creator.',
+      'Need a quick refresher on the goal? Pop the instructions back open without losing your wires.',
     placement: 'left',
   },
   {
+    title: 'Close the instructions',
     target: '.dialog-close-button',
     content:
-      'Use the Close button to exit the instructions and return to the workstation.',
+      'Close the dialog to return to your workstation when you are ready.',
     placement: 'left',
   },
   {
+    title: 'Experiment safely',
     target: '.workstation-sandbox-toggle',
     content:
-      'This is the Sandbox: a safe area where you can experiment freely without changing your current puzzle solution state.',
+      'The Sandbox is your scratch pad — try alternate wirings here without touching your real solution.',
     placement: 'top',
   },
 ];
@@ -99,41 +118,47 @@ export const workstationTourSteps: Step[] = [
 /**
  * Create Puzzle Tour - /app/create-puzzle
  */
-export const createPuzzleTourSteps: Step[] = [
+export const createPuzzleTourSteps: TourStep[] = [
   {
+    title: 'Start with the basics',
     target: '.create-puzzle-basic-tab',
     content:
-      'Start here! Name your puzzle, write a description, and set its difficulty level (Easy, Medium, or Hard). You can also set performance constraints like gate budget and cycle limits.',
+      'Name your puzzle, write a hook, and pick a difficulty. Set a gate budget or cycle limit here if you want a tight challenge.',
     placement: 'bottom',
   },
   {
+    title: 'Build the reference solution',
     target: '.create-puzzle-solution-tab',
     content:
-      'Build the correct solution circuit here. Design the gates and wires that solve your puzzle. You can also define an "Initial Board" with locked components that solvers must build around.',
+      'Wire the correct circuit yourself. You can also lock in a starter board that solvers must build around.',
     placement: 'bottom',
   },
   {
+    title: 'Define what "correct" means',
     target: '.create-puzzle-test-cases-tab',
     content:
-      'Define the test cases that validate solver solutions. Specify input values and expected outputs. Solvers must pass all tests to win. Use Python tests for more complex stream-based evaluation.',
+      'List the input/expected-output cases your puzzle grades against — or wire up Python tests for stream-based puzzles.',
     placement: 'bottom',
   },
   {
+    title: 'Brief your solvers',
     target: '.create-puzzle-instructions-tab',
     content:
-      'Write clear puzzle instructions in Markdown. Include the problem description, any hints, and context. Support for LaTeX math formulas is included!',
+      'Write the puzzle story in Markdown. LaTeX math is supported, so go ahead with the equations.',
     placement: 'bottom',
   },
   {
+    title: 'Add custom pieces',
     target: '.create-puzzle-custom-pieces-tab',
     content:
-      'Optionally create custom sub-circuit pieces for this specific puzzle. These can be used by solvers or as reference implementations.',
+      'Optionally bake in puzzle-specific sub-circuits — handy when you want to scope the gate set or hint at structure.',
     placement: 'bottom',
   },
   {
+    title: 'Ship it',
     target: '.create-puzzle-publish-button',
     content:
-      'When ready, publish your puzzle to make it available to the community. Or keep it as a draft to test and refine it further.',
+      'Publish when ready or keep it as a draft and iterate. You can come back to tune anything later.',
     placement: 'top',
   },
 ];
@@ -141,49 +166,96 @@ export const createPuzzleTourSteps: Step[] = [
 /**
  * My Puzzles Tour - /app/my-puzzles
  */
-export const myPuzzlesTourSteps: Step[] = [
+export const myPuzzlesTourSteps: TourStep[] = [
   {
+    title: 'Switch between drafts and published',
     target: '.tour-my-puzzles-tabs',
     content:
-      'Switch between your published puzzles and unpublished drafts.',
+      'Toggle between puzzles you have published and drafts you are still polishing.',
     placement: 'bottom',
   },
   {
+    title: 'Start a new puzzle',
     target: '.tour-my-puzzles-create',
     content:
-      'Click here to create a brand new puzzle.',
+      'Spin up a brand-new puzzle from scratch — the create-puzzle tour will walk you through it the first time.',
     placement: 'bottom',
   },
   {
+    title: 'Manage each puzzle',
     target: '.tour-my-puzzles-actions',
     content:
-      'Manage your puzzles here: edit details, publish/unpublish, or delete them.',
+      'Edit details, publish or unpublish, or delete a puzzle from here. Changes apply immediately.',
     placement: 'top',
     scrollIntoView: true,
     scrollTarget: '.tour-my-puzzles-actions',
-  } as Step,
+  } as TourStep,
 ];
 
 /**
  * Arsenal Tour - /app/arsenal
  */
-export const arsenalTourSteps: Step[] = [
+export const arsenalTourSteps: TourStep[] = [
   {
+    title: 'Your custom pieces live here',
     target: '.tour-arsenal-list',
     content:
-      'This is your collection of custom-built circuit pieces.',
+      'Every piece you have built is stored in your Arsenal. Use them in any puzzle that allows arsenal pieces.',
     placement: 'bottom',
   },
   {
+    title: 'Peek inside a piece',
     target: '.tour-arsenal-preview',
     content:
-      'Preview the internal logic of your saved pieces.',
+      'Preview the internal wiring of a piece without leaving this page — handy for remembering what each one does.',
     placement: 'top',
   },
   {
+    title: 'Keep things tidy',
     target: '.tour-arsenal-actions',
     content:
-      'Keep your arsenal organized by renaming or deleting unused pieces.',
+      'Rename, restyle, or delete pieces. A clean arsenal is a fast arsenal.',
+    placement: 'top',
+  },
+];
+
+/**
+ * Arsenal Creator Tour - /app/arsenal/creator
+ */
+export const arsenalCreatorTourSteps: TourStep[] = [
+  {
+    title: 'Declare your ports',
+    target: '.tour-creator-io-config',
+    content:
+      'Pick how many inputs and outputs this piece exposes. Those numbers decide what other puzzles can wire into.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Drag in gates',
+    target: '.tour-creator-palette',
+    content:
+      'Drag basic gates onto the grid — or reuse pieces from your existing Arsenal to compose more complex logic quickly.',
+    placement: 'right',
+  },
+  {
+    title: 'Wire the circuit',
+    target: '.tour-creator-grid',
+    content:
+      'Connect each declared input and output. If you skip a port, the Save dialog will warn you before it persists.',
+    placement: 'top',
+  },
+  {
+    title: 'Watch the cost meter',
+    target: '.tour-creator-cost',
+    content:
+      'Basic gates cost 1 each, reused Arsenal pieces inherit their own cost. Keep this in mind for budget-tight puzzles.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Save your piece',
+    target: '.tour-creator-save',
+    content:
+      'Click Save Piece to open the naming dialog. Give it a name, description, and optional visual style — then it joins your Arsenal.',
     placement: 'top',
   },
 ];
@@ -191,17 +263,19 @@ export const arsenalTourSteps: Step[] = [
 /**
  * Profile Tour - /app/profile
  */
-export const profileTourSteps: Step[] = [
+export const profileTourSteps: TourStep[] = [
   {
+    title: 'Track your climb',
     target: '.tour-profile-stats',
     content:
-      'Track your overall progression, Level, and total XP here.',
+      'Your overall level, XP, and progression live here. Watch the numbers grow as you solve.',
     placement: 'bottom',
   },
   {
+    title: 'Show off your medals',
     target: '.tour-profile-medals',
     content:
-      'See your puzzle-solving achievements and the medals you\'ve earned.',
+      'Every gold, silver, and bronze you earn is collected here. Tap one to revisit the puzzle behind it.',
     placement: 'bottom',
   },
 ];

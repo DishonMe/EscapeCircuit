@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { HelpCircle } from 'lucide-react';
+import { ArrowRight, Check, HelpCircle, Sparkles } from 'lucide-react';
 
 import GuidedTour from '@/components/ui/guided-tour';
 import { Button } from '@/components/ui/button';
@@ -43,30 +43,50 @@ function TourTooltip({
 }: any) {
   const isFirstStep = index === 0;
   const isLastStep = index === size - 1;
+  const progressPct = Math.round(((index + 1) / Math.max(1, size)) * 100);
+  const chipLabel = isLastStep
+    ? 'Final step'
+    : isFirstStep
+      ? 'Start here'
+      : 'Continue';
+  const ChipIcon = isLastStep ? Check : isFirstStep ? Sparkles : ArrowRight;
 
   return (
     <div
       {...tooltipProps}
-      className="w-[min(92vw,26rem)] rounded-2xl border border-border/70 bg-card/95 p-5 text-card-foreground shadow-2xl backdrop-blur-md"
+      key={index}
+      className="w-[min(92vw,26rem)] origin-top scale-100 rounded-2xl border border-border/70 bg-card/95 p-5 text-card-foreground opacity-100 shadow-2xl backdrop-blur-md animate-in fade-in-50 slide-in-from-bottom-2 duration-200"
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/80">
             Tutorial
           </p>
-          <div className="mt-1 text-base font-semibold text-foreground">
-            {index + 1}/{size}
-          </div>
+          {step?.title ? (
+            <h3 className="mt-1 truncate text-base font-semibold text-foreground">
+              {step.title}
+            </h3>
+          ) : (
+            <div className="mt-1 text-base font-semibold text-foreground">
+              Step {index + 1} of {size}
+            </div>
+          )}
         </div>
-        <div className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-          {isLastStep ? 'Final step' : isFirstStep ? 'Start here' : 'Continue'}
+        <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+          <ChipIcon className="size-3.5" />
+          {chipLabel}
         </div>
       </div>
 
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+          style={{ width: `${progressPct}%` }}
+          aria-label={`Tour progress ${index + 1} of ${size}`}
+        />
+      </div>
+
       <div className="mt-4 rounded-xl border border-border bg-background/90 p-4 text-sm leading-6 text-foreground shadow-inner">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          What this does
-        </div>
         {step?.content}
       </div>
 
@@ -74,7 +94,10 @@ function TourTooltip({
         <Button variant="ghost" size="sm" {...skipProps} className="px-3 text-sm">
           Skip
         </Button>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+          <span className="hidden sm:inline">
+            {index + 1} / {size}
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -84,7 +107,12 @@ function TourTooltip({
           >
             Prev
           </Button>
-          <Button variant="default" size="sm" {...primaryProps} className="px-3 text-sm">
+          <Button
+            variant="default"
+            size="sm"
+            {...primaryProps}
+            className="px-3 text-sm"
+          >
             {isLastStep ? 'Finish' : 'Next'}
           </Button>
         </div>

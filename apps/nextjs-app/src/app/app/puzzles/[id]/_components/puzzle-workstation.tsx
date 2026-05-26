@@ -29,6 +29,7 @@ import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
 import { validateSolution } from '@/features/puzzles/api/validate-solution';
 import { CreatorCommentDialog } from '@/features/puzzles/components/creator-comment-dialog';
+import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
 import { useAudio } from '@/hooks/useAudio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
@@ -211,6 +212,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const router = useRouter();
   const user = useUser();
   const startTime = useRef(Date.now());
+  // Per-puzzle guard: prevents the mount-time start-attempt effect from racing
+  // with beginSolveAgain when isSolved flips back to false. Reset by navigating
+  // to a different puzzle (the ref value no longer matches puzzle.id).
+  const initializedPuzzleIdRef = useRef<string | null>(null);
   const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
@@ -354,6 +359,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [puzzle?.initial_board, placed.length, wires.length]);
 
   useEffect(() => {
+    // Stop ticking the visible elapsed counter once the puzzle is solved.
+    // Take one final snapshot so the displayed value is the solve time, not
+    // a frozen stale value from the previous tick.
+    if (isSolved) {
+      setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
+      return;
+    }
+
     const tick = () => {
       setElapsedSeconds(Math.floor((Date.now() - startTime.current) / 1000));
     };
@@ -361,7 +374,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     tick();
     const intervalId = window.setInterval(tick, 1000);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [isSolved]);
 
   useEffect(() => {
     let cancelled = false;
@@ -369,14 +382,37 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const startAttempt = async () => {
       try {
         if (!puzzle?.id) return;
+        // Don't silently open a new attempt for an already-solved puzzle.
+        // The "Solve again" CTA is the only path to a fresh attempt; calling
+        // beginSolveAgain will manage the network request and state reset.
+        if (puzzle.is_solved || isSolved) {
+          initializedPuzzleIdRef.current = puzzle.id;
+          return;
+        }
+        // Per-puzzle guard: if beginSolveAgain already ran for this puzzle,
+        // the mount-time effect must not fire a duplicate start request.
+        if (initializedPuzzleIdRef.current === puzzle.id) {
+          return;
+        }
         const response = await startPuzzleAttempt({ puzzleId: puzzle.id });
         if (cancelled) return;
+        initializedPuzzleIdRef.current = puzzle.id;
         setAttemptId(typeof response.id === 'number' ? response.id : null);
         // Hydrate raw timer from server's started_at so a refresh doesn't reset
-        // the user's elapsed time.
+        // the user's elapsed time — but only if the server timestamp is
+        // plausible. (Backend now closes stale open attempts, so this guard is
+        // belt-and-braces protection against unusual races.)
         if (response.started_at) {
           const parsed = Date.parse(response.started_at);
-          if (Number.isFinite(parsed)) {
+          const timeLimit =
+            puzzle.timeLimit ??
+            (puzzle as { time_limit_seconds?: number | null })
+              .time_limit_seconds ??
+            null;
+          if (
+            Number.isFinite(parsed) &&
+            isPlausibleStartedAt(parsed, Date.now(), timeLimit)
+          ) {
             startTime.current = parsed;
           }
         }
@@ -404,7 +440,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => {
       cancelled = true;
     };
-  }, [puzzle?.id]);
+  }, [puzzle?.id, puzzle?.is_solved, isSolved]);
 
   const notifications = useNotifications();
 
@@ -1725,49 +1761,67 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
   };
 
+  const beginSolveAgain = () => {
+    // Single source of truth for "start a brand-new attempt": resets local
+    // state, then calls startPuzzleAttempt({ restart: true }) so the backend
+    // closes the previous attempt (if any) and returns a fresh attempt id.
+    clearDraft();
+    setPlaced([]);
+    setWires([]);
+    setIsSolved(false);
+    solvedRef.current = false;
+    startTime.current = Date.now();
+    setElapsedSeconds(0);
+    setAttemptId(null);
+    setCluesRevealed([]);
+    if (!puzzle?.id) return;
+    // Set the per-puzzle guard BEFORE the network call so the mount-time
+    // start-attempt effect (which re-runs when isSolved flips back to false)
+    // short-circuits instead of firing a duplicate start request.
+    initializedPuzzleIdRef.current = puzzle.id;
+    startPuzzleAttempt({ puzzleId: puzzle.id, restart: true })
+      .then((response) => {
+        setAttemptId(typeof response.id === 'number' ? response.id : null);
+        if (response.started_at) {
+          const parsed = Date.parse(response.started_at);
+          const timeLimit =
+            puzzle.timeLimit ??
+            (puzzle as { time_limit_seconds?: number | null })
+              .time_limit_seconds ??
+            null;
+          if (
+            Number.isFinite(parsed) &&
+            isPlausibleStartedAt(parsed, Date.now(), timeLimit)
+          ) {
+            startTime.current = parsed;
+          }
+        }
+        if (Array.isArray(response.revealed_clues)) {
+          setCluesRevealed(
+            response.revealed_clues.map((c) => ({
+              index: c.index,
+              text: c.text,
+              penalty: c.penalty_seconds,
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        // Best-effort: validate path will still work via the back-compat
+        // open-attempt fallback when attempt_id is null.
+      });
+  };
+
   const onSolveAgain = () => {
     const shouldResetBoard = postCheck.open && postCheck.solved;
 
     // For "Try again" after a failed check, keep the user's board AND the
     // accumulated clue penalty / attempt id — the student keeps working in the
-    // same attempt. For "Solve again" after success, start a fresh attempt:
-    // the previous one was closed server-side and clue requests must restart.
+    // same attempt. For "Solve again" after success, delegate to
+    // beginSolveAgain so the previous attempt is explicitly closed server-side
+    // and a fresh one is recorded for medals / leaderboard / XP.
     if (shouldResetBoard) {
-      clearDraft();
-      setPlaced([]);
-      setWires([]);
-      setIsSolved(false);
-      // Re-enable save/flush for the fresh attempt.
-      solvedRef.current = false;
-      startTime.current = Date.now();
-      // Tear down the old attempt's state and request a new one.
-      setAttemptId(null);
-      setCluesRevealed([]);
-      if (puzzle?.id) {
-        startPuzzleAttempt({ puzzleId: puzzle.id })
-          .then((response) => {
-            setAttemptId(typeof response.id === 'number' ? response.id : null);
-            if (response.started_at) {
-              const parsed = Date.parse(response.started_at);
-              if (Number.isFinite(parsed)) {
-                startTime.current = parsed;
-              }
-            }
-            if (Array.isArray(response.revealed_clues)) {
-              setCluesRevealed(
-                response.revealed_clues.map((c) => ({
-                  index: c.index,
-                  text: c.text,
-                  penalty: c.penalty_seconds,
-                })),
-              );
-            }
-          })
-          .catch(() => {
-            // Best-effort: validate path will still work via the back-compat
-            // open-attempt fallback when attempt_id is null.
-          });
-      }
+      beginSolveAgain();
     }
 
     // Always reset interaction/UI state
@@ -1977,6 +2031,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     </svg>
                     Solved
                   </span>
+                )}
+                {isSolved && !postCheck.open && (
+                  <button
+                    type="button"
+                    onClick={beginSolveAgain}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-sky-200/70 bg-sky-50/60 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 transition-colors hover:bg-sky-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  >
+                    Solve again
+                  </button>
                 )}
               </div>
               <div className="text-[13px] text-muted-foreground">
@@ -2208,9 +2271,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_250px]">
-          <div className="workstation-component-menu">
-            <WorkstationMenu
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[1fr_250px]">
+          {/*
+            Work area shell — visually separates the palette + circuit canvas
+            from the surrounding header / sidebar / sandbox so the user reads
+            the central canvas as a dedicated work surface.
+          */}
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-card/40 p-3 shadow-subtle md:min-h-[60vh] md:grid-cols-[240px_1fr]">
+            <div className="workstation-component-menu">
+              <WorkstationMenu
               basic={visibleBasics}
               custom={customComponents}
               sharedArsenal={sharedArsenalComponents}
@@ -2269,6 +2338,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               arsenalComponentDisplayModes={arsenalComponentDisplayModes}
               disableZoomPersistence
             />
+          </div>
           </div>
 
           <div className="flex flex-col gap-3">

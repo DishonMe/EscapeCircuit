@@ -125,6 +125,99 @@ class TestSolvingServiceStartAttempt:
         with pytest.raises(ValidationError):
             self.service.start_attempt("invalid_token", 1)
 
+    def test_stale_threshold_for_timed_puzzle_uses_4x_time_limit(self):
+        # 60-second puzzle → threshold is 4 minutes, not 24h.
+        assert SolvingService._stale_open_attempt_threshold_seconds(60) == 240
+
+    def test_stale_threshold_caps_at_24h_for_very_long_puzzles(self):
+        # time_limit_seconds * 4 would exceed 24h → cap at 24h.
+        assert SolvingService._stale_open_attempt_threshold_seconds(10 * 3600) == 24 * 3600
+
+    def test_stale_threshold_for_no_limit_puzzle_is_24h(self):
+        assert SolvingService._stale_open_attempt_threshold_seconds(None) == 24 * 3600
+        assert SolvingService._stale_open_attempt_threshold_seconds(0) == 24 * 3600
+
+    def _build_existing_attempt(self, started_at):
+        """Build a Mock SolveAttempt with a controllable started_at."""
+        existing = Mock(spec=SolveAttempt)
+        existing.id = 7
+        existing.puzzle_id = 1
+        existing.user_id = 1
+        existing.started_at = started_at
+        existing.to_dict.return_value = {
+            "id": 7,
+            "puzzle_id": 1,
+            "user_id": 1,
+            "started_at": started_at.isoformat() if started_at else None,
+        }
+        return existing
+
+    def test_start_attempt_reuses_recent_open_attempt(self):
+        from Backend.DomainLayer.Utils import utcnow
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        recent = self._build_existing_attempt(utcnow())
+        self.mock_solve_repo.get_open_attempt.return_value = recent
+
+        result = self.service.start_attempt("valid_token", 1)
+
+        # Idempotent reuse — no new attempt created, stale-close NOT invoked.
+        self.mock_solve_repo.abandon_stale_attempt.assert_not_called()
+        self.mock_solve_repo.create_attempt.assert_not_called()
+        assert result["id"] == 7
+
+    def test_start_attempt_abandons_stale_open_attempt(self):
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        self.mock_auth.require_user_id.return_value = 1
+        # 60-second puzzle → threshold is 240s. Make the attempt 10 minutes old.
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        stale = self._build_existing_attempt(utcnow() - timedelta(minutes=10))
+        self.mock_solve_repo.get_open_attempt.return_value = stale
+
+        fresh = Mock(spec=SolveAttempt)
+        fresh.id = 99
+        fresh.puzzle_id = 1
+        fresh.user_id = 1
+        fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = fresh
+
+        result = self.service.start_attempt("valid_token", 1)
+
+        self.mock_solve_repo.abandon_stale_attempt.assert_called_once_with(7)
+        self.mock_solve_repo.create_attempt.assert_called_once()
+        assert result["id"] == 99
+
+    def test_start_attempt_with_restart_closes_open_attempt_regardless_of_age(self):
+        from Backend.DomainLayer.Utils import utcnow
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        # Recent attempt — would normally be reused, but restart=True forces close.
+        recent = self._build_existing_attempt(utcnow())
+        self.mock_solve_repo.get_open_attempt.return_value = recent
+
+        fresh = Mock(spec=SolveAttempt)
+        fresh.id = 99
+        fresh.puzzle_id = 1
+        fresh.user_id = 1
+        fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = fresh
+
+        result = self.service.start_attempt("valid_token", 1, restart=True)
+
+        self.mock_solve_repo.abandon_stale_attempt.assert_called_once_with(7)
+        self.mock_solve_repo.create_attempt.assert_called_once()
+        assert result["id"] == 99
+
 
 class TestSolvingServiceSubmitSolution:
     def setup_method(self):
