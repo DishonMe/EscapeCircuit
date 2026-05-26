@@ -114,14 +114,25 @@ class SolvingService:
                     should_abandon = False
 
             if should_abandon:
-                try:
-                    self.solve_repo.abandon_stale_attempt(int(existing.id))
-                    self.conn.commit()
-                except Exception:
-                    pass
-                existing = None  # fall through to the create-new branch
-                attempt_obj = None
+                # Close + open the replacement in the SAME transaction so we
+                # never leave behind two open attempts for one (user, puzzle).
+                # Verify the close actually flipped submitted_at; if not, fail
+                # loudly rather than silently creating a duplicate open row.
+                stale_id = int(existing.id)
+                with transaction(self.conn):
+                    self.solve_repo.abandon_stale_attempt(stale_id)
+                    closed = self.solve_repo.get_attempt_by_id(stale_id)
+                    if closed is None or closed.submitted_at is None:
+                        raise ValidationError(
+                            "Failed to close stale attempt; refusing to start a new one."
+                        )
+                    new_attempt = SolveAttempt(
+                        id=1, puzzle_id=int(puzzle_id), user_id=int(user_id)
+                    )
+                    attempt_obj = self.solve_repo.create_attempt(new_attempt)
             else:
+                # Recent open attempt — idempotent reuse so a refresh doesn't
+                # strand accumulated clue requests against a fresh attempt id.
                 attempt_obj = existing
 
         if attempt_obj is None:

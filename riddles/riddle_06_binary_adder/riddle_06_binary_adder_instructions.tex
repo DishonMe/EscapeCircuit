@@ -9,17 +9,17 @@ Design a digital circuit that implements a \textbf{full adder} using only the fo
 \end{itemize}
 
 \subsection*{What is a Full Adder?}
-A full adder is a digital circuit that adds three binary digits: two input bits ($A$ and $B$) and a carry-in bit ($C_{\text{in}}$). It produces two outputs:
+A full adder is a digital circuit that adds three binary digits: two input bits (\textbf{First Addend} and \textbf{Second Addend}) and a \textbf{Carry In} bit. It produces two outputs:
 \begin{itemize}
-  \item Sum ($S$): The least significant bit of the sum
-  \item Carry-out ($C_{\text{out}}$): The carry bit to the next higher position
+  \item \textbf{Sum}: The least significant bit of the sum
+  \item \textbf{Carry Out}: The carry bit to the next higher position
 \end{itemize}
 
 The truth table for a full adder is:
 \begin{center}
 \begin{tabular}{|c|c|c|c|c|}
 \hline
-$A$ & $B$ & $C_{\text{in}}$ & $S$ & $C_{\text{out}}$ \\
+First Addend & Second Addend & Carry In & Sum & Carry Out \\
 \hline
 0 & 0 & 0 & 0 & 0 \\
 0 & 0 & 1 & 1 & 0 \\
@@ -45,8 +45,8 @@ $A$ & $B$ & $C_{\text{in}}$ & $S$ & $C_{\text{out}}$ \\
   \item Your circuit must correctly implement the full adder for all 8 possible input combinations
   \item Use only AND, NAND, and DFF gates
   \item Minimize the number of gates used (budget constraint may apply)
-  \item The circuit should have inputs: $A$, $B$, $C_{\text{in}}$
-  \item The circuit should have outputs: $S$, $C_{\text{out}}$
+  \item The circuit should have inputs: \textbf{First Addend}, \textbf{Second Addend}, \textbf{Carry In}
+  \item The circuit should have outputs: \textbf{Sum}, \textbf{Carry Out}
 \end{itemize}
 
 \subsection*{Hints}

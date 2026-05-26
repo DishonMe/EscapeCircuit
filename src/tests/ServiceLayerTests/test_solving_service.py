@@ -194,6 +194,30 @@ class TestSolvingServiceStartAttempt:
         self.mock_solve_repo.create_attempt.assert_called_once()
         assert result["id"] == 99
 
+    def test_start_attempt_raises_when_stale_close_did_not_take(self):
+        """If abandon_stale_attempt fails to flip submitted_at, refuse to open a
+        replacement so we never leave two open attempts for the same user/puzzle."""
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        stale = self._build_existing_attempt(utcnow() - timedelta(minutes=10))
+        self.mock_solve_repo.get_open_attempt.return_value = stale
+        # Simulate abandon_stale_attempt running but the row remaining unchanged
+        # (still open). The service must abort, NOT create a new attempt.
+        not_actually_closed = Mock(spec=SolveAttempt)
+        not_actually_closed.id = 7
+        not_actually_closed.submitted_at = None
+        self.mock_solve_repo.get_attempt_by_id.return_value = not_actually_closed
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.start_attempt("valid_token", 1)
+        assert "Failed to close stale attempt" in str(exc_info.value)
+        self.mock_solve_repo.create_attempt.assert_not_called()
+
     def test_start_attempt_with_restart_closes_open_attempt_regardless_of_age(self):
         from Backend.DomainLayer.Utils import utcnow
         self.mock_auth.require_user_id.return_value = 1

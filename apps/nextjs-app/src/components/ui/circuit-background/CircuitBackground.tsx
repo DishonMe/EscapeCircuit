@@ -40,13 +40,7 @@ export function CircuitBackground() {
     let spawnId: ReturnType<typeof setInterval>;
     let last = 0;
 
-    function resize() {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      init();
-    }
-
-    function init() {
+    const init = () => {
       nodes = [];
       edges = [];
       pulses = [];
@@ -75,15 +69,21 @@ export function CircuitBackground() {
           edges.push({ a: i, b: i + totalCols, alpha: 0.06 + Math.random() * 0.06 });
         }
       }
-    }
+    };
 
-    function spawnPulse() {
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      init();
+    };
+
+    const spawnPulse = () => {
       if (!edges.length) return;
       const edge = edges[Math.floor(Math.random() * edges.length)];
       pulses.push({ edge, t: 0, speed: 0.004 + Math.random() * 0.006 });
-    }
+    };
 
-    function draw(ts: number) {
+    const draw = (ts: number) => {
       const dt = ts - last;
       last = ts;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -136,7 +136,7 @@ export function CircuitBackground() {
       }
 
       animId = requestAnimationFrame(draw);
-    }
+    };
 
     resize();
     spawnId = setInterval(spawnPulse, 120);
