@@ -272,7 +272,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [showFirstSolveCelebration, setShowFirstSolveCelebration] =
     useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [typedInstructionText, setTypedInstructionText] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectivityIssues, setConnectivityIssues] = useState<string[] | null>(
     null,
@@ -467,56 +466,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  const normalizedInstructionText = useMemo(() => {
-    const normalizeInstructions = (raw: string) =>
-      raw
-        .replace(/\\section\*\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\subsection\*\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\textbf\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\textit\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\begin\{itemize\}|\\end\{itemize\}/g, '')
-        .replace(/\\item\s+/g, '- ')
-        .replace(/\\\\/g, '\n')
-        .replace(/\r\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-    const instructionsRaw = puzzle?.instructions?.trim();
-    if (!instructionsRaw) return '';
-
-    const normalizedInstructions = normalizeInstructions(instructionsRaw);
-    const description = puzzle?.description?.trim() ?? '';
-
-    if (!normalizedInstructions || normalizedInstructions === description) {
-      return '';
-    }
-
-    return normalizedInstructions;
-  }, [puzzle?.instructions, puzzle?.description]);
-
-  const terminalInstructionText = useMemo(
-    () => puzzle?.description?.trim() ?? '',
-    [puzzle?.description],
-  );
-
-  useEffect(() => {
-    if (!showPuzzleInfo) return;
-
-    setTypedInstructionText('');
-    if (!terminalInstructionText) return;
-
-    let index = 0;
-    const tick = window.setInterval(() => {
-      index += 1;
-      setTypedInstructionText(terminalInstructionText.slice(0, index));
-      if (index >= terminalInstructionText.length) {
-        window.clearInterval(tick);
-      }
-    }, 14);
-
-    return () => window.clearInterval(tick);
-  }, [showPuzzleInfo, terminalInstructionText]);
-
   // Render instructions HTML with markdown and KaTeX support
   useEffect(() => {
     if (!showPuzzleInfo || !puzzle?.instructions) {
@@ -535,10 +484,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
       const md = new MarkdownIt({ html: true }).use(markdownItKatex);
       const markdown = latexToMarkdown(puzzle.instructions!);
-      const html = md.render(markdown);
+      // eslint-disable-next-line testing-library/render-result-naming-convention -- md.render is markdown-it, not RTL
+      const renderedHtml = md.render(markdown);
 
       setRenderedInstructionsHtml(
-        DOMPurify.sanitize(html, {
+        DOMPurify.sanitize(renderedHtml, {
           ALLOWED_TAGS: [
             'p',
             'strong',
@@ -983,10 +933,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }, 0);
   }, [componentCatalog, placed]);
 
-  const canAddCost = (extraCost: number) => {
-    return currentCost + extraCost <= budgetLimit;
-  };
-
   const ioUsage = useMemo(() => {
     const usedInputs = new Set<string>();
     const usedOutputs = new Set<string>();
@@ -1016,64 +962,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       missingOutputs,
     };
   }, [inputs, outputs, wires]);
-
-  const buildHoleState = useCallback(() => {
-    const holes: Record<
-      string,
-      | { kind: 'empty' }
-      | { kind: 'component'; placedId: string; componentId: string }
-      | {
-          kind: 'port';
-          placedId: string;
-          componentId: string;
-          portIndex: number;
-          portKind: 'input' | 'output';
-        }
-    > = {};
-
-    const rotateOffset = (
-      offset: { row: number; col: number },
-      size: { w: number; h: number },
-      rotation: 0 | 90,
-    ) => {
-      if (rotation === 0) return offset;
-      return { row: offset.col, col: size.h - 1 - offset.row };
-    };
-
-    const rotatedSize = (size: { w: number; h: number }, rotation: 0 | 90) =>
-      rotation === 0 ? size : { w: size.h, h: size.w };
-
-    for (const inst of placed) {
-      const def = uiCatalog[inst.componentId];
-      if (!def) continue;
-
-      const size = rotatedSize(def.size, inst.rotation);
-      for (let r = 0; r < size.h; r++) {
-        for (let c = 0; c < size.w; c++) {
-          const key = `r${inst.origin.row + r}c${inst.origin.col + c}`;
-          holes[key] = {
-            kind: 'component',
-            placedId: inst.id,
-            componentId: inst.componentId,
-          };
-        }
-      }
-
-      def.ports.forEach((p, idx) => {
-        const rot = rotateOffset(p.offset, def.size, inst.rotation);
-        const key = `r${inst.origin.row + rot.row}c${inst.origin.col + rot.col}`;
-        holes[key] = {
-          kind: 'port',
-          placedId: inst.id,
-          componentId: inst.componentId,
-          portIndex: idx,
-          portKind: p.kind,
-        };
-      });
-    }
-
-    return holes;
-  }, [placed, uiCatalog]);
 
   const applyParsedState = useCallback(
     (parsed: any) => {
@@ -1576,28 +1464,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
 
     return issues;
-  };
-
-  const exportWorkingAreaJson = () => {
-    const payload = {
-      version: 1,
-      grid: { rows: 10, cols: 14 },
-      puzzle: { id: puzzle.id, inputs, outputs },
-      placed,
-      wires,
-      holes: buildHoleState(),
-      totalCost: currentCost,
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `puzzle-${puzzle.id}-circuit.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const checkSolution = async () => {
@@ -2546,10 +2412,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
                     <div className="space-y-3">
                       <div>
-                        <label className="mb-2 block text-[11px] font-medium text-foreground">
+                        <label
+                          htmlFor="sandbox-num-inputs"
+                          className="mb-2 block text-[11px] font-medium text-foreground"
+                        >
                           Inputs
                         </label>
                         <select
+                          id="sandbox-num-inputs"
                           value={sandboxNumInputs}
                           onChange={(e) =>
                             setSandboxNumInputs(parseInt(e.target.value))
@@ -2565,10 +2435,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-[11px] font-medium text-foreground">
+                        <label
+                          htmlFor="sandbox-num-outputs"
+                          className="mb-2 block text-[11px] font-medium text-foreground"
+                        >
                           Outputs
                         </label>
                         <select
+                          id="sandbox-num-outputs"
                           value={sandboxNumOutputs}
                           onChange={(e) =>
                             setSandboxNumOutputs(parseInt(e.target.value))
@@ -3042,12 +2916,33 @@ const InspectionDialog = ({
   arsenalComponentDisplayModes,
 }: InspectionDialogProps) => {
   const placedComponent = placed.find((p) => p.id === placedId);
-  if (!placedComponent) return null;
+  const uiDef = placedComponent
+    ? uiCatalog[placedComponent.componentId]
+    : undefined;
+  const catalogEntry = placedComponent
+    ? componentCatalog.get(placedComponent.componentId)
+    : undefined;
 
-  const uiDef = uiCatalog[placedComponent.componentId];
-  const catalogEntry = componentCatalog.get(placedComponent.componentId);
+  // Parse internal structure for circuit preview — must be a hook called
+  // unconditionally on every render (no early-return before this).
+  const parsedSolution = useMemo(() => {
+    if (!catalogEntry) return null;
+    try {
+      const solution = (catalogEntry as any).solution;
+      if (!solution) return null;
+      const parsed =
+        typeof solution === 'string' ? JSON.parse(solution) : solution;
+      return {
+        placed: parsed.placed || [],
+        wires: parsed.wires || [],
+      };
+    } catch (e) {
+      console.error('Failed to parse solution:', e);
+      return null;
+    }
+  }, [catalogEntry]);
 
-  if (!uiDef || !catalogEntry) return null;
+  if (!placedComponent || !uiDef || !catalogEntry) return null;
 
   // Determine visibility mode for this component (if it's an Arsenal piece in a puzzle context)
   const componentId = String(placedComponent.componentId);
@@ -3083,23 +2978,6 @@ const InspectionDialog = ({
 
   const isDFF = catalogEntry.type === 'DFF';
   const showIOMap = !isArsenal && !isDFF; // I/O Map for basic gates EXCEPT DFF
-
-  // Parse internal structure for circuit preview
-  const parsedSolution = useMemo(() => {
-    try {
-      const solution = (catalogEntry as any).solution;
-      if (!solution) return null;
-      const parsed =
-        typeof solution === 'string' ? JSON.parse(solution) : solution;
-      return {
-        placed: parsed.placed || [],
-        wires: parsed.wires || [],
-      };
-    } catch (e) {
-      console.error('Failed to parse solution:', e);
-      return null;
-    }
-  }, [(catalogEntry as any).solution]);
 
   // Map description from both camelCase and snake_case for API compatibility
   const getDescriptionContent = () => {

@@ -692,10 +692,14 @@ export default function ArsenalCreatorPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-[13px] font-medium text-foreground">
+              <label
+                htmlFor="arsenal-piece-name"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Piece Name
               </label>
               <input
+                id="arsenal-piece-name"
                 type="text"
                 value={pieceName}
                 onChange={(e: any) => setPieceName(e.target.value)}
@@ -713,10 +717,14 @@ export default function ArsenalCreatorPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-[13px] font-medium text-foreground">
+              <label
+                htmlFor="arsenal-piece-description"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
+                id="arsenal-piece-description"
                 value={pieceDescription}
                 onChange={(e: any) => setPieceDescription(e.target.value)}
                 placeholder="Describe what this component does and how it works..."

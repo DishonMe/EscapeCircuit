@@ -253,6 +253,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
             <label
+              htmlFor="login-username"
               className="mb-1.5 block text-[11px] uppercase tracking-widest"
               style={{
                 fontFamily: "'DM Mono', monospace",
@@ -262,6 +263,7 @@ export default function LoginPage() {
               Email or Username
             </label>
             <input
+              id="login-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -285,6 +287,7 @@ export default function LoginPage() {
 
           <div>
             <label
+              htmlFor="login-password"
               className="mb-1.5 block text-[11px] uppercase tracking-widest"
               style={{
                 fontFamily: "'DM Mono', monospace",
@@ -294,6 +297,7 @@ export default function LoginPage() {
               Password
             </label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
