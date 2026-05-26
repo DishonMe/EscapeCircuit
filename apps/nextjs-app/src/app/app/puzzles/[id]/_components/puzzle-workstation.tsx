@@ -2332,16 +2332,16 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     Wires
                   </div>
                   {highlightedWireIds.size > 0 && (
-                    <button
+                    <Button
                       type="button"
-                      size="xs"
+                      size="sm"
                       variant="ghost"
                       onClick={() => setHighlightedWireIds(new Set())}
                       className="text-[10px] text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 px-1.5 py-0.5 rounded transition-colors"
                       title="Clear wire highlights"
                     >
                       Clear
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {wires.length === 0 ? (
