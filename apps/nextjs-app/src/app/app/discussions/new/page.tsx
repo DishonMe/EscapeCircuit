@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 
 import { paths } from '@/config/paths';
-
 import { CreateDiscussion } from '@/features/discussions/components/create-discussion';
 
 const NewDiscussionPage = () => {

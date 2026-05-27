@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Settings } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -35,14 +35,14 @@ export const CreatorPuzzleLimits = ({
 
   const mutation = useUpdatePuzzleLimits({
     mutationConfig: {
-      onSuccess: (data) => {
+      onSuccess: () => {
         addNotification({
           type: 'success',
           title: `Puzzle limits for ${username} updated`,
         });
         setOpen(false);
       },
-      onError: (error: any) => {
+      onError: () => {
         addNotification({
           type: 'error',
           title: 'Failed to update puzzle limits',
@@ -80,13 +80,16 @@ export const CreatorPuzzleLimits = ({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-4 min-w-[260px]">
+    <div className="min-w-[260px] space-y-4 rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-semibold text-foreground">
           Puzzle Limits for {username}
         </span>
         <button
-          onClick={() => { handleReset(); setOpen(false); }}
+          onClick={() => {
+            handleReset();
+            setOpen(false);
+          }}
           className="text-[11px] text-muted-foreground hover:text-foreground"
         >
           Cancel
@@ -98,7 +101,9 @@ export const CreatorPuzzleLimits = ({
         <label className="text-[12px] font-medium text-foreground">
           Max Published
           {maxPublishedOverride === null && (
-            <span className="ml-1 text-[11px] text-muted-foreground">(level default)</span>
+            <span className="ml-1 text-[11px] text-muted-foreground">
+              (level default)
+            </span>
           )}
         </label>
         <div className="flex items-center gap-2">
@@ -126,7 +131,9 @@ export const CreatorPuzzleLimits = ({
         <label className="text-[12px] font-medium text-foreground">
           Max Unpublished
           {maxUnpublishedOverride === null && (
-            <span className="ml-1 text-[11px] text-muted-foreground">(level default)</span>
+            <span className="ml-1 text-[11px] text-muted-foreground">
+              (level default)
+            </span>
           )}
         </label>
         <div className="flex items-center gap-2">

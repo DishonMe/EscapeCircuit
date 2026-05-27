@@ -4,14 +4,25 @@
  */
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { CircleAlert, CircleCheck, CircuitBoard } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
-import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
+import { CircleAlert, CircleCheck, CircuitBoard } from 'lucide-react';
+import MarkdownIt from 'markdown-it';
+import markdownItKatex from 'markdown-it-katex';
+import { useRouter } from 'next/navigation';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+
+import 'katex/dist/katex.min.css';
+import {
+  WorkstationGrid,
+  type ComponentDef,
+  type PlacedGridComponent,
+  type SelectedComponentState,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { PageHero } from '@/components/ui/page-hero/page-hero';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
+import type { Wire } from '@/types/api';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 const DIFFICULTY_OPTIONS = [
   { value: 'EASY' as const, label: 'Easy' },
@@ -28,17 +39,6 @@ const BIT_OPTIONS = [
   { value: 0, label: '0' },
   { value: 1, label: '1' },
 ];
-import MarkdownIt from 'markdown-it';
-// @ts-ignore - markdown-it-katex doesn't have types
-import markdownItKatex from 'markdown-it-katex';
-import 'katex/dist/katex.min.css';
-import {
-  WorkstationGrid,
-  type ComponentDef,
-  type PlacedGridComponent,
-  type SelectedComponentState,
-} from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { Wire } from '@/types/api';
 
 type TabName =
   | 'basic'
@@ -98,10 +98,6 @@ const parseBinaryString = (str: string): number[] => {
       })
       .filter((v) => !isNaN(v));
   }
-};
-
-const arrayToBinaryString = (arr: number[]): string => {
-  return arr.join(',');
 };
 
 const formatInputStreamForDisplay = (
@@ -356,7 +352,7 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
   }, [latex]);
 
   return (
-    <div className="w-full rounded-xl border border-border bg-secondary/50 p-4 min-h-96 overflow-y-auto text-[13px]">
+    <div className="min-h-96 w-full overflow-y-auto rounded-xl border border-border bg-secondary/50 p-4 text-[13px]">
       <style>{`
         .prose .katex {
           vertical-align: baseline !important;
@@ -389,7 +385,7 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
       `}</style>
       {renderedHtml ? (
         <div
-          className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+          className="prose prose-sm max-w-none text-foreground dark:prose-invert [&_*]:text-foreground"
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
       ) : (
@@ -738,7 +734,7 @@ export default function CreatePuzzleForm() {
   const exportSolution = useCallback(async () => {
     // Build eval_map by simulating circuit on test cases
     const evalMap: Record<string, Record<string, number>> = {};
-    let simulationErrors: string[] = [];
+    const simulationErrors: string[] = [];
 
     // Check if circuit exists
     if (placed.length === 0 && wires.length === 0) {
@@ -828,7 +824,6 @@ export default function CreatePuzzleForm() {
             // with different outputs due to state. We'll use the first occurrence.
             if (!(evalKey in evalMap)) {
               evalMap[evalKey] = reorderedCycleOutputs;
-            } else {
             }
 
             // Check if this cycle matches expected output
@@ -948,33 +943,6 @@ export default function CreatePuzzleForm() {
     alert('Circuit validated. All test cases passed. Solution exported.');
   }, [placed, wires, data.testCases]);
 
-  const handleAddInputField = () => {
-    // Find the first input that hasn't been added to the form yet
-    const missingInput = data.basic.inputs.find(
-      (inputName) => !(inputName in (testCaseForm.inputs || {})),
-    );
-    const inputName =
-      missingInput || `input_${Object.keys(testCaseForm.inputs || {}).length}`;
-    setTestCaseForm((prev) => ({
-      ...prev,
-      inputs: { ...(prev.inputs || {}), [inputName]: 0 },
-    }));
-  };
-
-  const handleAddOutputField = () => {
-    // Find the first output that hasn't been added to the form yet
-    const missingOutput = data.basic.outputs.find(
-      (outputName) => !(outputName in (testCaseForm.expectedOutputs || {})),
-    );
-    const outputName =
-      missingOutput ||
-      `output_${Object.keys(testCaseForm.expectedOutputs || {}).length}`;
-    setTestCaseForm((prev) => ({
-      ...prev,
-      expectedOutputs: { ...(prev.expectedOutputs || {}), [outputName]: 0 },
-    }));
-  };
-
   const handleSubmit = async () => {
     if (!data.basic.name.trim()) {
       alert('Puzzle name is required');
@@ -1062,7 +1030,7 @@ export default function CreatePuzzleForm() {
       const authToken = Cookies.get(AUTH_TOKEN_COOKIE_NAME);
 
       // Convert test cases from camelCase to snake_case for backend
-      const convertedTestCases = data.testCases.map(({ id, ...tc }) => {
+      const convertedTestCases = data.testCases.map(({ id: _id, ...tc }) => {
         const converted: any = {
           kind: tc.kind,
         };
@@ -1217,7 +1185,7 @@ export default function CreatePuzzleForm() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto text-foreground">
+    <div className="mx-auto max-w-6xl p-8 text-foreground">
       <PageHero
         badge="Admin tools"
         icon={CircuitBoard}
@@ -1226,7 +1194,7 @@ export default function CreatePuzzleForm() {
       />
 
       {/* Tabs */}
-      <div className="flex border-b mb-6">
+      <div className="mb-6 flex border-b">
         {(
           [
             'basic',
@@ -1263,10 +1231,14 @@ export default function CreatePuzzleForm() {
         {activeTab === 'basic' && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[13px] font-medium text-foreground mb-2">
+              <label
+                htmlFor="cp-name"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Puzzle Name *
               </label>
               <input
+                id="cp-name"
                 type="text"
                 value={data.basic.name}
                 onChange={(e) => handleBasicChange('name', e.target.value)}
@@ -1276,10 +1248,14 @@ export default function CreatePuzzleForm() {
             </div>
 
             <div>
-              <label className="block text-[13px] font-medium text-foreground mb-2">
+              <label
+                htmlFor="cp-description"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Description *
               </label>
               <textarea
+                id="cp-description"
                 value={data.basic.description}
                 onChange={(e) =>
                   handleBasicChange('description', e.target.value)
@@ -1292,10 +1268,14 @@ export default function CreatePuzzleForm() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-budget"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Budget *
                 </label>
                 <input
+                  id="cp-budget"
                   type="number"
                   value={data.basic.budget}
                   onChange={(e) =>
@@ -1307,10 +1287,14 @@ export default function CreatePuzzleForm() {
               </div>
 
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-difficulty"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Difficulty *
                 </label>
                 <StyledSelect
+                  id="cp-difficulty"
                   aria-label="Difficulty"
                   value={data.basic.difficulty}
                   onValueChange={(v) => handleBasicChange('difficulty', v)}
@@ -1320,10 +1304,14 @@ export default function CreatePuzzleForm() {
             </div>
 
             <div>
-              <label className="block text-[13px] font-medium text-foreground mb-2">
+              <label
+                htmlFor="cp-time-limit"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Time Limit (seconds, optional)
               </label>
               <input
+                id="cp-time-limit"
                 type="number"
                 value={data.basic.timeLimit ?? ''}
                 onChange={(e) =>
@@ -1339,10 +1327,14 @@ export default function CreatePuzzleForm() {
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-min-cycles"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Min Cycles (optional)
                 </label>
                 <input
+                  id="cp-min-cycles"
                   type="number"
                   value={data.basic.minCycles ?? ''}
                   onChange={(e) =>
@@ -1356,10 +1348,14 @@ export default function CreatePuzzleForm() {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-max-cycles"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Max Cycles (optional)
                 </label>
                 <input
+                  id="cp-max-cycles"
                   type="number"
                   value={data.basic.maxCycles ?? ''}
                   onChange={(e) =>
@@ -1373,10 +1369,14 @@ export default function CreatePuzzleForm() {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-min-gate-count"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Minimum Gate Count (optional)
                 </label>
                 <input
+                  id="cp-min-gate-count"
                   type="number"
                   min="1"
                   value={data.basic.minGateCount ?? ''}
@@ -1395,10 +1395,14 @@ export default function CreatePuzzleForm() {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-total-gate-count"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Gate Limit (optional)
                 </label>
                 <input
+                  id="cp-total-gate-count"
                   type="number"
                   min="1"
                   value={data.basic.totalGateCount ?? ''}
@@ -1418,10 +1422,13 @@ export default function CreatePuzzleForm() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-[13px] font-medium text-foreground mb-2">
+            <div role="group" aria-labelledby="cp-gate-set">
+              <span
+                id="cp-gate-set"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Gate Set *
-              </label>
+              </span>
               <div className="flex flex-wrap gap-2">
                 {availableGates.map((gate) => (
                   <button
@@ -1432,10 +1439,10 @@ export default function CreatePuzzleForm() {
                         : [...data.basic.gateSet, gate];
                       handleBasicChange('gateSet', gateSet);
                     }}
-                    className={`px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors ${
+                    className={`rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors ${
                       data.basic.gateSet.includes(gate)
-                        ? 'bg-foreground text-background border-foreground'
-                        : 'bg-card border-border text-foreground hover:bg-secondary'
+                        ? 'border-foreground bg-foreground text-background'
+                        : 'border-border bg-card text-foreground hover:bg-secondary'
                     }`}
                   >
                     {gate}
@@ -1445,29 +1452,39 @@ export default function CreatePuzzleForm() {
             </div>
 
             {data.basic.gateSet.length > 0 && (
-              <div className="space-y-4">
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+              <div
+                className="space-y-4"
+                role="group"
+                aria-labelledby="cp-per-gate-limits"
+              >
+                <span
+                  id="cp-per-gate-limits"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Per-Gate Limits (optional)
-                </label>
-                <p className="text-[11px] text-muted-foreground mb-2">
+                </span>
+                <p className="mb-2 text-[11px] text-muted-foreground">
                   Ordered by category. Basic and custom limits support min/max.
                   Non-shared arsenal limits are max-only.
                 </p>
 
-                <div>
-                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                <div role="group" aria-labelledby="cp-specific-gates">
+                  <span
+                    id="cp-specific-gates"
+                    className="mb-2 block text-[12px] font-semibold text-foreground"
+                  >
                     1) Specific Gates (min/max)
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  </span>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     {data.basic.gateSet.map((gate) => (
                       <div
                         key={gate}
-                        className="border p-2 rounded-lg bg-secondary/50"
+                        className="rounded-lg border bg-secondary/50 p-2"
                       >
-                        <label className="text-[11px] font-semibold text-foreground">
+                        <span className="text-[11px] font-semibold text-foreground">
                           {gate}
-                        </label>
-                        <div className="text-[10px] text-muted-foreground mb-1">
+                        </span>
+                        <div className="mb-1 text-[10px] text-muted-foreground">
                           Category: Basic gate
                         </div>
                         <div className="space-y-1">
@@ -1486,6 +1503,7 @@ export default function CreatePuzzleForm() {
                             }}
                             className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                             placeholder="Max count"
+                            aria-label={`Max count for ${gate}`}
                           />
                           <input
                             type="number"
@@ -1507,6 +1525,7 @@ export default function CreatePuzzleForm() {
                             }}
                             className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                             placeholder="Min count"
+                            aria-label={`Min count for ${gate}`}
                           />
                         </div>
                       </div>
@@ -1514,20 +1533,23 @@ export default function CreatePuzzleForm() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                <div role="group" aria-labelledby="cp-custom-quotas">
+                  <span
+                    id="cp-custom-quotas"
+                    className="mb-2 block text-[12px] font-semibold text-foreground"
+                  >
                     2) Custom (min/max)
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  </span>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     {CUSTOM_MIN_MAX_TARGETS.map((target) => (
                       <div
                         key={target.name}
-                        className="border p-2 rounded-lg bg-secondary/50"
+                        className="rounded-lg border bg-secondary/50 p-2"
                       >
-                        <label className="text-[11px] font-semibold text-foreground">
+                        <span className="text-[11px] font-semibold text-foreground">
                           {target.name}
-                        </label>
-                        <div className="text-[10px] text-muted-foreground mb-1">
+                        </span>
+                        <div className="mb-1 text-[10px] text-muted-foreground">
                           Category: {target.label}
                         </div>
                         <div className="space-y-1">
@@ -1553,6 +1575,7 @@ export default function CreatePuzzleForm() {
                                 ? 'Max count (0 allowed)'
                                 : 'Max count'
                             }
+                            aria-label={`Max count for ${target.name}`}
                           />
                           <input
                             type="number"
@@ -1574,6 +1597,7 @@ export default function CreatePuzzleForm() {
                             }}
                             className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                             placeholder="Min count"
+                            aria-label={`Min count for ${target.name}`}
                           />
                         </div>
                       </div>
@@ -1581,20 +1605,23 @@ export default function CreatePuzzleForm() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[12px] font-semibold text-foreground mb-2">
+                <div role="group" aria-labelledby="cp-arsenal-max">
+                  <span
+                    id="cp-arsenal-max"
+                    className="mb-2 block text-[12px] font-semibold text-foreground"
+                  >
                     3) Non-Shared Arsenal (max only)
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  </span>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     {ARSENAL_MAX_ONLY_TARGETS.map((target) => (
                       <div
                         key={target.name}
-                        className="border p-2 rounded-lg bg-secondary/50"
+                        className="rounded-lg border bg-secondary/50 p-2"
                       >
-                        <label className="text-[11px] font-semibold text-foreground">
+                        <span className="text-[11px] font-semibold text-foreground">
                           {target.name}
-                        </label>
-                        <div className="text-[10px] text-muted-foreground mb-1">
+                        </span>
+                        <div className="mb-1 text-[10px] text-muted-foreground">
                           Category: {target.label}
                         </div>
                         <input
@@ -1615,6 +1642,7 @@ export default function CreatePuzzleForm() {
                           }}
                           className="w-full rounded-lg border border-border bg-transparent p-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                           placeholder="Max count"
+                          aria-label={`Max count for ${target.name}`}
                         />
                       </div>
                     ))}
@@ -1624,10 +1652,13 @@ export default function CreatePuzzleForm() {
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+              <div role="group" aria-labelledby="cp-basic-inputs">
+                <span
+                  id="cp-basic-inputs"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Inputs *
-                </label>
+                </span>
                 <div className="space-y-2">
                   {data.basic.inputs.map((input, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -1649,7 +1680,7 @@ export default function CreatePuzzleForm() {
                             data.basic.inputs.filter((_, i) => i !== idx),
                           );
                         }}
-                        className="px-3 py-2 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
+                        className="rounded-lg bg-red-50/50 px-3 py-2 text-[13px] text-red-700 transition-colors hover:bg-red-100"
                       >
                         Remove
                       </button>
@@ -1662,17 +1693,20 @@ export default function CreatePuzzleForm() {
                         `input_${data.basic.inputs.length}`,
                       ])
                     }
-                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 transition-colors hover:bg-emerald-100"
                   >
                     + Add Input
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+              <div role="group" aria-labelledby="cp-basic-outputs">
+                <span
+                  id="cp-basic-outputs"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Outputs *
-                </label>
+                </span>
                 <div className="space-y-2">
                   {data.basic.outputs.map((output, idx) => (
                     <div key={idx} className="flex gap-2">
@@ -1694,7 +1728,7 @@ export default function CreatePuzzleForm() {
                             data.basic.outputs.filter((_, i) => i !== idx),
                           );
                         }}
-                        className="px-3 py-2 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
+                        className="rounded-lg bg-red-50/50 px-3 py-2 text-[13px] text-red-700 transition-colors hover:bg-red-100"
                       >
                         Remove
                       </button>
@@ -1707,7 +1741,7 @@ export default function CreatePuzzleForm() {
                         `output_${data.basic.outputs.length}`,
                       ])
                     }
-                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    className="w-full rounded-lg bg-emerald-50/50 px-4 py-2 text-[13px] text-emerald-700 transition-colors hover:bg-emerald-100"
                   >
                     + Add Output
                   </button>
@@ -1720,12 +1754,12 @@ export default function CreatePuzzleForm() {
         {activeTab === 'test-cases' && (
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-secondary/50 p-4">
-              <h3 className="font-semibold mb-4">Add Test Case</h3>
+              <h3 className="mb-4 font-semibold">Add Test Case</h3>
 
               {(data.basic.inputs.length === 0 ||
                 data.basic.outputs.length === 0) && (
                 <div className="mb-4 rounded-lg border border-amber-300/50 bg-amber-50/40 p-3">
-                  <p className="text-[13px] text-amber-800 mb-2">
+                  <p className="mb-2 text-[13px] text-amber-800">
                     Add at least one input and one output to define test data.
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -1737,7 +1771,7 @@ export default function CreatePuzzleForm() {
                           `input_${data.basic.inputs.length}`,
                         ])
                       }
-                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 transition-colors hover:bg-emerald-100"
                     >
                       + Add Input
                     </button>
@@ -1749,14 +1783,14 @@ export default function CreatePuzzleForm() {
                           `output_${data.basic.outputs.length}`,
                         ])
                       }
-                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="rounded-lg bg-emerald-50/70 px-3 py-1.5 text-[12px] text-emerald-700 transition-colors hover:bg-emerald-100"
                     >
                       + Add Output
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveTab('basic')}
-                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] text-foreground hover:bg-secondary transition-colors"
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] text-foreground transition-colors hover:bg-secondary"
                     >
                       Open Basic Info
                     </button>
@@ -1765,10 +1799,14 @@ export default function CreatePuzzleForm() {
               )}
 
               <div className="mb-4">
-                <label className="block text-[13px] font-medium text-foreground mb-2">
+                <label
+                  htmlFor="cp-test-case-kind"
+                  className="mb-2 block text-[13px] font-medium text-foreground"
+                >
                   Test Case Type
                 </label>
                 <StyledSelect
+                  id="cp-test-case-kind"
                   aria-label="Test case type"
                   value={testCaseForm.kind || 'blackbox'}
                   onValueChange={(v) =>
@@ -1783,7 +1821,7 @@ export default function CreatePuzzleForm() {
                   }
                   options={TEST_CASE_KIND_OPTIONS}
                 />
-                <p className="text-[11px] text-foreground/75 mt-1">
+                <p className="mt-1 text-[11px] text-foreground/75">
                   {testCaseForm.kind === 'stream'
                     ? 'Sequential test with input/output values at each time step'
                     : 'Single combinatorial test case with fixed inputs and outputs'}
@@ -1793,18 +1831,27 @@ export default function CreatePuzzleForm() {
               {(testCaseForm.kind === 'blackbox' || !testCaseForm.kind) && (
                 <>
                   {data.basic.inputs.length > 0 && (
-                    <div>
-                      <label className="block text-[13px] font-medium text-foreground mb-2">
+                    <div role="group" aria-labelledby="cp-tc-inputs">
+                      <span
+                        id="cp-tc-inputs"
+                        className="mb-2 block text-[13px] font-medium text-foreground"
+                      >
                         Inputs
-                      </label>
-                      <div className="space-y-2 mb-4">
+                      </span>
+                      <div className="mb-4 space-y-2">
                         {data.basic.inputs.map((inputName) => (
                           <div
                             key={inputName}
                             className="flex items-center gap-2"
                           >
-                            <label className="w-32">{inputName}:</label>
+                            <label
+                              htmlFor={`cp-tc-input-${inputName}`}
+                              className="w-32"
+                            >
+                              {inputName}:
+                            </label>
                             <StyledSelect
+                              id={`cp-tc-input-${inputName}`}
                               aria-label={`Input value for ${inputName}`}
                               className="w-24"
                               value={testCaseForm.inputs?.[inputName] ?? 0}
@@ -1826,18 +1873,27 @@ export default function CreatePuzzleForm() {
                   )}
 
                   {data.basic.outputs.length > 0 && (
-                    <div>
-                      <label className="block text-[13px] font-medium text-foreground mb-2">
+                    <div role="group" aria-labelledby="cp-tc-expected-outputs">
+                      <span
+                        id="cp-tc-expected-outputs"
+                        className="mb-2 block text-[13px] font-medium text-foreground"
+                      >
                         Expected Outputs
-                      </label>
-                      <div className="space-y-2 mb-4">
+                      </span>
+                      <div className="mb-4 space-y-2">
                         {data.basic.outputs.map((outputName) => (
                           <div
                             key={outputName}
                             className="flex items-center gap-2"
                           >
-                            <label className="w-32">{outputName}:</label>
+                            <label
+                              htmlFor={`cp-tc-output-${outputName}`}
+                              className="w-32"
+                            >
+                              {outputName}:
+                            </label>
                             <StyledSelect
+                              id={`cp-tc-output-${outputName}`}
                               aria-label={`Expected output for ${outputName}`}
                               className="w-24"
                               value={
@@ -1864,7 +1920,7 @@ export default function CreatePuzzleForm() {
 
               {testCaseForm.kind === 'stream' && (
                 <>
-                  <div className="p-3 bg-amber-50/50 border border-border rounded-lg text-[13px] text-amber-700 mb-4">
+                  <div className="mb-4 rounded-lg border border-border bg-amber-50/50 p-3 text-[13px] text-amber-700">
                     <p className="font-semibold">
                       Stream Test Case (Sequential)
                     </p>
@@ -1875,17 +1931,22 @@ export default function CreatePuzzleForm() {
                   </div>
 
                   <div className="mb-6">
-                    <h4 className="font-semibold mb-3">Input Streams</h4>
-                    <p className="text-[11px] text-foreground/75 mb-3">
-                      Enter binary sequences: "01010" or "0,1,0,1,0" format
+                    <h4 className="mb-3 font-semibold">Input Streams</h4>
+                    <p className="mb-3 text-[11px] text-foreground/75">
+                      Enter binary sequences: &quot;01010&quot; or
+                      &quot;0,1,0,1,0&quot; format
                     </p>
                     <div className="space-y-3">
                       {data.basic.inputs.map((inputName) => (
                         <div key={inputName}>
-                          <label className="block text-[13px] font-medium text-foreground mb-1">
+                          <label
+                            htmlFor={`cp-stream-input-${inputName}`}
+                            className="mb-1 block text-[13px] font-medium text-foreground"
+                          >
                             {inputName}
                           </label>
                           <input
+                            id={`cp-stream-input-${inputName}`}
                             type="text"
                             placeholder="e.g. 01010 or 0,1,0,1,0"
                             value={streamInputStrings[inputName] || ''}
@@ -1907,19 +1968,24 @@ export default function CreatePuzzleForm() {
                   </div>
 
                   <div className="mb-6">
-                    <h4 className="font-semibold mb-3">
+                    <h4 className="mb-3 font-semibold">
                       Expected Output Streams
                     </h4>
-                    <p className="text-[11px] text-foreground/75 mb-3">
-                      Enter binary sequences: "01010" or "0,1,0,1,0" format
+                    <p className="mb-3 text-[11px] text-foreground/75">
+                      Enter binary sequences: &quot;01010&quot; or
+                      &quot;0,1,0,1,0&quot; format
                     </p>
                     <div className="space-y-3">
                       {data.basic.outputs.map((outputName) => (
                         <div key={outputName}>
-                          <label className="block text-[13px] font-medium text-foreground mb-1">
+                          <label
+                            htmlFor={`cp-stream-output-${outputName}`}
+                            className="mb-1 block text-[13px] font-medium text-foreground"
+                          >
                             {outputName}
                           </label>
                           <input
+                            id={`cp-stream-output-${outputName}`}
                             type="text"
                             placeholder="e.g. 01010 or 0,1,0,1,0"
                             value={streamOutputStrings[outputName] || ''}
@@ -1944,7 +2010,7 @@ export default function CreatePuzzleForm() {
 
               <button
                 onClick={handleAddTestCase}
-                className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                className="w-full rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
               >
                 Add Test Case
               </button>
@@ -1952,7 +2018,7 @@ export default function CreatePuzzleForm() {
 
             {data.testCases.length > 0 && (
               <div>
-                <h3 className="font-semibold mb-4">
+                <h3 className="mb-4 font-semibold">
                   Test Cases ({data.testCases.length})
                 </h3>
                 <div className="overflow-x-auto">
@@ -1989,7 +2055,7 @@ export default function CreatePuzzleForm() {
                           <td className="border p-2 text-center">
                             <button
                               onClick={() => handleRemoveTestCase(tc.id)}
-                              className="px-3 py-1 rounded-lg bg-red-50/50 text-red-700 text-[13px] hover:bg-red-100 transition-colors"
+                              className="rounded-lg bg-red-50/50 px-3 py-1 text-[13px] text-red-700 transition-colors hover:bg-red-100"
                             >
                               Delete
                             </button>
@@ -2007,18 +2073,18 @@ export default function CreatePuzzleForm() {
         {activeTab === 'python-tests' && (
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-secondary/50 p-4">
-              <h3 className="font-semibold mb-2">Python Tests (Optional)</h3>
-              <p className="text-[13px] text-muted-foreground mb-4">
+              <h3 className="mb-2 font-semibold">Python Tests (Optional)</h3>
+              <p className="mb-4 text-[13px] text-muted-foreground">
                 Upload a Python file with custom test cases for puzzle
                 validation. Tests will run when users submit solutions.
               </p>
 
-              <div className="space-y-3 mb-4">
+              <div className="mb-4 space-y-3">
                 <h4 className="text-[13px] font-semibold">How Tests Work:</h4>
-                <ul className="text-[13px] text-muted-foreground space-y-2 list-disc list-inside">
+                <ul className="list-inside list-disc space-y-2 text-[13px] text-muted-foreground">
                   <li>
                     <strong>REQUIRED:</strong> Define{' '}
-                    <code className="bg-black/20 px-1 rounded">
+                    <code className="rounded bg-black/20 px-1">
                       def run_tests(solution):
                     </code>{' '}
                     function
@@ -2026,18 +2092,18 @@ export default function CreatePuzzleForm() {
                   <li>
                     <strong>Purpose:</strong> Call your individual test
                     functions from{' '}
-                    <code className="bg-black/20 px-1 rounded">
+                    <code className="rounded bg-black/20 px-1">
                       run_tests()
                     </code>
                   </li>
                   <li>
-                    <strong>No return statements:</strong> Tests don't return
-                    values
+                    <strong>No return statements:</strong> Tests don&apos;t
+                    return values
                   </li>
                   <li>
                     <strong>Raise on failure:</strong> Use{' '}
-                    <code className="bg-black/20 px-1 rounded">
-                      raise Exception("error message")
+                    <code className="rounded bg-black/20 px-1">
+                      raise Exception(&quot;error message&quot;)
                     </code>{' '}
                     to fail
                   </li>
@@ -2047,16 +2113,16 @@ export default function CreatePuzzleForm() {
                   </li>
                   <li>
                     <strong>Available context:</strong>{' '}
-                    <code className="bg-black/20 px-1 rounded">solution</code>{' '}
+                    <code className="rounded bg-black/20 px-1">solution</code>{' '}
                     dict contains the circuit structure
                   </li>
                 </ul>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-[13px] font-medium text-foreground">
+              <label className="block space-y-2">
+                <span className="block text-[13px] font-medium text-foreground">
                   Python Tests File (optional)
-                </label>
+                </span>
                 <input
                   type="file"
                   accept=".py"
@@ -2072,13 +2138,13 @@ export default function CreatePuzzleForm() {
                     {data.pythonTests.name} selected
                   </p>
                 )}
-              </div>
+              </label>
 
-              <details className="mt-4 p-3 bg-black/20 rounded-lg">
-                <summary className="cursor-pointer font-semibold text-[13px]">
+              <details className="mt-4 rounded-lg bg-black/20 p-3">
+                <summary className="cursor-pointer text-[13px] font-semibold">
                   Example Test File
                 </summary>
-                <pre className="mt-3 p-3 bg-black/30 rounded text-[11px] overflow-x-auto">
+                <pre className="mt-3 overflow-x-auto rounded bg-black/30 p-3 text-[11px]">
                   {`# Example: validate_solution.py
 # Define individual test functions that validate the solution
 # The 'solution' dict contains: placedComponents, wires, totalCost, etc.
@@ -2116,10 +2182,10 @@ def run_tests(solution):
 
         {activeTab === 'instructions' && (
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <label className="block font-semibold">
+            <label className="block space-y-4">
+              <span className="block font-semibold">
                 Instructions (LaTeX) *
-              </label>
+              </span>
               <textarea
                 value={data.instructions}
                 onChange={(e) =>
@@ -2134,9 +2200,9 @@ def run_tests(solution):
                 {'\\textbf{}'}, {'\\textit{}'}, $...$ for math,{' '}
                 {'\\begin{itemize}'} for lists, {'\\begin{tabular}'} for tables
               </div>
-            </div>
-            <div className="space-y-4">
-              <label className="block font-semibold">Live Preview</label>
+            </label>
+            <div className="space-y-4" role="group" aria-label="Live Preview">
+              <p className="block font-semibold">Live Preview</p>
               <InstructionsPreview latex={data.instructions} />
             </div>
           </div>
@@ -2144,7 +2210,7 @@ def run_tests(solution):
 
         {activeTab === 'solution' && (
           <div className="space-y-4">
-            <div className="bg-secondary/50 border border-border p-4 rounded-lg">
+            <div className="rounded-lg border border-border bg-secondary/50 p-4">
               <h3 className="mb-2 inline-flex items-center gap-2 font-semibold text-foreground">
                 <CircuitBoard
                   className="size-4 text-muted-foreground"
@@ -2152,12 +2218,12 @@ def run_tests(solution):
                 />
                 Design Your Solution Circuit
               </h3>
-              <div className="text-[13px] text-foreground mb-3 space-y-2">
+              <div className="mb-3 space-y-2 text-[13px] text-foreground">
                 <p>
                   <strong>IMPORTANT:</strong> Your circuit must correctly
                   implement the logic for ALL test cases:
                 </p>
-                <ul className="list-disc list-inside ml-2">
+                <ul className="ml-2 list-inside list-disc">
                   {data.testCases.length > 0 ? (
                     data.testCases.map((tc, i) => {
                       if (tc.kind === 'blackbox') {
@@ -2184,22 +2250,22 @@ def run_tests(solution):
               </div>
               <button
                 onClick={exportSolution}
-                className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
               >
                 Export Solution (generates eval_map from circuit)
               </button>
             </div>
 
             {/* Workstation Grid (with menu on left) */}
-            <div className="grid grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card h-[700px]">
+            <div className="grid h-[700px] grid-cols-[240px_1fr] gap-4 rounded-xl border border-border bg-card shadow-card">
               {/* Gate Palette Sidebar */}
-              <div className="border-r p-3 overflow-y-auto bg-secondary/50">
-                <div className="text-[13px] font-semibold text-foreground mb-3">
+              <div className="overflow-y-auto border-r bg-secondary/50 p-3">
+                <div className="mb-3 text-[13px] font-semibold text-foreground">
                   Available Gates
                 </div>
                 {data.basic.gateSet.length === 0 ? (
                   <p className="text-[11px] text-foreground/75">
-                    Select gates in "Basic Info" tab
+                    Select gates in &quot;Basic Info&quot; tab
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -2217,7 +2283,7 @@ def run_tests(solution):
                           setDraggedPaletteComponentId(gateName);
                         }}
                         onDragEnd={() => setDraggedPaletteComponentId(null)}
-                        className="p-2 border border-border bg-card rounded-lg cursor-move hover:bg-secondary/50 font-medium text-[13px] text-foreground transition"
+                        className="cursor-move rounded-lg border border-border bg-card p-2 text-[13px] font-medium text-foreground transition hover:bg-secondary/50"
                       >
                         {gateName}
                       </div>
@@ -2244,7 +2310,7 @@ def run_tests(solution):
 
             {/* Export Status */}
             {data.solutionJSON.trim() && (
-              <div className="p-3 bg-emerald-50/50 border border-border rounded-lg">
+              <div className="rounded-lg border border-border bg-emerald-50/50 p-3">
                 <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-emerald-700">
                   <CircleCheck className="size-4" aria-hidden />
                   Solution exported and ready
@@ -2270,7 +2336,7 @@ def run_tests(solution):
                       solutionJSON: e.target.value,
                     }))
                   }
-                  className="w-full rounded-lg border border-border bg-transparent p-3 font-mono text-[11px] h-32 focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-32 w-full rounded-lg border border-border bg-transparent p-3 font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder={`{\n  "placed": [\n    {"id": "g1", "componentId": "XOR", "origin": {"row": 0, "col": 0}, "rotation": 0}\n  ],\n  "wires": [],\n  "inputs": ["A", "B"],\n  "outputs": ["S"],\n  "used_gates": ["XOR"]\n}`}
                 />
               </div>
@@ -2280,17 +2346,17 @@ def run_tests(solution):
       </div>
 
       {/* Submit/Cancel Buttons */}
-      <div className="flex gap-4 justify-end border-t pt-6">
+      <div className="flex justify-end gap-4 border-t pt-6">
         <button
           onClick={() => setShowConfirm('cancel')}
-          className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+          className="rounded-lg border border-border bg-card px-6 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary"
           disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           onClick={() => setShowConfirm('submit')}
-          className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
+          className="rounded-lg bg-foreground px-6 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Creating...' : 'Create Puzzle'}
@@ -2299,9 +2365,9 @@ def run_tests(solution):
 
       {/* Confirmation Dialogs */}
       {showConfirm === 'submit' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-xl shadow-card max-w-sm">
-            <h2 className="text-xl font-semibold mb-4">Confirm Creation</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="max-w-sm rounded-xl bg-card p-6 shadow-card">
+            <h2 className="mb-4 text-xl font-semibold">Confirm Creation</h2>
             <p className="mb-6">
               Are you sure you want to create this puzzle? Make sure all
               information is correct.
@@ -2309,13 +2375,13 @@ def run_tests(solution):
             <div className="flex gap-4">
               <button
                 onClick={() => setShowConfirm(null)}
-                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                className="flex-1 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
               >
                 Create
               </button>
@@ -2325,22 +2391,22 @@ def run_tests(solution):
       )}
 
       {showConfirm === 'cancel' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-xl shadow-card max-w-sm">
-            <h2 className="text-xl font-semibold mb-4">Discard Changes?</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="max-w-sm rounded-xl bg-card p-6 shadow-card">
+            <h2 className="mb-4 text-xl font-semibold">Discard Changes?</h2>
             <p className="mb-6">
               You will lose all unsaved changes if you go back.
             </p>
             <div className="flex gap-4">
               <button
                 onClick={() => setShowConfirm(null)}
-                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary"
               >
                 Keep Editing
               </button>
               <button
                 onClick={handleCancel}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition-colors"
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-red-700"
               >
                 Discard
               </button>

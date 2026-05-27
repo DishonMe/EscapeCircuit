@@ -1,21 +1,22 @@
 'use client';
 
+import { ChevronRight, Lock } from 'lucide-react';
 import type {
   DragEvent as ReactDragEvent,
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Lock } from 'lucide-react';
 
+import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
-import { RippleEffect } from '@/components/ripple-effect';
-import { useAudio } from '@/hooks/useAudio';
 import { useSettings } from '@/context/settings-context';
+import { useAudio } from '@/hooks/use-audio';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
+
 import { LogicNode, type LogicNodeVisualStyle } from './node';
 
 export type HoleCoord = { row: number; col: number };
@@ -200,7 +201,6 @@ export const WorkstationGrid = ({
   debuggerGateBits = {},
   debuggerSequences = {},
   onDebuggerSequenceChange,
-  onInspectComponent,
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
@@ -306,7 +306,7 @@ export const WorkstationGrid = ({
     y: 0,
     visible: false,
   });
-  const [hoveredWireSignal, setHoveredWireSignal] = useState<{
+  const [, setHoveredWireSignal] = useState<{
     wireId: string;
     x: number;
     y: number;
@@ -597,45 +597,52 @@ export const WorkstationGrid = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [copySelectionToClipboard, pasteFromClipboard]);
 
-  // Keyboard deletion (Delete / Backspace)
+  // Keyboard deletion (Delete / Backspace).
+  // We stash the live handler in a ref so the listener attaches once and
+  // always reads current state — avoiding both stale closures and the
+  // re-binding thrash that would come from listing every dep on the effect.
+  const deleteKeyHandlerRef = useRef<(e: KeyboardEvent) => void>();
+  deleteKeyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+    // Don't delete if user is typing in an input field
+    const activeEl = document.activeElement as HTMLElement;
+    if (
+      activeEl &&
+      (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+
+    if (
+      selectedEntity.type === 'component' &&
+      selectedEntity.placedIds.length > 0
+    ) {
+      // Delete all selected components (skip locked ones unless in edit mode)
+      for (const placedId of selectedEntity.placedIds) {
+        const component = placed.find((c) => c.id === placedId);
+        if (component?.isLocked && !isEditMode) {
+          continue;
+        }
+        removeComponent(placedId);
+      }
+    } else if (selectedEntity.type === 'wire') {
+      const wire = wires.find((w) => w.id === selectedEntity.wireId);
+      if (!wire?.isLocked || isEditMode) {
+        removeWire(selectedEntity.wireId);
+      }
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-
-      // Don't delete if user is typing in an input field
-      const activeEl = document.activeElement as HTMLElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
-      ) {
-        return;
-      }
-
-      e.preventDefault();
-
-      if (
-        selectedEntity.type === 'component' &&
-        selectedEntity.placedIds.length > 0
-      ) {
-        // Delete all selected components (skip locked ones unless in edit mode)
-        for (const placedId of selectedEntity.placedIds) {
-          const component = placed.find((c) => c.id === placedId);
-          if (component?.isLocked && !isEditMode) {
-            continue;
-          }
-          removeComponent(placedId);
-        }
-      } else if (selectedEntity.type === 'wire') {
-        const wire = wires.find((w) => w.id === selectedEntity.wireId);
-        if (!wire?.isLocked || isEditMode) {
-          removeWire(selectedEntity.wireId);
-        }
-      }
+      deleteKeyHandlerRef.current?.(e);
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity]);
+  }, []);
 
   const activeWireIdsSet = useMemo(
     () => new Set(activeWireIds),
@@ -1067,7 +1074,14 @@ export const WorkstationGrid = ({
 
       animatePanTo(clampPanToBounds(rawPan, zoom), 360);
     },
-    [animatePanTo, clampPanToBounds, gridCols, inputs.length, outputs.length, zoom],
+    [
+      animatePanTo,
+      clampPanToBounds,
+      gridCols,
+      inputs.length,
+      outputs.length,
+      zoom,
+    ],
   );
 
   const canPlaceComponentAt = (
@@ -1324,7 +1338,7 @@ export const WorkstationGrid = ({
     }
 
     return { inputs: inputsPos, outputs: outputsPos };
-  }, [inputs, outputs, pan.x, pan.y, zoom, gridCols, gridRows]);
+  }, [inputs, outputs, pan.x, pan.y, zoom, gridCols]);
 
   const onWheel = (e: ReactWheelEvent) => {
     e.preventDefault();
@@ -1341,8 +1355,8 @@ export const WorkstationGrid = ({
     const nextZoom = clamp(zoom * factor, minZoom, 4);
 
     // keep cursor world point stable
-    let afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
-    let afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
+    const afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
+    const afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
 
     const clampedPan = clampPanToBounds(
       { x: afterPanX, y: afterPanY },
@@ -1811,10 +1825,12 @@ export const WorkstationGrid = ({
   }, [selectedEntity, wires]);
 
   return (
-    <div className="flex flex-1 flex-col gap-2 min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="rounded-md border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-medium text-foreground">Working Area</div>
+          <div className="text-sm font-medium text-foreground">
+            Working Area
+          </div>
           <button
             type="button"
             className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -1934,7 +1950,7 @@ export const WorkstationGrid = ({
 
         {showSolvedSlam && (
           <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
-            <div className="rounded-xl border border-emerald-300/70 bg-white/90 px-6 py-3 text-4xl font-extrabold tracking-[0.12em] text-emerald-600 shadow-2xl shadow-emerald-500/30 animate-in fade-in zoom-in-50 duration-300 workstation-solved-slam">
+            <div className="workstation-solved-slam rounded-xl border border-emerald-300/70 bg-white/90 px-6 py-3 text-4xl font-extrabold tracking-[0.12em] text-emerald-600 shadow-2xl shadow-emerald-500/30 duration-300 animate-in fade-in zoom-in-50">
               SOLVED!
             </div>
           </div>
@@ -1963,7 +1979,7 @@ export const WorkstationGrid = ({
 
         {/* Copy, Paste, Trash - Top Flush, Centered Horizontally */}
         <div
-          className="absolute left-1/2 top-3 z-30 -translate-x-1/2 flex flex-col items-center gap-3"
+          className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-3"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-2">
@@ -2280,7 +2296,7 @@ export const WorkstationGrid = ({
         {microSparks.map((spark) => (
           <div
             key={spark.id}
-            className="pointer-events-none absolute z-30 size-1 rounded-full bg-yellow-400 workstation-micro-spark"
+            className="workstation-micro-spark pointer-events-none absolute z-30 size-1 rounded-full bg-yellow-400"
             style={{
               left: spark.x,
               top: spark.y,
@@ -2336,7 +2352,8 @@ export const WorkstationGrid = ({
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-muted-foreground/50'
-                              : (emptyHoleClassName ?? 'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50'),
+                              : (emptyHoleClassName ??
+                                'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50'),
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -2471,13 +2488,6 @@ export const WorkstationGrid = ({
 
                   const el = containerRef.current;
                   if (!el) return;
-                  const rect = el.getBoundingClientRect();
-                  const cursor = {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                  };
-                  const worldPos = screenToWorld(cursor);
-
                   // Group dragging: if clicked component is in selection, drag all selected
                   const placedIdsToMove =
                     selectedEntity.type === 'component' &&
@@ -2642,7 +2652,7 @@ export const WorkstationGrid = ({
                 {/* Lock indicator for locked components */}
                 {p.isLocked && (
                   <div
-                    className="lock-indicator absolute -top-3 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                    className="lock-indicator absolute -top-3 left-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
                     style={{
                       width: '24px',
                       height: '24px',
@@ -2765,7 +2775,7 @@ export const WorkstationGrid = ({
                         previewVisualPortOffsets.get(port.id) ?? port.offset,
                     })),
                   }}
-                  className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
+                  className="pointer-events-none absolute z-40 opacity-50 ring-2 ring-blue-500"
                   style={{
                     left: dropPreview.col * 18,
                     top: dropPreview.row * 18,

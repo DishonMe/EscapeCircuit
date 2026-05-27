@@ -19,7 +19,8 @@ type DiscussionsListResponse = {
 
 const sortBookmarkedFirst = (discussions: Discussion[]): Discussion[] => {
   return [...discussions].sort(
-    (a, b) => Number(Boolean(b.is_bookmarked)) - Number(Boolean(a.is_bookmarked)),
+    (a, b) =>
+      Number(Boolean(b.is_bookmarked)) - Number(Boolean(a.is_bookmarked)),
   );
 };
 
@@ -53,12 +54,15 @@ export const useToggleBookmark = ({
     onMutate: async () => {
       const queryKey = getDiscussionQueryOptions(discussionId).queryKey;
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<DiscussionWithReplies>(queryKey);
+      const previous =
+        queryClient.getQueryData<DiscussionWithReplies>(queryKey);
 
       await queryClient.cancelQueries({ queryKey: ['discussions'] });
-      const previousLists = queryClient.getQueriesData<DiscussionsListResponse>({
-        queryKey: ['discussions'],
-      });
+      const previousLists = queryClient.getQueriesData<DiscussionsListResponse>(
+        {
+          queryKey: ['discussions'],
+        },
+      );
 
       let nextIsBookmarked: boolean | undefined;
 
@@ -80,20 +84,22 @@ export const useToggleBookmark = ({
         const target = listData.discussions.find(
           (d) => String(d.id) === String(discussionId),
         );
-        const resolvedNext = nextIsBookmarked ?? (target ? !Boolean(target.is_bookmarked) : undefined);
+        const resolvedNext =
+          nextIsBookmarked ?? (target ? !target.is_bookmarked : undefined);
         if (resolvedNext === undefined) continue;
         nextIsBookmarked = resolvedNext;
 
-        const updatedDiscussions = listData.discussions
-          .map((d) =>
-            String(d.id) === String(discussionId)
-              ? { ...d, is_bookmarked: resolvedNext }
-              : d,
-          );
+        const updatedDiscussions = listData.discussions.map((d) =>
+          String(d.id) === String(discussionId)
+            ? { ...d, is_bookmarked: resolvedNext }
+            : d,
+        );
 
         const keyParts = Array.isArray(key) ? key : [];
         const filters =
-          keyParts.length > 1 && typeof keyParts[1] === 'object' && keyParts[1] !== null
+          keyParts.length > 1 &&
+          typeof keyParts[1] === 'object' &&
+          keyParts[1] !== null
             ? (keyParts[1] as { bookmarkedOnly?: boolean })
             : undefined;
         const bookmarkedOnly = Boolean(filters?.bookmarkedOnly);

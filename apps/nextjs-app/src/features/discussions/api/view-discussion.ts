@@ -12,7 +12,11 @@ export const viewDiscussion = ({
   return api.post(`/discussions/${discussionId}/view`);
 };
 
-export const useViewDiscussion = ({ discussionId }: { discussionId: string }) => {
+export const useViewDiscussion = ({
+  discussionId,
+}: {
+  discussionId: string;
+}) => {
   const queryClient = useQueryClient();
 
   return useMutation({

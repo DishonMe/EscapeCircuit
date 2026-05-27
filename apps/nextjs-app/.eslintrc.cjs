@@ -56,6 +56,14 @@ module.exports = {
             'puzzle-save-button',
             'puzzle-rating-section',
             'dialog-close-button',
+            // CSS keyframe / utility class names defined in styled-jsx
+            // blocks or globals.css — not Tailwind utilities.
+            'workstation-solved-slam',
+            'workstation-wire-flow-fast',
+            'workstation-wire-snapback',
+            'workstation-micro-spark',
+            'lock-indicator',
+            'ripple-pulse',
           ],
         },
       },
@@ -74,10 +82,7 @@ module.exports = {
         'plugin:react-hooks/recommended',
         'plugin:jsx-a11y/recommended',
         'plugin:prettier/recommended',
-        'plugin:testing-library/react',
-        'plugin:jest-dom/recommended',
         'plugin:tailwindcss/recommended',
-        'plugin:vitest/legacy-recommended',
       ],
       rules: {
         '@next/next/no-img-element': 'off',
@@ -158,13 +163,34 @@ module.exports = {
         'import/no-named-as-default': 'off',
         'react/react-in-jsx-scope': 'off',
         'jsx-a11y/anchor-is-valid': 'off',
-        '@typescript-eslint/no-unused-vars': ['error'],
+        '@typescript-eslint/no-unused-vars': [
+          'error',
+          { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        ],
         '@typescript-eslint/explicit-function-return-type': ['off'],
         '@typescript-eslint/explicit-module-boundary-types': ['off'],
         '@typescript-eslint/no-empty-function': ['off'],
         '@typescript-eslint/no-explicit-any': ['off'],
         'prettier/prettier': ['error', {}, { usePrettierrc: true }],
+        // `jsx` / `global` are valid styled-jsx props; the rule doesn't
+        // know about styled-jsx so we allow them at the config level
+        // rather than scattering inline disables.
+        'react/no-unknown-property': ['error', { ignore: ['jsx', 'global'] }],
+        // StyledSelect is a custom form control wrapping Radix Select;
+        // teach the a11y rule so labels wrapping it pass the check.
+        'jsx-a11y/label-has-associated-control': [
+          'error',
+          { controlComponents: ['StyledSelect'] },
+        ],
       },
+    },
+    {
+      files: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
+      extends: [
+        'plugin:testing-library/react',
+        'plugin:jest-dom/recommended',
+        'plugin:vitest/legacy-recommended',
+      ],
     },
     {
       plugins: ['check-file'],

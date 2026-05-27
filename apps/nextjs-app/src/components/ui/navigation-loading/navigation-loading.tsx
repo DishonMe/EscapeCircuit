@@ -1,19 +1,35 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 type NavigationLoadingContextValue = {
   isNavigating: boolean;
   startNavigation: (href?: string) => void;
 };
 
-const NavigationLoadingContext = createContext<NavigationLoadingContextValue | null>(null);
+const NavigationLoadingContext =
+  createContext<NavigationLoadingContextValue | null>(null);
 
-export const NavigationLoadingProvider = ({ children }: { children: React.ReactNode }) => {
+export const NavigationLoadingProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const [isNavigating, setIsNavigating] = useState(false);
-  const [navigationStartKey, setNavigationStartKey] = useState<string | null>(null);
-  const [navigationTargetKey, setNavigationTargetKey] = useState<string | null>(null);
+  const [navigationStartKey, setNavigationStartKey] = useState<string | null>(
+    null,
+  );
+  const [navigationTargetKey, setNavigationTargetKey] = useState<string | null>(
+    null,
+  );
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -29,21 +45,25 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
     }
   }, []);
 
-  const startNavigation = useCallback((href?: string) => {
-    const targetKey = href ? keyFromHref(href) : null;
-    // Do not show loader for no-op navigations to current route.
-    if (targetKey && targetKey === routeKey) return;
+  const startNavigation = useCallback(
+    (href?: string) => {
+      const targetKey = href ? keyFromHref(href) : null;
+      // Do not show loader for no-op navigations to current route.
+      if (targetKey && targetKey === routeKey) return;
 
-    setNavigationStartKey(routeKey);
-    setNavigationTargetKey(targetKey);
-    setIsNavigating(true);
-  }, [keyFromHref, routeKey]);
+      setNavigationStartKey(routeKey);
+      setNavigationTargetKey(targetKey);
+      setIsNavigating(true);
+    },
+    [keyFromHref, routeKey],
+  );
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
       if (event.defaultPrevented) return;
       if (event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        return;
 
       const target = event.target as HTMLElement | null;
       const anchor = target?.closest('a');
@@ -66,7 +86,8 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
     };
 
     document.addEventListener('click', handleDocumentClick, true);
-    return () => document.removeEventListener('click', handleDocumentClick, true);
+    return () =>
+      document.removeEventListener('click', handleDocumentClick, true);
   }, [startNavigation]);
 
   useEffect(() => {
@@ -123,11 +144,13 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
           <div className="rounded-xl border border-border bg-card px-6 py-5 shadow-xl">
             <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:0ms]" />
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:120ms]" />
-              <span className="size-2 rounded-full bg-foreground animate-bounce [animation-delay:240ms]" />
+              <span className="size-2 animate-bounce rounded-full bg-foreground [animation-delay:0ms]" />
+              <span className="size-2 animate-bounce rounded-full bg-foreground [animation-delay:120ms]" />
+              <span className="size-2 animate-bounce rounded-full bg-foreground [animation-delay:240ms]" />
             </div>
-            <p className="mt-3 text-center text-sm text-muted-foreground">Opening page...</p>
+            <p className="mt-3 text-center text-sm text-muted-foreground">
+              Opening page...
+            </p>
           </div>
         </div>
       )}
@@ -138,7 +161,9 @@ export const NavigationLoadingProvider = ({ children }: { children: React.ReactN
 export const useNavigationLoading = () => {
   const context = useContext(NavigationLoadingContext);
   if (!context) {
-    throw new Error('useNavigationLoading must be used within NavigationLoadingProvider');
+    throw new Error(
+      'useNavigationLoading must be used within NavigationLoadingProvider',
+    );
   }
   return context;
 };

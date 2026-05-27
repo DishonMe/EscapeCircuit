@@ -13,7 +13,9 @@ interface SettingsContextType {
   setSoundVolume: (volume: number) => void;
 }
 
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+const SettingsContext = createContext<SettingsContextType | undefined>(
+  undefined,
+);
 
 const STORAGE_KEY = 'escapecircuit-settings';
 
@@ -24,7 +26,11 @@ interface StoredSettings {
   soundVolume?: number;
 }
 
-export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
+export const SettingsProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [visualEffectsEnabled, setVisualEffectsEnabled] = useState(true);
   const [colabPetsEnabled, setColabPetsEnabled] = useState(false);
@@ -37,10 +43,14 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const settings: StoredSettings = JSON.parse(stored);
-        if (settings.soundEnabled !== undefined) setSoundEnabled(settings.soundEnabled);
-        if (settings.visualEffectsEnabled !== undefined) setVisualEffectsEnabled(settings.visualEffectsEnabled);
-        if (settings.colabPetsEnabled !== undefined) setColabPetsEnabled(settings.colabPetsEnabled);
-        if (settings.soundVolume !== undefined) setSoundVolume(settings.soundVolume);
+        if (settings.soundEnabled !== undefined)
+          setSoundEnabled(settings.soundEnabled);
+        if (settings.visualEffectsEnabled !== undefined)
+          setVisualEffectsEnabled(settings.visualEffectsEnabled);
+        if (settings.colabPetsEnabled !== undefined)
+          setColabPetsEnabled(settings.colabPetsEnabled);
+        if (settings.soundVolume !== undefined)
+          setSoundVolume(settings.soundVolume);
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -52,7 +62,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   // Save settings to localStorage whenever they change
   useEffect(() => {
     if (!isHydrated) return;
-    
+
     try {
       const settings: StoredSettings = {
         soundEnabled,
@@ -64,7 +74,13 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
     } catch (error) {
       console.error('Failed to save settings:', error);
     }
-  }, [soundEnabled, visualEffectsEnabled, colabPetsEnabled, soundVolume, isHydrated]);
+  }, [
+    soundEnabled,
+    visualEffectsEnabled,
+    colabPetsEnabled,
+    soundVolume,
+    isHydrated,
+  ]);
 
   const value: SettingsContextType = {
     soundEnabled,

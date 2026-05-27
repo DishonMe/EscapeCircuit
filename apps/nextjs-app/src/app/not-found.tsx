@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 import { paths } from '@/config/paths';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';

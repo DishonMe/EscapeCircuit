@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { Pin, Lock, ArrowLeft, Bell, BellOff, Bookmark } from 'lucide-react';
 import NextLink from 'next/link';
+import { useEffect, useRef } from 'react';
 
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { Button } from '@/components/ui/button';
 import { MDPreview } from '@/components/ui/md-preview';
-import { Spinner } from '@/components/ui/spinner';
 import { useNotifications } from '@/components/ui/notifications';
+import { Spinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import { useUser } from '@/lib/auth';
 import {
@@ -16,7 +17,6 @@ import {
   canDeleteDiscussion,
 } from '@/lib/authorization';
 import { cn } from '@/utils/cn';
-import { AvatarDisplay } from '@/components/ui/avatar-display';
 
 import { useToggleBookmark } from '../api/bookmark-discussion';
 import { useDeleteDiscussion } from '../api/delete-discussion';
@@ -28,6 +28,7 @@ import { useReactToDiscussion } from '../api/react-discussion';
 import { useReportDiscussion } from '../api/report-discussion';
 import { useViewDiscussion } from '../api/view-discussion';
 import { useVoteDiscussion } from '../api/vote-discussion';
+
 import { CategoryBadge } from './category-badge';
 import { ReactionPicker } from './reaction-picker';
 import { ReplyComposer } from './reply-composer';

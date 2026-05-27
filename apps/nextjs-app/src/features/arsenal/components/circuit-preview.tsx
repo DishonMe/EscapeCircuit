@@ -1,14 +1,16 @@
 'use client';
 
-import { useMyArsenal } from '@/features/arsenal/api';
-import type { ArsenalPiece } from '@/features/arsenal/api';
-import type { Wire } from '@/types/api';
+/* eslint-disable import/no-restricted-paths -- shared workstation primitives currently live under app/; extracting them is a separate refactor. */
+import { extractVisualStyleFromComponentLike } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
 import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import type {
   ComponentDef,
   PlacedGridComponent,
 } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import { extractVisualStyleFromComponentLike } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
+/* eslint-enable import/no-restricted-paths */
+import { useMyArsenal } from '@/features/arsenal/api';
+import type { ArsenalPiece } from '@/features/arsenal/api';
+import type { Wire } from '@/types/api';
 
 type PreviewPiece = Pick<
   ArsenalPiece,
@@ -39,8 +41,14 @@ export function CircuitPreview({ piece }: { piece: PreviewPiece }) {
   const structure = parseStructure(piece.structure_json);
   const { placed, wires } = structure;
 
-  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
-  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+  const inputLabels = Array.from(
+    { length: structure.numInputs },
+    (_, i) => `in${i}`,
+  );
+  const outputLabels = Array.from(
+    { length: structure.numOutputs },
+    (_, i) => `out${i}`,
+  );
 
   const arsenalMap = new Map<string, ArsenalPiece>();
   if (myArsenal) {
@@ -180,37 +188,52 @@ export function CircuitPreview({ piece }: { piece: PreviewPiece }) {
     }
   });
 
-  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
-  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+  const gridRows = Math.max(
+    15,
+    Math.max(...placed.map((c) => c.origin.row), 0) + 3,
+  );
+  const gridCols = Math.max(
+    30,
+    Math.max(...placed.map((c) => c.origin.col), 0) + 3,
+  );
 
   return (
     <div className="space-y-4">
       {piece.description && (
-        <div className="bg-foreground/5 border border-border/40 rounded-lg p-3">
+        <div className="rounded-lg border border-border/40 bg-foreground/5 p-3">
           <p className="text-sm text-foreground">{piece.description}</p>
         </div>
       )}
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Inputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numInputs}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Outputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numOutputs}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Components</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Cost</p>
           <p className="text-lg font-semibold text-foreground">{piece.cost}</p>
         </div>
       </div>
 
-      <div className="border border-border/60 rounded-lg bg-background overflow-hidden relative" style={{ height: '500px' }}>
+      <div
+        className="relative overflow-hidden rounded-lg border border-border/60 bg-background"
+        style={{ height: '500px' }}
+      >
         <style>{`
           [data-preview-mode="true"] button[title*="Delete"],
           [data-preview-mode="true"] button[title*="Cancel wiring"],
@@ -249,15 +272,22 @@ export function CircuitPreview({ piece }: { piece: PreviewPiece }) {
       </div>
 
       {placed.length > 0 && (
-        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground/70">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
               .filter(
-                (comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx,
+                (comp, idx, arr) =>
+                  arr.findIndex((c) => c.componentId === comp.componentId) ===
+                  idx,
               )
               .map((comp) => (
-                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
+                <div
+                  key={comp.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
                   <span className="text-foreground/70">{comp.componentId}</span>
                 </div>
               ))}

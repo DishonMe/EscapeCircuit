@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { parse } from 'marked';
+import { useEffect, useState } from 'react';
 
 export type MDPreviewProps = {
   value: string;

@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import 'katex/dist/katex.min.css';
 import { CircleCheck, CircleX, Medal, Star } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type {
+  ComponentDef,
+  PlacedGridComponent,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type {
-  ComponentDef,
-  PlacedGridComponent,
-} from '@/app/app/puzzles/[id]/_components/workstation-grid';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import type { CircuitComponent, Puzzle, Wire } from '@/types/api';
 
@@ -485,7 +486,7 @@ export const PuzzleViewDialog = ({
     useState(false);
 
   // Fetch full puzzle details when dialog opens
-  const { data: fullPuzzle, isLoading: isPuzzleLoading } = usePuzzle({
+  const { data: fullPuzzle } = usePuzzle({
     id: String(puzzle?.id || ''),
     config: {
       enabled: open && !!puzzle?.id,
@@ -543,7 +544,7 @@ export const PuzzleViewDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] max-w-2xl bg-card flex flex-col">
+      <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col bg-card">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {displayPuzzle.title}
@@ -605,11 +606,11 @@ export const PuzzleViewDialog = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto space-y-4 py-4 px-4">
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {tab === 'base' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Title
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -617,7 +618,7 @@ export const PuzzleViewDialog = ({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Description
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -625,7 +626,7 @@ export const PuzzleViewDialog = ({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Creator
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -633,7 +634,7 @@ export const PuzzleViewDialog = ({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Difficulty
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -641,10 +642,10 @@ export const PuzzleViewDialog = ({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Status
                 </p>
-                <p className="text-[13px] text-foreground capitalize">
+                <p className="text-[13px] capitalize text-foreground">
                   {(displayPuzzle as any).status ||
                     ((displayPuzzle as any).isPublished
                       ? 'Published'
@@ -652,7 +653,7 @@ export const PuzzleViewDialog = ({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Visibility
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -661,17 +662,17 @@ export const PuzzleViewDialog = ({
               </div>
               {displayPuzzle.creatorComment && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Creator Comment
                   </p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                  <p className="rounded bg-secondary p-2 text-[13px] text-foreground">
                     {displayPuzzle.creatorComment}
                   </p>
                 </div>
               )}
               {displayPuzzle.defaultGateSet && (
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Default Gate Set
                   </p>
                   <p className="text-[13px] text-foreground">
@@ -681,7 +682,7 @@ export const PuzzleViewDialog = ({
                 </div>
               )}
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Arsenal Allowed
                 </p>
                 <p className="text-[13px] text-foreground">
@@ -694,26 +695,26 @@ export const PuzzleViewDialog = ({
           {tab === 'test' && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Time Limit
                 </p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                <p className="rounded bg-secondary p-2 text-[13px] text-foreground">
                   {displayPuzzle.timeLimit} seconds
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Budget Limit
                 </p>
-                <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                <p className="rounded bg-secondary p-2 text-[13px] text-foreground">
                   {displayPuzzle.budgetLimit || displayPuzzle.budget}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Test Cases
                 </p>
-                <div className="border border-border rounded overflow-hidden">
+                <div className="overflow-hidden rounded border border-border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary">
@@ -752,15 +753,15 @@ export const PuzzleViewDialog = ({
                               key={idx}
                               className="border-b border-border hover:bg-secondary/50"
                             >
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]">
-                                <pre className="font-mono text-wrap break-words">
+                              <td className="px-3 py-2 text-[11px] text-muted-foreground">
+                                <pre className="text-wrap break-words font-mono">
                                   {JSON.stringify(
                                     tc.inputs || tc.input_stream || {},
                                   )}
                                 </pre>
                               </td>
-                              <td className="px-3 py-2 text-muted-foreground text-[11px]">
-                                <pre className="font-mono text-wrap break-words">
+                              <td className="px-3 py-2 text-[11px] text-muted-foreground">
+                                <pre className="text-wrap break-words font-mono">
                                   {JSON.stringify(
                                     tc.outputs ||
                                       tc.expected_output_stream ||
@@ -785,10 +786,10 @@ export const PuzzleViewDialog = ({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Gate Limits (Allowed Gates)
                 </p>
-                <div className="bg-secondary p-3 rounded text-[13px] text-foreground">
+                <div className="rounded bg-secondary p-3 text-[13px] text-foreground">
                   {(displayPuzzle as any).gateLimits &&
                   Object.keys((displayPuzzle as any).gateLimits).length > 0
                     ? Object.entries((displayPuzzle as any).gateLimits)
@@ -801,7 +802,7 @@ export const PuzzleViewDialog = ({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Arsenal Pieces
                 </p>
                 <p className="inline-flex items-center gap-1.5 text-[12px] text-foreground">
@@ -825,7 +826,7 @@ export const PuzzleViewDialog = ({
                 displayPuzzle.specialComponents &&
                 displayPuzzle.specialComponents.length > 0 && (
                   <div>
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Available Arsenal
                     </p>
                     <div className="space-y-2">
@@ -833,7 +834,7 @@ export const PuzzleViewDialog = ({
                         (comp: any, idx: number) => (
                           <div
                             key={idx}
-                            className="bg-secondary p-3 rounded text-[12px]"
+                            className="rounded bg-secondary p-3 text-[12px]"
                           >
                             <p className="text-foreground">
                               <strong>{comp.type}</strong> - Cost: {comp.cost},
@@ -852,30 +853,30 @@ export const PuzzleViewDialog = ({
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Total Solves
                   </p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                  <p className="rounded bg-secondary p-2 text-[13px] text-foreground">
                     {displayPuzzle.solvedCount || 0}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Times Saved
                   </p>
-                  <p className="text-[13px] text-foreground bg-secondary p-2 rounded">
+                  <p className="rounded bg-secondary p-2 text-[13px] text-foreground">
                     {(displayPuzzle as any).timesSaved || 0}
                   </p>
                 </div>
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Average Ratings
                 </p>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">
+                  <div className="rounded bg-secondary p-3">
+                    <p className="mb-1 text-[11px] text-muted-foreground">
                       Difficulty
                     </p>
                     <p className="text-[16px] font-semibold text-foreground">
@@ -886,8 +887,8 @@ export const PuzzleViewDialog = ({
                       /5
                     </p>
                   </div>
-                  <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">
+                  <div className="rounded bg-secondary p-3">
+                    <p className="mb-1 text-[11px] text-muted-foreground">
                       Fun
                     </p>
                     <p className="text-[16px] font-semibold text-foreground">
@@ -897,8 +898,8 @@ export const PuzzleViewDialog = ({
                       /5
                     </p>
                   </div>
-                  <div className="bg-secondary p-3 rounded">
-                    <p className="text-[11px] text-muted-foreground mb-1">
+                  <div className="rounded bg-secondary p-3">
+                    <p className="mb-1 text-[11px] text-muted-foreground">
                       Clearness
                     </p>
                     <p className="text-[16px] font-semibold text-foreground">
@@ -912,10 +913,10 @@ export const PuzzleViewDialog = ({
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Rating Distribution
                 </p>
-                <div className="border border-border rounded overflow-hidden">
+                <div className="overflow-hidden rounded border border-border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary">
@@ -975,10 +976,10 @@ export const PuzzleViewDialog = ({
               </div>
 
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Medal Distribution
                 </p>
-                <div className="border border-border rounded overflow-hidden">
+                <div className="overflow-hidden rounded border border-border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary">
@@ -1098,12 +1099,12 @@ export const PuzzleViewDialog = ({
                     }
                   `}</style>
                   <div
-                    className="prose prose-sm max-w-none dark:prose-invert text-foreground [&_*]:text-foreground"
+                    className="prose prose-sm max-w-none text-foreground dark:prose-invert [&_*]:text-foreground"
                     dangerouslySetInnerHTML={{ __html: renderedHtml }}
                   />
                 </>
               ) : (
-                <div className="text-muted-foreground text-[13px]">
+                <div className="text-[13px] text-muted-foreground">
                   No instructions provided.
                 </div>
               )}
@@ -1113,7 +1114,7 @@ export const PuzzleViewDialog = ({
           {tab === 'creator-solution' && (
             <div className="space-y-4">
               <div className="rounded-lg border border-border bg-secondary/40 p-4">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Creator Solution
                 </p>
                 <p className="mt-2 text-[13px] text-foreground">
@@ -1125,7 +1126,7 @@ export const PuzzleViewDialog = ({
               {creatorSolutionAvailable ? (
                 <>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-secondary p-3 rounded border border-border/60">
+                    <div className="rounded border border-border/60 bg-secondary p-3">
                       <p className="text-[11px] text-muted-foreground">
                         Components
                       </p>
@@ -1133,7 +1134,7 @@ export const PuzzleViewDialog = ({
                         {creatorSolution.placed.length}
                       </p>
                     </div>
-                    <div className="bg-secondary p-3 rounded border border-border/60">
+                    <div className="rounded border border-border/60 bg-secondary p-3">
                       <p className="text-[11px] text-muted-foreground">Wires</p>
                       <p className="text-[16px] font-semibold text-foreground">
                         {creatorSolution.wires.length}
@@ -1143,19 +1144,19 @@ export const PuzzleViewDialog = ({
 
                   <button
                     onClick={() => setShowCreatorSolutionPreview(true)}
-                    className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+                    className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
                   >
                     Open Preview Window
                   </button>
                 </>
               ) : (
-                <div className="rounded-lg border border-border bg-card p-4 text-[13px] text-muted-foreground space-y-2">
+                <div className="space-y-2 rounded-lg border border-border bg-card p-4 text-[13px] text-muted-foreground">
                   <div>
                     No creator solution is available for preview for this
                     puzzle.
                   </div>
                   {creatorSolutionMeta && (
-                    <div className="text-[11px] text-muted-foreground/90 space-y-1">
+                    <div className="space-y-1 text-[11px] text-muted-foreground/90">
                       <div>
                         Backend availability:{' '}
                         {String(creatorSolutionMeta.available)}
@@ -1184,7 +1185,7 @@ export const PuzzleViewDialog = ({
           open={showCreatorSolutionPreview}
           onOpenChange={setShowCreatorSolutionPreview}
         >
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {displayPuzzle.title} - Creator Solution Preview
@@ -1256,33 +1257,33 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-foreground/5 border border-border/40 rounded-lg p-3">
+      <div className="rounded-lg border border-border/40 bg-foreground/5 p-3">
         <p className="text-sm text-foreground">
           This is the sample solution uploaded by the creator for this puzzle.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Inputs</p>
           <p className="text-lg font-semibold text-foreground">
             {inputLabels.length}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Outputs</p>
           <p className="text-lg font-semibold text-foreground">
             {outputLabels.length}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Components</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Components</p>
           <p className="text-lg font-semibold text-foreground">
             {placed.length}
           </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Cost</p>
           <p className="text-lg font-semibold text-foreground">{totalCost}</p>
         </div>
       </div>
@@ -1298,7 +1299,7 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
       )}
 
       <div
-        className="border border-border/60 rounded-lg bg-background overflow-hidden relative"
+        className="relative overflow-hidden rounded-lg border border-border/60 bg-background"
         style={{ height: '500px' }}
       >
         <style>{`
@@ -1339,8 +1340,8 @@ const CreatorSolutionPreview = ({ puzzle }: { puzzle: Puzzle }) => {
       </div>
 
       {placed.length > 0 && (
-        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground/70">
             Components Used:
           </p>
           <div className="flex flex-wrap gap-2">

@@ -40,7 +40,8 @@ export const useFollowDiscussion = ({
     onMutate: async () => {
       const queryKey = getDiscussionQueryOptions(discussionId).queryKey;
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<DiscussionWithReplies>(queryKey);
+      const previous =
+        queryClient.getQueryData<DiscussionWithReplies>(queryKey);
 
       if (previous?.engagement) {
         queryClient.setQueryData<DiscussionWithReplies>(queryKey, {

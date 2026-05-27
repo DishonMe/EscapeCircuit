@@ -62,7 +62,7 @@ export const InfoPopup = ({ children, className = '' }: InfoPopupProps) => {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="inline-flex items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-muted-foreground"
         aria-label="More info"
       >
         <svg
@@ -99,7 +99,7 @@ export const InfoPopup = ({ children, className = '' }: InfoPopupProps) => {
             />
             {children}
           </div>,
-          document.body
+          document.body,
         )}
     </span>
   );

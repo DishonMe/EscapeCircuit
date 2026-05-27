@@ -1,11 +1,8 @@
-
 'use client';
 
-import { useMemo, useState } from 'react';
 import { Eye } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-import { Spinner } from '@/components/ui/spinner';
-import { Table } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,17 +11,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-
-import { useSolvingAttempts } from '../api/get-solving-attempts';
+import { Spinner } from '@/components/ui/spinner';
+import { Table } from '@/components/ui/table';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { SolutionPreview } from '@/features/puzzles/components/solution-preview';
 import { AdminSolvingAttempt } from '@/types/api';
+
+import { useSolvingAttempts } from '../api/get-solving-attempts';
 
 type Row = AdminSolvingAttempt & { createdAt: number };
 
 export const SolvingAttemptsList = () => {
   const query = useSolvingAttempts({ filters: { limit: 200 } });
-  const [selectedAttempt, setSelectedAttempt] = useState<AdminSolvingAttempt | null>(null);
+  const [selectedAttempt, setSelectedAttempt] =
+    useState<AdminSolvingAttempt | null>(null);
   const puzzleQuery = usePuzzle({
     id: String(selectedAttempt?.puzzle_id ?? ''),
     config: {
@@ -36,7 +36,12 @@ export const SolvingAttemptsList = () => {
     const attempts = query.data?.data ?? [];
     // Filter out attempts with no submitted_structure_json (never actually submitted a circuit)
     return attempts
-      .filter((attempt) => attempt.submitted_structure_json !== null && attempt.submitted_structure_json !== undefined && String(attempt.submitted_structure_json).trim() !== '')
+      .filter(
+        (attempt) =>
+          attempt.submitted_structure_json !== null &&
+          attempt.submitted_structure_json !== undefined &&
+          String(attempt.submitted_structure_json).trim() !== '',
+      )
       .map((attempt) => {
         const ts = attempt.submitted_at || attempt.started_at;
         return {
@@ -49,7 +54,10 @@ export const SolvingAttemptsList = () => {
   const filteredOutCount = useMemo(() => {
     const attempts = query.data?.data ?? [];
     return attempts.filter(
-      (attempt) => attempt.submitted_structure_json === null || attempt.submitted_structure_json === undefined || String(attempt.submitted_structure_json).trim() === ''
+      (attempt) =>
+        attempt.submitted_structure_json === null ||
+        attempt.submitted_structure_json === undefined ||
+        String(attempt.submitted_structure_json).trim() === '',
     ).length;
   }, [query.data?.data]);
 
@@ -64,7 +72,9 @@ export const SolvingAttemptsList = () => {
   if (query.isError) {
     return (
       <div className="rounded-lg border border-red-200/60 bg-red-50/50 p-4">
-        <p className="text-[13px] text-red-700">Failed to load solving attempts.</p>
+        <p className="text-[13px] text-red-700">
+          Failed to load solving attempts.
+        </p>
       </div>
     );
   }
@@ -82,7 +92,8 @@ export const SolvingAttemptsList = () => {
       {filteredOutCount > 0 && (
         <div className="mb-3 rounded-lg border border-amber-200/60 bg-amber-50/50 p-3">
           <p className="text-[12px] text-amber-700">
-            {filteredOutCount} empty attempt{filteredOutCount !== 1 ? 's' : ''} (no circuit) hidden from view
+            {filteredOutCount} empty attempt{filteredOutCount !== 1 ? 's' : ''}{' '}
+            (no circuit) hidden from view
           </p>
         </div>
       )}
@@ -118,7 +129,9 @@ export const SolvingAttemptsList = () => {
             title: 'Puzzle',
             field: 'puzzle_name',
             Cell({ entry }) {
-              return <span>{entry.puzzle_name || `Puzzle #${entry.puzzle_id}`}</span>;
+              return (
+                <span>{entry.puzzle_name || `Puzzle #${entry.puzzle_id}`}</span>
+              );
             },
           },
           {
@@ -134,9 +147,19 @@ export const SolvingAttemptsList = () => {
             field: 'id',
             Cell({ entry }) {
               if (entry.passed === true) {
-                return <span className="text-xs text-emerald-600 font-medium">Passed</span>;
+                return (
+                  <span className="text-xs font-medium text-emerald-600">
+                    Passed
+                  </span>
+                );
               }
-              return <span className={`text-xs ${entry.passed === false ? 'text-rose-600 font-medium' : 'text-muted-foreground'}`}>{entry.fail_reason || '-'}</span>;
+              return (
+                <span
+                  className={`text-xs ${entry.passed === false ? 'font-medium text-rose-600' : 'text-muted-foreground'}`}
+                >
+                  {entry.fail_reason || '-'}
+                </span>
+              );
             },
           },
           {
@@ -158,8 +181,11 @@ export const SolvingAttemptsList = () => {
         ]}
       />
 
-      <Dialog open={!!selectedAttempt} onOpenChange={(open) => !open && setSelectedAttempt(null)}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={!!selectedAttempt}
+        onOpenChange={(open) => !open && setSelectedAttempt(null)}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Submitted Board</DialogTitle>
             <DialogDescription>
@@ -169,8 +195,8 @@ export const SolvingAttemptsList = () => {
 
           {!selectedAttempt?.submitted_structure_json ? (
             <div className="rounded-lg border border-border bg-secondary p-3 text-sm text-muted-foreground">
-              No submitted board is stored for this attempt. This can happen when the
-              attempt was opened but never submitted.
+              No submitted board is stored for this attempt. This can happen
+              when the attempt was opened but never submitted.
             </div>
           ) : (
             <SolutionPreview

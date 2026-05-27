@@ -53,7 +53,10 @@ const DEFAULT_VISUAL_STYLE: Required<LogicNodeVisualStyle> = {
   surfaceStyle: 'gradient',
 };
 
-const LEGACY_PRESET_OVERRIDES: Record<string, Partial<Required<LogicNodeVisualStyle>>> = {
+const LEGACY_PRESET_OVERRIDES: Record<
+  string,
+  Partial<Required<LogicNodeVisualStyle>>
+> = {
   'clean-lab': {
     accentColor: '#3b82f6',
     roundness: 4,
@@ -95,15 +98,21 @@ const SURFACE_STYLES: LogicNodeSurfaceStyle[] = [
   'carbon',
 ];
 
-const clampRoundness = (value: number) => Math.max(0, Math.min(10, Math.round(value)));
+const clampRoundness = (value: number) =>
+  Math.max(0, Math.min(10, Math.round(value)));
 
-const isHexColor = (value: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+const isHexColor = (value: string) =>
+  /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
 
 const hexToRgba = (hex: string, alpha: number) => {
   const normalized = hex.replace('#', '');
-  const full = normalized.length === 3
-    ? normalized.split('').map((c) => c + c).join('')
-    : normalized;
+  const full =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : normalized;
 
   const r = Number.parseInt(full.slice(0, 2), 16);
   const g = Number.parseInt(full.slice(2, 4), 16);
@@ -128,8 +137,12 @@ const resolveVisualStyle = (
   };
 
   const accentColor = visualStyle?.accentColor;
-  const legacyCornerStyle = (visualStyle as { cornerStyle?: string } | undefined)?.cornerStyle;
-  const legacyBorderStyle = (visualStyle as { borderStyle?: string } | undefined)?.borderStyle;
+  const legacyCornerStyle = (
+    visualStyle as { cornerStyle?: string } | undefined
+  )?.cornerStyle;
+  const legacyBorderStyle = (
+    visualStyle as { borderStyle?: string } | undefined
+  )?.borderStyle;
   const legacyEdgeAddonRaw = (
     visualStyle as { edgeAddon?: string; edge_addon?: string } | undefined
   )?.edgeAddon;
@@ -163,7 +176,8 @@ const resolveVisualStyle = (
         ? 'double'
         : base.borderStyle;
 
-  const edgeAddonRaw = visualStyle?.edgeAddon ?? legacyEdgeAddonRaw ?? legacyEdgeAddonAltRaw;
+  const edgeAddonRaw =
+    visualStyle?.edgeAddon ?? legacyEdgeAddonRaw ?? legacyEdgeAddonAltRaw;
   const resolvedEdgeAddon =
     edgeAddonRaw === 'chip'
       ? 'chip-legs'
@@ -180,7 +194,8 @@ const resolveVisualStyle = (
       : base.surfaceStyle;
 
   return {
-    accentColor: accentColor && isHexColor(accentColor) ? accentColor : base.accentColor,
+    accentColor:
+      accentColor && isHexColor(accentColor) ? accentColor : base.accentColor,
     roundness:
       typeof requestedRoundness === 'number'
         ? clampRoundness(requestedRoundness)
@@ -210,7 +225,7 @@ const getGateSVG = (label: string) => {
     case 'AND': {
       // 3x2 gate: inputs at (9,9) and (9,27), output at (48,18)
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Left vertical line */}
           <line x1="9" y1="9" x2="9" y2="27" {...commonProps} />
           {/* Top horizontal line */}
@@ -225,7 +240,7 @@ const getGateSVG = (label: string) => {
     case 'OR': {
       // 3x2 gate: inputs at (9,9) and (9,27), output at (48,18)
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Curved input side */}
           <path d="M 9 9 Q 24 18 9 27" {...commonProps} />
           {/* Top horizontal line */}
@@ -240,7 +255,7 @@ const getGateSVG = (label: string) => {
     case 'NOT': {
       // 3x1 gate: input at (9,9), output at (48,9), large triangle centered
       return (
-        <svg viewBox="0 0 54 18" className="w-full h-full">
+        <svg viewBox="0 0 54 18" className="size-full">
           {/* Triangle - larger and centered */}
           <path d="M 4 0 L 4 18 L 35 9 Z" {...commonProps} />
           {/* Negation bubble at output */}
@@ -251,7 +266,7 @@ const getGateSVG = (label: string) => {
     case 'NAND': {
       // 3x2 gate: AND with negation bubble connected
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Left vertical line */}
           <line x1="9" y1="9" x2="9" y2="27" {...commonProps} />
           {/* Top horizontal line */}
@@ -268,7 +283,7 @@ const getGateSVG = (label: string) => {
     case 'NOR': {
       // 3x2 gate: OR with negation bubble connected
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Curved input side */}
           <path d="M 9 9 Q 17 18 9 27" {...commonProps} />
           {/* Top horizontal line */}
@@ -285,7 +300,7 @@ const getGateSVG = (label: string) => {
     case 'XOR': {
       // 3x2 gate: OR-like with extra curved input line
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Curved input side - first curve */}
           <path d="M 9 9 Q 17 18 9 27" {...commonProps} />
           {/* Curved input side - second curve for XOR */}
@@ -302,7 +317,7 @@ const getGateSVG = (label: string) => {
     case 'XNOR': {
       // 3x2 gate: XOR with negation bubble connected
       return (
-        <svg viewBox="0 0 54 36" className="w-full h-full">
+        <svg viewBox="0 0 54 36" className="size-full">
           {/* Curved input side - first curve */}
           <path d="M 9 9 Q 17 18 9 27" {...commonProps} />
           {/* Curved input side - second curve for XOR */}
@@ -321,16 +336,39 @@ const getGateSVG = (label: string) => {
     case 'DFF': {
       // 3x1 gate: D flip-flop symbol with clock notch and Q output
       return (
-        <svg viewBox="0 0 54 18" className="w-full h-full">
+        <svg viewBox="0 0 54 18" className="size-full">
           {/* Body */}
-          <rect x="10" y="1.5" width="26" height="15" rx="2.5" {...commonProps} />
+          <rect
+            x="10"
+            y="1.5"
+            width="26"
+            height="15"
+            rx="2.5"
+            {...commonProps}
+          />
           {/* Clock notch */}
           <path d="M 10 9 L 14 6.3 L 14 11.7 Z" {...commonProps} />
           {/* Output lead */}
           <line x1="36" y1="9" x2="45" y2="9" {...commonProps} />
           {/* Labels */}
-          <text x="18" y="11" fill="currentColor" fontSize="5.5" fontWeight="700">D</text>
-          <text x="28" y="11" fill="currentColor" fontSize="5.5" fontWeight="700">Q</text>
+          <text
+            x="18"
+            y="11"
+            fill="currentColor"
+            fontSize="5.5"
+            fontWeight="700"
+          >
+            D
+          </text>
+          <text
+            x="28"
+            y="11"
+            fill="currentColor"
+            fontSize="5.5"
+            fontWeight="700"
+          >
+            Q
+          </text>
         </svg>
       );
     }
@@ -366,15 +404,13 @@ export const LogicNode = ({
 
   const hasCustomVisualStyle = Boolean(
     rawVisualStyle &&
-    (
-      rawVisualStyle.preset ||
+    (rawVisualStyle.preset ||
       rawVisualStyle.cornerStyle ||
       rawVisualStyle.accentColor ||
       typeof rawVisualStyle.roundness === 'number' ||
       rawVisualStyle.borderStyle ||
       rawVisualStyle.edgeAddon ||
-      rawVisualStyle.surfaceStyle
-    ),
+      rawVisualStyle.surfaceStyle),
   );
   const resolvedVisualStyle = hasCustomVisualStyle
     ? resolveVisualStyle(node.visualStyle)
@@ -389,7 +425,8 @@ export const LogicNode = ({
     ? hexToRgba(resolvedVisualStyle.accentColor, 0.28)
     : '';
 
-  const shellRoundness = resolvedVisualStyle?.roundness ?? DEFAULT_VISUAL_STYLE.roundness;
+  const shellRoundness =
+    resolvedVisualStyle?.roundness ?? DEFAULT_VISUAL_STYLE.roundness;
   const shellRadiusPx = 2 + shellRoundness * 1.2;
   const shellRadius = `${shellRadiusPx}px`;
 
@@ -446,24 +483,23 @@ export const LogicNode = ({
     >
       {isBasicGate ? (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="absolute inset-0">
-            {getGateSVG(gateType)}
-          </div>
-          <span className={cn(
-            "select-none text-[7px] font-bold text-foreground relative z-10",
-            gateType === 'XNOR' ? 'text-[6px]' : 'text-[7px]',
-            gateType === 'XNOR' && 'translate-x-[2px]', 
-            gateType === 'NOT' && 'absolute left-1/4 top-1/2 -translate-y-1/2'
-          )}>
+          <div className="absolute inset-0">{getGateSVG(gateType)}</div>
+          <span
+            className={cn(
+              'select-none text-[7px] font-bold text-foreground relative z-10',
+              gateType === 'XNOR' ? 'text-[6px]' : 'text-[7px]',
+              gateType === 'XNOR' && 'translate-x-[2px]',
+              gateType === 'NOT' &&
+                'absolute left-1/4 top-1/2 -translate-y-1/2',
+            )}
+          >
             {gateInstanceLabel}
           </span>
         </div>
       ) : isDffGate ? (
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-[1px] rounded-sm bg-gradient-to-b from-card to-card/70" />
-          <div className="absolute inset-0">
-            {getGateSVG('DFF')}
-          </div>
+          <div className="absolute inset-px rounded-sm bg-gradient-to-b from-card to-card/70" />
+          <div className="absolute inset-0">{getGateSVG('DFF')}</div>
           <span className="absolute right-1 top-0.5 select-none rounded border border-border/60 bg-background/80 px-1 text-[6px] font-semibold leading-none text-muted-foreground">
             {gateInstanceLabel}
           </span>
@@ -473,19 +509,19 @@ export const LogicNode = ({
           {showChipLegs ? (
             <>
               <div
-                className="absolute inset-x-[6px] -top-[2px] h-[2px] opacity-95"
+                className="absolute inset-x-[6px] top-[-2px] h-[2px] opacity-95"
                 style={{ backgroundImage: chipLegsHorizontal }}
               />
               <div
-                className="absolute inset-x-[6px] -bottom-[2px] h-[2px] opacity-95"
+                className="absolute inset-x-[6px] bottom-[-2px] h-[2px] opacity-95"
                 style={{ backgroundImage: chipLegsHorizontal }}
               />
               <div
-                className="absolute inset-y-[6px] -left-[2px] w-[2px] opacity-90"
+                className="absolute inset-y-[6px] left-[-2px] w-[2px] opacity-90"
                 style={{ backgroundImage: chipLegsVertical }}
               />
               <div
-                className="absolute inset-y-[6px] -right-[2px] w-[2px] opacity-90"
+                className="absolute inset-y-[6px] right-[-2px] w-[2px] opacity-90"
                 style={{ backgroundImage: chipLegsVertical }}
               />
             </>
@@ -551,13 +587,15 @@ export const LogicNode = ({
                   <div
                     className="absolute inset-0"
                     style={{
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 32%, rgba(0,0,0,0.04) 100%)',
+                      background:
+                        'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 32%, rgba(0,0,0,0.04) 100%)',
                     }}
                   />
                   <div
-                    className="absolute -left-[20%] top-[8%] h-[35%] w-[70%] -rotate-12"
+                    className="absolute left-[-20%] top-[8%] h-[35%] w-[70%] -rotate-12"
                     style={{
-                      background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 60%, rgba(255,255,255,0) 100%)',
+                      background:
+                        'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 60%, rgba(255,255,255,0) 100%)',
                       opacity: 0.5,
                     }}
                   />
@@ -573,7 +611,7 @@ export const LogicNode = ({
               />
             </div>
           ) : (
-            <div className="absolute inset-[1px] rounded-[5px] border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
+            <div className="absolute inset-px rounded-[5px] border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
           )}
           <div className="absolute inset-x-1 inset-y-0 flex items-center justify-center">
             <span className="max-w-full truncate px-2 text-[9px] font-semibold tracking-wide text-foreground">
