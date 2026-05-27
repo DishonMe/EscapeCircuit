@@ -4,7 +4,6 @@ import { ChevronRight, Lock } from 'lucide-react';
 import type {
   DragEvent as ReactDragEvent,
   PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -1340,7 +1339,8 @@ export const WorkstationGrid = ({
     return { inputs: inputsPos, outputs: outputsPos };
   }, [inputs, outputs, pan.x, pan.y, zoom, gridCols]);
 
-  const onWheel = (e: ReactWheelEvent) => {
+  const wheelHandlerRef = useRef<(e: WheelEvent) => void>();
+  wheelHandlerRef.current = (e: WheelEvent) => {
     e.preventDefault();
     stopPanAnimation();
     const el = containerRef.current;
@@ -1366,6 +1366,14 @@ export const WorkstationGrid = ({
     setZoom(nextZoom);
     setPan(clampedPan);
   };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => wheelHandlerRef.current?.(e);
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
 
   const onPointerDownBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -1877,7 +1885,6 @@ export const WorkstationGrid = ({
             'workstation-board-failure border-red-400',
           viewportClassName,
         )}
-        onWheel={onWheel}
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMoveBackground}
         onPointerUp={onPointerUpBackground}
