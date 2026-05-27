@@ -1,7 +1,7 @@
 'use client';
 
-import NextLink from 'next/link';
 import { MessageSquare, Plus } from 'lucide-react';
+import NextLink from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/page-hero/page-hero';
@@ -14,7 +14,7 @@ const DiscussionsPage = () => {
   const user = useUser();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-8">
       <PageHero
         badge="Community"
         icon={MessageSquare}

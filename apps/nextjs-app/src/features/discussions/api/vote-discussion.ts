@@ -44,7 +44,8 @@ export const useVoteDiscussion = ({
     onMutate: async ({ value }) => {
       const queryKey = getDiscussionQueryOptions(discussionId).queryKey;
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<DiscussionWithReplies>(queryKey);
+      const previous =
+        queryClient.getQueryData<DiscussionWithReplies>(queryKey);
 
       if (previous?.engagement) {
         const eng = previous.engagement;

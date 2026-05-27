@@ -1,12 +1,16 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Loader, Filter, X, ArrowUp, ArrowDown, Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect, ChangeEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/page-hero/page-hero';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
+import {
+  useCreatorNotificationsHistory,
+  NotificationFilters,
+} from '@/features/notifications/api';
 import { useUser } from '@/lib/auth';
 
 const NOTIF_TYPE_OPTIONS = [
@@ -21,10 +25,6 @@ const NOTIF_ORDER_BY_OPTIONS = [
   { value: 'created_at', label: 'Creation Date' },
   { value: 'xp_amount', label: 'XP Amount' },
 ] as const;
-import {
-  useCreatorNotificationsHistory,
-  NotificationFilters,
-} from '@/features/notifications/api';
 
 const defaultFilters: Pick<NotificationFilters, 'orderBy' | 'orderDirection'> =
   {
@@ -103,7 +103,7 @@ const NotificationsPage = () => {
               variant="ghost"
               size="sm"
               onClick={handleClearFilters}
-              className="text-muted-foreground text-[13px]"
+              className="text-[13px] text-muted-foreground"
             >
               <X className="size-4" />
               Clear
@@ -113,13 +113,13 @@ const NotificationsPage = () => {
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+          <div className="space-y-5 rounded-xl border border-border bg-card p-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
               {/* Type Filter */}
-              <div className="flex flex-col">
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <label className="flex flex-col">
+                <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Type
-                </label>
+                </span>
                 <StyledSelect
                   aria-label="Notification type"
                   value={filters.notifType || ''}
@@ -131,13 +131,13 @@ const NotificationsPage = () => {
                   }
                   options={NOTIF_TYPE_OPTIONS}
                 />
-              </div>
+              </label>
 
               {/* Puzzle Name Filter */}
-              <div className="flex flex-col">
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <label className="flex flex-col">
+                <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Puzzle Name
-                </label>
+                </span>
                 <input
                   type="text"
                   placeholder="Search puzzle..."
@@ -150,13 +150,13 @@ const NotificationsPage = () => {
                     })
                   }
                 />
-              </div>
+              </label>
 
               {/* Actor Username Filter */}
-              <div className="flex flex-col">
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <label className="flex flex-col">
+                <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Actor
-                </label>
+                </span>
                 <input
                   type="text"
                   placeholder="Search user..."
@@ -169,13 +169,13 @@ const NotificationsPage = () => {
                     })
                   }
                 />
-              </div>
+              </label>
 
               {/* Order By */}
-              <div className="flex flex-col">
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <label className="flex flex-col">
+                <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Order By
-                </label>
+                </span>
                 <StyledSelect
                   aria-label="Order by"
                   value={filters.orderBy || 'created_at'}
@@ -184,13 +184,13 @@ const NotificationsPage = () => {
                   }
                   options={NOTIF_ORDER_BY_OPTIONS}
                 />
-              </div>
+              </label>
 
               {/* Direction */}
-              <div className="flex flex-col">
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <label className="flex flex-col">
+                <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Direction
-                </label>
+                </span>
                 <button
                   type="button"
                   onClick={() => {
@@ -216,7 +216,7 @@ const NotificationsPage = () => {
                     </>
                   )}
                 </button>
-              </div>
+              </label>
             </div>
           </div>
         )}
@@ -234,7 +234,7 @@ const NotificationsPage = () => {
           </p>
           <button
             onClick={() => refetch()}
-            className="mt-3 rounded-lg bg-red-600 px-3 py-1 text-[11px] text-white hover:bg-red-700 transition-colors"
+            className="mt-3 rounded-lg bg-red-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-red-700"
           >
             Try Again
           </button>

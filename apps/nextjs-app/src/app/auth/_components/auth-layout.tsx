@@ -1,13 +1,13 @@
 'use client';
 
+import Cookies from 'js-cookie';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { ReactNode, useEffect, useState, useRef } from 'react';
-import Cookies from 'js-cookie';
 
 import { Link } from '@/components/ui/link';
+import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
-import { useNotifications } from '@/components/ui/notifications';
 
 type LayoutProps = {
   children: ReactNode;
@@ -101,7 +101,7 @@ export const AuthLayout = ({ children }: LayoutProps) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <Link className="flex items-center" href={paths.home.getHref()}>
-            <img className="h-20 w-20" src="/logo.svg" alt="Workflow" />
+            <img className="size-20" src="/logo.svg" alt="Workflow" />
           </Link>
         </div>
 

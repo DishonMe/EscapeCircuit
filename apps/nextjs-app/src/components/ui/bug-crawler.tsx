@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface BugCrawlerProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ interface BugState {
   legPhase: number;
 }
 
-export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
+export const BugCrawler = ({ children }: BugCrawlerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bugStateRef = useRef<BugState>({
@@ -49,7 +49,13 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
     bugStateRef.current.targetY = targetY;
   };
 
-  const drawBug = (ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, legPhase: number) => {
+  const drawBug = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    angle: number,
+    legPhase: number,
+  ) => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
@@ -107,11 +113,10 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
 
     // Legs (6 total, 3 on each side)
     const legOffsets = [-4, 0, 4];
-    const legHeights = [5, 6, 5];
 
     legOffsets.forEach((offset, idx) => {
       // Left legs
-      const leftPhase = (legPhase + idx * (Math.PI * 2 / 3)) % (Math.PI * 2);
+      const leftPhase = (legPhase + idx * ((Math.PI * 2) / 3)) % (Math.PI * 2);
       const leftY = offset + Math.sin(leftPhase) * 2;
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1;
@@ -121,7 +126,8 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
       ctx.stroke();
 
       // Right legs
-      const rightPhase = (legPhase + idx * (Math.PI * 2 / 3) + Math.PI) % (Math.PI * 2);
+      const rightPhase =
+        (legPhase + idx * ((Math.PI * 2) / 3) + Math.PI) % (Math.PI * 2);
       const rightY = offset + Math.sin(rightPhase) * 2;
       ctx.beginPath();
       ctx.moveTo(6, rightY);
@@ -202,7 +208,7 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
     // Initialize bug position to center of container
     bugStateRef.current.x = rect.width / 2;
     bugStateRef.current.y = rect.height / 2;
-    
+
     // Pick first target
     pickNewTarget();
 
@@ -213,6 +219,9 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
+    // animate / pickNewTarget read refs only and never need to re-run;
+    // mount-only intent is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleMouseEnter = () => {
@@ -225,13 +234,17 @@ export const BugCrawler = ({ children, borderRadius = 6 }: BugCrawlerProps) => {
 
   const handleClick = (e: React.MouseEvent) => {
     // Only trigger burst if click is on the button itself, not the canvas
-    if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
+    if (
+      (e.target as HTMLElement).tagName === 'BUTTON' ||
+      (e.target as HTMLElement).closest('button')
+    ) {
       bugStateRef.current.burstTime = 800;
       pickNewTarget();
     }
   };
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- decorative wrapper around an already-interactive child; click only triggers a visual bug burst.
     <div
       ref={containerRef}
       className="relative inline-block"

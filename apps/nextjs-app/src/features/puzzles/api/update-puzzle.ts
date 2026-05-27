@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 import { Puzzle } from '@/types/api';

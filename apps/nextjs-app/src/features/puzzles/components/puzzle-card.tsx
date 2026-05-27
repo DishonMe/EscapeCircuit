@@ -142,7 +142,9 @@ export const PuzzleCard = ({
         )}
         {puzzle.is_solved && puzzle.first_solved_at && (
           <>
-            <span>First Solved - {formatFirstSolved(puzzle.first_solved_at)}</span>
+            <span>
+              First Solved - {formatFirstSolved(puzzle.first_solved_at)}
+            </span>
             <span aria-hidden>·</span>
           </>
         )}

@@ -1,10 +1,22 @@
 import type { LogicNodeVisualStyle } from './node';
 
-const LEGACY_PRESETS = new Set(['clean-lab', 'retro-chip', 'blueprint', 'playful']);
+const LEGACY_PRESETS = new Set([
+  'clean-lab',
+  'retro-chip',
+  'blueprint',
+  'playful',
+]);
 const LEGACY_CORNER_STYLES = new Set(['rounded', 'sharp', 'capsule']);
 const BORDER_STYLES = new Set(['solid', 'double', 'etched']);
 const EDGE_ADDONS = new Set(['none', 'chip-legs', 'chip']);
-const SURFACE_STYLES = new Set(['flat', 'brushed', 'gradient', 'matte', 'glass', 'carbon']);
+const SURFACE_STYLES = new Set([
+  'flat',
+  'brushed',
+  'gradient',
+  'matte',
+  'glass',
+  'carbon',
+]);
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const MIN_ROUNDNESS = 0;
@@ -70,7 +82,9 @@ const asNumber = (value: unknown): number | undefined => {
 const clampRoundness = (value: number) =>
   Math.max(MIN_ROUNDNESS, Math.min(MAX_ROUNDNESS, Math.round(value)));
 
-const resolveLegacyCornerToRoundness = (cornerStyle: string): number | undefined => {
+const resolveLegacyCornerToRoundness = (
+  cornerStyle: string,
+): number | undefined => {
   if (cornerStyle === 'sharp') return 0;
   if (cornerStyle === 'capsule') return MAX_ROUNDNESS;
   if (cornerStyle === 'rounded') return 4;
@@ -85,7 +99,9 @@ export const normalizeLogicNodeVisualStyle = (
 
   const presetRaw = asString(rec.preset);
   const accentRaw = asString(rec.accentColor ?? rec.accent_color);
-  const roundnessRaw = asNumber(rec.roundness ?? rec.cornerRadius ?? rec.corner_radius);
+  const roundnessRaw = asNumber(
+    rec.roundness ?? rec.cornerRadius ?? rec.corner_radius,
+  );
   const legacyCornerRaw = asString(rec.cornerStyle ?? rec.corner_style);
   const borderRaw = asString(rec.borderStyle ?? rec.border_style);
   const edgeAddonRaw = asString(rec.edgeAddon ?? rec.edge_addon);
@@ -116,7 +132,10 @@ export const normalizeLogicNodeVisualStyle = (
   }
 
   if (edgeAddonRaw && EDGE_ADDONS.has(edgeAddonRaw)) {
-    style.edgeAddon = edgeAddonRaw === 'chip' ? 'chip-legs' : (edgeAddonRaw as LogicNodeVisualStyle['edgeAddon']);
+    style.edgeAddon =
+      edgeAddonRaw === 'chip'
+        ? 'chip-legs'
+        : (edgeAddonRaw as LogicNodeVisualStyle['edgeAddon']);
   }
 
   if (surfaceRaw && SURFACE_STYLES.has(surfaceRaw)) {
@@ -170,8 +189,8 @@ export const extractVisualStyleFromComponentLike = (
 
   const solutionRec = asRecord(rec.solution);
   const fromSolution = solutionRec
-    ? normalizeLogicNodeVisualStyle(solutionRec.visualStyle) ??
-      normalizeLogicNodeVisualStyle(solutionRec.visual_style)
+    ? (normalizeLogicNodeVisualStyle(solutionRec.visualStyle) ??
+      normalizeLogicNodeVisualStyle(solutionRec.visual_style))
     : undefined;
   if (fromSolution) return fromSolution;
 

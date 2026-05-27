@@ -46,7 +46,7 @@ import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderbo
 import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
-import { useAudio } from '@/hooks/useAudio';
+import { useAudio } from '@/hooks/use-audio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
 import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';

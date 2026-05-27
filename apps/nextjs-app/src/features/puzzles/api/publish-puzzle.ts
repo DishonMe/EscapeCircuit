@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 import { Puzzle } from '@/types/api';
@@ -32,7 +33,9 @@ export const usePublishPuzzle = ({ config }: UsePublishPuzzleOptions = {}) => {
   });
 };
 
-export const useUnpublishPuzzle = ({ config }: UseUnpublishPuzzleOptions = {}) => {
+export const useUnpublishPuzzle = ({
+  config,
+}: UseUnpublishPuzzleOptions = {}) => {
   const queryClient = useQueryClient();
 
   return useMutation({

@@ -44,7 +44,7 @@ export const AvatarDisplay = ({
       <img
         src={`/avatars/${avatarName}.png`}
         alt={avatarName}
-        className="w-full h-full object-cover"
+        className="size-full object-cover"
         loading="lazy"
       />
     </div>

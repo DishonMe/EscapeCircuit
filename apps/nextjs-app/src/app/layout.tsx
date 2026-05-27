@@ -11,11 +11,9 @@ export const metadata = {
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className="bg-background text-foreground transition-colors">
-        <AppProvider>
-          {children}
-        </AppProvider>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );

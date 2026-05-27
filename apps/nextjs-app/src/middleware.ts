@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { AUTH_TOKEN_COOKIE_NAME } from './utils/auth-constants';
 
 export function middleware(request: NextRequest) {
@@ -8,7 +9,7 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
-  
+
   // Public routes that don't require authentication (can be accessed without login)
   const publicRoutes = [
     '/',
@@ -29,7 +30,7 @@ export function middleware(request: NextRequest) {
 
   // Check if the current path is a public route
   const isPublicRoute = publicRoutes.includes(pathname);
-  
+
   // Check if the current path is a logged-in only route
   const isLoggedInOnlyRoute = loggedInOnlyRoutes.includes(pathname);
 

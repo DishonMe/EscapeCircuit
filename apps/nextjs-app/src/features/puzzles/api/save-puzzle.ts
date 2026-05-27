@@ -57,10 +57,10 @@ export const useToggleSavePuzzle = ({
           return {
             ...oldData,
             data: oldData.data.map((p) =>
-              p.id === targetPuzzleId ? { ...p, is_saved: !p.is_saved } : p
+              p.id === targetPuzzleId ? { ...p, is_saved: !p.is_saved } : p,
             ),
           };
-        }
+        },
       );
 
       return { previousData };

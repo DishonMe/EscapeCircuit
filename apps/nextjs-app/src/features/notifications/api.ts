@@ -1,4 +1,9 @@
-import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
@@ -26,9 +31,11 @@ export interface NotificationFilters {
 }
 
 // --- Fetch unread notifications ---
-export const getCreatorNotifications = (filters: NotificationFilters = {}): Promise<CreatorNotification[]> => {
+export const getCreatorNotifications = (
+  filters: NotificationFilters = {},
+): Promise<CreatorNotification[]> => {
   const params: Record<string, any> = {};
-  
+
   if (filters.notifType) params.notif_type = filters.notifType;
   if (filters.puzzleName) params.puzzle_name = filters.puzzleName;
   if (filters.actorUsername) params.actor_username = filters.actorUsername;
@@ -45,7 +52,9 @@ export const getCreatorNotifications = (filters: NotificationFilters = {}): Prom
   });
 };
 
-export const creatorNotificationsQueryOptions = (filters: NotificationFilters = {}) =>
+export const creatorNotificationsQueryOptions = (
+  filters: NotificationFilters = {},
+) =>
   queryOptions({
     queryKey: ['creator-notifications', filters],
     queryFn: () => getCreatorNotifications(filters),
@@ -59,7 +68,10 @@ type UseCreatorNotificationsOptions = {
   queryConfig?: QueryConfig<typeof creatorNotificationsQueryOptions>;
 };
 
-export const useCreatorNotifications = ({ filters = {}, queryConfig }: UseCreatorNotificationsOptions = {}) =>
+export const useCreatorNotifications = ({
+  filters = {},
+  queryConfig,
+}: UseCreatorNotificationsOptions = {}) =>
   useQuery({
     ...creatorNotificationsQueryOptions(filters),
     ...queryConfig,
@@ -83,9 +95,11 @@ export const useMarkNotificationsRead = () => {
 };
 
 // --- Fetch all notifications history (both read and unread) ---
-export const getCreatorNotificationsHistory = async (filters: NotificationFilters = {}): Promise<CreatorNotification[]> => {
+export const getCreatorNotificationsHistory = async (
+  filters: NotificationFilters = {},
+): Promise<CreatorNotification[]> => {
   const params: Record<string, any> = {};
-  
+
   if (filters.notifType) params.notif_type = filters.notifType;
   if (filters.puzzleName) params.puzzle_name = filters.puzzleName;
   if (filters.actorUsername) params.actor_username = filters.actorUsername;
@@ -96,10 +110,14 @@ export const getCreatorNotificationsHistory = async (filters: NotificationFilter
   if (filters.limit) params.limit = filters.limit;
   if (filters.offset) params.offset = filters.offset;
 
-  return await api.get('/users/me/notifications/history', { params }) as CreatorNotification[];
+  return (await api.get('/users/me/notifications/history', {
+    params,
+  })) as CreatorNotification[];
 };
 
-export const creatorNotificationsHistoryQueryOptions = (filters: NotificationFilters = {}) =>
+export const creatorNotificationsHistoryQueryOptions = (
+  filters: NotificationFilters = {},
+) =>
   queryOptions({
     queryKey: ['creator-notifications-history', filters],
     queryFn: () => getCreatorNotificationsHistory(filters),
@@ -112,7 +130,10 @@ type UseCreatorNotificationsHistoryOptions = {
   queryConfig?: QueryConfig<typeof creatorNotificationsHistoryQueryOptions>;
 };
 
-export const useCreatorNotificationsHistory = ({ filters = {}, queryConfig }: UseCreatorNotificationsHistoryOptions = {}) => 
+export const useCreatorNotificationsHistory = ({
+  filters = {},
+  queryConfig,
+}: UseCreatorNotificationsHistoryOptions = {}) =>
   useQuery({
     ...creatorNotificationsHistoryQueryOptions(filters),
     ...queryConfig,

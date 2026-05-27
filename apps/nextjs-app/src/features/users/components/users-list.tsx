@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, useEffect, ChangeEvent } from 'react';
 import { Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useEffect, ChangeEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { Table } from '@/components/ui/table';
+/* eslint-disable import/no-restricted-paths -- users-list is the admin user listing and intentionally composes admin actions on rows. */
+import { AdminUserProfileDialog } from '@/features/admin/components/admin-user-profile-dialog';
+import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
+import { CreatorPuzzleLimits } from '@/features/admin/components/creator-puzzle-limits';
+import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
+/* eslint-enable import/no-restricted-paths */
 import { formatDate } from '@/utils/format';
 
 import { useUsers, UserFilters } from '../api/get-users';
@@ -33,10 +39,6 @@ const USER_ORDER_BY_OPTIONS = [
 ] as const;
 
 import { DeleteUser } from './delete-user';
-import { AssignCreatorButton } from '@/features/admin/components/assign-creator-button';
-import { RemoveCreatorButton } from '@/features/admin/components/remove-creator-button';
-import { CreatorPuzzleLimits } from '@/features/admin/components/creator-puzzle-limits';
-import { AdminUserProfileDialog } from '@/features/admin/components/admin-user-profile-dialog';
 
 // Debounce hook — delays value updates until user stops typing
 function useDebouncedValue<T>(value: T, delay: number = 400): T {
@@ -83,7 +85,8 @@ export const UsersList = () => {
       return (
         <div className="rounded-xl border border-red-200/60 bg-red-50/50 p-4">
           <p className="text-[13px] text-red-700">
-            Failed to load users. {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
+            Failed to load users.{' '}
+            {usersQuery.error?.message && `Error: ${usersQuery.error.message}`}
           </p>
         </div>
       );
@@ -119,10 +122,14 @@ export const UsersList = () => {
                 solver: 'bg-secondary text-foreground/80',
                 pending_creator: 'bg-amber-50/50 text-amber-700',
               };
-              const color = roleColors[role] || 'bg-secondary text-foreground/80';
-              const label = role === 'pending_creator' ? 'Pending Creator' : role;
+              const color =
+                roleColors[role] || 'bg-secondary text-foreground/80';
+              const label =
+                role === 'pending_creator' ? 'Pending Creator' : role;
               return (
-                <span className={`capitalize rounded-md px-2 py-0.5 text-[11px] font-medium ${color}`}>
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium capitalize ${color}`}
+                >
                   {label}
                 </span>
               );
@@ -140,7 +147,9 @@ export const UsersList = () => {
             field: 'id',
             Cell({ entry }: { entry: any }) {
               if (typeof entry.is_online !== 'boolean') {
-                return <span className="text-xs text-muted-foreground">N/A</span>;
+                return (
+                  <span className="text-xs text-muted-foreground">N/A</span>
+                );
               }
               return (
                 <span
@@ -160,7 +169,7 @@ export const UsersList = () => {
             field: 'id',
             Cell({ entry }: { entry: any }) {
               return (
-                <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2">
                   <AdminUserProfileDialog
                     userId={Number(entry.id)}
                     username={entry.username}
@@ -171,7 +180,8 @@ export const UsersList = () => {
                       username={entry.username}
                     />
                   )}
-                  {(entry.role === 'creator' || entry.role === 'pending_creator') && (
+                  {(entry.role === 'creator' ||
+                    entry.role === 'pending_creator') && (
                     <>
                       <RemoveCreatorButton
                         userId={Number(entry.id)}
@@ -182,10 +192,18 @@ export const UsersList = () => {
                         <CreatorPuzzleLimits
                           userId={Number(entry.id)}
                           username={entry.username}
-                          effectiveMaxPublished={entry.effective_max_published ?? 5}
-                          effectiveMaxUnpublished={entry.effective_max_unpublished ?? 5}
-                          maxPublishedOverride={entry.max_published_override ?? null}
-                          maxUnpublishedOverride={entry.max_unpublished_override ?? null}
+                          effectiveMaxPublished={
+                            entry.effective_max_published ?? 5
+                          }
+                          effectiveMaxUnpublished={
+                            entry.effective_max_unpublished ?? 5
+                          }
+                          maxPublishedOverride={
+                            entry.max_published_override ?? null
+                          }
+                          maxUnpublishedOverride={
+                            entry.max_unpublished_override ?? null
+                          }
                         />
                       )}
                     </>
@@ -218,7 +236,7 @@ export const UsersList = () => {
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-muted-foreground text-[13px]"
+            className="text-[13px] text-muted-foreground"
           >
             <X className="size-4" />
             Clear
@@ -228,23 +246,32 @@ export const UsersList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+        <div className="space-y-5 rounded-xl border border-border bg-card p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Username Search */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Username</label>
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Username
+              </span>
               <input
                 type="text"
                 placeholder="Search username..."
                 className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 value={filters.usernameSearch || ''}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters({ ...filters, usernameSearch: e.target.value || undefined })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setFilters({
+                    ...filters,
+                    usernameSearch: e.target.value || undefined,
+                  })
+                }
               />
-            </div>
+            </label>
 
             {/* Role */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Role</label>
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Role
+              </span>
               <StyledSelect
                 aria-label="Role"
                 value={filters.role || ''}
@@ -253,11 +280,13 @@ export const UsersList = () => {
                 }
                 options={ROLE_OPTIONS}
               />
-            </div>
+            </label>
 
             {/* Experience Level */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Experience</label>
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Experience
+              </span>
               <StyledSelect
                 aria-label="Experience level"
                 value={filters.experienceLevel || 'all'}
@@ -266,11 +295,13 @@ export const UsersList = () => {
                 }
                 options={EXPERIENCE_OPTIONS}
               />
-            </div>
+            </label>
 
             {/* Order By */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Order By</label>
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Order By
+              </span>
               <StyledSelect
                 aria-label="Order by"
                 value={filters.orderBy || 'created_at'}
@@ -279,17 +310,23 @@ export const UsersList = () => {
                 }
                 options={USER_ORDER_BY_OPTIONS}
               />
-            </div>
+            </label>
 
             {/* Direction */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Direction</label>
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Direction
+              </span>
               <button
                 type="button"
                 onClick={() => {
                   const currentDirection = filters.orderDirection || 'ASC';
-                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
-                  setFilters({ ...filters, orderDirection: newDirection as any });
+                  const newDirection =
+                    currentDirection === 'ASC' ? 'DESC' : 'ASC';
+                  setFilters({
+                    ...filters,
+                    orderDirection: newDirection as any,
+                  });
                 }}
                 className="inline-flex h-9 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-3 text-[13px] text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/30 focus:outline-none focus:ring-1 focus:ring-ring"
               >
@@ -305,7 +342,7 @@ export const UsersList = () => {
                   </>
                 )}
               </button>
-            </div>
+            </label>
           </div>
         </div>
       )}

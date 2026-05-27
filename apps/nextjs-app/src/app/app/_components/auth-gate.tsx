@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 
-import { useUser } from '@/lib/auth';
 import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
-import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 import CreatorNotificationsPopup from '@/features/notifications/creator-notifications-popup';
+import { useUser } from '@/lib/auth';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 const AuthGate = ({ children }: { children: React.ReactNode }) => {
   const user = useUser();

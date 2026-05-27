@@ -4,7 +4,9 @@ import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 import { AdminUserProfile } from '@/types/api';
 
-export const getAdminUserProfile = (userId: number): Promise<AdminUserProfile> => {
+export const getAdminUserProfile = (
+  userId: number,
+): Promise<AdminUserProfile> => {
   return api.get(`/admin/users/${userId}/profile`);
 };
 
@@ -21,7 +23,10 @@ type UseAdminUserProfileOptions = {
   queryConfig?: QueryConfig<typeof getAdminUserProfileQueryOptions>;
 };
 
-export const useAdminUserProfile = ({ userId, queryConfig }: UseAdminUserProfileOptions) => {
+export const useAdminUserProfile = ({
+  userId,
+  queryConfig,
+}: UseAdminUserProfileOptions) => {
   return useQuery({
     ...getAdminUserProfileQueryOptions(userId),
     ...queryConfig,

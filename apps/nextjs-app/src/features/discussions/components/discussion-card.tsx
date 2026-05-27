@@ -1,14 +1,22 @@
 'use client';
 
-import { MessageSquare, Eye, Pin, Lock, CheckCircle, Bookmark } from 'lucide-react';
+import {
+  MessageSquare,
+  Eye,
+  Pin,
+  Lock,
+  CheckCircle,
+  Bookmark,
+} from 'lucide-react';
 import NextLink from 'next/link';
 
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { paths } from '@/config/paths';
 import { Discussion } from '@/types/api';
 import { cn } from '@/utils/cn';
-import { AvatarDisplay } from '@/components/ui/avatar-display';
 
 import { useToggleBookmark } from '../api/bookmark-discussion';
+
 import { CategoryBadge } from './category-badge';
 import { UserBadge } from './user-badge';
 
@@ -42,9 +50,7 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
           className="min-w-0 flex-1"
         >
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            {discussion.is_pinned && (
-              <Pin className="size-3.5 text-blue-500" />
-            )}
+            {discussion.is_pinned && <Pin className="size-3.5 text-blue-500" />}
             {discussion.is_locked && (
               <Lock className="size-3.5 text-muted-foreground" />
             )}
@@ -83,7 +89,10 @@ export const DiscussionCard = ({ discussion }: { discussion: Discussion }) => {
           disabled={bookmarkMutation.isPending}
         >
           <Bookmark
-            className={cn('size-4', isBookmarked && 'fill-yellow-500 text-yellow-500')}
+            className={cn(
+              'size-4',
+              isBookmarked && 'fill-yellow-500 text-yellow-500',
+            )}
           />
         </button>
       </div>

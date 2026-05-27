@@ -4,9 +4,7 @@ import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 import { AuditLogEntry } from '@/types/api';
 
-export const getAuditLog = (
-  limit: number = 100,
-): Promise<AuditLogEntry[]> => {
+export const getAuditLog = (limit: number = 100): Promise<AuditLogEntry[]> => {
   return api.get('/admin/audit-log', { params: { limit } });
 };
 
