@@ -45,6 +45,16 @@ export type PlacedGridComponent = {
   rotation: 0 | 90;
   isLocked?: boolean; // If true, component is immovable, undeletable, and mandatory to use
 };
+type ClipboardComponent = PlacedGridComponent & {
+  label: string;
+};
+type ClipboardPayload = {
+  version: 1;
+  sourcePuzzleId: string;
+  components: ClipboardComponent[];
+  wires: Wire[];
+};
+const normalizeClipboardKey = (value: string) => value.trim().toLowerCase();
 
 export type PortAddress = {
   ownerId: string; // placedId or IO:IN:* / IO:OUT:*
@@ -62,6 +72,8 @@ const DEFAULT_GRID_ROWS = 15;
 const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 const PUZZLE_IO_Y_OFFSET_PX = 20;
+const WORKSTATION_CLIPBOARD_STORAGE_KEY =
+  'escapecircuit.workstation.clipboard.v1';
 
 // Visual Feature: Dynamic Wire Coloring
 const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316'];
@@ -320,10 +332,7 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
-  const [clipboard, setClipboard] = useState<{
-    components: PlacedGridComponent[];
-    wires: Wire[];
-  } | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardPayload | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
   const [isWorkingAreaCollapsed, setIsWorkingAreaCollapsed] = useState(false);
 
@@ -333,7 +342,114 @@ export const WorkstationGrid = ({
     clipboard && clipboard.components.length > 0,
   );
 
-  const copySelectionToClipboard = useCallback(() => {
+  const catalogLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+
+    for (const def of Object.values(catalog)) {
+      lookup.set(normalizeClipboardKey(def.id), def.id);
+      lookup.set(normalizeClipboardKey(def.label), def.id);
+    }
+
+    return lookup;
+  }, [catalog]);
+
+  const resolveCatalogComponentId = useCallback(
+    (component: ClipboardComponent): string | null => {
+      const exact = catalog[component.componentId];
+      if (exact) return exact.id;
+
+      const byLabel = catalogLookup.get(
+        normalizeClipboardKey(component.label || component.componentId),
+      );
+      return byLabel ?? null;
+    },
+    [catalog, catalogLookup],
+  );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as ClipboardPayload;
+      if (
+        parsed &&
+        parsed.version === 1 &&
+        Array.isArray(parsed.components) &&
+        Array.isArray(parsed.wires)
+      ) {
+        setClipboard(parsed);
+      }
+    } catch {
+      // ignore clipboard hydration failures
+    }
+  }, []);
+
+  const persistClipboardPayload = useCallback(async (payload: ClipboardPayload) => {
+    setClipboard(payload);
+
+    try {
+      window.localStorage.setItem(
+        WORKSTATION_CLIPBOARD_STORAGE_KEY,
+        JSON.stringify(payload),
+      );
+    } catch {
+      // ignore storage failures
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(JSON.stringify(payload));
+      }
+    } catch {
+      // ignore clipboard write failures
+    }
+  }, []);
+
+  const readClipboardPayload = useCallback(async (): Promise<ClipboardPayload | null> => {
+    const parsePayload = (raw: string | null): ClipboardPayload | null => {
+      if (!raw) return null;
+
+      try {
+        const parsed = JSON.parse(raw) as ClipboardPayload;
+        if (
+          parsed &&
+          parsed.version === 1 &&
+          Array.isArray(parsed.components) &&
+          Array.isArray(parsed.wires)
+        ) {
+          return parsed;
+        }
+      } catch {
+        return null;
+      }
+
+      return null;
+    };
+
+    try {
+      const systemText = navigator.clipboard
+        ? await navigator.clipboard.readText()
+        : '';
+      const fromSystem = parsePayload(systemText);
+      if (fromSystem) return fromSystem;
+    } catch {
+      // ignore clipboard read failures
+    }
+
+    const fromState = clipboard;
+    if (fromState) return fromState;
+
+    try {
+      return parsePayload(
+        window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
+      );
+    } catch {
+      return null;
+    }
+  }, [clipboard]);
+
+  const copySelectionToClipboard = useCallback(async () => {
     if (
       selectedEntity.type !== 'component' ||
       selectedEntity.placedIds.length === 0
@@ -349,36 +465,77 @@ export const WorkstationGrid = ({
         selectedIds.has(w.to.componentId),
     );
 
-    setClipboard({ components: selectedComps, wires: internalWires });
-  }, [selectedEntity, placed, wires]);
+    const payload: ClipboardPayload = {
+      version: 1,
+      sourcePuzzleId: puzzleId,
+      components: selectedComps.map((component) => ({
+        ...component,
+        label: catalog[component.componentId]?.label ?? component.componentId,
+      })),
+      wires: internalWires,
+    };
 
-  const pasteFromClipboard = useCallback(() => {
-    if (!clipboard || clipboard.components.length === 0) {
+    await persistClipboardPayload(payload);
+  }, [catalog, persistClipboardPayload, placed, puzzleId, selectedEntity, wires]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    const payload = await readClipboardPayload();
+    if (!payload || payload.components.length === 0) {
       return;
     }
 
-    const copiedWithDefs: Array<{
-      comp: PlacedGridComponent;
+    const resolvedComponents: Array<{
+      comp: ClipboardComponent;
+      resolvedComponentId: string;
       def: ComponentDef;
       size: { w: number; h: number };
     }> = [];
+    const missingComponents: string[] = [];
 
-    for (const comp of clipboard.components) {
-      const def = catalog[comp.componentId];
-      if (!def) {
-        notifications.addNotification({
-          type: 'warning',
-          title: 'Cannot paste here',
-          message: 'One or more copied components are unavailable.',
-        });
-        return;
+    for (const comp of payload.components) {
+      const resolvedComponentId = resolveCatalogComponentId(comp);
+      if (!resolvedComponentId) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
       }
-      copiedWithDefs.push({
+
+      const def = catalog[resolvedComponentId];
+      if (!def) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
+      }
+
+      resolvedComponents.push({
         comp,
+        resolvedComponentId,
         def,
         size: rotatedSize(def.size, comp.rotation),
       });
     }
+
+    if (!resolvedComponents.length) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Cannot paste here',
+        message: 'No copied components are available in this workspace.',
+      });
+      return;
+    }
+
+    if (missingComponents.length > 0) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Partial paste',
+        message: `Skipped ${missingComponents.length} unavailable component${missingComponents.length === 1 ? '' : 's'}.`,
+      });
+    }
+
+    const copiedWithDefs: Array<{
+      resolvedComponentId: string;
+      comp: PlacedGridComponent;
+      def: ComponentDef;
+      size: { w: number; h: number };
+    }> = resolvedComponents;
 
     const minRow = Math.min(
       ...copiedWithDefs.map(({ comp }) => comp.origin.row),
@@ -517,11 +674,11 @@ export const WorkstationGrid = ({
     const pasteStamp = Date.now();
 
     relativeLayout.forEach((item, idx) => {
-      const newId = `${item.comp.componentId}:${pasteStamp}-${idx}`;
+      const newId = `${item.resolvedComponentId}:${pasteStamp}-${idx}`;
       idMap.set(item.comp.id, newId);
       newComponents.push({
         id: newId,
-        componentId: item.comp.componentId,
+        componentId: item.resolvedComponentId,
         origin: {
           row: chosenAnchor.row + item.rowOffset,
           col: chosenAnchor.col + item.colOffset,
@@ -530,7 +687,7 @@ export const WorkstationGrid = ({
       });
     });
 
-    clipboard.wires.forEach((wire, idx) => {
+    payload.wires.forEach((wire, idx) => {
       const newFromId = idMap.get(wire.from.componentId);
       const newToId = idMap.get(wire.to.componentId);
       if (newFromId && newToId) {
@@ -548,9 +705,7 @@ export const WorkstationGrid = ({
       type: 'component',
       placedIds: Array.from(idMap.values()),
     });
-    setClipboard(null);
   }, [
-    clipboard,
     catalog,
     gridRows,
     gridCols,
@@ -558,6 +713,8 @@ export const WorkstationGrid = ({
     onPlacedChange,
     onWiresChange,
     placed,
+    readClipboardPayload,
+    resolveCatalogComponentId,
     wires,
   ]);
 
@@ -583,12 +740,12 @@ export const WorkstationGrid = ({
 
       if (isCopyKey) {
         e.preventDefault();
-        copySelectionToClipboard();
+        void copySelectionToClipboard();
       }
 
       if (isPasteKey) {
         e.preventDefault();
-        pasteFromClipboard();
+        void pasteFromClipboard();
       }
     };
 
