@@ -2959,6 +2959,7 @@ export const WorkstationGrid = ({
             if (!pt) return null;
             const inputBit = debuggerInputBits[label] ?? '0';
             const sequenceValue = debuggerSequences[label] ?? '';
+            const sequenceBits = sequenceValue.split('');
             return (
               <div key={id}>
                 {debuggerActive ? (
@@ -2988,6 +2989,31 @@ export const WorkstationGrid = ({
                       className="h-5 w-20 rounded border border-green-300 bg-white px-1 text-[10px] text-green-700"
                       title="Input bit sequence"
                     />
+                  </div>
+                ) : null}
+                {debuggerActive && sequenceBits.length > 0 ? (
+                  <div
+                    className="pointer-events-none absolute z-30 flex max-w-[90px] flex-wrap items-center gap-[2px]"
+                    style={{
+                      left: pt.x,
+                      top: pt.y,
+                      transform: 'translate(-102%, -105%)',
+                    }}
+                    title={`Step ${debuggerStepIndex + 1} highlighted in sequence`}
+                  >
+                    {sequenceBits.map((bit, bitIndex) => (
+                      <span
+                        key={`${id}-seq-${bitIndex}`}
+                        className={cn(
+                          'inline-flex h-3 w-3 items-center justify-center rounded border text-[9px] font-bold leading-none',
+                          bitIndex === debuggerStepIndex
+                            ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                            : 'border-green-200 bg-white/95 text-green-700',
+                        )}
+                      >
+                        {bit}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
                 <button

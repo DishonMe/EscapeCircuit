@@ -69,6 +69,18 @@ export function CircuitDebugger({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepCount, setStepCount] = useState(0);
+  const [sequenceStepIndex, setSequenceStepIndex] = useState(0);
+
+  const parseSequenceBits = (value: string): string[] => {
+    if (!value.trim()) return [];
+    if (value.includes(',')) {
+      return value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part === '0' || part === '1');
+    }
+    return value.split('').filter((ch) => ch === '0' || ch === '1');
+  };
 
   useEffect(() => {
     if (!modeOverride) return;
@@ -87,6 +99,18 @@ export function CircuitDebugger({
     void handleRunSequence();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRunToken, isOpen]);
+
+  useEffect(() => {
+    if (mode !== 'sequence') {
+      setSequenceStepIndex(0);
+      return;
+    }
+
+    setSequenceStepIndex((prev) => {
+      const maxIndex = Math.max(stepCount - 1, 0);
+      return Math.min(Math.max(prev, 0), maxIndex);
+    });
+  }, [mode, stepCount]);
 
   // Helper: count same component types for numbering
   const getComponentDisplayLabel = (
@@ -198,6 +222,7 @@ export function CircuitDebugger({
       setPuzzleOutputs([puzzleOutputsMap]);
       setHasRun(true);
       setStepCount(1);
+      setSequenceStepIndex(0);
 
       // Call callback if provided
       if (onDebug) {
@@ -309,6 +334,7 @@ export function CircuitDebugger({
       setPuzzleOutputs(allPuzzleOutputs);
       setHasRun(true);
       setStepCount(maxLength);
+      setSequenceStepIndex(0);
     } catch (err: any) {
       setError(err.message || 'Failed to simulate circuit sequence');
       console.error('Debug sequence simulation error:', err);
@@ -386,12 +412,66 @@ export function CircuitDebugger({
                         placeholder="e.g., 01010 or 0,1,0,1,0"
                         className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       />
+                      {parseSequenceBits(sequenceInputs[inputName] || '').length >
+                      0 ? (
+                        <div
+                          className="mt-1.5 flex flex-wrap items-center gap-1"
+                          title={`Current step ${sequenceStepIndex + 1}`}
+                        >
+                          {parseSequenceBits(sequenceInputs[inputName] || '').map(
+                            (bit, index) => (
+                              <span
+                                key={`${inputName}-bit-${index}`}
+                                className={`inline-flex h-5 w-5 items-center justify-center rounded border text-[11px] font-semibold ${
+                                  index === sequenceStepIndex
+                                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                                    : 'border-border bg-card text-foreground'
+                                }`}
+                              >
+                                {bit}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      ) : null}
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         Enter binary digits (0,1) or comma-separated values
                       </p>
                     </div>
                   </div>
                 ))}
+
+                {stepCount > 0 ? (
+                  <div className="ml-[5.5rem] flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setSequenceStepIndex((prev) => Math.max(prev - 1, 0))
+                      }
+                      disabled={sequenceStepIndex <= 0}
+                    >
+                      Prev Step
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setSequenceStepIndex((prev) =>
+                          Math.min(prev + 1, Math.max(stepCount - 1, 0)),
+                        )
+                      }
+                      disabled={sequenceStepIndex >= stepCount - 1}
+                    >
+                      Next Step
+                    </Button>
+                    <span className="text-[12px] text-muted-foreground">
+                      Current Step {sequenceStepIndex + 1}/{stepCount}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
