@@ -11,6 +11,7 @@ import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { useSettings } from '@/context/settings-context';
 import { useAudio } from '@/hooks/use-audio';
 import type { Wire } from '@/types/api';
@@ -213,6 +214,11 @@ export const WorkstationGrid = ({
   debuggerSequences = {},
   onDebuggerSequenceChange,
   onDebuggerSequenceCommit,
+  onEnterInlineDebugger,
+  onDebuggerStepPrev,
+  onDebuggerStepNext,
+  onOpenFullDebuggerReport,
+  onExitInlineDebugger,
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
@@ -246,6 +252,11 @@ export const WorkstationGrid = ({
   debuggerSequences?: Record<string, string>;
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
   onDebuggerSequenceCommit?: (inputName: string, sequence: string) => void;
+  onEnterInlineDebugger?: () => void;
+  onDebuggerStepPrev?: () => void;
+  onDebuggerStepNext?: () => void;
+  onOpenFullDebuggerReport?: () => void;
+  onExitInlineDebugger?: () => void;
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
@@ -260,6 +271,7 @@ export const WorkstationGrid = ({
   const { visualEffectsEnabled } = useSettings();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const debuggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const panAnimationFrameRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
@@ -1998,25 +2010,60 @@ export const WorkstationGrid = ({
           <div className="text-sm font-medium text-foreground">
             Working Area
           </div>
-          <button
-            type="button"
-            className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
-            aria-expanded={!isWorkingAreaCollapsed}
-            aria-label={
-              isWorkingAreaCollapsed
-                ? 'Expand Working Area info'
-                : 'Collapse Working Area info'
-            }
-            title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <ChevronRight
-              className={cn(
-                'size-4 transition-transform duration-200',
-                !isWorkingAreaCollapsed && 'rotate-90',
-              )}
-            />
-          </button>
+          <div className="flex items-center gap-2">
+            {onEnterInlineDebugger || onExitInlineDebugger ? (
+              !debuggerActive ? (
+                <Button
+                  ref={debuggerButtonRef}
+                  size="sm"
+                  variant="outline"
+                  className="relative overflow-hidden"
+                  onClick={onEnterInlineDebugger}
+                >
+                  <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                  Debugger
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={onDebuggerStepPrev}>
+                    ◄ Previous Step
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onDebuggerStepNext}>
+                    Next Step ►
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenFullDebuggerReport}
+                  >
+                    Full Debugger Report
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onExitInlineDebugger}>
+                    Exit Debugger
+                  </Button>
+                </>
+              )
+            ) : null}
+            <button
+              type="button"
+              className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
+              aria-expanded={!isWorkingAreaCollapsed}
+              aria-label={
+                isWorkingAreaCollapsed
+                  ? 'Expand Working Area info'
+                  : 'Collapse Working Area info'
+              }
+              title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
+            >
+              <ChevronRight
+                className={cn(
+                  'size-4 transition-transform duration-200',
+                  !isWorkingAreaCollapsed && 'rotate-90',
+                )}
+              />
+            </button>
+          </div>
         </div>
         {!isWorkingAreaCollapsed ? (
           <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">

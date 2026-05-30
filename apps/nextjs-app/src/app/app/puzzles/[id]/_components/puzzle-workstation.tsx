@@ -3,8 +3,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
-  StepBack,
-  StepForward,
   ArrowRight,
   Trash2,
   CircleAlert,
@@ -34,7 +32,6 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
-import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
 import { workstationTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
@@ -214,7 +211,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   // with beginSolveAgain when isSolved flips back to false. Reset by navigating
   // to a different puzzle (the ref value no longer matches puzzle.id).
   const initializedPuzzleIdRef = useRef<string | null>(null);
-  const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
@@ -2004,53 +2000,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   }
                 />
               ) : null}
-              {!isInlineDebugger ? (
-                <div className="relative">
-                  <Button
-                    ref={debuggerButtonRef}
-                    variant="outline"
-                    size="sm"
-                    className="workstation-debugger-button relative overflow-hidden"
-                    onClick={enterInlineDebugger}
-                  >
-                    <ZigzagBugCanvas containerRef={debuggerButtonRef} />
-                    Debugger
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDebuggerStepPrev}
-                  >
-                    <StepBack className="mr-1 size-4" />
-                    Previous Step
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDebuggerStepNext}
-                  >
-                    <StepForward className="mr-1 size-4" />
-                    Next Step
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDebugger(true)}
-                  >
-                    View Full Debugger Report
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exitInlineDebugger}
-                  >
-                    Exit Debugger
-                  </Button>
-                </>
-              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -2238,6 +2187,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 debuggerSequences={debugSequences}
                 onDebuggerSequenceChange={onInlineSequenceChange}
                 onDebuggerSequenceCommit={onInlineSequenceCommit}
+                onEnterInlineDebugger={enterInlineDebugger}
+                onDebuggerStepPrev={onDebuggerStepPrev}
+                onDebuggerStepNext={onDebuggerStepNext}
+                onOpenFullDebuggerReport={() => setShowDebugger(true)}
+                onExitInlineDebugger={exitInlineDebugger}
                 onInspectComponent={setInspectingPlacedId}
                 arsenalComponentDisplayModes={arsenalComponentDisplayModes}
                 disableZoomPersistence
