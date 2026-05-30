@@ -11,6 +11,7 @@ import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { useSettings } from '@/context/settings-context';
 import { useAudio } from '@/hooks/use-audio';
 import type { Wire } from '@/types/api';
@@ -45,6 +46,16 @@ export type PlacedGridComponent = {
   rotation: 0 | 90;
   isLocked?: boolean; // If true, component is immovable, undeletable, and mandatory to use
 };
+type ClipboardComponent = PlacedGridComponent & {
+  label: string;
+};
+type ClipboardPayload = {
+  version: 1;
+  sourcePuzzleId: string;
+  components: ClipboardComponent[];
+  wires: Wire[];
+};
+const normalizeClipboardKey = (value: string) => value.trim().toLowerCase();
 
 export type PortAddress = {
   ownerId: string; // placedId or IO:IN:* / IO:OUT:*
@@ -62,6 +73,8 @@ const DEFAULT_GRID_ROWS = 15;
 const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 const PUZZLE_IO_Y_OFFSET_PX = 20;
+const WORKSTATION_CLIPBOARD_STORAGE_KEY =
+  'escapecircuit.workstation.clipboard.v1';
 
 // Visual Feature: Dynamic Wire Coloring
 const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316'];
@@ -200,6 +213,12 @@ export const WorkstationGrid = ({
   debuggerGateBits = {},
   debuggerSequences = {},
   onDebuggerSequenceChange,
+  onDebuggerSequenceCommit,
+  onEnterInlineDebugger,
+  onDebuggerStepPrev,
+  onDebuggerStepNext,
+  onOpenFullDebuggerReport,
+  onExitInlineDebugger,
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
@@ -232,6 +251,12 @@ export const WorkstationGrid = ({
   debuggerGateBits?: Record<string, string>;
   debuggerSequences?: Record<string, string>;
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
+  onDebuggerSequenceCommit?: (inputName: string, sequence: string) => void;
+  onEnterInlineDebugger?: () => void;
+  onDebuggerStepPrev?: () => void;
+  onDebuggerStepNext?: () => void;
+  onOpenFullDebuggerReport?: () => void;
+  onExitInlineDebugger?: () => void;
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
@@ -246,6 +271,7 @@ export const WorkstationGrid = ({
   const { visualEffectsEnabled } = useSettings();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const debuggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const panAnimationFrameRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
@@ -320,10 +346,7 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
-  const [clipboard, setClipboard] = useState<{
-    components: PlacedGridComponent[];
-    wires: Wire[];
-  } | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardPayload | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
   const [isWorkingAreaCollapsed, setIsWorkingAreaCollapsed] = useState(false);
 
@@ -333,7 +356,114 @@ export const WorkstationGrid = ({
     clipboard && clipboard.components.length > 0,
   );
 
-  const copySelectionToClipboard = useCallback(() => {
+  const catalogLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+
+    for (const def of Object.values(catalog)) {
+      lookup.set(normalizeClipboardKey(def.id), def.id);
+      lookup.set(normalizeClipboardKey(def.label), def.id);
+    }
+
+    return lookup;
+  }, [catalog]);
+
+  const resolveCatalogComponentId = useCallback(
+    (component: ClipboardComponent): string | null => {
+      const exact = catalog[component.componentId];
+      if (exact) return exact.id;
+
+      const byLabel = catalogLookup.get(
+        normalizeClipboardKey(component.label || component.componentId),
+      );
+      return byLabel ?? null;
+    },
+    [catalog, catalogLookup],
+  );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as ClipboardPayload;
+      if (
+        parsed &&
+        parsed.version === 1 &&
+        Array.isArray(parsed.components) &&
+        Array.isArray(parsed.wires)
+      ) {
+        setClipboard(parsed);
+      }
+    } catch {
+      // ignore clipboard hydration failures
+    }
+  }, []);
+
+  const persistClipboardPayload = useCallback(async (payload: ClipboardPayload) => {
+    setClipboard(payload);
+
+    try {
+      window.localStorage.setItem(
+        WORKSTATION_CLIPBOARD_STORAGE_KEY,
+        JSON.stringify(payload),
+      );
+    } catch {
+      // ignore storage failures
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(JSON.stringify(payload));
+      }
+    } catch {
+      // ignore clipboard write failures
+    }
+  }, []);
+
+  const readClipboardPayload = useCallback(async (): Promise<ClipboardPayload | null> => {
+    const parsePayload = (raw: string | null): ClipboardPayload | null => {
+      if (!raw) return null;
+
+      try {
+        const parsed = JSON.parse(raw) as ClipboardPayload;
+        if (
+          parsed &&
+          parsed.version === 1 &&
+          Array.isArray(parsed.components) &&
+          Array.isArray(parsed.wires)
+        ) {
+          return parsed;
+        }
+      } catch {
+        return null;
+      }
+
+      return null;
+    };
+
+    try {
+      const systemText = navigator.clipboard
+        ? await navigator.clipboard.readText()
+        : '';
+      const fromSystem = parsePayload(systemText);
+      if (fromSystem) return fromSystem;
+    } catch {
+      // ignore clipboard read failures
+    }
+
+    const fromState = clipboard;
+    if (fromState) return fromState;
+
+    try {
+      return parsePayload(
+        window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
+      );
+    } catch {
+      return null;
+    }
+  }, [clipboard]);
+
+  const copySelectionToClipboard = useCallback(async () => {
     if (
       selectedEntity.type !== 'component' ||
       selectedEntity.placedIds.length === 0
@@ -349,36 +479,77 @@ export const WorkstationGrid = ({
         selectedIds.has(w.to.componentId),
     );
 
-    setClipboard({ components: selectedComps, wires: internalWires });
-  }, [selectedEntity, placed, wires]);
+    const payload: ClipboardPayload = {
+      version: 1,
+      sourcePuzzleId: puzzleId,
+      components: selectedComps.map((component) => ({
+        ...component,
+        label: catalog[component.componentId]?.label ?? component.componentId,
+      })),
+      wires: internalWires,
+    };
 
-  const pasteFromClipboard = useCallback(() => {
-    if (!clipboard || clipboard.components.length === 0) {
+    await persistClipboardPayload(payload);
+  }, [catalog, persistClipboardPayload, placed, puzzleId, selectedEntity, wires]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    const payload = await readClipboardPayload();
+    if (!payload || payload.components.length === 0) {
       return;
     }
 
-    const copiedWithDefs: Array<{
-      comp: PlacedGridComponent;
+    const resolvedComponents: Array<{
+      comp: ClipboardComponent;
+      resolvedComponentId: string;
       def: ComponentDef;
       size: { w: number; h: number };
     }> = [];
+    const missingComponents: string[] = [];
 
-    for (const comp of clipboard.components) {
-      const def = catalog[comp.componentId];
-      if (!def) {
-        notifications.addNotification({
-          type: 'warning',
-          title: 'Cannot paste here',
-          message: 'One or more copied components are unavailable.',
-        });
-        return;
+    for (const comp of payload.components) {
+      const resolvedComponentId = resolveCatalogComponentId(comp);
+      if (!resolvedComponentId) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
       }
-      copiedWithDefs.push({
+
+      const def = catalog[resolvedComponentId];
+      if (!def) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
+      }
+
+      resolvedComponents.push({
         comp,
+        resolvedComponentId,
         def,
         size: rotatedSize(def.size, comp.rotation),
       });
     }
+
+    if (!resolvedComponents.length) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Cannot paste here',
+        message: 'No copied components are available in this workspace.',
+      });
+      return;
+    }
+
+    if (missingComponents.length > 0) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Partial paste',
+        message: `Skipped ${missingComponents.length} unavailable component${missingComponents.length === 1 ? '' : 's'}.`,
+      });
+    }
+
+    const copiedWithDefs: Array<{
+      resolvedComponentId: string;
+      comp: PlacedGridComponent;
+      def: ComponentDef;
+      size: { w: number; h: number };
+    }> = resolvedComponents;
 
     const minRow = Math.min(
       ...copiedWithDefs.map(({ comp }) => comp.origin.row),
@@ -517,11 +688,11 @@ export const WorkstationGrid = ({
     const pasteStamp = Date.now();
 
     relativeLayout.forEach((item, idx) => {
-      const newId = `${item.comp.componentId}:${pasteStamp}-${idx}`;
+      const newId = `${item.resolvedComponentId}:${pasteStamp}-${idx}`;
       idMap.set(item.comp.id, newId);
       newComponents.push({
         id: newId,
-        componentId: item.comp.componentId,
+        componentId: item.resolvedComponentId,
         origin: {
           row: chosenAnchor.row + item.rowOffset,
           col: chosenAnchor.col + item.colOffset,
@@ -530,7 +701,7 @@ export const WorkstationGrid = ({
       });
     });
 
-    clipboard.wires.forEach((wire, idx) => {
+    payload.wires.forEach((wire, idx) => {
       const newFromId = idMap.get(wire.from.componentId);
       const newToId = idMap.get(wire.to.componentId);
       if (newFromId && newToId) {
@@ -548,9 +719,7 @@ export const WorkstationGrid = ({
       type: 'component',
       placedIds: Array.from(idMap.values()),
     });
-    setClipboard(null);
   }, [
-    clipboard,
     catalog,
     gridRows,
     gridCols,
@@ -558,6 +727,8 @@ export const WorkstationGrid = ({
     onPlacedChange,
     onWiresChange,
     placed,
+    readClipboardPayload,
+    resolveCatalogComponentId,
     wires,
   ]);
 
@@ -583,12 +754,12 @@ export const WorkstationGrid = ({
 
       if (isCopyKey) {
         e.preventDefault();
-        copySelectionToClipboard();
+        void copySelectionToClipboard();
       }
 
       if (isPasteKey) {
         e.preventDefault();
-        pasteFromClipboard();
+        void pasteFromClipboard();
       }
     };
 
@@ -1839,25 +2010,60 @@ export const WorkstationGrid = ({
           <div className="text-sm font-medium text-foreground">
             Working Area
           </div>
-          <button
-            type="button"
-            className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
-            aria-expanded={!isWorkingAreaCollapsed}
-            aria-label={
-              isWorkingAreaCollapsed
-                ? 'Expand Working Area info'
-                : 'Collapse Working Area info'
-            }
-            title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <ChevronRight
-              className={cn(
-                'size-4 transition-transform duration-200',
-                !isWorkingAreaCollapsed && 'rotate-90',
-              )}
-            />
-          </button>
+          <div className="flex items-center gap-2">
+            {onEnterInlineDebugger || onExitInlineDebugger ? (
+              !debuggerActive ? (
+                <Button
+                  ref={debuggerButtonRef}
+                  size="sm"
+                  variant="outline"
+                  className="relative overflow-hidden"
+                  onClick={onEnterInlineDebugger}
+                >
+                  <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                  Debugger
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={onDebuggerStepPrev}>
+                    ◄ Previous Step
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onDebuggerStepNext}>
+                    Next Step ►
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenFullDebuggerReport}
+                  >
+                    Full Debugger Report
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onExitInlineDebugger}>
+                    Exit Debugger
+                  </Button>
+                </>
+              )
+            ) : null}
+            <button
+              type="button"
+              className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
+              aria-expanded={!isWorkingAreaCollapsed}
+              aria-label={
+                isWorkingAreaCollapsed
+                  ? 'Expand Working Area info'
+                  : 'Collapse Working Area info'
+              }
+              title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
+            >
+              <ChevronRight
+                className={cn(
+                  'size-4 transition-transform duration-200',
+                  !isWorkingAreaCollapsed && 'rotate-90',
+                )}
+              />
+            </button>
+          </div>
         </div>
         {!isWorkingAreaCollapsed ? (
           <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
@@ -2802,6 +3008,7 @@ export const WorkstationGrid = ({
             if (!pt) return null;
             const inputBit = debuggerInputBits[label] ?? '0';
             const sequenceValue = debuggerSequences[label] ?? '';
+            const sequenceBits = sequenceValue.split('');
             return (
               <div key={id}>
                 {debuggerActive ? (
@@ -2828,9 +3035,49 @@ export const WorkstationGrid = ({
                           e.target.value.replace(/[^01]/g, ''),
                         )
                       }
+                      onBlur={(e) =>
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          e.target.value.replace(/[^01]/g, ''),
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        const target = e.currentTarget;
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          target.value.replace(/[^01]/g, ''),
+                        );
+                        target.blur();
+                      }}
                       className="h-5 w-20 rounded border border-green-300 bg-white px-1 text-[10px] text-green-700"
                       title="Input bit sequence"
                     />
+                  </div>
+                ) : null}
+                {debuggerActive && sequenceBits.length > 0 ? (
+                  <div
+                    className="pointer-events-none absolute z-30 flex max-w-[90px] flex-wrap items-center gap-[2px]"
+                    style={{
+                      left: pt.x,
+                      top: pt.y,
+                      transform: 'translate(-102%, -105%)',
+                    }}
+                    title={`Step ${debuggerStepIndex + 1} highlighted in sequence`}
+                  >
+                    {sequenceBits.map((bit, bitIndex) => (
+                      <span
+                        key={`${id}-seq-${bitIndex}`}
+                        className={cn(
+                          'inline-flex h-3 w-3 items-center justify-center rounded border text-[9px] font-bold leading-none',
+                          bitIndex === debuggerStepIndex
+                            ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                            : 'border-green-200 bg-white/95 text-green-700',
+                        )}
+                      >
+                        {bit}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
                 <button
