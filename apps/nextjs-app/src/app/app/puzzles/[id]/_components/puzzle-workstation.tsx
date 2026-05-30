@@ -280,6 +280,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [debugSequences, setDebugSequences] = useState<Record<string, string>>(
     {},
   );
+  const [debugSequencesCommitted, setDebugSequencesCommitted] = useState<
+    Record<string, string>
+  >({});
   const [debugStepIndex, setDebugStepIndex] = useState(0);
   const [debugIsRunning, setDebugIsRunning] = useState(false);
   const [debugRunKey, setDebugRunKey] = useState(0);
@@ -559,6 +562,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   useEffect(() => {
     if (!inputs.length) return;
     setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const inputName of inputs) {
+        const current = sanitizeBitSequence(prev[inputName] ?? '');
+        next[inputName] = current || defaultDebugSequence;
+      }
+      return next;
+    });
+    setDebugSequencesCommitted((prev) => {
       const next: Record<string, string> = {};
       for (const inputName of inputs) {
         const current = sanitizeBitSequence(prev[inputName] ?? '');
@@ -1152,7 +1163,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const parsed: Record<string, string[]> = {};
     let stepCount = 0;
     for (const inputName of inputs) {
-      const bits = parseBitSequence(debugSequences[inputName] ?? '');
+      const bits = parseBitSequence(debugSequencesCommitted[inputName] ?? '');
       if (!bits.length) {
         notifications.addNotification({
           type: 'warning',
@@ -1263,7 +1274,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [
     puzzle?.id,
     inputs,
-    debugSequences,
+    debugSequencesCommitted,
     placed,
     wires,
     currentCost,
@@ -1787,6 +1798,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const onInlineSequenceChange = (inputName: string, rawValue: string) => {
     const edited = sanitizeBitSequence(rawValue);
+
+    setDebugSequences((prev) => ({
+      ...prev,
+      [inputName]: edited,
+    }));
+  };
+
+  const onInlineSequenceCommit = (inputName: string, rawValue: string) => {
+    const edited = sanitizeBitSequence(rawValue);
     const targetLength = Math.max(
       1,
       edited.length || defaultDebugSequence.length || 1,
@@ -1801,6 +1821,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     };
 
     setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const name of inputs) {
+        if (name === inputName) {
+          next[name] = normalizeToTargetLength(edited || '0');
+        } else {
+          next[name] = normalizeToTargetLength(
+            prev[name] ?? defaultDebugSequence,
+          );
+        }
+      }
+      return next;
+    });
+
+    setDebugSequencesCommitted((prev) => {
       const next: Record<string, string> = {};
       for (const name of inputs) {
         if (name === inputName) {
@@ -2203,6 +2237,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 debuggerGateBits={currentGateBits}
                 debuggerSequences={debugSequences}
                 onDebuggerSequenceChange={onInlineSequenceChange}
+                onDebuggerSequenceCommit={onInlineSequenceCommit}
                 onInspectComponent={setInspectingPlacedId}
                 arsenalComponentDisplayModes={arsenalComponentDisplayModes}
                 disableZoomPersistence

@@ -212,6 +212,7 @@ export const WorkstationGrid = ({
   debuggerGateBits = {},
   debuggerSequences = {},
   onDebuggerSequenceChange,
+  onDebuggerSequenceCommit,
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
@@ -244,6 +245,7 @@ export const WorkstationGrid = ({
   debuggerGateBits?: Record<string, string>;
   debuggerSequences?: Record<string, string>;
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
+  onDebuggerSequenceCommit?: (inputName: string, sequence: string) => void;
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
@@ -2986,6 +2988,21 @@ export const WorkstationGrid = ({
                           e.target.value.replace(/[^01]/g, ''),
                         )
                       }
+                      onBlur={(e) =>
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          e.target.value.replace(/[^01]/g, ''),
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        const target = e.currentTarget;
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          target.value.replace(/[^01]/g, ''),
+                        );
+                        target.blur();
+                      }}
                       className="h-5 w-20 rounded border border-green-300 bg-white px-1 text-[10px] text-green-700"
                       title="Input bit sequence"
                     />
