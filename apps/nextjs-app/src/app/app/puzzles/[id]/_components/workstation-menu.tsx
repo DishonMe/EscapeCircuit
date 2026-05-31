@@ -251,6 +251,7 @@ const DraggableItem = ({
   component,
   inPalette = false,
   isSelected,
+  isConnectedToSelected,
   onSelect,
   onInfoClick,
   onDragStart,
@@ -261,6 +262,7 @@ const DraggableItem = ({
   node: LogicNodeDefinition;
   inPalette?: boolean;
   isSelected?: boolean;
+  isConnectedToSelected?: boolean;
   onSelect?: (componentId: string) => void;
   onInfoClick?: () => void;
   onDragStart?: (id: string) => void;
@@ -278,7 +280,9 @@ const DraggableItem = ({
         'group flex w-full items-center gap-1 rounded-lg border px-1.5 py-0.5 text-left text-[14px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
         isSelected
           ? 'border-sky-500 bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-secondary'
-          : 'border-border bg-secondary',
+          : isConnectedToSelected
+            ? 'border-blue-500 bg-blue-500/20'
+            : 'border-border bg-secondary',
       )}
     >
       <button
@@ -609,7 +613,11 @@ export const WorkstationMenu = ({
             <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
           </DialogHeader>
           {viewingTruthTableData ? (
-            <div className="overflow-hidden rounded-lg border border-border/60">
+            <div className="space-y-3">
+              <p className="text-sm text-foreground leading-relaxed">
+                The truth table below demonstrates the gate's logic, showing the relationship between its inputs and resulting outputs.
+              </p>
+              <div className="overflow-hidden rounded-lg border border-border/60">
               <table className="w-full text-[13px] text-foreground">
                 <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
                   <tr>
@@ -645,6 +653,7 @@ export const WorkstationMenu = ({
                   )}
                 </tbody>
               </table>
+            </div>
             </div>
           ) : (
             <div className="text-[13px] text-muted-foreground">
