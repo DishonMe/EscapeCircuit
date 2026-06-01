@@ -46,6 +46,7 @@ import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderbo
 import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
+import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
 import { useAudio } from '@/hooks/useAudio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
@@ -218,6 +219,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
+  const { mutate: completeTutorial } = useCompleteTutorial({});
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
@@ -1853,6 +1855,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
         steps={workstationTourSteps}
         side="left"
+        onTourFinished={() => completeTutorial('solving-page')}
       />
       <div className="flex w-full flex-col gap-3">
         {visualEffectsEnabled &&

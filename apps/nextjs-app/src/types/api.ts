@@ -24,6 +24,7 @@ export type User = Entity<{
   level: number;
   avatar_name: string;
   avatar_color: string;
+  tutorials_completed: string; // Comma-separated list of completed tutorial names
   max_published_override?: number | null;
   max_unpublished_override?: number | null;
   effective_max_published?: number;

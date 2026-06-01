@@ -28,6 +28,7 @@ class UserRepo:
             xp INTEGER NOT NULL,
             avatar_name TEXT NOT NULL DEFAULT 'Dinosaur',
             avatar_color TEXT NOT NULL DEFAULT '#38bdf8',
+            tutorials_completed TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             pw_salt BLOB,
             pw_hash BLOB
@@ -79,9 +80,28 @@ class UserRepo:
         # Migration: add avatar_color column if missing
         if "avatar_color" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN avatar_color TEXT NOT NULL DEFAULT '#38bdf8'")
+        # Migration: add tutorials_completed column if missing
+        if "tutorials_completed" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN tutorials_completed TEXT NOT NULL DEFAULT ''")
+            # If old tutorial_completed column exists with some true values, migrate them
+            if "tutorial_completed" in cols:
+                # For users who completed the old single tutorial, mark browse-puzzles as completed
+                self.conn.execute(
+                    "UPDATE users SET tutorials_completed = 'browse-puzzles' WHERE tutorial_completed = 1"
+                )
+            self.conn.commit()
 
     @staticmethod
     def _row_to_user(row) -> User:
+        # Backward compatibility: check new tutorials_completed column, fallback to old tutorial_completed
+        tutorials_completed = ""
+        if "tutorials_completed" in row.keys():
+            # Use the value as-is (could be None or empty string from DB, both treated as empty)
+            tutorials_completed = row["tutorials_completed"] or ""
+        elif "tutorial_completed" in row.keys() and row["tutorial_completed"]:
+            # Migrate old single-tutorial flag to new format
+            tutorials_completed = "browse-puzzles"
+        
         return User.from_dict({
             "id": int(row["id"]),
             "username": row["username"],
@@ -92,6 +112,7 @@ class UserRepo:
             "avatar_name": row["avatar_name"] if "avatar_name" in row.keys() else "Dinosaur",
             "avatar_color": row["avatar_color"] if "avatar_color" in row.keys() else "#38bdf8",
             "is_discussion_banned": bool(row["is_discussion_banned"]) if "is_discussion_banned" in row.keys() else False,
+            "tutorials_completed": tutorials_completed,
             "created_at": row["created_at"],
             "max_published_puzzles": row["max_published_puzzles"] if "max_published_puzzles" in row.keys() else None,
             "max_unpublished_puzzles": row["max_unpublished_puzzles"] if "max_unpublished_puzzles" in row.keys() else None,
@@ -167,6 +188,121 @@ class UserRepo:
             "UPDATE users SET xp = xp + ? WHERE id = ?",
             (int(delta), int(user_id)),
         )
+
+    def complete_tutorial(self, user_id: int, tutorial_name: str) -> None:
+        """Mark a specific tutorial as completed for a user.
+        
+        Args:
+            user_id: The ID of the user
+            tutorial_name: The name of the tutorial (e.g., 'browse-puzzles', 'arsenal')
+        """
+        try:
+            # Get current tutorials_completed list
+            row = self.conn.execute(
+                "SELECT tutorials_completed FROM users WHERE id = ?",
+                (int(user_id),)
+            ).fetchone()
+            
+            if not row:
+                print(f"DEBUG: User {user_id} not found in complete_tutorial")
+                return
+            
+            current = row["tutorials_completed"] or ""
+            print(f"DEBUG: complete_tutorial - user_id={user_id}, tutorial_name={tutorial_name}, current='{current}'")
+            
+            # Parse the comma-separated list
+            completed_list = [t.strip() for t in current.split(",") if t.strip()]
+            
+            # Add tutorial if not already completed
+            if tutorial_name not in completed_list:
+                completed_list.append(tutorial_name)
+                new_completed = ",".join(completed_list)
+                print(f"DEBUG: Updating tutorials_completed to '{new_completed}'")
+                self.conn.execute(
+                    "UPDATE users SET tutorials_completed=? WHERE id=?",
+                    (new_completed, int(user_id))
+                )
+            else:
+                print(f"DEBUG: Tutorial {tutorial_name} already in completed_list: {completed_list}")
+        except Exception as e:
+            print(f"ERROR in complete_tutorial: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def has_completed_tutorial(self, user_id: int, tutorial_name: str) -> bool:
+        """Check if a user has completed a specific tutorial.
+        
+        Args:
+            user_id: The ID of the user
+            tutorial_name: The name of the tutorial to check
+            
+        Returns:
+            True if the tutorial has been completed, False otherwise
+        """
+        try:
+            row = self.conn.execute(
+                "SELECT tutorials_completed FROM users WHERE id = ?",
+                (int(user_id),)
+            ).fetchone()
+            
+            if not row:
+                print(f"DEBUG: User {user_id} not found in has_completed_tutorial")
+                return False
+            
+            completed = row["tutorials_completed"]
+            print(f"DEBUG: has_completed_tutorial - user_id={user_id}, tutorial_name={tutorial_name}, completed='{completed}'")
+            
+            if not completed:
+                print(f"DEBUG: tutorials_completed is empty, returning False")
+                return False
+            
+            completed_list = [t.strip() for t in completed.split(",") if t.strip()]
+            result = tutorial_name in completed_list
+            print(f"DEBUG: completed_list={completed_list}, result={result}")
+            return result
+        except Exception as e:
+            print(f"ERROR in has_completed_tutorial: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_remaining_tutorials(self, user_id: int) -> list[str]:
+        """Get list of tutorials NOT yet completed by the user.
+        
+        Args:
+            user_id: The ID of the user
+            
+        Returns:
+            List of tutorial names that haven't been completed
+        """
+        all_tutorials = ["browse-puzzles", "solving-page", "arsenal", "my-puzzles", "arsenal-creator"]
+        try:
+            row = self.conn.execute(
+                "SELECT tutorials_completed FROM users WHERE id = ?",
+                (int(user_id),)
+            ).fetchone()
+            
+            if not row:
+                print(f"DEBUG: User {user_id} not found in get_remaining_tutorials")
+                return all_tutorials
+            
+            completed = row["tutorials_completed"]
+            print(f"DEBUG: get_remaining_tutorials - user_id={user_id}, completed='{completed}'")
+            
+            if not completed:
+                print(f"DEBUG: tutorials_completed is empty, returning all tutorials")
+                return all_tutorials
+            
+            completed_list = [t.strip() for t in completed.split(",") if t.strip()]
+            remaining = [t for t in all_tutorials if t not in completed_list]
+            print(f"DEBUG: completed_list={completed_list}, remaining={remaining}")
+            return remaining
+        except Exception as e:
+            print(f"ERROR in get_remaining_tutorials: {e}")
+            import traceback
+            traceback.print_exc()
+            return all_tutorials
 
     def delete(self, user_id: int) -> bool:
         """Delete a user by ID. Returns True if a row was actually deleted."""

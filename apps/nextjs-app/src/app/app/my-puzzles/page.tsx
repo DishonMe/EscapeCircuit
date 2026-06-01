@@ -16,7 +16,7 @@ export const metadata = {
 const MyPuzzlesPage = async ({
   searchParams,
 }: {
-  searchParams: { page: string | null };
+  searchParams: { page: string | null; startTutorial?: string };
 }) => {
   const queryClient = new QueryClient();
 
@@ -30,7 +30,7 @@ const MyPuzzlesPage = async ({
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <MyPuzzlesClient />
+      <MyPuzzlesClient autoStartTutorial={searchParams.startTutorial === 'true'} />
     </HydrationBoundary>
   );
 };
