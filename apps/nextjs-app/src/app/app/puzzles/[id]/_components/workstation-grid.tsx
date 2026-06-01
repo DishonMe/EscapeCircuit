@@ -1256,6 +1256,22 @@ export const WorkstationGrid = ({
       return;
     }
 
+    // Check that the input doesn't already have a wire connected to it
+    if (
+      wires.some(
+        (w) =>
+          w.to.componentId === to.ownerId &&
+          w.to.pinIndex === toPinIndex,
+      )
+    ) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Invalid wire',
+        message: 'An input can only have one wire connected to it.',
+      });
+      return;
+    }
+
     onWiresChange(
       wires.concat({
         id: `wire:${Date.now()}`,
