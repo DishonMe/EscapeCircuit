@@ -958,38 +958,46 @@ export const WorkstationGrid = ({
       return fit;
     };
 
-    const calculatePan = (fit: number, containerWidth: number) => {
-      // Inputs are at column -1. We want to position them with a visible left margin.
-      // Formula: screen_x = pan.x + (col + 0.5) * CELL_PX * fit
-      // To place col -1 at ~15% from left (leaving room for input labels):
-      const targetScreenX = containerWidth * 0.15;
-      const panX = targetScreenX - -0.5 * CELL_PX * fit;
-      // Pan Y: center vertically
-      const panY = 2 * CELL_PX * fit;
+    const calculatePan = (currentZoom: number, containerWidth: number, containerHeight: number) => {
+      const panX = containerWidth / 2 - (gridCols / 2) * CELL_PX * currentZoom;
+      const panY = containerHeight / 2 - (gridRows / 2) * CELL_PX * currentZoom;
       return { x: panX, y: panY };
     };
 
     const raw = shouldPersistZoom
       ? window.localStorage.getItem(STORAGE_KEY)
       : null;
+    
+    let activeZoom = 1;
+    const fit = updateFit();
     if (!raw) {
-      const fit = updateFit();
-      setZoom(fit);
-      const pan = calculatePan(fit, el.getBoundingClientRect().width);
-      setPan(pan);
+      activeZoom = fit;
+      setZoom(activeZoom);
     } else {
-      const fit = updateFit();
-      setZoom((prev) => Math.max(prev, fit));
-      const pan = calculatePan(fit, el.getBoundingClientRect().width);
-      setPan(pan);
+      try {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.zoom === 'number') {
+          activeZoom = Math.max(parsed.zoom, fit);
+        } else {
+          activeZoom = fit;
+        }
+      } catch {
+        activeZoom = fit;
+      }
+      setZoom(activeZoom);
     }
 
+    const rect = el.getBoundingClientRect();
+    setPan(calculatePan(activeZoom, rect.width, rect.height));
+
     const ro = new ResizeObserver(() => {
-      const fit = updateFit();
-      setZoom((prev) => Math.max(prev, fit));
-      const rect = el.getBoundingClientRect();
-      const pan = calculatePan(fit, rect.width);
-      setPan(pan);
+      const newFit = updateFit();
+      setZoom((prev) => {
+        const nextZoom = Math.max(prev, newFit);
+        const newRect = el.getBoundingClientRect();
+        setPan(calculatePan(nextZoom, newRect.width, newRect.height));
+        return nextZoom;
+      });
     });
     ro.observe(el);
 
@@ -1182,10 +1190,18 @@ export const WorkstationGrid = ({
       const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
       const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
 
-      const minPanX = Math.min(0, rect.width - gridWidthPx);
-      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
-      const minPanY = Math.min(0, rect.height - gridHeightPx);
-      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
+      const paddingX = 250;
+      const paddingY = 150;
+
+      const limitX1 = paddingX;
+      const limitX2 = rect.width - gridWidthPx - paddingX;
+      const minPanX = Math.min(limitX1, limitX2);
+      const maxPanX = Math.max(limitX1, limitX2);
+
+      const limitY1 = paddingY;
+      const limitY2 = rect.height - gridHeightPx - paddingY;
+      const minPanY = Math.min(limitY1, limitY2);
+      const maxPanY = Math.max(limitY1, limitY2);
 
       return {
         x: clamp(nextPan.x, minPanX, maxPanX),
@@ -3097,7 +3113,8 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-102%, -165%)',
+                      transform: `translate(-102%, -165%) scale(${zoom})`,
+                      transformOrigin: 'right bottom',
                     }}
                   >
                     <div
@@ -3141,7 +3158,8 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-102%, -105%)',
+                      transform: `translate(-102%, -105%) scale(${zoom})`,
+                      transformOrigin: 'right bottom',
                     }}
                     title={`Step ${debuggerStepIndex + 1} highlighted in sequence`}
                   >
@@ -3172,7 +3190,8 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
+                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px)) scale(${zoom})`,
+                    transformOrigin: 'right center',
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -3225,7 +3244,8 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-140%, -50%)',
+                      transform: `translate(-140%, -50%) scale(${zoom})`,
+                      transformOrigin: 'right center',
                     }}
                   >
                     <div
@@ -3246,7 +3266,8 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
+                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px)) scale(${zoom})`,
+                    transformOrigin: 'left center',
                     animationDelay: `${Math.min(outputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
