@@ -25,10 +25,10 @@ const switchToTab = (tabClass: string) => {
  */
 export const browsePuzzlesTourSteps: TourStep[] = [
   {
-    title: 'Filter the gallery',
-    target: '.puzzle-filters-button',
+    title: 'At a Glance',
+    target: '.puzzle-info-section',
     content:
-      'Hunt for the right puzzle by difficulty, fun, clarity, or solve status. Try opening it now and slide a filter to see how the list reshuffles.',
+      'Check out the puzzle difficulty, title, and description to find the perfect challenge.',
     placement: 'bottom',
   },
   {
@@ -46,18 +46,25 @@ export const browsePuzzlesTourSteps: TourStep[] = [
     placement: 'bottom',
   },
   {
-    title: 'Sort to taste',
-    target: '.puzzle-sort-dropdown',
-    content:
-      'Sort by creation date, difficulty, fun, or clarity. A great way to surface puzzles that match your current mood.',
-    placement: 'bottom',
-  },
-  {
     title: 'Jump into the Workstation',
     target: '.puzzle-card-action',
     content:
       'Click Solve Puzzle to enter the Workstation — that is where you wire your gates, run tests, and earn XP.',
     placement: 'left',
+  },
+  {
+    title: 'Filter the gallery',
+    target: '.puzzle-filters-button',
+    content:
+      'Hunt for the right puzzle by difficulty, fun, clarity, or solve status. Try opening it now and slide a filter to see how the list reshuffles.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Sort to taste',
+    target: '.puzzle-sort-dropdown',
+    content:
+      'Sort by creation date, difficulty, fun, or clarity. A great way to surface puzzles that match your current mood.',
+    placement: 'bottom',
   },
   {
     title: 'Bookmark for later',
@@ -71,6 +78,13 @@ export const browsePuzzlesTourSteps: TourStep[] = [
     target: '.puzzle-rating-section',
     content:
       'After you spend real time on a puzzle, rate it. Creators get feedback, and other players find the gems.',
+    placement: 'top',
+  },
+  {
+    title: 'View Leaderboard',
+    target: '.puzzle-leaderboard-button',
+    content:
+      'See how your solution stacks up against other players. Compete for the fastest time or the most efficient circuit.',
     placement: 'top',
   },
 ];
