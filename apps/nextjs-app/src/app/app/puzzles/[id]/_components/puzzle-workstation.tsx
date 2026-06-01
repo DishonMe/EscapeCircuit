@@ -3,8 +3,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
-  StepBack,
-  StepForward,
   ArrowRight,
   Trash2,
   CircleAlert,
@@ -34,7 +32,6 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
-import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
 import { workstationTourSteps, debuggerTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
@@ -115,6 +112,11 @@ type PostCheckState =
       xpEarned?: number;
       puzzleTotalXP?: number;
       xpLeftForMax?: number;
+      firstFailedTest?: {
+        inputs: Record<string, any>;
+        expected: Record<string, any>;
+        actual: Record<string, any>;
+      };
     };
 
 type BoardFeedbackState = 'idle' | 'success' | 'failure';
@@ -215,7 +217,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   // with beginSolveAgain when isSolved flips back to false. Reset by navigating
   // to a different puzzle (the ref value no longer matches puzzle.id).
   const initializedPuzzleIdRef = useRef<string | null>(null);
-  const debuggerButtonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
@@ -226,6 +227,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
+  const [highlightedWireIds, setHighlightedWireIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedComponent, setSelectedComponent] =
     useState<SelectedComponentState>({ mode: 'none' });
   // Undo/Redo history: tracks snapshots of {placed, wires} state
@@ -257,6 +261,11 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     string | null
   >(null);
   const [showDebugger, setShowDebugger] = useState(false);
+
+  // Auto-open instructions modal on component mount
+  useEffect(() => {
+    setShowPuzzleInfo(true);
+  }, []);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatorComment, setShowCreatorComment] = useState(false);
   const [showRating, setShowRating] = useState(false);
@@ -282,6 +291,9 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [debugSequences, setDebugSequences] = useState<Record<string, string>>(
     {},
   );
+  const [debugSequencesCommitted, setDebugSequencesCommitted] = useState<
+    Record<string, string>
+  >({});
   const [debugStepIndex, setDebugStepIndex] = useState(0);
   const [debugIsRunning, setDebugIsRunning] = useState(false);
   const [debugRunKey, setDebugRunKey] = useState(0);
@@ -561,6 +573,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   useEffect(() => {
     if (!inputs.length) return;
     setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const inputName of inputs) {
+        const current = sanitizeBitSequence(prev[inputName] ?? '');
+        next[inputName] = current || defaultDebugSequence;
+      }
+      return next;
+    });
+    setDebugSequencesCommitted((prev) => {
       const next: Record<string, string> = {};
       for (const inputName of inputs) {
         const current = sanitizeBitSequence(prev[inputName] ?? '');
@@ -1154,7 +1174,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     const parsed: Record<string, string[]> = {};
     let stepCount = 0;
     for (const inputName of inputs) {
-      const bits = parseBitSequence(debugSequences[inputName] ?? '');
+      const bits = parseBitSequence(debugSequencesCommitted[inputName] ?? '');
       if (!bits.length) {
         notifications.addNotification({
           type: 'warning',
@@ -1265,7 +1285,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   }, [
     puzzle?.id,
     inputs,
-    debugSequences,
+    debugSequencesCommitted,
     placed,
     wires,
     currentCost,
@@ -1327,6 +1347,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     }
     return outputBits;
   }, [debugSnapshot, debugStepIndex, placed]);
+
+  // Computed before the early returns below so this hook is always called in
+  // the same order (react-hooks/rules-of-hooks).
+  const effectiveSteps = useMemo(() => {
+    if (!puzzle?.creatorComment?.trim()) {
+      return workstationTourSteps.filter(
+        (step) => step.target !== '.workstation-creator-comment-button',
+      );
+    }
+    return workstationTourSteps;
+  }, [puzzle?.creatorComment]);
 
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
@@ -1549,6 +1580,32 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       await wait(res.solved ? 1000 : 700);
       setBoardFeedback('idle');
 
+      // Extract first failed test from details array if present
+      let firstFailedTest:
+        | {
+            inputs: Record<string, any>;
+            expected: Record<string, any>;
+            actual: Record<string, any>;
+          }
+        | undefined;
+      if (
+        !res.solved &&
+        (res as any).details &&
+        Array.isArray((res as any).details) &&
+        (res as any).details.length > 0
+      ) {
+        const firstDetail = (res as any).details[0];
+        if (firstDetail.inputs && firstDetail.expected && firstDetail.actual) {
+          firstFailedTest = {
+            inputs: firstDetail.inputs,
+            expected: firstDetail.expected,
+            actual: firstDetail.actual,
+          };
+        }
+      } else if (!res.solved && (res as any).first_failed_test) {
+        firstFailedTest = (res as any).first_failed_test;
+      }
+
       setPostCheck({
         open: true,
         solved: res.solved,
@@ -1563,6 +1620,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         xpEarned: res.xp_earned,
         puzzleTotalXP: res.puzzle_total_xp,
         xpLeftForMax: res.xp_left_for_max,
+        firstFailedTest,
       });
 
       if (res.solved) {
@@ -1789,6 +1847,15 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
 
   const onInlineSequenceChange = (inputName: string, rawValue: string) => {
     const edited = sanitizeBitSequence(rawValue);
+
+    setDebugSequences((prev) => ({
+      ...prev,
+      [inputName]: edited,
+    }));
+  };
+
+  const onInlineSequenceCommit = (inputName: string, rawValue: string) => {
+    const edited = sanitizeBitSequence(rawValue);
     const targetLength = Math.max(
       1,
       edited.length || defaultDebugSequence.length || 1,
@@ -1803,6 +1870,20 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     };
 
     setDebugSequences((prev) => {
+      const next: Record<string, string> = {};
+      for (const name of inputs) {
+        if (name === inputName) {
+          next[name] = normalizeToTargetLength(edited || '0');
+        } else {
+          next[name] = normalizeToTargetLength(
+            prev[name] ?? defaultDebugSequence,
+          );
+        }
+      }
+      return next;
+    });
+
+    setDebugSequencesCommitted((prev) => {
       const next: Record<string, string> = {};
       for (const name of inputs) {
         if (name === inputName) {
@@ -1853,7 +1934,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         tourName="puzzle-workstation"
         pageTitle="Puzzle Workstation"
         pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
-        steps={workstationTourSteps}
+        steps={effectiveSteps}
         side="left"
         onTourFinished={() => completeTutorial('solving-page')}
       />
@@ -2048,6 +2129,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="workstation-creator-comment-button"
                   title="View creator comment"
                   onClick={() => setShowCreatorComment(true)}
                 >
@@ -2210,6 +2292,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 isPowerSurge={isPowerSurge}
                 boardFeedback={boardFeedback}
                 showSolvedSlam={showSolvedSlam}
+                highlightedWireIds={Array.from(highlightedWireIds)}
                 boardRows={puzzle.board_rows ?? 15}
                 boardCols={puzzle.board_cols ?? 30}
                 debuggerActive={isInlineDebugger}
@@ -2220,6 +2303,12 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 debuggerGateBits={currentGateBits}
                 debuggerSequences={debugSequences}
                 onDebuggerSequenceChange={onInlineSequenceChange}
+                onDebuggerSequenceCommit={onInlineSequenceCommit}
+                onEnterInlineDebugger={enterInlineDebugger}
+                onDebuggerStepPrev={onDebuggerStepPrev}
+                onDebuggerStepNext={onDebuggerStepNext}
+                onOpenFullDebuggerReport={() => setShowDebugger(true)}
+                onExitInlineDebugger={exitInlineDebugger}
                 onInspectComponent={setInspectingPlacedId}
                 arsenalComponentDisplayModes={arsenalComponentDisplayModes}
                 disableZoomPersistence
@@ -2256,8 +2345,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                 </div>
               )}
               <div className="mt-3">
-                <div className="mb-2 text-[11px] font-medium text-muted-foreground">
-                  Wires
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-medium text-muted-foreground">
+                    Wires
+                  </div>
+                  {highlightedWireIds.size > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setHighlightedWireIds(new Set())}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
+                      title="Clear wire highlights"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
                 {wires.length === 0 ? (
                   <div className="text-[11px] text-muted-foreground/60">
@@ -2334,7 +2437,24 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       return (
                         <li
                           key={w.id}
-                          className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:border-border hover:bg-secondary/70"
+                          // The row is a keyboard-operable shortcut to
+                          // highlight the wire (tabIndex + onKeyDown below);
+                          // the list-item-specific role rule is the only
+                          // objection, so it is suppressed for this element.
+                          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            // Highlight this wire on the grid
+                            setHighlightedWireIds(new Set([w.id]));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setHighlightedWireIds(new Set([w.id]));
+                            }
+                          }}
+                          className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:border-border hover:bg-secondary/70"
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-1.5">
                             {/* From Badge */}
@@ -2809,9 +2929,71 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   </p>
                 </div>
               ) : (
-                <div className="text-muted-foreground">
-                  Your circuit did not pass the test cases. Try adjusting your
-                  wiring/components.
+                <div className="space-y-3 text-foreground">
+                  <p className="text-muted-foreground">
+                    Your circuit did not pass the test cases. Try adjusting your
+                    wiring/components.
+                  </p>
+                  {postCheck.open && postCheck.firstFailedTest && (
+                    <div className="mt-4 space-y-2 rounded-lg border border-border bg-secondary/50 p-3">
+                      <p className="text-[12px] font-semibold uppercase tracking-wide text-foreground">
+                        Failed on:
+                      </p>
+                      <div className="space-y-2 text-[12px]">
+                        <div>
+                          <p className="mb-1 font-medium text-foreground">
+                            Inputs:
+                          </p>
+                          <div className="space-y-0.5 pl-3">
+                            {Object.entries(
+                              postCheck.firstFailedTest.inputs,
+                            ).map(([key, val]) => (
+                              <p
+                                key={key}
+                                className="font-mono text-muted-foreground"
+                              >
+                                {key}:{' '}
+                                <span className="text-foreground">{val}</span>
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="mb-1 font-medium text-foreground">
+                              Expected:
+                            </p>
+                            <div className="space-y-0.5 pl-3">
+                              {Object.entries(
+                                postCheck.firstFailedTest.expected,
+                              ).map(([key, val]) => (
+                                <p
+                                  key={key}
+                                  className="font-mono text-green-600"
+                                >
+                                  {key}: {val}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="mb-1 font-medium text-foreground">
+                              Got:
+                            </p>
+                            <div className="space-y-0.5 pl-3">
+                              {Object.entries(
+                                postCheck.firstFailedTest.actual,
+                              ).map(([key, val]) => (
+                                <p key={key} className="font-mono text-red-600">
+                                  {key}: {val}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2879,12 +3061,14 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         </Dialog>
 
         {/* Creator Comment Dialog */}
-        <CreatorCommentDialog
-          open={showCreatorComment}
-          onOpenChange={setShowCreatorComment}
-          puzzle={puzzle}
-          showLink={false}
-        />
+        {puzzle?.creatorComment?.trim() && (
+          <CreatorCommentDialog
+            open={showCreatorComment}
+            onOpenChange={setShowCreatorComment}
+            puzzle={puzzle}
+            showLink={false}
+          />
+        )}
 
         {/* Component Inspection Dialog - Main Workstation */}
         {inspectingPlacedId &&

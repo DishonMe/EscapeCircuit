@@ -10,12 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { WorkstationGrid } from './workstation-grid';
-import type { PlacedGridComponent, ComponentDef } from './workstation-grid';
+import { useMyArsenal } from '@/features/arsenal/api';
 import { CircuitComponent, CircuitSolution } from '@/types/api';
 import { cn } from '@/utils/cn';
-import { LogicNode, type LogicNodeDefinition } from './node';
-import { useMyArsenal } from '@/features/arsenal/api';
+
+import { type LogicNodeDefinition } from './node';
+import { WorkstationGrid } from './workstation-grid';
+import type { PlacedGridComponent, ComponentDef } from './workstation-grid';
 
 type ArsenalCircuit = {
   id: string;
@@ -129,7 +130,9 @@ const Category = ({
 }) => {
   return (
     <div className="rounded-xl border border-border bg-card p-3 text-card-foreground shadow-subtle transition-all duration-300">
-      <div className="mb-2 text-[14px] font-semibold tracking-tight text-foreground">{title}</div>
+      <div className="mb-2 text-[14px] font-semibold tracking-tight text-foreground">
+        {title}
+      </div>
       {children}
     </div>
   );
@@ -246,9 +249,9 @@ const getFallbackNodeDefinition = (
 
 const DraggableItem = ({
   component,
-  node,
   inPalette = false,
   isSelected,
+  isConnectedToSelected,
   onSelect,
   onInfoClick,
   onDragStart,
@@ -259,6 +262,7 @@ const DraggableItem = ({
   node: LogicNodeDefinition;
   inPalette?: boolean;
   isSelected?: boolean;
+  isConnectedToSelected?: boolean;
   onSelect?: (componentId: string) => void;
   onInfoClick?: () => void;
   onDragStart?: (id: string) => void;
@@ -271,55 +275,65 @@ const DraggableItem = ({
   };
 
   return (
-      <div
-        className={cn(
-          'group flex w-full items-center gap-1 rounded-lg border px-1.5 py-0.5 text-left text-[14px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-          isSelected
-            ? 'border-sky-500 bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-secondary'
+    <div
+      className={cn(
+        'group flex w-full items-center gap-1 rounded-lg border px-1.5 py-0.5 text-left text-[14px] text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+        isSelected
+          ? 'border-sky-500 bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.28)] dark:bg-secondary'
+          : isConnectedToSelected
+            ? 'border-blue-500 bg-blue-500/20'
             : 'border-border bg-secondary',
+      )}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onInfoClick?.();
+        }}
+        className={cn(
+          'text-muted-foreground hover:text-foreground transition-colors cursor-help opacity-100',
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         )}
+        title={getInfoTitle()}
       >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onInfoClick?.();
-          }}
-          className={cn(
-            'text-muted-foreground hover:text-foreground transition-colors cursor-help opacity-100',
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-          )}
-          title={getInfoTitle()}
-        >
-          <Info size={16} />
-        </button>
-        <div
-          draggable
-          onDragStart={(e) => {
-            const transparentDragImage = document.createElement('canvas');
-            transparentDragImage.width = 1;
-            transparentDragImage.height = 1;
-            e.dataTransfer.setDragImage(transparentDragImage, 0, 0);
-            e.dataTransfer.setData(
-              'application/x-escapecircuit-component',
-              component.id,
-            );
-            e.dataTransfer.setData('text/plain', component.id);
-            e.dataTransfer.effectAllowed = 'copy';
-            onDragStart?.(component.id);
-          }}
-          onDragEnd={() => onDragEnd?.()}
-          onClick={() => onSelect?.(component.id)}
-          className="flex flex-1 cursor-grab active:cursor-grabbing items-center justify-between"
-        >
-          <span className="font-semibold text-foreground">{component.type}</span>
-          {inPalette ? (
-            <span className="text-[12px] text-muted-foreground">
-              cost {component.cost}
-            </span>
-          ) : null}
-        </div>
+        <Info size={16} />
+      </button>
+      <div
+        role="button"
+        tabIndex={0}
+        draggable
+        onDragStart={(e) => {
+          const transparentDragImage = document.createElement('canvas');
+          transparentDragImage.width = 1;
+          transparentDragImage.height = 1;
+          e.dataTransfer.setDragImage(transparentDragImage, 0, 0);
+          e.dataTransfer.setData(
+            'application/x-escapecircuit-component',
+            component.id,
+          );
+          e.dataTransfer.setData('text/plain', component.id);
+          e.dataTransfer.effectAllowed = 'copy';
+          onDragStart?.(component.id);
+        }}
+        onDragEnd={() => onDragEnd?.()}
+        onClick={() => onSelect?.(component.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect?.(component.id);
+          }
+        }}
+        className="flex flex-1 cursor-grab items-center justify-between active:cursor-grabbing"
+      >
+        <span className="font-semibold text-foreground">{component.type}</span>
+        {inPalette ? (
+          <span className="text-[12px] text-muted-foreground">
+            cost {component.cost}
+          </span>
+        ) : null}
       </div>
+    </div>
   );
 };
 
@@ -353,11 +367,9 @@ export const WorkstationMenu = ({
     string | null
   >(null);
   const [viewingTruthTableData, setViewingTruthTableData] = useState<any>(null);
-  const [viewingCircuitPreviewFor, setViewingCircuitPreviewFor] = useState<
-    ArsenalCircuit | null
-  >(null);
+  const [viewingCircuitPreviewFor, setViewingCircuitPreviewFor] =
+    useState<ArsenalCircuit | null>(null);
   const [viewingDFFDescription, setViewingDFFDescription] = useState(false);
-
 
   useEffect(() => {
     if (!allowArsenal) return;
@@ -397,7 +409,11 @@ export const WorkstationMenu = ({
     return [];
   };
 
-  const handleInfoClick = (componentId: string, component: CircuitComponent, category: 'basic' | 'custom' | 'arsenal' = 'basic') => {
+  const handleInfoClick = (
+    componentId: string,
+    component: CircuitComponent,
+    category: 'basic' | 'custom' | 'arsenal' = 'basic',
+  ) => {
     // Show circuit preview ONLY for arsenal pieces
     if (category === 'arsenal') {
       // Convert component to ArsenalCircuit format
@@ -405,36 +421,42 @@ export const WorkstationMenu = ({
         id: component.id,
         name: component.type,
         usedBasicTypes: getUsedBasicTypes(component),
-        solution: (component as any).solution || { structure: { placed: [], wires: [] } },
+        solution: (component as any).solution || {
+          structure: { placed: [], wires: [] },
+        },
         description: (component as any).description,
       };
       setViewingCircuitPreviewFor(arsenalCircuit);
       return;
     }
-    
+
     // For DFF, show the description instead of truth table
     if (component.type === 'DFF') {
       setViewingDFFDescription(true);
       return;
     }
-    
+
     // Show truth table for other basic gates and custom pieces
     setViewingTruthTableFor(component.type || componentId);
-    
+
     // Check if component has truth_table data (from API arsenal pieces)
     const truthTableSource = TRUTH_TABLES[component.type || componentId];
     const apiData = (component as any).truth_table;
-    
+
     if (apiData) {
       // Parse the truth table from API data
       try {
-        const parsedTT = typeof apiData === 'string' ? JSON.parse(apiData) : apiData;
+        const parsedTT =
+          typeof apiData === 'string' ? JSON.parse(apiData) : apiData;
         // Convert to the expected format
         const inputKeys = Object.keys(parsedTT)[0]?.split(',') || [];
         setViewingTruthTableData({
           inputs: inputKeys,
           outputs: Object.keys(parsedTT[Object.keys(parsedTT)[0]] || {}),
-          rows: Object.entries(parsedTT).map(([input, output]: any) => [input, ...Object.values(output)]),
+          rows: Object.entries(parsedTT).map(([input, output]: any) => [
+            input,
+            ...Object.values(output),
+          ]),
         });
       } catch {
         setViewingTruthTableData(truthTableSource);
@@ -443,10 +465,6 @@ export const WorkstationMenu = ({
       setViewingTruthTableData(truthTableSource);
     }
   };
-
-  const truthTable = viewingTruthTableFor
-    ? TRUTH_TABLES[viewingTruthTableFor]
-    : null;
 
   const knownPreviewArsenalComponents = useMemo(() => {
     const byId = new Map<string, CircuitComponent>();
@@ -595,37 +613,52 @@ export const WorkstationMenu = ({
             <DialogTitle>Truth Table: {viewingTruthTableFor}</DialogTitle>
           </DialogHeader>
           {viewingTruthTableData ? (
-            <div className="overflow-hidden rounded-lg border border-border/60">
-              <table className="w-full text-[13px] text-foreground">
-                <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
-                  <tr>
-                    {viewingTruthTableData.inputs.map((i: string) => (
-                      <th key={i} className="px-3 py-2 text-center">
-                        {i}
-                      </th>
-                    ))}
-                    {viewingTruthTableData.outputs.map((o: string) => (
-                      <th
-                        key={o}
-                        className="border-l border-border px-3 py-2 text-center"
-                      >
-                        {o}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {viewingTruthTableData.rows.map((row: string[], idx: number) => (
-                    <tr key={idx} className="divide-x divide-border bg-card">
-                      {row.map((cell: string, cIdx: number) => (
-                        <td key={cIdx} className="px-3 py-2 text-center text-foreground">
-                          {cell}
-                        </td>
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed text-foreground">
+                The truth table below demonstrates the gate&apos;s logic,
+                showing the relationship between its inputs and resulting
+                outputs.
+              </p>
+              <div className="overflow-hidden rounded-lg border border-border/60">
+                <table className="w-full text-[13px] text-foreground">
+                  <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
+                    <tr>
+                      {viewingTruthTableData.inputs.map((i: string) => (
+                        <th key={i} className="px-3 py-2 text-center">
+                          {i}
+                        </th>
+                      ))}
+                      {viewingTruthTableData.outputs.map((o: string) => (
+                        <th
+                          key={o}
+                          className="border-l border-border px-3 py-2 text-center"
+                        >
+                          {o}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {viewingTruthTableData.rows.map(
+                      (row: string[], idx: number) => (
+                        <tr
+                          key={idx}
+                          className="divide-x divide-border bg-card"
+                        >
+                          {row.map((cell: string, cIdx: number) => (
+                            <td
+                              key={cIdx}
+                              className="px-3 py-2 text-center text-foreground"
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-[13px] text-muted-foreground">
@@ -646,16 +679,34 @@ export const WorkstationMenu = ({
             <DialogDescription>Sequential Logic Component</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-[13px] text-foreground leading-relaxed">
-              A D Flip-Flop (DFF) is a sequential logic component. It captures the value of the Data (D) input at a definite portion of the clock cycle (usually the rising edge) and outputs that captured value at Q. The output Q only changes state when the clock ticks, holding its value steady between clock edges.
+            <p className="text-[13px] leading-relaxed text-foreground">
+              A D Flip-Flop (DFF) is a sequential logic component. It captures
+              the value of the Data (D) input at a definite portion of the clock
+              cycle (usually the rising edge) and outputs that captured value at
+              Q. The output Q only changes state when the clock ticks, holding
+              its value steady between clock edges.
             </p>
-            <div className="rounded-lg bg-secondary/50 p-3 space-y-2">
-              <p className="text-[12px] font-semibold text-foreground">Key Characteristics:</p>
-              <ul className="text-[12px] text-muted-foreground space-y-1">
-                <li>• <span className="font-medium">Sequential:</span> Output depends on previous state</li>
-                <li>• <span className="font-medium">State Memory:</span> Stores a single bit of data</li>
-                <li>• <span className="font-medium">Clock-driven:</span> Changes only on clock edges</li>
-                <li>• <span className="font-medium">Deterministic:</span> Input always captured consistently</li>
+            <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
+              <p className="text-[12px] font-semibold text-foreground">
+                Key Characteristics:
+              </p>
+              <ul className="space-y-1 text-[12px] text-muted-foreground">
+                <li>
+                  • <span className="font-medium">Sequential:</span> Output
+                  depends on previous state
+                </li>
+                <li>
+                  • <span className="font-medium">State Memory:</span> Stores a
+                  single bit of data
+                </li>
+                <li>
+                  • <span className="font-medium">Clock-driven:</span> Changes
+                  only on clock edges
+                </li>
+                <li>
+                  • <span className="font-medium">Deterministic:</span> Input
+                  always captured consistently
+                </li>
               </ul>
             </div>
           </div>
@@ -667,9 +718,11 @@ export const WorkstationMenu = ({
         open={Boolean(viewingCircuitPreviewFor)}
         onOpenChange={(open) => !open && setViewingCircuitPreviewFor(null)}
       >
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{viewingCircuitPreviewFor?.name} - Circuit Preview</DialogTitle>
+            <DialogTitle>
+              {viewingCircuitPreviewFor?.name} - Circuit Preview
+            </DialogTitle>
             <DialogDescription>
               Read-only preview of the circuit. No modifications allowed.
             </DialogDescription>
@@ -695,7 +748,9 @@ function CircuitPreviewContent({
 }) {
   const { data: myArsenal } = useMyArsenal();
 
-  const parseStructure = (solution: any): {
+  const parseStructure = (
+    solution: any,
+  ): {
     numInputs: number;
     numOutputs: number;
     placed: PlacedGridComponent[];
@@ -704,7 +759,7 @@ function CircuitPreviewContent({
     try {
       // Try to get structure from different possible locations
       const struct = solution.structure || solution || {};
-      
+
       return {
         numInputs: struct.numInputs || 0,
         numOutputs: struct.numOutputs || 0,
@@ -720,8 +775,14 @@ function CircuitPreviewContent({
   const { placed, wires } = structure;
 
   // Build input/output labels
-  const inputLabels = Array.from({ length: structure.numInputs }, (_, i) => `in${i}`);
-  const outputLabels = Array.from({ length: structure.numOutputs }, (_, i) => `out${i}`);
+  const inputLabels = Array.from(
+    { length: structure.numInputs },
+    (_, i) => `in${i}`,
+  );
+  const outputLabels = Array.from(
+    { length: structure.numOutputs },
+    (_, i) => `out${i}`,
+  );
 
   // Build map of arsenal metadata by ID for quick lookup.
   const arsenalMap = new Map<
@@ -767,13 +828,82 @@ function CircuitPreviewContent({
   // Build catalog with standard component definitions
   // Size formula: width=3, height=max(inputs, outputs)
   const catalog: Record<string, ComponentDef> = {
-    AND: { id: 'AND', label: 'AND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    OR: { id: 'OR', label: 'OR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOT: { id: 'NOT', label: 'NOT', cost: 1, size: { w: 3, h: 1 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } }] },
-    XOR: { id: 'XOR', label: 'XOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NAND: { id: 'NAND', label: 'NAND', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    NOR: { id: 'NOR', label: 'NOR', cost: 1, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
-    XNOR: { id: 'XNOR', label: 'XNOR', cost: 2, size: { w: 3, h: 2 }, ports: [{ id: 'P0', kind: 'input', offset: { row: 0, col: 0 } }, { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } }, { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } }] },
+    AND: {
+      id: 'AND',
+      label: 'AND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    OR: {
+      id: 'OR',
+      label: 'OR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOT: {
+      id: 'NOT',
+      label: 'NOT',
+      cost: 1,
+      size: { w: 3, h: 1 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'output', offset: { row: 0, col: 2 } },
+      ],
+    },
+    XOR: {
+      id: 'XOR',
+      label: 'XOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NAND: {
+      id: 'NAND',
+      label: 'NAND',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    NOR: {
+      id: 'NOR',
+      label: 'NOR',
+      cost: 1,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
+    XNOR: {
+      id: 'XNOR',
+      label: 'XNOR',
+      cost: 2,
+      size: { w: 3, h: 2 },
+      ports: [
+        { id: 'P0', kind: 'input', offset: { row: 0, col: 0 } },
+        { id: 'P1', kind: 'input', offset: { row: 1, col: 0 } },
+        { id: 'P2', kind: 'output', offset: { row: 1, col: 2 } },
+      ],
+    },
   };
 
   // Add any custom arsenal pieces as components
@@ -786,9 +916,13 @@ function CircuitPreviewContent({
         const numOutputs = arsenalPiece.num_outputs ?? 0;
         const maxPorts = Math.max(numInputs, numOutputs);
         const size = { w: 3, h: Math.max(1, maxPorts) };
-        
+
         // Generate ports for arsenal pieces
-        const ports: Array<{ id: string; kind: 'input' | 'output'; offset: { row: number; col: number } }> = [];
+        const ports: Array<{
+          id: string;
+          kind: 'input' | 'output';
+          offset: { row: number; col: number };
+        }> = [];
         for (let i = 0; i < numInputs; i++) {
           ports.push({
             id: `in${i}`,
@@ -803,7 +937,7 @@ function CircuitPreviewContent({
             offset: { row: Math.min(i, size.h - 1), col: size.w - 1 },
           });
         }
-        
+
         catalog[comp.componentId] = {
           id: comp.componentId,
           label: getCatalogLabel(comp.componentId),
@@ -827,48 +961,66 @@ function CircuitPreviewContent({
     }
   });
 
-  const gridRows = Math.max(15, Math.max(...placed.map((c) => c.origin.row), 0) + 3);
-  const gridCols = Math.max(30, Math.max(...placed.map((c) => c.origin.col), 0) + 3);
+  const gridRows = Math.max(
+    15,
+    Math.max(...placed.map((c) => c.origin.row), 0) + 3,
+  );
+  const gridCols = Math.max(
+    30,
+    Math.max(...placed.map((c) => c.origin.col), 0) + 3,
+  );
 
   return (
     <div className="space-y-4">
       {/* Description */}
       {arsenalCircuit.description && (
-        <div className="bg-foreground/5 p-3 rounded-lg border border-border/40">
-          <p className="text-sm text-foreground">{arsenalCircuit.description}</p>
+        <div className="rounded-lg border border-border/40 bg-foreground/5 p-3">
+          <p className="text-sm text-foreground">
+            {arsenalCircuit.description}
+          </p>
         </div>
       )}
 
       {arsenalCircuit.usedBasicTypes.length > 0 && (
-        <div className="bg-secondary/30 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Basic Gates Used</p>
-          <p className="text-sm text-foreground">{arsenalCircuit.usedBasicTypes.join(', ')}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Basic Gates Used</p>
+          <p className="text-sm text-foreground">
+            {arsenalCircuit.usedBasicTypes.join(', ')}
+          </p>
         </div>
       )}
 
       {/* Circuit Stats */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numInputs}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Inputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numInputs}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{structure.numOutputs}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Outputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {structure.numOutputs}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Components</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Cost</p>
-          <p className="text-lg font-semibold text-foreground">{(arsenalCircuit.solution as any)?.totalCost || 0}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Cost</p>
+          <p className="text-lg font-semibold text-foreground">
+            {(arsenalCircuit.solution as any)?.totalCost || 0}
+          </p>
         </div>
       </div>
 
       {/* Circuit Grid - Read-only Workstation */}
-      <div 
-        className="border border-border/60 rounded-lg bg-background overflow-hidden relative" 
+      <div
+        className="relative overflow-hidden rounded-lg border border-border/60 bg-background"
         style={{ height: '500px' }}
       >
         <style>{`
@@ -898,8 +1050,8 @@ function CircuitPreviewContent({
             wires={wires}
             selectedComponent={{ mode: 'none' }}
             onSelectedComponentChange={() => {}} // Read-only: no changes
-            onPlacedChange={() => {}}             // Read-only: no changes
-            onWiresChange={() => {}}              // Read-only: no changes
+            onPlacedChange={() => {}} // Read-only: no changes
+            onWiresChange={() => {}} // Read-only: no changes
             draggedPaletteComponentId={null}
             isChecking={false}
             boardRows={gridRows}
@@ -910,14 +1062,25 @@ function CircuitPreviewContent({
 
       {/* Component Legend */}
       {placed.length > 0 && (
-        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground/70">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
-              .filter((comp, idx, arr) => arr.findIndex((c) => c.componentId === comp.componentId) === idx)
+              .filter(
+                (comp, idx, arr) =>
+                  arr.findIndex((c) => c.componentId === comp.componentId) ===
+                  idx,
+              )
               .map((comp) => (
-                <div key={comp.componentId} className="flex items-center gap-2 text-xs">
-                  <span className="text-foreground/70">{catalog[comp.componentId]?.label || comp.componentId}</span>
+                <div
+                  key={comp.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <span className="text-foreground/70">
+                    {catalog[comp.componentId]?.label || comp.componentId}
+                  </span>
                 </div>
               ))}
           </div>

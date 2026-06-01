@@ -4,13 +4,12 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import Cookies from 'js-cookie';
 import { z } from 'zod';
 
 import { AuthResponse, User } from '@/types/api';
-
-import Cookies from 'js-cookie';
-
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
+
 import { api } from './api-client';
 
 const authCookieOptions: Cookies.CookieAttributes = {
@@ -32,9 +31,10 @@ export const getUser = async (): Promise<User> => {
 const userQueryKey = ['user'];
 
 export const getUserQueryOptions = () => {
-  const hasToken = typeof window !== 'undefined'
-    ? !!Cookies.get(AUTH_TOKEN_COOKIE_NAME)
-    : false;
+  const hasToken =
+    typeof window !== 'undefined'
+      ? !!Cookies.get(AUTH_TOKEN_COOKIE_NAME)
+      : false;
   return queryOptions({
     queryKey: userQueryKey,
     queryFn: getUser,
@@ -45,10 +45,10 @@ export const getUserQueryOptions = () => {
 
 export const useUser = () => useQuery(getUserQueryOptions());
 
-export const useLogin = ({ 
-  onSuccess, 
-  onError 
-}: { 
+export const useLogin = ({
+  onSuccess,
+  onError,
+}: {
   onSuccess?: () => void;
   onError?: (error: any) => void;
 }) => {
@@ -124,7 +124,11 @@ const registerWithEmailAndPassword = (
 // --- Google Login ---
 
 const loginWithGoogle = (token: string): Promise<any> => {
-  return api.post('/users/google-login', { token }, { suppressErrorNotification: true });
+  return api.post(
+    '/users/google-login',
+    { token },
+    { suppressErrorNotification: true },
+  );
 };
 
 const completeGoogleRegistration = (data: {
@@ -134,7 +138,9 @@ const completeGoogleRegistration = (data: {
   avatar_name: string;
   avatar_color: string;
 }): Promise<AuthResponse> => {
-  return api.post('/users/google-complete-registration', data, { suppressErrorNotification: true });
+  return api.post('/users/google-complete-registration', data, {
+    suppressErrorNotification: true,
+  });
 };
 
 export const useGoogleLogin = ({
@@ -144,7 +150,11 @@ export const useGoogleLogin = ({
 }: {
   onSuccess?: () => void;
   onError?: (error: any) => void;
-  onNeedsPassword?: (data: { email: string; name: string; token: string }) => void;
+  onNeedsPassword?: (data: {
+    email: string;
+    name: string;
+    token: string;
+  }) => void;
 }) => {
   const queryClient = useQueryClient();
   return useMutation({

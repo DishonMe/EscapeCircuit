@@ -1,8 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 
-export const deletePuzzle = (puzzleId: string | number): Promise<{ success: boolean }> => {
+export const deletePuzzle = (
+  puzzleId: string | number,
+): Promise<{ success: boolean }> => {
   return api.delete(`/puzzles/${puzzleId}`);
 };
 

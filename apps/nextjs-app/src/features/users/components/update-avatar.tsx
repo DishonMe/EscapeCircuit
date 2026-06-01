@@ -1,13 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { ImageIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/components/ui/notifications';
 import { AvatarDisplay } from '@/components/ui/avatar-display';
-import { useUser } from '@/lib/auth';
-import { useDisclosure } from '@/hooks/use-disclosure';
+import { Button } from '@/components/ui/button';
 import {
   Drawer,
   DrawerTrigger,
@@ -17,22 +14,83 @@ import {
   DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
+import { useNotifications } from '@/components/ui/notifications';
+import { useDisclosure } from '@/hooks/use-disclosure';
+import { useUser } from '@/lib/auth';
 
-import {
-  updateAvatarInputSchema,
-  useUpdateAvatar,
-} from '../api/update-avatar';
+import { updateAvatarInputSchema, useUpdateAvatar } from '../api/update-avatar';
 
 const AVATAR_LIST = [
-  'Alligator', 'Anteater', 'Armadillo', 'Auroch', 'Axolotl', 'Badger', 'Bat', 'Beaver',
-  'Buffalo', 'Camel', 'Capybara', 'Chameleon', 'Cheetah', 'Chinchilla', 'Chipmunk',
-  'Chupacabra', 'Cormorant', 'Coyote', 'Crow', 'Dingo', 'Dinosaur', 'Dolphin', 'Duck',
-  'Elephant', 'Ferret', 'Fox', 'Frog', 'Giraffe', 'Gopher', 'Grizzly', 'Hedgehog',
-  'Hippo', 'Hyena', 'Ibex', 'Ifrit', 'Iguana', 'Jackal', 'Kangaroo', 'Koala',
-  'Kraken', 'Lemur', 'Leopard', 'Liger', 'Llama', 'Manatee', 'Mink', 'Monkey',
-  'Moose', 'Narwhal', 'Orangutan', 'Otter', 'Panda', 'Penguin', 'Platypus', 'Pumpkin',
-  'Python', 'Quagga', 'Rabbit', 'Raccoon', 'Rhino', 'Sheep', 'Shrew', 'Skunk',
-  'Squirrel', 'Tiger', 'Turtle', 'Walrus', 'Wolf', 'Wolverine', 'Wombat'
+  'Alligator',
+  'Anteater',
+  'Armadillo',
+  'Auroch',
+  'Axolotl',
+  'Badger',
+  'Bat',
+  'Beaver',
+  'Buffalo',
+  'Camel',
+  'Capybara',
+  'Chameleon',
+  'Cheetah',
+  'Chinchilla',
+  'Chipmunk',
+  'Chupacabra',
+  'Cormorant',
+  'Coyote',
+  'Crow',
+  'Dingo',
+  'Dinosaur',
+  'Dolphin',
+  'Duck',
+  'Elephant',
+  'Ferret',
+  'Fox',
+  'Frog',
+  'Giraffe',
+  'Gopher',
+  'Grizzly',
+  'Hedgehog',
+  'Hippo',
+  'Hyena',
+  'Ibex',
+  'Ifrit',
+  'Iguana',
+  'Jackal',
+  'Kangaroo',
+  'Koala',
+  'Kraken',
+  'Lemur',
+  'Leopard',
+  'Liger',
+  'Llama',
+  'Manatee',
+  'Mink',
+  'Monkey',
+  'Moose',
+  'Narwhal',
+  'Orangutan',
+  'Otter',
+  'Panda',
+  'Penguin',
+  'Platypus',
+  'Pumpkin',
+  'Python',
+  'Quagga',
+  'Rabbit',
+  'Raccoon',
+  'Rhino',
+  'Sheep',
+  'Shrew',
+  'Skunk',
+  'Squirrel',
+  'Tiger',
+  'Turtle',
+  'Walrus',
+  'Wolf',
+  'Wolverine',
+  'Wombat',
 ];
 
 const COLOR_PRESETS = [
@@ -52,14 +110,16 @@ export const UpdateAvatar = () => {
   const user = useUser();
   const { addNotification } = useNotifications();
   const { open, close, isOpen } = useDisclosure();
-  
+
   const userAvatar = user.data?.avatar_name || 'Dinosaur';
   const userColor = user.data?.avatar_color || '#38bdf8';
-  
+
   const [selectedAvatar, setSelectedAvatar] = useState(userAvatar);
   const [selectedColor, setSelectedColor] = useState(userColor);
   const [customColor, setCustomColor] = useState(userColor);
-  const [useCustomColor, setUseCustomColor] = useState(!COLOR_PRESETS.includes(userColor));
+  const [useCustomColor, setUseCustomColor] = useState(
+    !COLOR_PRESETS.includes(userColor),
+  );
 
   // Update local state when user data changes
   useEffect(() => {
@@ -92,7 +152,7 @@ export const UpdateAvatar = () => {
   const handleSaveAvatar = (e: React.FormEvent) => {
     e.preventDefault();
     const finalColor = useCustomColor ? customColor : selectedColor;
-    
+
     // Validate before submitting
     try {
       updateAvatarInputSchema.parse({
@@ -107,7 +167,7 @@ export const UpdateAvatar = () => {
       });
       return;
     }
-    
+
     updateAvatarMutation.mutate({
       data: {
         avatar_name: selectedAvatar,
@@ -117,10 +177,13 @@ export const UpdateAvatar = () => {
   };
 
   return (
-    <Drawer open={isOpen} onOpenChange={(newOpen) => {
-      if (newOpen) open();
-      else close();
-    }}>
+    <Drawer
+      open={isOpen}
+      onOpenChange={(newOpen) => {
+        if (newOpen) open();
+        else close();
+      }}
+    >
       <DrawerTrigger asChild>
         <Button icon={<ImageIcon className="size-4" />} size="sm">
           Change Avatar
@@ -133,9 +196,11 @@ export const UpdateAvatar = () => {
           </DrawerHeader>
           <div className="space-y-4 px-6">
             {/* Preview */}
-            <div className="rounded-lg border border-border bg-secondary/50 p-4 flex items-center gap-4">
+            <div className="flex items-center gap-4 rounded-lg border border-border bg-secondary/50 p-4">
               <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-2">Preview</p>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                  Preview
+                </p>
                 <AvatarDisplay
                   avatarName={selectedAvatar}
                   avatarColor={useCustomColor ? customColor : selectedColor}
@@ -143,18 +208,20 @@ export const UpdateAvatar = () => {
                 />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">{selectedAvatar}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h3 className="font-semibold text-foreground">
+                  {selectedAvatar}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Color: {useCustomColor ? customColor : selectedColor}
                 </p>
               </div>
             </div>
 
             {/* Avatar Selection */}
-            <div>
-              <label className="text-sm font-semibold text-foreground mb-2 block">
+            <div role="group" aria-label="Choose Animal">
+              <p className="mb-2 block text-sm font-semibold text-foreground">
                 Choose Animal
-              </label>
+              </p>
               <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-secondary/50 p-3">
                 <div className="grid grid-cols-5 gap-2">
                   {AVATAR_LIST.map((avatar) => (
@@ -162,7 +229,7 @@ export const UpdateAvatar = () => {
                       key={avatar}
                       type="button"
                       onClick={() => setSelectedAvatar(avatar)}
-                      className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${
                         selectedAvatar === avatar
                           ? 'border-blue-500 ring-2 ring-blue-400'
                           : 'border-border hover:border-foreground/30'
@@ -172,7 +239,7 @@ export const UpdateAvatar = () => {
                       <img
                         src={`/avatars/${avatar}.png`}
                         alt={avatar}
-                        className="w-full h-full object-cover"
+                        className="size-full object-cover"
                         loading="lazy"
                       />
                     </button>
@@ -182,12 +249,12 @@ export const UpdateAvatar = () => {
             </div>
 
             {/* Color Selection */}
-            <div>
-              <label className="text-sm font-semibold text-foreground mb-2 block">
+            <div role="group" aria-label="Choose Color">
+              <p className="mb-2 block text-sm font-semibold text-foreground">
                 Choose Color
-              </label>
+              </p>
               <div className="space-y-3">
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-wrap gap-2">
                   {COLOR_PRESETS.map((color) => (
                     <button
                       key={color}
@@ -196,7 +263,7 @@ export const UpdateAvatar = () => {
                         setSelectedColor(color);
                         setUseCustomColor(false);
                       }}
-                      className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                      className={`size-10 rounded-lg border-2 transition-all ${
                         !useCustomColor && selectedColor === color
                           ? 'border-foreground ring-2 ring-foreground/30'
                           : 'border-border hover:border-foreground/30'
@@ -216,7 +283,7 @@ export const UpdateAvatar = () => {
                       setCustomColor(e.target.value);
                       setUseCustomColor(true);
                     }}
-                    className="w-10 h-10 rounded-lg cursor-pointer border border-border"
+                    className="size-10 cursor-pointer rounded-lg border border-border"
                   />
                   <input
                     type="text"
@@ -228,7 +295,7 @@ export const UpdateAvatar = () => {
                       }
                     }}
                     placeholder="#000000"
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm text-foreground"
+                    className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
                   />
                 </div>
               </div>

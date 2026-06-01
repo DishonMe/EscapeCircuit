@@ -1,13 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { AlertTriangle, Ban, Lock, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import {
-  AlertTriangle,
-  Ban,
-  Lock,
-  Trash2,
-} from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/dialog';
@@ -143,9 +138,7 @@ export const ReportsList = () => {
       {reports.length === 0 ? (
         <div className="rounded-xl border border-border bg-secondary p-4">
           <p className="text-foreground/80">
-            {statusFilter
-              ? `No ${statusFilter} reports.`
-              : 'No reports yet.'}
+            {statusFilter ? `No ${statusFilter} reports.` : 'No reports yet.'}
           </p>
         </div>
       ) : (
@@ -160,7 +153,8 @@ export const ReportsList = () => {
                 <div className="flex items-center gap-2">
                   <span
                     className={`rounded-lg px-2 py-0.5 text-[11px] font-medium ${
-                      reasonColors[report.reason] || 'bg-secondary text-foreground'
+                      reasonColors[report.reason] ||
+                      'bg-secondary text-foreground'
                     }`}
                   >
                     {reasonLabels[report.reason] || report.reason}
@@ -249,9 +243,7 @@ export const ReportsList = () => {
 
                   {/* Moderation actions */}
                   <button
-                    onClick={() =>
-                      warnMutation.mutate({ reportId: report.id })
-                    }
+                    onClick={() => warnMutation.mutate({ reportId: report.id })}
                     disabled={warnMutation.isPending}
                     className="flex items-center gap-1 rounded-lg bg-amber-50/50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-secondary disabled:opacity-50"
                   >

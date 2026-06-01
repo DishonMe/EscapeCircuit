@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Flag } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -50,7 +50,11 @@ export const ReportDialog = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px] text-muted-foreground"
+        >
           <Flag className="mr-1 size-3" />
           Report
         </Button>
@@ -64,10 +68,10 @@ export const ReportDialog = ({
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <div>
-            <label className="mb-1 block text-[13px] font-medium text-foreground">
+          <label className="block">
+            <span className="mb-1 block text-[13px] font-medium text-foreground">
               Reason
-            </label>
+            </span>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -80,12 +84,12 @@ export const ReportDialog = ({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-1 block text-[13px] font-medium text-foreground">
+          <label className="block">
+            <span className="mb-1 block text-[13px] font-medium text-foreground">
               Additional details (optional)
-            </label>
+            </span>
             <textarea
               value={details}
               onChange={(e) => setDetails(e.target.value)}
@@ -93,7 +97,7 @@ export const ReportDialog = ({
               rows={3}
               className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[13px] focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
             />
-          </div>
+          </label>
         </div>
 
         <DialogFooter>

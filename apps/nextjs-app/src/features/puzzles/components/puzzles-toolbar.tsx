@@ -132,178 +132,171 @@ export const PuzzlesToolbar = ({
         {/* Row 1: search, chips, sort, view toggle (pinned right) */}
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto">
-        {/* Search input */}
-        <div className="relative shrink-0">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <input
-            type="text"
-            placeholder="Search puzzles..."
-            className="w-64 rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-            value={searchInput}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => {
-              onSearchInputChange(e.target.value);
-              onFiltersChange({
-                ...filters,
-                search: e.target.value || undefined,
-                page: 1,
-              });
-            }}
-          />
-        </div>
+            {/* Search input */}
+            <div className="relative shrink-0">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <input
+                type="text"
+                placeholder="Search puzzles..."
+                className="w-64 rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                value={searchInput}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  onSearchInputChange(e.target.value);
+                  onFiltersChange({
+                    ...filters,
+                    search: e.target.value || undefined,
+                    page: 1,
+                  });
+                }}
+              />
+            </div>
 
-        {/* Result counter */}
-        {showResultCount && (
-          <span className="shrink-0 font-mono text-[12px] text-muted-foreground">
-            {meta!.total} puzzles
-          </span>
-        )}
+            {/* Result counter */}
+            {showResultCount && (
+              <span className="shrink-0 font-mono text-[12px] text-muted-foreground">
+                {meta!.total} puzzles
+              </span>
+            )}
 
-        <span
-          aria-hidden
-          className="h-6 w-px shrink-0 bg-border/70"
-        />
+            <span aria-hidden className="h-6 w-px shrink-0 bg-border/70" />
 
-        {/* Difficulty chip group */}
-        <div
-          role="group"
-          aria-label="Filter by difficulty"
-          className="flex shrink-0 flex-nowrap items-center gap-1.5"
-        >
-          <button
-            type="button"
-            aria-pressed={difficultyChip === 'all'}
-            onClick={() => handleDifficultyChip('all')}
-            className={CHIP_BASE}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            aria-pressed={difficultyChip === 'easy'}
-            onClick={() => handleDifficultyChip('easy')}
-            className={CHIP_BASE}
-          >
-            Easy
-          </button>
-          <button
-            type="button"
-            aria-pressed={difficultyChip === 'medium'}
-            onClick={() => handleDifficultyChip('medium')}
-            className={CHIP_BASE}
-          >
-            Medium
-          </button>
-          <button
-            type="button"
-            aria-pressed={difficultyChip === 'hard'}
-            onClick={() => handleDifficultyChip('hard')}
-            className={CHIP_BASE}
-          >
-            Hard
-          </button>
-          {difficultyChip === 'range' && (
+            {/* Difficulty chip group */}
+            <div
+              role="group"
+              aria-label="Filter by difficulty"
+              className="flex shrink-0 flex-nowrap items-center gap-1.5"
+            >
+              <button
+                type="button"
+                aria-pressed={difficultyChip === 'all'}
+                onClick={() => handleDifficultyChip('all')}
+                className={CHIP_BASE}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                aria-pressed={difficultyChip === 'easy'}
+                onClick={() => handleDifficultyChip('easy')}
+                className={CHIP_BASE}
+              >
+                Easy
+              </button>
+              <button
+                type="button"
+                aria-pressed={difficultyChip === 'medium'}
+                onClick={() => handleDifficultyChip('medium')}
+                className={CHIP_BASE}
+              >
+                Medium
+              </button>
+              <button
+                type="button"
+                aria-pressed={difficultyChip === 'hard'}
+                onClick={() => handleDifficultyChip('hard')}
+                className={CHIP_BASE}
+              >
+                Hard
+              </button>
+              {difficultyChip === 'range' && (
+                <button
+                  type="button"
+                  aria-pressed={true}
+                  disabled
+                  className={cn(CHIP_BASE, 'cursor-default')}
+                >
+                  Range
+                </button>
+              )}
+            </div>
+
+            <span aria-hidden className="h-6 w-px shrink-0 bg-border/70" />
+
+            {/* Status chip group */}
+            <div
+              role="group"
+              aria-label="Filter by status"
+              className="flex shrink-0 flex-nowrap items-center gap-1.5"
+            >
+              {(
+                [
+                  { value: 'all', label: 'All' },
+                  { value: 'unsolved', label: 'Unsolved' },
+                  { value: 'bronze', label: 'Bronze' },
+                  { value: 'silver', label: 'Silver' },
+                  { value: 'gold', label: 'Gold' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={medalFilter === opt.value}
+                  onClick={() => handleMedalChip(opt.value)}
+                  className={CHIP_BASE}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort select */}
+            <StyledSelect
+              aria-label="Sort by"
+              className="puzzle-sort-dropdown w-[140px]"
+              value={filters.orderBy ?? 'created_at'}
+              onValueChange={handleOrderByChange}
+              options={ORDER_BY_OPTIONS}
+            />
+
+            {/* Direction toggle */}
             <button
               type="button"
-              aria-pressed={true}
-              disabled
-              className={cn(CHIP_BASE, 'cursor-default')}
+              onClick={handleDirectionToggle}
+              aria-label={
+                (filters.orderDirection ?? 'ASC') === 'ASC'
+                  ? 'Sort ascending — click to switch to descending'
+                  : 'Sort descending — click to switch to ascending'
+              }
+              className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              Range
+              {(filters.orderDirection ?? 'ASC') === 'ASC' ? (
+                <ArrowUp className="size-4" />
+              ) : (
+                <ArrowDown className="size-4" />
+              )}
             </button>
-          )}
-        </div>
-
-        <span
-          aria-hidden
-          className="h-6 w-px shrink-0 bg-border/70"
-        />
-
-        {/* Status chip group */}
-        <div
-          role="group"
-          aria-label="Filter by status"
-          className="flex shrink-0 flex-nowrap items-center gap-1.5"
-        >
-          {(
-            [
-              { value: 'all', label: 'All' },
-              { value: 'unsolved', label: 'Unsolved' },
-              { value: 'bronze', label: 'Bronze' },
-              { value: 'silver', label: 'Silver' },
-              { value: 'gold', label: 'Gold' },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={medalFilter === opt.value}
-              onClick={() => handleMedalChip(opt.value)}
-              className={CHIP_BASE}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Sort select */}
-        <StyledSelect
-          aria-label="Sort by"
-          className="puzzle-sort-dropdown w-[140px]"
-          value={filters.orderBy ?? 'created_at'}
-          onValueChange={handleOrderByChange}
-          options={ORDER_BY_OPTIONS}
-        />
-
-        {/* Direction toggle */}
-        <button
-          type="button"
-          onClick={handleDirectionToggle}
-          aria-label={
-            (filters.orderDirection ?? 'ASC') === 'ASC'
-              ? 'Sort ascending — click to switch to descending'
-              : 'Sort descending — click to switch to ascending'
-          }
-          className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          {(filters.orderDirection ?? 'ASC') === 'ASC' ? (
-            <ArrowUp className="size-4" />
-          ) : (
-            <ArrowDown className="size-4" />
-          )}
-        </button>
-
           </div>
 
-        {/* View toggle — hidden on <sm, pinned to the far right of row 1 */}
-        <div className="hidden shrink-0 items-center overflow-hidden rounded-lg border border-border sm:inline-flex">
-          <button
-            type="button"
-            aria-pressed={view === 'gallery'}
-            aria-label="Gallery view"
-            onClick={() => onViewChange('gallery')}
-            className={cn(
-              'inline-flex size-8 items-center justify-center bg-background text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              view === 'gallery' && 'bg-secondary',
-            )}
-          >
-            <LayoutGrid className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-pressed={view === 'list'}
-            aria-label="List view"
-            onClick={() => onViewChange('list')}
-            className={cn(
-              'inline-flex size-8 items-center justify-center bg-background text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              view === 'list' && 'bg-secondary',
-            )}
-          >
-            <List className="size-4" />
-          </button>
-        </div>
+          {/* View toggle — hidden on <sm, pinned to the far right of row 1 */}
+          <div className="hidden shrink-0 items-center overflow-hidden rounded-lg border border-border sm:inline-flex">
+            <button
+              type="button"
+              aria-pressed={view === 'gallery'}
+              aria-label="Gallery view"
+              onClick={() => onViewChange('gallery')}
+              className={cn(
+                'inline-flex size-8 items-center justify-center bg-background text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                view === 'gallery' && 'bg-secondary',
+              )}
+            >
+              <LayoutGrid className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'list'}
+              aria-label="List view"
+              onClick={() => onViewChange('list')}
+              className={cn(
+                'inline-flex size-8 items-center justify-center bg-background text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                view === 'list' && 'bg-secondary',
+              )}
+            >
+              <List className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* Row 2: More filters, Clear, Updating */}

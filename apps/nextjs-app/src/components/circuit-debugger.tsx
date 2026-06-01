@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
+/* eslint-disable import/no-restricted-paths -- types live with the grid component; extracting them is a separate refactor. */
+import type {
+  ComponentDef,
+  PlacedGridComponent,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
+/* eslint-enable import/no-restricted-paths */
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,8 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api-client';
 import type { Wire } from '@/types/api';
-import type { ComponentDef, PlacedGridComponent } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-
 
 export type DebuggerProps = {
   isOpen: boolean;
@@ -51,17 +56,31 @@ export function CircuitDebugger({
 }: DebuggerProps) {
   const [mode, setMode] = useState<'single' | 'sequence'>('single');
   const [inputValues, setInputValues] = useState<Record<string, string>>(
-    Object.fromEntries(inputs.map((inp) => [inp, '0']))
+    Object.fromEntries(inputs.map((inp) => [inp, '0'])),
   );
   const [sequenceInputs, setSequenceInputs] = useState<Record<string, string>>(
-    Object.fromEntries(inputs.map((inp) => [inp, '']))
+    Object.fromEntries(inputs.map((inp) => [inp, ''])),
   );
   const [gateOutputs, setGateOutputs] = useState<GateOutput[][]>([]);
-  const [puzzleOutputs, setPuzzleOutputs] = useState<Record<string, string>[]>([]);
+  const [puzzleOutputs, setPuzzleOutputs] = useState<Record<string, string>[]>(
+    [],
+  );
   const [hasRun, setHasRun] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepCount, setStepCount] = useState(0);
+  const [sequenceStepIndex, setSequenceStepIndex] = useState(0);
+
+  const parseSequenceBits = (value: string): string[] => {
+    if (!value.trim()) return [];
+    if (value.includes(',')) {
+      return value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part === '0' || part === '1');
+    }
+    return value.split('').filter((ch) => ch === '0' || ch === '1');
+  };
 
   useEffect(() => {
     if (!modeOverride) return;
@@ -81,16 +100,28 @@ export function CircuitDebugger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRunToken, isOpen]);
 
+  useEffect(() => {
+    if (mode !== 'sequence') {
+      setSequenceStepIndex(0);
+      return;
+    }
+
+    setSequenceStepIndex((prev) => {
+      const maxIndex = Math.max(stepCount - 1, 0);
+      return Math.min(Math.max(prev, 0), maxIndex);
+    });
+  }, [mode, stepCount]);
+
   // Helper: count same component types for numbering
   const getComponentDisplayLabel = (
     componentId: string,
-    placedId: string
+    placedId: string,
   ): string => {
     const def = catalog[componentId];
     if (!def) return componentId;
 
     const sameTypeComponents = placed.filter(
-      (p) => p.componentId === componentId
+      (p) => p.componentId === componentId,
     );
     if (sameTypeComponents.length <= 1) {
       return def.label;
@@ -167,7 +198,10 @@ export function CircuitDebugger({
       }
 
       // Call backend simulation endpoint using the proper API client
-      const endpoint = puzzleId === 'arsenal-creator' ? '/arsenal/simulate' : `/puzzles/${puzzleId}/simulate`;
+      const endpoint =
+        puzzleId === 'arsenal-creator'
+          ? '/arsenal/simulate'
+          : `/puzzles/${puzzleId}/simulate`;
       const result = await api.post<any>(endpoint, {
         solution,
         inputs: inputsForBackend,
@@ -188,6 +222,7 @@ export function CircuitDebugger({
       setPuzzleOutputs([puzzleOutputsMap]);
       setHasRun(true);
       setStepCount(1);
+      setSequenceStepIndex(0);
 
       // Call callback if provided
       if (onDebug) {
@@ -240,7 +275,9 @@ export function CircuitDebugger({
     // Verify all sequences have the same length
     for (const inp of inputs) {
       if (sequences[inp].length !== maxLength) {
-        setError(`All sequences must have the same length (expected ${maxLength}, got ${sequences[inp].length} for ${inp})`);
+        setError(
+          `All sequences must have the same length (expected ${maxLength}, got ${sequences[inp].length} for ${inp})`,
+        );
         return;
       }
     }
@@ -262,7 +299,10 @@ export function CircuitDebugger({
       };
 
       // Call backend simulation endpoint with sequence
-      const endpoint = puzzleId === 'arsenal-creator' ? '/arsenal/simulate' : `/puzzles/${puzzleId}/simulate`;
+      const endpoint =
+        puzzleId === 'arsenal-creator'
+          ? '/arsenal/simulate'
+          : `/puzzles/${puzzleId}/simulate`;
       const result = await api.post<any>(endpoint, {
         solution,
         inputs: sequences,
@@ -273,22 +313,28 @@ export function CircuitDebugger({
       const allGateOutputs: GateOutput[][] = result.steps.map((step: any) =>
         step.gateOutputs.map((gate: any) => ({
           ...gate,
-          displayLabel: getComponentDisplayLabel(gate.componentId, gate.placedId),
-        }))
+          displayLabel: getComponentDisplayLabel(
+            gate.componentId,
+            gate.placedId,
+          ),
+        })),
       );
 
-      const allPuzzleOutputs: Record<string, string>[] = result.steps.map((step: any) => {
-        const map: Record<string, string> = {};
-        for (const [key, value] of Object.entries(step.puzzleOutputs)) {
-          map[key] = String(value);
-        }
-        return map;
-      });
+      const allPuzzleOutputs: Record<string, string>[] = result.steps.map(
+        (step: any) => {
+          const map: Record<string, string> = {};
+          for (const [key, value] of Object.entries(step.puzzleOutputs)) {
+            map[key] = String(value);
+          }
+          return map;
+        },
+      );
 
       setGateOutputs(allGateOutputs);
       setPuzzleOutputs(allPuzzleOutputs);
       setHasRun(true);
       setStepCount(maxLength);
+      setSequenceStepIndex(0);
     } catch (err: any) {
       setError(err.message || 'Failed to simulate circuit sequence');
       console.error('Debug sequence simulation error:', err);
@@ -299,7 +345,7 @@ export function CircuitDebugger({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Circuit Debugger</DialogTitle>
         </DialogHeader>
@@ -325,21 +371,25 @@ export function CircuitDebugger({
 
           {/* Input Section */}
           <div>
-            <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-3">
+            <h3 className="mb-3 text-[13px] font-semibold tracking-tight text-foreground">
               {mode === 'single' ? 'Puzzle Inputs' : 'Input Sequences'}
             </h3>
             {mode === 'single' ? (
               <div className="grid grid-cols-2 gap-3">
                 {inputs.map((inputName) => (
                   <div key={inputName} className="flex items-center gap-2">
-                    <label className="text-[13px] font-medium text-foreground w-20">{inputName}:</label>
+                    <label className="w-20 text-[13px] font-medium text-foreground">
+                      {inputName}:
+                    </label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={inputValues[inputName] || ''}
-                      onChange={(e) => handleInputChange(inputName, e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange(inputName, e.target.value)
+                      }
                       placeholder="0 or 1"
-                      className="border border-border rounded-lg bg-card px-2.5 py-1.5 w-16 text-center text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="w-16 rounded-lg border border-border bg-card px-2.5 py-1.5 text-center text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       maxLength={1}
                     />
                   </div>
@@ -349,35 +399,97 @@ export function CircuitDebugger({
               <div className="grid grid-cols-1 gap-3">
                 {inputs.map((inputName) => (
                   <div key={inputName} className="flex items-start gap-2">
-                    <label className="text-[13px] font-medium text-foreground w-20 pt-2">{inputName}:</label>
+                    <label className="w-20 pt-2 text-[13px] font-medium text-foreground">
+                      {inputName}:
+                    </label>
                     <div className="flex-1">
                       <input
                         type="text"
                         value={sequenceInputs[inputName] || ''}
-                        onChange={(e) => handleSequenceChange(inputName, e.target.value)}
+                        onChange={(e) =>
+                          handleSequenceChange(inputName, e.target.value)
+                        }
                         placeholder="e.g., 01010 or 0,1,0,1,0"
-                        className="border border-border rounded-lg bg-card px-2.5 py-1.5 w-full text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       />
-                      <p className="text-[11px] text-muted-foreground mt-1">
+                      {parseSequenceBits(sequenceInputs[inputName] || '')
+                        .length > 0 ? (
+                        <div
+                          className="mt-1.5 flex flex-wrap items-center gap-1"
+                          title={`Current step ${sequenceStepIndex + 1}`}
+                        >
+                          {parseSequenceBits(
+                            sequenceInputs[inputName] || '',
+                          ).map((bit, index) => (
+                            <span
+                              key={`${inputName}-bit-${index}`}
+                              className={`inline-flex size-5 items-center justify-center rounded border text-[11px] font-semibold ${
+                                index === sequenceStepIndex
+                                  ? 'border-emerald-500 bg-emerald-500 text-white'
+                                  : 'border-border bg-card text-foreground'
+                              }`}
+                            >
+                              {bit}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <p className="mt-1 text-[11px] text-muted-foreground">
                         Enter binary digits (0,1) or comma-separated values
                       </p>
                     </div>
                   </div>
                 ))}
+
+                {stepCount > 0 ? (
+                  <div className="ml-[5.5rem] flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setSequenceStepIndex((prev) => Math.max(prev - 1, 0))
+                      }
+                      disabled={sequenceStepIndex <= 0}
+                    >
+                      Prev Step
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setSequenceStepIndex((prev) =>
+                          Math.min(prev + 1, Math.max(stepCount - 1, 0)),
+                        )
+                      }
+                      disabled={sequenceStepIndex >= stepCount - 1}
+                    >
+                      Next Step
+                    </Button>
+                    <span className="text-[12px] text-muted-foreground">
+                      Current Step {sequenceStepIndex + 1}/{stepCount}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50/50 border border-red-200/60 rounded-lg p-3 text-[13px] text-red-700">
+            <div className="rounded-lg border border-red-200/60 bg-red-50/50 p-3 text-[13px] text-red-700">
               {error}
             </div>
           )}
 
           {/* Run Button */}
           <div className="flex justify-center">
-            <Button onClick={handleRunDebugger} disabled={isLoading} className="px-6">
+            <Button
+              onClick={handleRunDebugger}
+              disabled={isLoading}
+              className="px-6"
+            >
               {isLoading ? 'Simulating...' : 'Simulate'}
             </Button>
           </div>
@@ -390,15 +502,21 @@ export function CircuitDebugger({
                   {/* Gate Outputs */}
                   {gateOutputs[0].length > 0 && (
                     <div>
-                      <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h3>
-                      <div className="space-y-1.5 bg-secondary p-3 rounded-lg border border-border">
+                      <h3 className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
+                        Gate Outputs
+                      </h3>
+                      <div className="space-y-1.5 rounded-lg border border-border bg-secondary p-3">
                         {gateOutputs[0].map((gate) => (
                           <div
                             key={gate.placedId}
                             className="flex justify-between text-[13px]"
                           >
-                            <span className="font-medium text-foreground">{gate.displayLabel}:</span>
-                            <span className="font-mono text-foreground">{gate.values}</span>
+                            <span className="font-medium text-foreground">
+                              {gate.displayLabel}:
+                            </span>
+                            <span className="font-mono text-foreground">
+                              {gate.values}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -407,14 +525,18 @@ export function CircuitDebugger({
 
                   {/* Puzzle Outputs */}
                   <div>
-                    <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h3>
-                    <div className="space-y-1.5 bg-secondary p-3 rounded-lg border border-border">
+                    <h3 className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
+                      Puzzle Outputs
+                    </h3>
+                    <div className="space-y-1.5 rounded-lg border border-border bg-secondary p-3">
                       {outputs.map((outputName) => (
                         <div
                           key={outputName}
                           className="flex justify-between text-[13px]"
                         >
-                          <span className="font-medium text-foreground">{outputName}:</span>
+                          <span className="font-medium text-foreground">
+                            {outputName}:
+                          </span>
                           <span className="font-mono font-semibold text-foreground">
                             {puzzleOutputs[0]?.[outputName] || '0'}
                           </span>
@@ -427,17 +549,26 @@ export function CircuitDebugger({
 
               {mode === 'sequence' && gateOutputs.length > 0 && (
                 <div className="overflow-x-auto">
-                  <h3 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Simulation Results ({stepCount} steps)</h3>
+                  <h3 className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
+                    Simulation Results ({stepCount} steps)
+                  </h3>
 
                   {/* Puzzle Outputs Table */}
                   <div className="mb-4">
-                    <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Puzzle Outputs</h4>
-                    <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
+                    <h4 className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
+                      Puzzle Outputs
+                    </h4>
+                    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border/60 text-[13px]">
                       <thead>
                         <tr className="bg-secondary">
-                          <th className="border border-border px-3 py-2 text-left text-foreground">Step</th>
+                          <th className="border border-border px-3 py-2 text-left text-foreground">
+                            Step
+                          </th>
                           {outputs.map((out) => (
-                            <th key={out} className="border border-border px-3 py-2 text-center text-foreground">
+                            <th
+                              key={out}
+                              className="border border-border px-3 py-2 text-center text-foreground"
+                            >
                               {out}
                             </th>
                           ))}
@@ -445,10 +576,20 @@ export function CircuitDebugger({
                       </thead>
                       <tbody>
                         {puzzleOutputs.map((outputs_map, step) => (
-                          <tr key={step} className={step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'}>
-                            <td className="border border-border px-3 py-2 font-mono text-muted-foreground">{step + 1}</td>
+                          <tr
+                            key={step}
+                            className={
+                              step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'
+                            }
+                          >
+                            <td className="border border-border px-3 py-2 font-mono text-muted-foreground">
+                              {step + 1}
+                            </td>
                             {outputs.map((out) => (
-                              <td key={out} className="border border-border px-3 py-2 text-center font-mono font-semibold text-muted-foreground">
+                              <td
+                                key={out}
+                                className="border border-border px-3 py-2 text-center font-mono font-semibold text-muted-foreground"
+                              >
                                 {outputs_map[out] || '0'}
                               </td>
                             ))}
@@ -461,13 +602,20 @@ export function CircuitDebugger({
                   {/* Gate Outputs Table */}
                   {gateOutputs.some((step) => step.length > 0) && (
                     <div>
-                      <h4 className="text-[13px] font-semibold tracking-tight text-foreground mb-2">Gate Outputs</h4>
-                      <table className="border-collapse border border-border/60 w-full text-[13px] rounded-lg overflow-hidden">
+                      <h4 className="mb-2 text-[13px] font-semibold tracking-tight text-foreground">
+                        Gate Outputs
+                      </h4>
+                      <table className="w-full border-collapse overflow-hidden rounded-lg border border-border/60 text-[13px]">
                         <thead>
                           <tr className="bg-secondary">
-                            <th className="border border-border px-3 py-2 text-left text-foreground">Step</th>
+                            <th className="border border-border px-3 py-2 text-left text-foreground">
+                              Step
+                            </th>
                             {gateOutputs[0]?.map((gate) => (
-                              <th key={gate.placedId} className="border border-border px-3 py-2 text-center text-foreground">
+                              <th
+                                key={gate.placedId}
+                                className="border border-border px-3 py-2 text-center text-foreground"
+                              >
                                 {gate.displayLabel}
                               </th>
                             ))}
@@ -475,10 +623,20 @@ export function CircuitDebugger({
                         </thead>
                         <tbody>
                           {gateOutputs.map((step_gates, step) => (
-                            <tr key={step} className={step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'}>
-                              <td className="border border-border px-3 py-2 font-mono text-muted-foreground">{step + 1}</td>
+                            <tr
+                              key={step}
+                              className={
+                                step % 2 === 0 ? 'bg-card' : 'bg-secondary/30'
+                              }
+                            >
+                              <td className="border border-border px-3 py-2 font-mono text-muted-foreground">
+                                {step + 1}
+                              </td>
                               {step_gates.map((gate) => (
-                                <td key={gate.placedId} className="border border-border px-3 py-2 text-center font-mono text-muted-foreground">
+                                <td
+                                  key={gate.placedId}
+                                  className="border border-border px-3 py-2 text-center font-mono text-muted-foreground"
+                                >
                                   {gate.values}
                                 </td>
                               ))}

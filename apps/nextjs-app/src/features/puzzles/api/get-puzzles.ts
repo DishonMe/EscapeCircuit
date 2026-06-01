@@ -47,8 +47,10 @@ export const getPuzzles = (
   if (filters.experienceLevel && filters.experienceLevel !== 'all') {
     params.creator_experience_level = filters.experienceLevel;
   }
-  if (filters.minClearness !== undefined) params.min_clearness = filters.minClearness;
-  if (filters.maxClearness !== undefined) params.max_clearness = filters.maxClearness;
+  if (filters.minClearness !== undefined)
+    params.min_clearness = filters.minClearness;
+  if (filters.maxClearness !== undefined)
+    params.max_clearness = filters.maxClearness;
   if (filters.minFun !== undefined) params.min_fun = filters.minFun;
   if (filters.maxFun !== undefined) params.max_fun = filters.maxFun;
   if (filters.dateFrom) params.date_from = filters.dateFrom;
@@ -73,7 +75,10 @@ type UsePuzzlesOptions = {
   config?: QueryConfig<typeof getPuzzlesQueryOptions>;
 };
 
-export const usePuzzles = ({ filters = { page: 1 }, config }: UsePuzzlesOptions = {}) => {
+export const usePuzzles = ({
+  filters = { page: 1 },
+  config,
+}: UsePuzzlesOptions = {}) => {
   return useQuery({
     ...getPuzzlesQueryOptions(filters),
     ...config,

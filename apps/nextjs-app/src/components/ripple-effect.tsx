@@ -1,12 +1,12 @@
 /**
  * Ripple Effect component that animates from a point on drop.
  * Shows a radial ripple expanding and fading at the exact drop location.
- * 
+ *
  * Usage:
- *   <RippleEffect 
- *     x={100} 
- *     y={200} 
- *     key={Date.now()} 
+ *   <RippleEffect
+ *     x={100}
+ *     y={200}
+ *     key={Date.now()}
  *   />
  */
 
@@ -26,7 +26,8 @@ export const RippleEffect = ({ x, y }: { x: number; y: number }) => {
         }
 
         .ripple-pulse {
-          animation: workstation-ripple 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+          animation: workstation-ripple 600ms
+            cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         }
       `}</style>
       <div

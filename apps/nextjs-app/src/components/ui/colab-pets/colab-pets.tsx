@@ -81,7 +81,8 @@ export function ColabPets({ topOffsetPx = 0, stripHeightPx }: ColabPetsProps) {
       aria-hidden="true"
     >
       {pets.map((pet) => {
-        const animationName = pet.direction === 'ltr' ? 'colab-pet-ltr' : 'colab-pet-rtl';
+        const animationName =
+          pet.direction === 'ltr' ? 'colab-pet-ltr' : 'colab-pet-rtl';
 
         return (
           <span
@@ -133,7 +134,7 @@ export function ColabPets({ topOffsetPx = 0, stripHeightPx }: ColabPetsProps) {
         Usage in root layout/page:
 
         1) Import the component:
-           import { ColabPets } from '@/components/ui/colab-pets/ColabPets';
+           import { ColabPets } from '@/components/ui/colab-pets/colab-pets';
 
         2) Render once near the app root, for example in layout.tsx:
            <body>

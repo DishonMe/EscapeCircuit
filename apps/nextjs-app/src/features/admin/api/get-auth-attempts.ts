@@ -24,7 +24,9 @@ export const getAuthAttempts = (
   });
 };
 
-export const getAuthAttemptsQueryOptions = (filters: AuthAttemptsFilters = {}) => {
+export const getAuthAttemptsQueryOptions = (
+  filters: AuthAttemptsFilters = {},
+) => {
   return queryOptions({
     queryKey: ['admin-auth-attempts', filters],
     queryFn: () => getAuthAttempts(filters),
@@ -36,7 +38,10 @@ type UseAuthAttemptsOptions = {
   queryConfig?: QueryConfig<typeof getAuthAttemptsQueryOptions>;
 };
 
-export const useAuthAttempts = ({ filters = {}, queryConfig }: UseAuthAttemptsOptions = {}) => {
+export const useAuthAttempts = ({
+  filters = {},
+  queryConfig,
+}: UseAuthAttemptsOptions = {}) => {
   return useQuery({
     ...getAuthAttemptsQueryOptions(filters),
     ...queryConfig,

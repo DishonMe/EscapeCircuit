@@ -42,7 +42,10 @@ type UseMyPuzzlesOptions = {
   config?: QueryConfig<typeof getMyPuzzles>;
 };
 
-export const useMyPuzzles = ({ filters = {}, config }: UseMyPuzzlesOptions = {}) => {
+export const useMyPuzzles = ({
+  filters = {},
+  config,
+}: UseMyPuzzlesOptions = {}) => {
   return useQuery({
     ...myPuzzlesQueryOptions(filters),
     ...config,

@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from 'react';
 
-import { useCreatorNotifications, useMarkNotificationsRead } from '@/features/notifications/api';
 import { useNotifications } from '@/components/ui/notifications';
+import {
+  useCreatorNotifications,
+  useMarkNotificationsRead,
+} from '@/features/notifications/api';
 import { useUser } from '@/lib/auth';
 
 const SHOWN_NOTIFICATIONS_KEY = 'escapecircuit_shown_notifications';
@@ -18,7 +21,8 @@ const CREATOR_ROLES = ['creator', 'admin', 'pending_creator'];
 
 const CreatorNotificationsPopup = () => {
   const user = useUser();
-  const isCreatorOrAdmin = !!user.data && CREATOR_ROLES.includes(user.data.role);
+  const isCreatorOrAdmin =
+    !!user.data && CREATOR_ROLES.includes(user.data.role);
   const { data: notifications, status } = useCreatorNotifications({
     queryConfig: { enabled: isCreatorOrAdmin },
   });
@@ -42,7 +46,9 @@ const CreatorNotificationsPopup = () => {
 
     // Get previously shown notification IDs from localStorage
     const shownNotificationsStr = localStorage.getItem(SHOWN_NOTIFICATIONS_KEY);
-    const shownNotifications = shownNotificationsStr ? JSON.parse(shownNotificationsStr) : [];
+    const shownNotifications = shownNotificationsStr
+      ? JSON.parse(shownNotificationsStr)
+      : [];
     const shownSet = new Set(shownNotifications);
 
     // Filter out already shown notifications
@@ -56,7 +62,10 @@ const CreatorNotificationsPopup = () => {
 
     // Update localStorage with all current notification IDs
     const allNotificationIds = notifications.map((n) => n.id);
-    localStorage.setItem(SHOWN_NOTIFICATIONS_KEY, JSON.stringify(allNotificationIds));
+    localStorage.setItem(
+      SHOWN_NOTIFICATIONS_KEY,
+      JSON.stringify(allNotificationIds),
+    );
 
     // Show each notification as a toast (stagger slightly for UX)
     newNotifications.forEach((n, i) => {

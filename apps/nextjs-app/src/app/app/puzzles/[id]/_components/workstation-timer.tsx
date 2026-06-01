@@ -2,11 +2,16 @@
 
 import { useMemo } from 'react';
 
-const formatTime = (seconds: number) => {
-  const abs = Math.abs(seconds);
-  const m = Math.floor(abs / 60);
-  const s = abs % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+import {
+  timerVisualState,
+  type TimerState,
+} from '@/features/puzzles/lib/timer-display';
+
+const STATE_COLOR_CLASS: Record<TimerState, string> = {
+  'no-limit': 'bg-slate-50/50 text-slate-700 border-slate-200/60',
+  normal: 'bg-emerald-50/50 text-emerald-700 border-emerald-200/60',
+  warning: 'bg-amber-50/50 text-amber-700 border-amber-200/60',
+  expired: 'bg-red-50/50 text-red-700 border-red-200/60',
 };
 
 /**
@@ -33,30 +38,9 @@ export const WorkstationTimer = ({
   const hasLimit = typeof timeLimitSeconds === 'number' && timeLimitSeconds > 0;
 
   const { label, colorClass } = useMemo(() => {
-    if (!hasLimit) {
-      return {
-        label: formatTime(displayElapsed),
-        colorClass: 'bg-slate-50/50 text-slate-700 border-slate-200/60',
-      };
-    }
-
-    const remaining = (timeLimitSeconds as number) - displayElapsed;
-
-    if (remaining <= 0) {
-      return {
-        label: `+${formatTime(remaining)}`,
-        colorClass: 'bg-red-50/50 text-red-700 border-red-200/60',
-      };
-    }
-
-    const percentage = remaining / (timeLimitSeconds as number);
-    let color = 'bg-emerald-50/50 text-emerald-700 border-emerald-200/60';
-    if (percentage <= 0.1) {
-      color = 'bg-amber-50/50 text-amber-700 border-amber-200/60';
-    }
-
-    return { label: formatTime(remaining), colorClass: color };
-  }, [hasLimit, displayElapsed, timeLimitSeconds]);
+    const { state, label } = timerVisualState(displayElapsed, timeLimitSeconds);
+    return { label, colorClass: STATE_COLOR_CLASS[state] };
+  }, [displayElapsed, timeLimitSeconds]);
 
   return (
     <div

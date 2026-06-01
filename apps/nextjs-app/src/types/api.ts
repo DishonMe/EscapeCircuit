@@ -18,7 +18,15 @@ export type Meta = {
 export type User = Entity<{
   username: string;
   email: string;
-  role: 'admin' | 'creator' | 'solver' | 'pending_creator' | 'ADMIN' | 'USER' | 'GAME_MASTER' | 'PLAYER'; // Support both for safety
+  role:
+    | 'admin'
+    | 'creator'
+    | 'solver'
+    | 'pending_creator'
+    | 'ADMIN'
+    | 'USER'
+    | 'GAME_MASTER'
+    | 'PLAYER'; // Support both for safety
   bio: string;
   xp: number;
   level: number;
@@ -133,7 +141,7 @@ export type Puzzle = Entity<{
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   timeLimit: number; // in seconds
   budgetLimit: number;
-  creatorBudget?: number | null;  // Creator's solution cost (for medal bonus condition)
+  creatorBudget?: number | null; // Creator's solution cost (for medal bonus condition)
   budget?: number; // Backend compat
   inputs: string[];
   outputs: string[];
@@ -143,13 +151,13 @@ export type Puzzle = Entity<{
   filteredBasicComponents?: string[];
   defaultGateSet?: string[];
   allowArsenal?: boolean;
-  allowedArsenalComponentIds?: string[];  // Specific Arsenal components allowed in this puzzle
-  arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;  // Display mode for each Arsenal component
-  board_rows?: number | null;  // Board height (null = use default)
-  board_cols?: number | null;  // Board width (null = use default)
-  specialComponents?: CircuitComponent[];  // Backward compatibility (all special components)
-  customComponents?: CircuitComponent[];   // Custom pieces for this puzzle
-  arsenalComponents?: CircuitComponent[];  // User's arsenal pieces
+  allowedArsenalComponentIds?: string[]; // Specific Arsenal components allowed in this puzzle
+  arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>; // Display mode for each Arsenal component
+  board_rows?: number | null; // Board height (null = use default)
+  board_cols?: number | null; // Board width (null = use default)
+  specialComponents?: CircuitComponent[]; // Backward compatibility (all special components)
+  customComponents?: CircuitComponent[]; // Custom pieces for this puzzle
+  arsenalComponents?: CircuitComponent[]; // User's arsenal pieces
   sharedArsenalComponents?: CircuitComponent[]; // Creator-shared arsenal pieces
   solverArsenalComponents?: CircuitComponent[]; // Solver personal arsenal pieces
   rating: number;
@@ -184,7 +192,7 @@ export type Puzzle = Entity<{
   // Rating metrics (injected by browse/get endpoints)
   rating_metrics?: RatingMetrics;
   // Initial board: locked components pre-placed for solver
-  initial_board?: { 
+  initial_board?: {
     locked_placed: Array<{
       id: string;
       componentId: string;
@@ -201,23 +209,29 @@ export type CircuitComponent = {
   type: string;
   cost: number;
   pins: number;
-  num_inputs?: number;  // For arsenal/custom pieces
-  num_outputs?: number;  // For arsenal/custom pieces
-  puzzle_id?: number | null;  // Non-null indicates custom piece, null indicates arsenal piece
-  basic_gates?: string;  // For arsenal/custom pieces
-  truth_table?: string;  // For arsenal/custom pieces
+  num_inputs?: number; // For arsenal/custom pieces
+  num_outputs?: number; // For arsenal/custom pieces
+  puzzle_id?: number | null; // Non-null indicates custom piece, null indicates arsenal piece
+  basic_gates?: string; // For arsenal/custom pieces
+  truth_table?: string; // For arsenal/custom pieces
   is_arsenal?: boolean;
-  used_basic_types?: string[];  // Array of basic gate types used in the component
-  solution?: Record<string, any>;  // Component's internal structure/implementation
+  used_basic_types?: string[]; // Array of basic gate types used in the component
+  solution?: Record<string, any>; // Component's internal structure/implementation
   visual_style?: {
     accentColor?: string;
     roundness?: number;
     borderStyle?: 'solid' | 'double' | 'etched';
     edgeAddon?: 'none' | 'chip-legs';
-    surfaceStyle?: 'flat' | 'brushed' | 'gradient' | 'matte' | 'glass' | 'carbon';
+    surfaceStyle?:
+      | 'flat'
+      | 'brushed'
+      | 'gradient'
+      | 'matte'
+      | 'glass'
+      | 'carbon';
   };
-  hide_internal_structure?: boolean;  // Whether internal structure should be hidden from player
-  description?: string;  // Component description shown in inspection dialog
+  hide_internal_structure?: boolean; // Whether internal structure should be hidden from player
+  description?: string; // Component description shown in inspection dialog
 };
 
 export type PlacedComponent = {

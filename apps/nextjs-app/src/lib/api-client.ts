@@ -1,7 +1,7 @@
+import Cookies from 'js-cookie';
+
 import { useNotifications } from '@/components/ui/notifications';
 import { env } from '@/config/env';
-
-import Cookies from 'js-cookie';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 type RequestOptions = {
@@ -52,7 +52,9 @@ export function getServerCookies() {
 }
 
 function getTokenFromCookieString(cookieString: string): string | undefined {
-  const match = cookieString.match(new RegExp(`${AUTH_TOKEN_COOKIE_NAME}=([^;]+)`));
+  const match = cookieString.match(
+    new RegExp(`${AUTH_TOKEN_COOKIE_NAME}=([^;]+)`),
+  );
   return match ? match[1] : undefined;
 }
 
@@ -128,13 +130,17 @@ async function fetchApi<T>(
         let message = '';
         try {
           const errorData = await response.json();
-          message = errorData.message || errorData.detail || response.statusText;
+          message =
+            errorData.message || errorData.detail || response.statusText;
         } catch {
           message = response.statusText || 'An error occurred';
         }
-        
+
         // Only force logout for true auth failures, not generic backend validation issues.
-        if (typeof window !== 'undefined' && isAuthenticationFailure(response.status, message)) {
+        if (
+          typeof window !== 'undefined' &&
+          isAuthenticationFailure(response.status, message)
+        ) {
           // Clear the invalid token
           Cookies.remove(AUTH_TOKEN_COOKIE_NAME);
 
@@ -150,7 +156,7 @@ async function fetchApi<T>(
           // Stop further processing
           throw new Error('Unauthorized - redirecting to login');
         }
-        
+
         if (typeof window !== 'undefined' && !suppressErrorNotification) {
           useNotifications.getState().addNotification({
             type: 'error',
@@ -162,9 +168,15 @@ async function fetchApi<T>(
 
       return response.json();
     } catch (error) {
-      if (attempt < maxRetries && error instanceof TypeError && error.message.includes('fetch')) {
+      if (
+        attempt < maxRetries &&
+        error instanceof TypeError &&
+        error.message.includes('fetch')
+      ) {
         // Retry on network errors with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 2 ** attempt * 1000),
+        );
         continue;
       }
       throw error;

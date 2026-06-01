@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
 import { Search } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { Spinner } from '@/components/ui/spinner';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
@@ -9,6 +9,7 @@ import { ThreadCategory } from '@/types/api';
 import { cn } from '@/utils/cn';
 
 import { useDiscussions, DiscussionFilters } from '../api/get-discussions';
+
 import { CATEGORY_OPTIONS } from './category-badge';
 import { DiscussionCard } from './discussion-card';
 
@@ -71,7 +72,10 @@ export const DiscussionsList = () => {
           />
         </div>
 
-        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border/70 lg:block" />
+        <span
+          aria-hidden
+          className="hidden h-6 w-px shrink-0 bg-border/70 lg:block"
+        />
 
         {/* Category chips */}
         <div
@@ -106,7 +110,10 @@ export const DiscussionsList = () => {
           ))}
         </div>
 
-        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border/70 lg:block" />
+        <span
+          aria-hidden
+          className="hidden h-6 w-px shrink-0 bg-border/70 lg:block"
+        />
 
         {/* Sort */}
         <StyledSelect

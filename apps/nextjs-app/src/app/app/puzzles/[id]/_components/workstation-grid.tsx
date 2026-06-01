@@ -1,21 +1,22 @@
 'use client';
 
+import { ChevronRight, Lock, ZoomIn, ZoomOut } from 'lucide-react';
 import type {
   DragEvent as ReactDragEvent,
   PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Lock } from 'lucide-react';
 
+import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
 import { Spinner } from '@/components/ui/spinner';
-import { RippleEffect } from '@/components/ripple-effect';
-import { useAudio } from '@/hooks/useAudio';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { useSettings } from '@/context/settings-context';
+import { useAudio } from '@/hooks/use-audio';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
+
 import { LogicNode, type LogicNodeVisualStyle } from './node';
 
 export type HoleCoord = { row: number; col: number };
@@ -45,6 +46,16 @@ export type PlacedGridComponent = {
   rotation: 0 | 90;
   isLocked?: boolean; // If true, component is immovable, undeletable, and mandatory to use
 };
+type ClipboardComponent = PlacedGridComponent & {
+  label: string;
+};
+type ClipboardPayload = {
+  version: 1;
+  sourcePuzzleId: string;
+  components: ClipboardComponent[];
+  wires: Wire[];
+};
+const normalizeClipboardKey = (value: string) => value.trim().toLowerCase();
 
 export type PortAddress = {
   ownerId: string; // placedId or IO:IN:* / IO:OUT:*
@@ -62,6 +73,8 @@ const DEFAULT_GRID_ROWS = 15;
 const DEFAULT_GRID_COLS = 30;
 const CELL_PX = 18;
 const PUZZLE_IO_Y_OFFSET_PX = 20;
+const WORKSTATION_CLIPBOARD_STORAGE_KEY =
+  'escapecircuit.workstation.clipboard.v1';
 
 // Visual Feature: Dynamic Wire Coloring
 const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f97316'];
@@ -190,6 +203,7 @@ export const WorkstationGrid = ({
   showSolvedSlam = false,
   activeWireIds = [],
   activeComponentIds = [],
+  highlightedWireIds = [],
   boardRows,
   boardCols,
   debuggerActive = false,
@@ -200,7 +214,12 @@ export const WorkstationGrid = ({
   debuggerGateBits = {},
   debuggerSequences = {},
   onDebuggerSequenceChange,
-  onInspectComponent,
+  onDebuggerSequenceCommit,
+  onEnterInlineDebugger,
+  onDebuggerStepPrev,
+  onDebuggerStepNext,
+  onOpenFullDebuggerReport,
+  onExitInlineDebugger,
   isEditMode = false,
   viewportClassName,
   disableZoomPersistence = false,
@@ -223,6 +242,7 @@ export const WorkstationGrid = ({
   showSolvedSlam?: boolean;
   activeWireIds?: string[];
   activeComponentIds?: string[];
+  highlightedWireIds?: string[];
   boardRows?: number | null;
   boardCols?: number | null;
   debuggerActive?: boolean;
@@ -233,6 +253,12 @@ export const WorkstationGrid = ({
   debuggerGateBits?: Record<string, string>;
   debuggerSequences?: Record<string, string>;
   onDebuggerSequenceChange?: (inputName: string, sequence: string) => void;
+  onDebuggerSequenceCommit?: (inputName: string, sequence: string) => void;
+  onEnterInlineDebugger?: () => void;
+  onDebuggerStepPrev?: () => void;
+  onDebuggerStepNext?: () => void;
+  onOpenFullDebuggerReport?: () => void;
+  onExitInlineDebugger?: () => void;
   onInspectComponent?: (placedId: string) => void;
   arsenalComponentDisplayModes?: Record<string, 'circuit' | 'description'>;
   isEditMode?: boolean;
@@ -247,6 +273,7 @@ export const WorkstationGrid = ({
   const { visualEffectsEnabled } = useSettings();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const debuggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const panAnimationFrameRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
@@ -306,7 +333,7 @@ export const WorkstationGrid = ({
     y: 0,
     visible: false,
   });
-  const [hoveredWireSignal, setHoveredWireSignal] = useState<{
+  const [, setHoveredWireSignal] = useState<{
     wireId: string;
     x: number;
     y: number;
@@ -321,10 +348,7 @@ export const WorkstationGrid = ({
   const [microSparks, setMicroSparks] = useState<
     Array<{ id: string; x: number; y: number; dx: number; dy: number }>
   >([]);
-  const [clipboard, setClipboard] = useState<{
-    components: PlacedGridComponent[];
-    wires: Wire[];
-  } | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardPayload | null>(null);
   const [bootSequenceActive, setBootSequenceActive] = useState(true);
   const [isWorkingAreaCollapsed, setIsWorkingAreaCollapsed] = useState(false);
 
@@ -334,7 +358,120 @@ export const WorkstationGrid = ({
     clipboard && clipboard.components.length > 0,
   );
 
-  const copySelectionToClipboard = useCallback(() => {
+  const catalogLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+
+    for (const def of Object.values(catalog)) {
+      lookup.set(normalizeClipboardKey(def.id), def.id);
+      lookup.set(normalizeClipboardKey(def.label), def.id);
+    }
+
+    return lookup;
+  }, [catalog]);
+
+  const resolveCatalogComponentId = useCallback(
+    (component: ClipboardComponent): string | null => {
+      const exact = catalog[component.componentId];
+      if (exact) return exact.id;
+
+      const byLabel = catalogLookup.get(
+        normalizeClipboardKey(component.label || component.componentId),
+      );
+      return byLabel ?? null;
+    },
+    [catalog, catalogLookup],
+  );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(
+        WORKSTATION_CLIPBOARD_STORAGE_KEY,
+      );
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as ClipboardPayload;
+      if (
+        parsed &&
+        parsed.version === 1 &&
+        Array.isArray(parsed.components) &&
+        Array.isArray(parsed.wires)
+      ) {
+        setClipboard(parsed);
+      }
+    } catch {
+      // ignore clipboard hydration failures
+    }
+  }, []);
+
+  const persistClipboardPayload = useCallback(
+    async (payload: ClipboardPayload) => {
+      setClipboard(payload);
+
+      try {
+        window.localStorage.setItem(
+          WORKSTATION_CLIPBOARD_STORAGE_KEY,
+          JSON.stringify(payload),
+        );
+      } catch {
+        // ignore storage failures
+      }
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(JSON.stringify(payload));
+        }
+      } catch {
+        // ignore clipboard write failures
+      }
+    },
+    [],
+  );
+
+  const readClipboardPayload =
+    useCallback(async (): Promise<ClipboardPayload | null> => {
+      const parsePayload = (raw: string | null): ClipboardPayload | null => {
+        if (!raw) return null;
+
+        try {
+          const parsed = JSON.parse(raw) as ClipboardPayload;
+          if (
+            parsed &&
+            parsed.version === 1 &&
+            Array.isArray(parsed.components) &&
+            Array.isArray(parsed.wires)
+          ) {
+            return parsed;
+          }
+        } catch {
+          return null;
+        }
+
+        return null;
+      };
+
+      try {
+        const systemText = navigator.clipboard
+          ? await navigator.clipboard.readText()
+          : '';
+        const fromSystem = parsePayload(systemText);
+        if (fromSystem) return fromSystem;
+      } catch {
+        // ignore clipboard read failures
+      }
+
+      const fromState = clipboard;
+      if (fromState) return fromState;
+
+      try {
+        return parsePayload(
+          window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
+        );
+      } catch {
+        return null;
+      }
+    }, [clipboard]);
+
+  const copySelectionToClipboard = useCallback(async () => {
     if (
       selectedEntity.type !== 'component' ||
       selectedEntity.placedIds.length === 0
@@ -350,36 +487,84 @@ export const WorkstationGrid = ({
         selectedIds.has(w.to.componentId),
     );
 
-    setClipboard({ components: selectedComps, wires: internalWires });
-  }, [selectedEntity, placed, wires]);
+    const payload: ClipboardPayload = {
+      version: 1,
+      sourcePuzzleId: puzzleId,
+      components: selectedComps.map((component) => ({
+        ...component,
+        label: catalog[component.componentId]?.label ?? component.componentId,
+      })),
+      wires: internalWires,
+    };
 
-  const pasteFromClipboard = useCallback(() => {
-    if (!clipboard || clipboard.components.length === 0) {
+    await persistClipboardPayload(payload);
+  }, [
+    catalog,
+    persistClipboardPayload,
+    placed,
+    puzzleId,
+    selectedEntity,
+    wires,
+  ]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    const payload = await readClipboardPayload();
+    if (!payload || payload.components.length === 0) {
       return;
     }
 
-    const copiedWithDefs: Array<{
-      comp: PlacedGridComponent;
+    const resolvedComponents: Array<{
+      comp: ClipboardComponent;
+      resolvedComponentId: string;
       def: ComponentDef;
       size: { w: number; h: number };
     }> = [];
+    const missingComponents: string[] = [];
 
-    for (const comp of clipboard.components) {
-      const def = catalog[comp.componentId];
-      if (!def) {
-        notifications.addNotification({
-          type: 'warning',
-          title: 'Cannot paste here',
-          message: 'One or more copied components are unavailable.',
-        });
-        return;
+    for (const comp of payload.components) {
+      const resolvedComponentId = resolveCatalogComponentId(comp);
+      if (!resolvedComponentId) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
       }
-      copiedWithDefs.push({
+
+      const def = catalog[resolvedComponentId];
+      if (!def) {
+        missingComponents.push(comp.label || comp.componentId);
+        continue;
+      }
+
+      resolvedComponents.push({
         comp,
+        resolvedComponentId,
         def,
         size: rotatedSize(def.size, comp.rotation),
       });
     }
+
+    if (!resolvedComponents.length) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Cannot paste here',
+        message: 'No copied components are available in this workspace.',
+      });
+      return;
+    }
+
+    if (missingComponents.length > 0) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Partial paste',
+        message: `Skipped ${missingComponents.length} unavailable component${missingComponents.length === 1 ? '' : 's'}.`,
+      });
+    }
+
+    const copiedWithDefs: Array<{
+      resolvedComponentId: string;
+      comp: PlacedGridComponent;
+      def: ComponentDef;
+      size: { w: number; h: number };
+    }> = resolvedComponents;
 
     const minRow = Math.min(
       ...copiedWithDefs.map(({ comp }) => comp.origin.row),
@@ -518,11 +703,11 @@ export const WorkstationGrid = ({
     const pasteStamp = Date.now();
 
     relativeLayout.forEach((item, idx) => {
-      const newId = `${item.comp.componentId}:${pasteStamp}-${idx}`;
+      const newId = `${item.resolvedComponentId}:${pasteStamp}-${idx}`;
       idMap.set(item.comp.id, newId);
       newComponents.push({
         id: newId,
-        componentId: item.comp.componentId,
+        componentId: item.resolvedComponentId,
         origin: {
           row: chosenAnchor.row + item.rowOffset,
           col: chosenAnchor.col + item.colOffset,
@@ -531,7 +716,7 @@ export const WorkstationGrid = ({
       });
     });
 
-    clipboard.wires.forEach((wire, idx) => {
+    payload.wires.forEach((wire, idx) => {
       const newFromId = idMap.get(wire.from.componentId);
       const newToId = idMap.get(wire.to.componentId);
       if (newFromId && newToId) {
@@ -549,9 +734,7 @@ export const WorkstationGrid = ({
       type: 'component',
       placedIds: Array.from(idMap.values()),
     });
-    setClipboard(null);
   }, [
-    clipboard,
     catalog,
     gridRows,
     gridCols,
@@ -559,6 +742,8 @@ export const WorkstationGrid = ({
     onPlacedChange,
     onWiresChange,
     placed,
+    readClipboardPayload,
+    resolveCatalogComponentId,
     wires,
   ]);
 
@@ -584,12 +769,12 @@ export const WorkstationGrid = ({
 
       if (isCopyKey) {
         e.preventDefault();
-        copySelectionToClipboard();
+        void copySelectionToClipboard();
       }
 
       if (isPasteKey) {
         e.preventDefault();
-        pasteFromClipboard();
+        void pasteFromClipboard();
       }
     };
 
@@ -597,45 +782,52 @@ export const WorkstationGrid = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [copySelectionToClipboard, pasteFromClipboard]);
 
-  // Keyboard deletion (Delete / Backspace)
+  // Keyboard deletion (Delete / Backspace).
+  // We stash the live handler in a ref so the listener attaches once and
+  // always reads current state — avoiding both stale closures and the
+  // re-binding thrash that would come from listing every dep on the effect.
+  const deleteKeyHandlerRef = useRef<(e: KeyboardEvent) => void>();
+  deleteKeyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+    // Don't delete if user is typing in an input field
+    const activeEl = document.activeElement as HTMLElement;
+    if (
+      activeEl &&
+      (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+
+    if (
+      selectedEntity.type === 'component' &&
+      selectedEntity.placedIds.length > 0
+    ) {
+      // Delete all selected components (skip locked ones unless in edit mode)
+      for (const placedId of selectedEntity.placedIds) {
+        const component = placed.find((c) => c.id === placedId);
+        if (component?.isLocked && !isEditMode) {
+          continue;
+        }
+        removeComponent(placedId);
+      }
+    } else if (selectedEntity.type === 'wire') {
+      const wire = wires.find((w) => w.id === selectedEntity.wireId);
+      if (!wire?.isLocked || isEditMode) {
+        removeWire(selectedEntity.wireId);
+      }
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-
-      // Don't delete if user is typing in an input field
-      const activeEl = document.activeElement as HTMLElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
-      ) {
-        return;
-      }
-
-      e.preventDefault();
-
-      if (
-        selectedEntity.type === 'component' &&
-        selectedEntity.placedIds.length > 0
-      ) {
-        // Delete all selected components (skip locked ones unless in edit mode)
-        for (const placedId of selectedEntity.placedIds) {
-          const component = placed.find((c) => c.id === placedId);
-          if (component?.isLocked && !isEditMode) {
-            continue;
-          }
-          removeComponent(placedId);
-        }
-      } else if (selectedEntity.type === 'wire') {
-        const wire = wires.find((w) => w.id === selectedEntity.wireId);
-        if (!wire?.isLocked || isEditMode) {
-          removeWire(selectedEntity.wireId);
-        }
-      }
+      deleteKeyHandlerRef.current?.(e);
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity]);
+  }, []);
 
   const activeWireIdsSet = useMemo(
     () => new Set(activeWireIds),
@@ -1067,7 +1259,14 @@ export const WorkstationGrid = ({
 
       animatePanTo(clampPanToBounds(rawPan, zoom), 360);
     },
-    [animatePanTo, clampPanToBounds, gridCols, inputs.length, outputs.length, zoom],
+    [
+      animatePanTo,
+      clampPanToBounds,
+      gridCols,
+      inputs.length,
+      outputs.length,
+      zoom,
+    ],
   );
 
   const canPlaceComponentAt = (
@@ -1340,9 +1539,10 @@ export const WorkstationGrid = ({
     }
 
     return { inputs: inputsPos, outputs: outputsPos };
-  }, [inputs, outputs, pan.x, pan.y, zoom, gridCols, gridRows]);
+  }, [inputs, outputs, pan.x, pan.y, zoom, gridCols]);
 
-  const onWheel = (e: ReactWheelEvent) => {
+  const wheelHandlerRef = useRef<(e: WheelEvent) => void>();
+  wheelHandlerRef.current = (e: WheelEvent) => {
     e.preventDefault();
     stopPanAnimation();
     const el = containerRef.current;
@@ -1357,8 +1557,8 @@ export const WorkstationGrid = ({
     const nextZoom = clamp(zoom * factor, minZoom, 4);
 
     // keep cursor world point stable
-    let afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
-    let afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
+    const afterPanX = cursor.x - before.col * CELL_PX * nextZoom;
+    const afterPanY = cursor.y - before.row * CELL_PX * nextZoom;
 
     const clampedPan = clampPanToBounds(
       { x: afterPanX, y: afterPanY },
@@ -1368,6 +1568,14 @@ export const WorkstationGrid = ({
     setZoom(nextZoom);
     setPan(clampedPan);
   };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => wheelHandlerRef.current?.(e);
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
 
   const onPointerDownBackground = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -1793,9 +2001,9 @@ export const WorkstationGrid = ({
     );
   };
 
-  // Calculate highlighted wire IDs based on selected component
+  // Calculate highlighted wire IDs based on selected component or passed prop
   // Note: Wire highlighting is disabled for puzzle INPUT nodes
-  const highlightedWireIds = useMemo(() => {
+  const computedHighlightedWireIds = useMemo(() => {
     const highlighted = new Set<string>();
 
     if (selectedEntity.type === 'component') {
@@ -1826,30 +2034,88 @@ export const WorkstationGrid = ({
     return highlighted;
   }, [selectedEntity, wires]);
 
+  // Use the passed highlightedWireIds prop if provided (for cross-highlighting from debugger),
+  // otherwise use the computed highlighting based on selected component
+  const resolvedHighlightedWireIds = useMemo(() => {
+    if (highlightedWireIds && highlightedWireIds.length > 0) {
+      return new Set(highlightedWireIds);
+    }
+    return computedHighlightedWireIds;
+  }, [highlightedWireIds, computedHighlightedWireIds]);
+
   return (
-    <div className="flex flex-1 flex-col gap-2 min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="rounded-md border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-medium text-foreground">Working Area</div>
-          <button
-            type="button"
-            className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
-            aria-expanded={!isWorkingAreaCollapsed}
-            aria-label={
-              isWorkingAreaCollapsed
-                ? 'Expand Working Area info'
-                : 'Collapse Working Area info'
-            }
-            title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <ChevronRight
-              className={cn(
-                'size-4 transition-transform duration-200',
-                !isWorkingAreaCollapsed && 'rotate-90',
-              )}
-            />
-          </button>
+          <div className="text-sm font-medium text-foreground">
+            Working Area
+          </div>
+          <div className="flex items-center gap-2">
+            {onEnterInlineDebugger || onExitInlineDebugger ? (
+              !debuggerActive ? (
+                <Button
+                  ref={debuggerButtonRef}
+                  size="sm"
+                  variant="outline"
+                  className="relative overflow-hidden"
+                  onClick={onEnterInlineDebugger}
+                >
+                  <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                  Debugger
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepPrev}
+                  >
+                    ◄ Previous Step
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepNext}
+                  >
+                    Next Step ►
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenFullDebuggerReport}
+                  >
+                    Full Debugger Report
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onExitInlineDebugger}
+                  >
+                    Exit Debugger
+                  </Button>
+                </>
+              )
+            ) : null}
+            <button
+              type="button"
+              className="-mr-1 inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsWorkingAreaCollapsed((prev) => !prev)}
+              aria-expanded={!isWorkingAreaCollapsed}
+              aria-label={
+                isWorkingAreaCollapsed
+                  ? 'Expand Working Area info'
+                  : 'Collapse Working Area info'
+              }
+              title={isWorkingAreaCollapsed ? 'Expand' : 'Collapse'}
+            >
+              <ChevronRight
+                className={cn(
+                  'size-4 transition-transform duration-200',
+                  !isWorkingAreaCollapsed && 'rotate-90',
+                )}
+              />
+            </button>
+          </div>
         </div>
         {!isWorkingAreaCollapsed ? (
           <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
@@ -1877,7 +2143,6 @@ export const WorkstationGrid = ({
             'workstation-board-failure border-red-400',
           viewportClassName,
         )}
-        onWheel={onWheel}
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMoveBackground}
         onPointerUp={onPointerUpBackground}
@@ -1950,7 +2215,7 @@ export const WorkstationGrid = ({
 
         {showSolvedSlam && (
           <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
-            <div className="rounded-xl border border-emerald-300/70 bg-white/90 px-6 py-3 text-4xl font-extrabold tracking-[0.12em] text-emerald-600 shadow-2xl shadow-emerald-500/30 animate-in fade-in zoom-in-50 duration-300 workstation-solved-slam">
+            <div className="workstation-solved-slam rounded-xl border border-emerald-300/70 bg-white/90 px-6 py-3 text-4xl font-extrabold tracking-[0.12em] text-emerald-600 shadow-2xl shadow-emerald-500/30 duration-300 animate-in fade-in zoom-in-50">
               SOLVED!
             </div>
           </div>
@@ -1979,7 +2244,7 @@ export const WorkstationGrid = ({
 
         {/* Copy, Paste, Trash - Top Flush, Centered Horizontally */}
         <div
-          className="absolute left-1/2 top-3 z-30 -translate-x-1/2 flex flex-col items-center gap-3"
+          className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-3"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-2">
@@ -2068,6 +2333,30 @@ export const WorkstationGrid = ({
                 <path d="M6 6l1 16h10l1-16" />
               </svg>
             </button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="size-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.min(z * 1.15, 3));
+              }}
+              title="Zoom in (Scroll up)"
+            >
+              <ZoomIn className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="size-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.max(z / 1.15, minZoom));
+              }}
+              title="Zoom out (Scroll down)"
+            >
+              <ZoomOut className="size-4" />
+            </Button>
           </div>
         </div>
 
@@ -2111,7 +2400,7 @@ export const WorkstationGrid = ({
             const isRecentlyConnected = recentlyConnectedWireId === w.id;
             const isHighSignal = activeWireIdsSet.has(w.id);
             const isDeleteWarn = hoveredDeleteWireId === w.id;
-            const isHighlighted = highlightedWireIds.has(w.id);
+            const isHighlighted = resolvedHighlightedWireIds.has(w.id);
             const wirePath = getCurvedWirePath(a, b);
             const isSurgePowered =
               isPowerSurge && (activeWireIdsSet.size === 0 || isHighSignal);
@@ -2153,13 +2442,13 @@ export const WorkstationGrid = ({
                   stroke={strokeColor}
                   strokeWidth={
                     isPowerSurge
-                      ? 4.2
+                      ? 5.5
                       : isSelected
-                        ? 3
+                        ? 4
                         : isHighlighted
-                          ? 4
+                          ? 5
                           : isRecentlyConnected
-                            ? 4
+                            ? 5
                             : 2
                   }
                   strokeDasharray={isWireLocked ? '6,3' : undefined}
@@ -2207,12 +2496,12 @@ export const WorkstationGrid = ({
                   stroke={flowColor}
                   strokeWidth={
                     isPowerSurge
-                      ? 3.2
+                      ? 4.2
                       : isHighlighted
-                        ? 3
+                        ? 4
                         : isHighSignal
-                          ? 2.4
-                          : 1.4
+                          ? 3
+                          : 2
                   }
                   strokeDasharray={
                     isHighlighted ? '5 5' : isHighSignal ? '9 7' : '7 9'
@@ -2262,7 +2551,7 @@ export const WorkstationGrid = ({
                 )}
                 fill="none"
                 stroke="#bfdbfe"
-                strokeWidth={1.4}
+                strokeWidth={2}
                 strokeDasharray="8 6"
                 className="workstation-wire-flow-fast"
                 style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
@@ -2284,7 +2573,7 @@ export const WorkstationGrid = ({
                 d={getCurvedWirePath(wireSnapBack.from, wireSnapBack.current)}
                 fill="none"
                 stroke="#bfdbfe"
-                strokeWidth={1.4}
+                strokeWidth={2}
                 strokeDasharray="8 6"
                 className="workstation-wire-flow-fast workstation-wire-snapback"
                 style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.7))' }}
@@ -2296,7 +2585,7 @@ export const WorkstationGrid = ({
         {microSparks.map((spark) => (
           <div
             key={spark.id}
-            className="pointer-events-none absolute z-30 size-1 rounded-full bg-yellow-400 workstation-micro-spark"
+            className="workstation-micro-spark pointer-events-none absolute z-30 size-1 rounded-full bg-yellow-400"
             style={{
               left: spark.x,
               top: spark.y,
@@ -2352,7 +2641,8 @@ export const WorkstationGrid = ({
                             ? 'size-3 bg-blue-400'
                             : occ
                               ? 'size-3 bg-muted-foreground/50'
-                              : (emptyHoleClassName ?? 'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50'),
+                              : (emptyHoleClassName ??
+                                'size-1 bg-muted-foreground/30 hover:bg-muted-foreground/50'),
                         )}
                         onPointerDown={(e) => {
                           e.stopPropagation();
@@ -2487,13 +2777,6 @@ export const WorkstationGrid = ({
 
                   const el = containerRef.current;
                   if (!el) return;
-                  const rect = el.getBoundingClientRect();
-                  const cursor = {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                  };
-                  const worldPos = screenToWorld(cursor);
-
                   // Group dragging: if clicked component is in selection, drag all selected
                   const placedIdsToMove =
                     selectedEntity.type === 'component' &&
@@ -2616,7 +2899,7 @@ export const WorkstationGrid = ({
               >
                 {/* Selected Action Buttons: Delete (Outside) */}
                 {isSelected && !isDragging && (
-                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1">
+                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
                       <button
@@ -2652,13 +2935,17 @@ export const WorkstationGrid = ({
                         </svg>
                       </button>
                     )}
+                    {/* Component Name Label */}
+                    <span className="ml-1 whitespace-nowrap rounded bg-card/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-border">
+                      {def.label}
+                    </span>
                   </div>
                 )}
 
                 {/* Lock indicator for locked components */}
                 {p.isLocked && (
                   <div
-                    className="lock-indicator absolute -top-3 left-1/2 z-40 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                    className="lock-indicator absolute -top-3 left-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
                     style={{
                       width: '24px',
                       height: '24px',
@@ -2781,7 +3068,7 @@ export const WorkstationGrid = ({
                         previewVisualPortOffsets.get(port.id) ?? port.offset,
                     })),
                   }}
-                  className="absolute z-40 opacity-50 ring-2 ring-blue-500 pointer-events-none"
+                  className="pointer-events-none absolute z-40 opacity-50 ring-2 ring-blue-500"
                   style={{
                     left: dropPreview.col * 18,
                     top: dropPreview.row * 18,
@@ -2801,6 +3088,7 @@ export const WorkstationGrid = ({
             if (!pt) return null;
             const inputBit = debuggerInputBits[label] ?? '0';
             const sequenceValue = debuggerSequences[label] ?? '';
+            const sequenceBits = sequenceValue.split('');
             return (
               <div key={id}>
                 {debuggerActive ? (
@@ -2827,9 +3115,49 @@ export const WorkstationGrid = ({
                           e.target.value.replace(/[^01]/g, ''),
                         )
                       }
+                      onBlur={(e) =>
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          e.target.value.replace(/[^01]/g, ''),
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        const target = e.currentTarget;
+                        onDebuggerSequenceCommit?.(
+                          label,
+                          target.value.replace(/[^01]/g, ''),
+                        );
+                        target.blur();
+                      }}
                       className="h-5 w-20 rounded border border-green-300 bg-white px-1 text-[10px] text-green-700"
                       title="Input bit sequence"
                     />
+                  </div>
+                ) : null}
+                {debuggerActive && sequenceBits.length > 0 ? (
+                  <div
+                    className="pointer-events-none absolute z-30 flex max-w-[90px] flex-wrap items-center gap-[2px]"
+                    style={{
+                      left: pt.x,
+                      top: pt.y,
+                      transform: 'translate(-102%, -105%)',
+                    }}
+                    title={`Step ${debuggerStepIndex + 1} highlighted in sequence`}
+                  >
+                    {sequenceBits.map((bit, bitIndex) => (
+                      <span
+                        key={`${id}-seq-${bitIndex}`}
+                        className={cn(
+                          'inline-flex h-3 w-3 items-center justify-center rounded border text-[9px] font-bold leading-none',
+                          bitIndex === debuggerStepIndex
+                            ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                            : 'border-green-200 bg-white/95 text-green-700',
+                        )}
+                      >
+                        {bit}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
                 <button

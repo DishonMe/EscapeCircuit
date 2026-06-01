@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
 import {
   Trash2,
   MessageSquare,
@@ -11,17 +9,9 @@ import {
   Plus,
   Upload,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useState, type ReactNode } from 'react';
 
-import { useUser } from '@/lib/auth';
-import { useMyPuzzles } from '@/features/puzzles/api/get-my-puzzles';
-import { useDeletePuzzle } from '@/features/puzzles/api/delete-puzzle';
-import {
-  usePublishPuzzle,
-  useUnpublishPuzzle,
-} from '@/features/puzzles/api/publish-puzzle';
-import { useUpdatePuzzle } from '@/features/puzzles/api/update-puzzle';
-import { Spinner } from '@/components/ui/spinner';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -30,8 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
+import { useDeletePuzzle } from '@/features/puzzles/api/delete-puzzle';
+import { useMyPuzzles } from '@/features/puzzles/api/get-my-puzzles';
+import {
+  usePublishPuzzle,
+  useUnpublishPuzzle,
+} from '@/features/puzzles/api/publish-puzzle';
+import { useUpdatePuzzle } from '@/features/puzzles/api/update-puzzle';
+import { useUser } from '@/lib/auth';
 import type { Puzzle } from '@/types/api';
+
 import { PuzzleViewDialog } from './puzzle-view-dialog';
 
 type MyPuzzlesProps = {
@@ -40,14 +40,12 @@ type MyPuzzlesProps = {
 
 export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
   const user = useUser();
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [showPublished, setShowPublished] = useState(true);
   const [commentingPuzzle, setCommentingPuzzle] = useState<Puzzle | null>(null);
   const [creatorComment, setCreatorComment] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [viewingPuzzle, setViewingPuzzle] = useState<Puzzle | null>(null);
-
-  const userId = user.data?.id;
 
   // Fetch all puzzles (both published and unpublished) for the user
   const puzzlesQuery = useMyPuzzles({
@@ -62,7 +60,6 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
   const updateMutation = useUpdatePuzzle();
 
   const allPuzzles = puzzlesQuery.data?.data || [];
-  const meta = puzzlesQuery.data?.meta;
   const isLoading = puzzlesQuery.isLoading;
   const isAdmin = String(user.data?.role || '').toLowerCase() === 'admin';
   const effectiveMaxPublished = Number(user.data?.effective_max_published ?? 5);
@@ -225,7 +222,7 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
         </div>
 
         {/* Create Puzzle Buttons */}
-        <div className="mb-6 flex flex-wrap gap-3 tour-my-puzzles-create">
+        <div className="tour-my-puzzles-create mb-6 flex flex-wrap gap-3">
           <Link
             href={paths.app.createPuzzle.getHref()}
             onClick={handleCreatePuzzleClick}
@@ -246,15 +243,15 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
         </div>
 
         {/* Published/Unpublished Toggle */}
-        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-4 tour-my-puzzles-tabs">
+        <div className="tour-my-puzzles-tabs mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="radio"
                 name="puzzle_status"
                 checked={showPublished}
                 onChange={() => setShowPublished(true)}
-                className="w-4 h-4"
+                className="size-4"
               />
               <span className="text-[13px] font-medium text-foreground">
                 Published Puzzles
@@ -262,13 +259,13 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
             </label>
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="radio"
                 name="puzzle_status"
                 checked={!showPublished}
                 onChange={() => setShowPublished(false)}
-                className="w-4 h-4"
+                className="size-4"
               />
               <span className="text-[13px] font-medium text-foreground">
                 Unpublished Puzzles
@@ -295,7 +292,7 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
             <Link
               href={paths.app.createPuzzle.getHref()}
               onClick={handleCreatePuzzleClick}
-              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
             >
               Create Your First Puzzle
             </Link>
@@ -364,13 +361,13 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
 
                   {/* Description */}
                   {puzzle.description && (
-                    <p className="mb-4 text-[13px] text-muted-foreground line-clamp-2">
+                    <p className="mb-4 line-clamp-2 text-[13px] text-muted-foreground">
                       {puzzle.description}
                     </p>
                   )}
 
                   {/* Quick Stats */}
-                  <div className="mb-4 rounded-lg bg-secondary/50 p-3 text-[11px] text-muted-foreground space-y-1 mt-auto">
+                  <div className="mb-4 mt-auto space-y-1 rounded-lg bg-secondary/50 p-3 text-[11px] text-muted-foreground">
                     {puzzle.rating_metrics &&
                       puzzle.rating_metrics.count > 0 && (
                         <>
@@ -403,7 +400,7 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2 tour-my-puzzles-actions">
+                  <div className="tour-my-puzzles-actions grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setViewingPuzzle(puzzle)}
                       className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 text-[13px] font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 hover:shadow-md"
@@ -433,11 +430,11 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
                         disabled={publishMutation.isPending}
                         className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-600/80 bg-emerald-600 px-3 text-[13px] font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md disabled:opacity-50"
                       >
-                          {publishMutation.isPending
-                            ? 'Publishing...'
-                            : 'Publish'}
-                        </button>
-                      )}
+                        {publishMutation.isPending
+                          ? 'Publishing...'
+                          : 'Publish'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setDeleteConfirmId(String(puzzle.id))}
                       className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-red-200/70 bg-red-50/60 px-3 text-[13px] font-semibold text-red-700 transition-colors hover:border-red-300 hover:bg-red-100/70 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
@@ -470,34 +467,34 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
-                  <label className="text-[13px] font-medium text-slate-900 dark:text-slate-100">
+                <label className="block">
+                  <span className="text-[13px] font-medium text-slate-900 dark:text-slate-100">
                     Your Comment
-                  </label>
+                  </span>
                   <textarea
                     value={creatorComment}
                     onChange={(e) => setCreatorComment(e.target.value)}
-                    className="w-full rounded border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     placeholder="Enter a message for people solving this puzzle..."
                     rows={4}
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     • Only one comment allowed per puzzle • Use this to note
                     corrections or provide important clarifications
                   </p>
-                </div>
+                </label>
               </div>
               <DialogFooter>
                 <button
                   onClick={() => setCommentingPuzzle(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground bg-transparent hover:bg-secondary transition-colors"
+                  className="rounded-lg border border-border bg-transparent px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary"
                 >
                   Cancel
                 </button>
                 {commentingPuzzle?.creatorComment && (
                   <button
                     onClick={handleDeleteComment}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background hover:bg-red-700 transition-colors disabled:opacity-50"
+                    className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-red-700 disabled:opacity-50"
                     disabled={updateMutation.isPending}
                   >
                     {updateMutation.isPending ? 'Deleting...' : 'Delete'}
@@ -506,7 +503,7 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
                 <button
                   onClick={handleSaveComment}
                   disabled={updateMutation.isPending}
-                  className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
+                  className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
                 >
                   {updateMutation.isPending ? 'Saving...' : 'Save'}
                 </button>
@@ -534,14 +531,14 @@ export const MyPuzzles = ({ tutorialSlot }: MyPuzzlesProps = {}) => {
               <DialogFooter>
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="rounded-lg border border-border px-4 py-2 text[13px] font-medium text-foreground hover:bg-secondary transition-colors"
+                  className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(deleteConfirmId)}
                   disabled={deleteMutation.isPending}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-red-700 disabled:opacity-50"
                 >
                   {deleteMutation.isPending ? 'Deleting...' : 'Delete Puzzle'}
                 </button>

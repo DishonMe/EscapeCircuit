@@ -4,11 +4,7 @@ import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
 import { Puzzle } from '@/types/api';
 
-export const getPuzzle = ({
-  id,
-}: {
-  id: string;
-}): Promise<Puzzle> => {
+export const getPuzzle = ({ id }: { id: string }): Promise<Puzzle> => {
   return api.get(`/puzzles/${id}`);
 };
 

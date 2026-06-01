@@ -21,7 +21,9 @@ const MEDAL_BONUS = {
  * Determine difficulty tier from average difficulty rating
  * Matches backend: tier_from_avg_difficulty
  */
-export function getDifficultyTier(avgDifficulty: number): 'EASY' | 'MEDIUM' | 'HARD' {
+export function getDifficultyTier(
+  avgDifficulty: number,
+): 'EASY' | 'MEDIUM' | 'HARD' {
   const d = typeof avgDifficulty === 'number' ? avgDifficulty : 0;
   if (d >= 7.0) {
     return 'HARD';

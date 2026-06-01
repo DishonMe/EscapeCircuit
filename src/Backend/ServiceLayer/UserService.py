@@ -230,6 +230,35 @@ class UserService:
             }
             for row in created_rows
         ]
+
+        # Get puzzles the user has solved (from puzzle_progress table)
+        solved_puzzle_rows = conn.execute(
+            """
+            SELECT DISTINCT pp.puzzle_id, p.id, p.name
+            FROM puzzle_progress pp
+            JOIN puzzles p ON p.id = pp.puzzle_id
+            WHERE pp.user_id = ? AND pp.best_medal > 0
+            ORDER BY p.id
+            """,
+            (int(user_id),),
+        ).fetchall()
+        d["solved_puzzles"] = [
+            {
+                "puzzle_id": int(row["puzzle_id"]),
+                "id": str(row["id"]),
+                "name": row["name"],
+            }
+            for row in solved_puzzle_rows
+        ]
+
+        # Get total count of published puzzles in the database
+        total_puzzles_row = conn.execute(
+            """
+            SELECT COUNT(*) AS total FROM puzzles WHERE status = 'published'
+            """
+        ).fetchone()
+        d["total_puzzles"] = int(total_puzzles_row["total"]) if total_puzzles_row else 0
+
         return d
 
     def complete_tutorial(self, session_token: str, tutorial_name: str) -> dict:

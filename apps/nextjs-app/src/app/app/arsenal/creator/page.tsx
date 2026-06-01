@@ -666,7 +666,6 @@ export default function ArsenalCreatorPage() {
             onPlacedChange={handlePlacedChange}
             onWiresChange={setWires}
             draggedPaletteComponentId={draggedPaletteComponentId}
-            viewportClassName="h-full"
             emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
           />
         </div>

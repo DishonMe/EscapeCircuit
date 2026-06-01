@@ -17,9 +17,17 @@ export function getLevelInfo(xp: number) {
 
   const xpIntoLevel = safeXp - currentThreshold;
   const xpForLevel = nextThreshold - currentThreshold;
-  const pct = xpForLevel > 0 ? Math.min(100, (xpIntoLevel / xpForLevel) * 100) : 100;
+  const pct =
+    xpForLevel > 0 ? Math.min(100, (xpIntoLevel / xpForLevel) * 100) : 100;
 
-  return { level, currentThreshold, nextThreshold, xpIntoLevel, xpForLevel, pct };
+  return {
+    level,
+    currentThreshold,
+    nextThreshold,
+    xpIntoLevel,
+    xpForLevel,
+    pct,
+  };
 }
 
 export const XPBar = ({ currentXP }: { currentXP: number }) => {
