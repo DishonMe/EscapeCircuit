@@ -144,11 +144,17 @@ class TestMeMedalAggregation:
         arsenal_row = {"count": 7}
         saved_rows = [{"id": 10, "name": "S", "status": "published", "created_at": "t"}]
         created_rows = [{"id": 20, "name": "C", "status": "draft", "created_at": "t"}]
+        solved_rows = [{"puzzle_id": 30, "id": 30, "name": "Solved"}]
 
-        # The me() function calls .execute(...).fetchall() / .fetchone() in sequence
-        def execute_side_effect(sql, params):
+        # The me() function calls .execute(...).fetchall() / .fetchone() in sequence.
+        # NOTE: both the medal-aggregation query and the solved-puzzles query
+        # reference puzzle_progress, so the solved-puzzles query (which uses
+        # "DISTINCT pp.puzzle_id") must be matched first.
+        def execute_side_effect(sql, params=None):
             cursor = Mock()
-            if "puzzle_progress" in sql:
+            if "DISTINCT pp.puzzle_id" in sql:
+                cursor.fetchall.return_value = solved_rows
+            elif "puzzle_progress" in sql:
                 cursor.fetchall.return_value = medal_rows
             elif "circuits" in sql:
                 cursor.fetchone.return_value = arsenal_row
@@ -156,6 +162,8 @@ class TestMeMedalAggregation:
                 cursor.fetchall.return_value = saved_rows
             elif "creator_user_id" in sql:
                 cursor.fetchall.return_value = created_rows
+            elif "AS total" in sql:
+                cursor.fetchone.return_value = {"total": 12}
             return cursor
 
         repo.conn.execute.side_effect = execute_side_effect
@@ -167,6 +175,7 @@ class TestMeMedalAggregation:
         assert result["arsenal_count"] == 7
         assert len(result["saved_puzzles"]) == 1
         assert len(result["created_puzzles"]) == 1
+        assert len(result["solved_puzzles"]) == 1
 
 
 # ---------------------------------------------------------------------------

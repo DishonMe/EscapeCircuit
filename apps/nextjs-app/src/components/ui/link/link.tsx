@@ -35,7 +35,11 @@ export const Link = ({ className, children, href, ...props }: LinkProps) => {
         : `${href.pathname ?? ''}${href.search ?? ''}${href.hash ?? ''}`;
 
     if (!hrefAsString || hrefAsString.startsWith('#')) return;
-    if (hrefAsString.startsWith('http://') || hrefAsString.startsWith('https://')) return;
+    if (
+      hrefAsString.startsWith('http://') ||
+      hrefAsString.startsWith('https://')
+    )
+      return;
 
     startNavigation(hrefAsString);
   };

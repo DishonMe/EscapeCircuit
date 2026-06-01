@@ -1,15 +1,28 @@
 'use client';
 
-import { Bell, Check, Flower2, Folder, Gamepad2, Home, MessageSquare, Moon, PanelLeft, Shield, Sun, User2, Users, Zap } from 'lucide-react';
+import {
+  Bell,
+  Check,
+  Flower2,
+  Folder,
+  Gamepad2,
+  MessageSquare,
+  Moon,
+  PanelLeft,
+  Shield,
+  Sun,
+  User2,
+  Zap,
+} from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
-import { Button } from '@/components/ui/button';
-import { ColabPets } from '@/components/ui/colab-pets/ColabPets';
 import { AvatarDisplay } from '@/components/ui/avatar-display';
+import { Button } from '@/components/ui/button';
+import { ColabPets } from '@/components/ui/colab-pets/colab-pets';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import {
   DropdownMenu,
@@ -23,9 +36,9 @@ import { SettingsMenu } from '@/components/ui/settings-menu';
 import { XPBar } from '@/components/ui/xp-bar';
 import { paths } from '@/config/paths';
 import { useSettings } from '@/context/settings-context';
+import { CreatorInviteBanner } from '@/features/admin/components/creator-invite-banner';
 import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
-import { CreatorInviteBanner } from '@/features/admin/components/creator-invite-banner';
 
 type SideNavigationItem = {
   name: string;
@@ -42,11 +55,8 @@ const DASHBOARD_AVATAR_STORAGE_KEY = 'escape-circuit:last-avatar';
 
 const Logo = () => {
   return (
-    <Link
-      className="flex items-center gap-1.5"
-      href={paths.home.getHref()}
-    >
-      <img src="/logo.svg" alt="EscapeCircuit" className="h-7 w-7 shrink-0" />
+    <Link className="flex items-center gap-1.5" href={paths.home.getHref()}>
+      <img src="/logo.svg" alt="EscapeCircuit" className="size-7 shrink-0" />
       <span className="text-[15px] font-semibold tracking-tight text-foreground">
         EscapeCircuit
       </span>
@@ -94,11 +104,7 @@ const ThemeToggle = () => {
       aria-label="Toggle dark mode"
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {isDark ? (
-        <Moon className="size-4" />
-      ) : (
-        <Sun className="size-4" />
-      )}
+      {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
     </Button>
   );
 };
@@ -322,7 +328,9 @@ const PaletteThemePicker = () => {
     );
   }
 
-  const currentPaletteLabel = activePalette ? PALETTE_META[activePalette].label : 'Default';
+  const currentPaletteLabel = activePalette
+    ? PALETTE_META[activePalette].label
+    : 'Default';
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -342,8 +350,12 @@ const PaletteThemePicker = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 p-3">
         <div className="mb-2">
-          <p className="text-[13px] font-semibold text-foreground">Color Themes</p>
-          <p className="text-[11px] text-muted-foreground">Pick a cohesive palette</p>
+          <p className="text-[13px] font-semibold text-foreground">
+            Color Themes
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Pick a cohesive palette
+          </p>
         </div>
 
         <button
@@ -381,7 +393,7 @@ const PaletteThemePicker = () => {
               >
                 <span className="sr-only">{meta.label}</span>
                 {isActive && (
-                  <span className="absolute inset-0 grid place-items-center rounded-md bg-black/12">
+                  <span className="absolute inset-0 grid place-items-center rounded-md bg-black/10">
                     <Check className="size-4 text-white drop-shadow-sm" />
                   </span>
                 )}
@@ -466,8 +478,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user.data?.avatar_name, user.data?.avatar_color]);
 
-  const headerAvatarName =
-    user.data?.avatar_name ?? storedAvatar?.avatarName;
+  const headerAvatarName = user.data?.avatar_name ?? storedAvatar?.avatarName;
   const headerAvatarColor =
     user.data?.avatar_color ?? storedAvatar?.avatarColor;
 
@@ -475,10 +486,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     <div className="flex min-h-screen w-full flex-col bg-background">
       {colabPetsEnabled && <ColabPets topOffsetPx={56} stripHeightPx={76} />}
 
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-card/80 backdrop-blur-sm px-5">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-card/80 px-5 backdrop-blur-sm">
         <div className="flex items-center gap-8">
           <Logo />
-          <nav className="hidden sm:flex items-center gap-0.5">
+          <nav className="hidden items-center gap-0.5 sm:flex">
             {navigation.map((item) => {
               const isActive = pathname === item.to;
               return (
@@ -509,7 +520,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <ThemeToggle />
           <PaletteThemePicker />
           <SettingsMenu />
-          <div className="hidden md:flex items-center gap-2 text-[13px]">
+          <div className="hidden items-center gap-2 text-[13px] md:flex">
             {isHydrated && headerAvatarName && headerAvatarColor ? (
               <AvatarDisplay
                 avatarName={headerAvatarName}
@@ -517,11 +528,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 size="sm"
               />
             ) : (
-              <div className="h-8 w-8 rounded-full bg-secondary" aria-hidden="true" />
+              <div
+                className="size-8 rounded-full bg-secondary"
+                aria-hidden="true"
+              />
             )}
-            <span className="font-medium text-foreground">{user.data?.username}</span>
+            <span className="font-medium text-foreground">
+              {user.data?.username}
+            </span>
             <span className="text-border">|</span>
-            <span className="text-muted-foreground capitalize">{user.data?.role}</span>
+            <span className="capitalize text-muted-foreground">
+              {user.data?.role}
+            </span>
             {isExperienced && (
               <>
                 <span className="text-border">|</span>
@@ -533,7 +551,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </div>
           <Drawer>
             <DrawerTrigger asChild>
-              <Button size="icon" variant="ghost" className="sm:hidden size-8">
+              <Button size="icon" variant="ghost" className="size-8 sm:hidden">
                 <PanelLeft className="size-4" />
                 <span className="sr-only">Toggle Menu</span>
               </Button>
@@ -543,7 +561,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               className="bg-card pt-10 text-foreground sm:max-w-60"
             >
               <nav className="grid gap-1 px-3 text-sm font-medium">
-                <div className="flex h-12 shrink-0 items-center px-2 mb-4">
+                <div className="mb-4 flex h-12 shrink-0 items-center px-2">
                   <Logo />
                 </div>
                 {navigation.map((item) => {
@@ -586,13 +604,17 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => router.push(paths.app.profile.getHref())}
-                className={cn('block px-3 py-1.5 text-[13px] text-foreground cursor-pointer')}
+                className={cn(
+                  'block px-3 py-1.5 text-[13px] text-foreground cursor-pointer',
+                )}
               >
                 Your Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className={cn('block px-3 py-1.5 text-[13px] text-foreground w-full cursor-pointer')}
+                className={cn(
+                  'block px-3 py-1.5 text-[13px] text-foreground w-full cursor-pointer',
+                )}
                 onClick={() => logout.mutate()}
               >
                 Sign Out
@@ -601,10 +623,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </DropdownMenu>
         </div>
       </header>
-      <main className="flex-1 px-5 py-5 md:px-8 md:py-6">
-          <CreatorInviteBanner />
-          {children}
-        </main>
+      <main className="flex-1 p-5 md:px-8 md:py-6">
+        <CreatorInviteBanner />
+        {children}
+      </main>
     </div>
   );
 };

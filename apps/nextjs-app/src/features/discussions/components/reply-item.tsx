@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { CheckCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
+import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/dialog';
 import { MDPreview } from '@/components/ui/md-preview';
@@ -10,13 +11,13 @@ import { useNotifications } from '@/components/ui/notifications';
 import { useUser } from '@/lib/auth';
 import { Reply } from '@/types/api';
 import { cn } from '@/utils/cn';
-import { AvatarDisplay } from '@/components/ui/avatar-display';
 
 import { useAcceptReply } from '../api/accept-reply';
 import { useDeleteReply } from '../api/delete-reply';
 import { useReactToReply } from '../api/react-reply';
 import { useReportReply } from '../api/report-reply';
 import { useVoteReply } from '../api/vote-reply';
+
 import { ReactionPicker } from './reaction-picker';
 import { ReplyComposer } from './reply-composer';
 import { ReportDialog } from './report-dialog';
@@ -181,7 +182,9 @@ export const ReplyItem = ({
                 size="sm"
                 className={cn(
                   'h-7 text-[11px]',
-                  reply.is_accepted ? 'text-emerald-600' : 'text-muted-foreground',
+                  reply.is_accepted
+                    ? 'text-emerald-600'
+                    : 'text-muted-foreground',
                 )}
                 onClick={() => acceptMutation.mutate({ replyId: reply.id })}
                 isLoading={acceptMutation.isPending}
@@ -210,9 +213,7 @@ export const ReplyItem = ({
                   <Button
                     variant="destructive"
                     isLoading={deleteMutation.isPending}
-                    onClick={() =>
-                      deleteMutation.mutate({ replyId: reply.id })
-                    }
+                    onClick={() => deleteMutation.mutate({ replyId: reply.id })}
                   >
                     Delete
                   </Button>

@@ -1,0 +1,62 @@
+================================================================================
+ESCAPECIRCUIT — TEST PLAN ↔ ADD MAP
+================================================================================
+Where the tests promised by the Application Design Document (ADD) live, what
+was added, and the few places the ADD text must be corrected to match the code.
+
+
+RUN EVERYTHING
+--------------------------------------------------------------------------------
+  One command (backend + frontend + coverage + designed summary):
+      macOS / Linux:   ./run_tests.sh        (or:  ./run_tests.sh backend | frontend)
+      Windows:         run_tests.bat         (or:  run_tests.bat backend | frontend)
+
+  Or individually:
+      Backend  (2666 tests):   cd src && python -m pytest
+      Frontend (26 tests):     cd apps/nextjs-app && yarn test
+      Frontend checks:         cd apps/nextjs-app && yarn check-types && yarn lint
+
+  Status: backend 2666 passed (81% cov) · frontend 26 passed · lint clean · build OK.
+
+
+A. ACCEPTANCE TESTS  (one test per ADD use-case table row)
+--------------------------------------------------------------------------------
+  File:  src/tests/AcceptanceTests/test_acceptance_use_cases.py   (51 tests)
+  Run :  cd src && python -m pytest tests/AcceptanceTests
+
+  One class per Use Case; one method per ADD "Test Name"; every header lists
+  "What each test checks". Covers UC1–UC14 (UC13 Discussions + UC14
+  Notifications are NEW — the old SystemTests file only had UC1–UC12).
+
+    UC1  Browse & Search        UC8   Solution Validation
+    UC2  Solve a Puzzle         UC9   Appoint Creator
+    UC3  Save & Reuse Circuits  UC10  Profile & Progress
+    UC4  Create & Publish       UC11  Sandbox
+    UC5  Rate a Puzzle          UC12  Manage Arsenal
+    UC6  Rewards & Level Up     UC13  Discussions        (new)
+    UC7  Manage Puzzles         UC14  Notifications      (new)
+
+
+B. UNIT TESTS PROMISED IN ADD CH.7.2  (gaps filled)
+--------------------------------------------------------------------------------
+  NEW:
+    src/tests/PersistantLayerTests/test_solve_repo_leaderboard.py  (4)  leaderboard by time/cost, passed filter
+    src/tests/ServiceLayerTests/test_rating_weighting.py           (5)  _weighted_avg, _exp_weight, distribution
+    src/tests/test_settings_constants.py                          (13)  pins every constant the ADD cites
+
+  ALREADY COVERED:
+    Circuit cost ............ DomainUnitTests/test_circuit.py
+    Puzzle budget ........... DomainUnitTests/test_puzzle.py
+    XP / medals / level ..... ServiceLayerTests/test_xp_service.py
+    Rating rules ............ ServiceLayerTests/test_rating_service.py, DomainUnitTests/test_rating.py
+
+  Constants live in src/Backend/settings.py.  Coverage:  python -m pytest --cov=Backend
+
+
+C. FRONTEND TEST SETUP (was missing; now works)
+--------------------------------------------------------------------------------
+  Added vitest.config.ts + "test" script (yarn test now runs).
+  New pure-logic libs + tests:
+    src/features/puzzles/lib/timer-display.ts        (timer green/amber/red, ADD 7.4)
+    src/features/puzzles/lib/leaderboard-format.ts   (time/cost formatting)
+================================================================================

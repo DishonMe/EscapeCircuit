@@ -1,14 +1,14 @@
 'use client';
 
+import { GoogleLogin } from '@react-oauth/google';
 import NextLink from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { GoogleLogin } from '@react-oauth/google';
 
 import { Button } from '@/components/ui/button';
 import { Form, Input } from '@/components/ui/form';
+import { useNotifications } from '@/components/ui/notifications';
 import { paths } from '@/config/paths';
 import { useLogin, loginInputSchema, useGoogleLogin } from '@/lib/auth';
-import { useNotifications } from '@/components/ui/notifications';
 
 type LoginFormProps = {
   onSuccess: () => void;
@@ -16,26 +16,29 @@ type LoginFormProps = {
 
 export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const { addNotification } = useNotifications();
-  
+
   // Check if Google login is configured
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const isGoogleLoginEnabled = 
-    googleClientId && 
+  const isGoogleLoginEnabled =
+    googleClientId &&
     googleClientId !== 'your_google_client_id_here' &&
     googleClientId.length > 0;
-  
+
   const login = useLogin({
     onSuccess,
     onError: (error: any) => {
-      let message = error?.message || 'Invalid username or password. Please try again.';
-      
+      let message =
+        error?.message || 'Invalid username or password. Please try again.';
+
       // Provide specific guidance based on error
       if (message.includes('not found')) {
-        message = 'Username not found. Please check your username or create a new account.';
+        message =
+          'Username not found. Please check your username or create a new account.';
       } else if (message.includes('invalid password')) {
-        message = 'Incorrect password. Please try again or use the password reset feature.';
+        message =
+          'Incorrect password. Please try again or use the password reset feature.';
       }
-      
+
       addNotification({
         type: 'error',
         title: 'Failed to log in',
@@ -52,14 +55,17 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         addNotification({
           type: 'info',
           title: 'Google Login Not Available',
-          message: 'Google login has not been configured on this server. Please use your username and password to log in.',
+          message:
+            'Google login has not been configured on this server. Please use your username and password to log in.',
         });
         return;
       }
       addNotification({
         type: 'error',
         title: 'Google Sign-In Failed',
-        message: error?.message || 'Could not authenticate with Google. Please make sure your Google account is verified and try again.',
+        message:
+          error?.message ||
+          'Could not authenticate with Google. Please make sure your Google account is verified and try again.',
       });
     },
     onNeedsPassword: (data) => {
@@ -133,7 +139,8 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
                 addNotification({
                   type: 'error',
                   title: 'Google Sign-In Failed',
-                  message: 'Could not authenticate with Google. Please try again or use username/password login.',
+                  message:
+                    'Could not authenticate with Google. Please try again or use username/password login.',
                 });
               }}
             />

@@ -1,14 +1,15 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import Cookies from 'js-cookie';
+import { CircleCheck, Upload, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
-import { CircleCheck, Upload, BookOpen } from 'lucide-react';
-import Cookies from 'js-cookie';
-import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
+
 import { PageHero } from '@/components/ui/page-hero/page-hero';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { useUser } from '@/lib/auth';
+import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
 const DIFFICULTY_OPTIONS = [
   { value: 'EASY' as const, label: 'Easy' },
@@ -170,7 +171,7 @@ export default function UploadPuzzlePage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto text-foreground">
+    <div className="mx-auto max-w-4xl p-8 text-foreground">
       <PageHero
         badge="Admin tools"
         icon={Upload}
@@ -188,16 +189,16 @@ export default function UploadPuzzlePage() {
       />
 
       {showInfo && (
-        <div className="mb-8 p-6 bg-secondary/50 border border-border rounded-xl space-y-6">
+        <div className="mb-8 space-y-6 rounded-xl border border-border bg-secondary/50 p-6">
           <h2 className="text-lg font-semibold text-foreground">
             File Format Guide
           </h2>
 
-          <details className="border border-border p-4 rounded-lg bg-card">
-            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
+          <details className="rounded-lg border border-border bg-card p-4">
+            <summary className="cursor-pointer text-[13px] font-medium text-foreground">
               Configuration JSON (puzzle_config.json)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary/50 p-3 font-mono text-[11px] text-foreground">
               {`{
   "puzzle": {
     "name": "Binary Adder Quiz",
@@ -244,31 +245,33 @@ export default function UploadPuzzlePage() {
   ]
 }`}
             </pre>
-            <div className="mt-3 text-[12px] text-foreground/80 space-y-2">
+            <div className="mt-3 space-y-2 text-[12px] text-foreground/80">
               <p>
                 <strong>Constraint Examples in test_cases:</strong>
               </p>
-              <ul className="list-disc list-inside space-y-1">
+              <ul className="list-inside list-disc space-y-1">
                 <li>
-                  <code className="bg-black/20 px-1 rounded">
-                    "gate_count_limit"
+                  <code className="rounded bg-black/20 px-1">
+                    &quot;gate_count_limit&quot;
                   </code>{' '}
                   - Total gate constraint: max_gate_count (limit),
                   min_gate_count (minimum required)
                 </li>
                 <li>
-                  <code className="bg-black/20 px-1 rounded">"gate_limit"</code>{' '}
+                  <code className="rounded bg-black/20 px-1">
+                    &quot;gate_limit&quot;
+                  </code>{' '}
                   - Per-gate type constraint: gate_name, gate_limit (max),
                   min_gate_limit (min, optional)
                 </li>
               </ul>
               <p>
                 Shared arsenal pieces can be bundled in
-                <code className="bg-black/20 px-1 rounded ml-1">
+                <code className="ml-1 rounded bg-black/20 px-1">
                   shared_arsenal_pieces
                 </code>{' '}
                 and referenced by name in
-                <code className="bg-black/20 px-1 rounded ml-1">
+                <code className="ml-1 rounded bg-black/20 px-1">
                   allowed_arsenal_component_ids
                 </code>
                 .
@@ -276,12 +279,12 @@ export default function UploadPuzzlePage() {
             </div>
           </details>
 
-          <details className="border border-border p-4 rounded-lg bg-card">
-            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
+          <details className="rounded-lg border border-border bg-card p-4">
+            <summary className="cursor-pointer text-[13px] font-medium text-foreground">
               Instructions LaTeX (puzzle_instructions.tex)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
-              {`\section*{Binary Adder Quiz Instructions}
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary/50 p-3 font-mono text-[11px] text-foreground">
+              {`\\section*{Binary Adder Quiz Instructions}
 
 \\subsection*{Objective}
 Design a digital circuit that implements a \\textbf{full adder} using:
@@ -294,15 +297,15 @@ Design a digital circuit that implements a \\textbf{full adder} using:
 \\subsection*{What is a Full Adder?}
 A full adder is a digital circuit that adds three binary digits. It produces two outputs:
 \\begin{itemize}
-  \\item Sum (\$S\$): The least significant bit
-  \\item Carry-out (\$C_{\\text{out}}\$): The carry bit
+  \\item Sum ($S$): The least significant bit
+  \\item Carry-out ($C_{\\text{out}}$): The carry bit
 \\end{itemize}
 
 \\subsection*{Truth Table}
 \\begin{center}
 \\begin{tabular}{|c|c|c|c|c|}
 \\hline
-\$A\$ & \$B\$ & \$C_{\\text{in}}\$ & \$S\$ & \$C_{\\text{out}}\$ \\\\
+$A$ & $B$ & $C_{\\text{in}}$ & $S$ & $C_{\\text{out}}$ \\\\
 \\hline
 0 & 0 & 0 & 0 & 0 \\\\
 ... \\\\
@@ -310,15 +313,15 @@ A full adder is a digital circuit that adds three binary digits. It produces two
 \\end{tabular}
 \\end{center}
 
-Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for inline or \\\\[\\ ... \\\\] for display math.`}
+Note: Use LaTeX syntax for all formatting. Math expressions use single $ for inline or \\[ ... \\] for display math.`}
             </pre>
           </details>
 
-          <details className="border border-border p-4 rounded-lg bg-card">
-            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
+          <details className="rounded-lg border border-border bg-card p-4">
+            <summary className="cursor-pointer text-[13px] font-medium text-foreground">
               Sample Solution JSON (puzzle_solution.json)
             </summary>
-            <pre className="mt-3 p-3 bg-secondary/50 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary/50 p-3 font-mono text-[11px] text-foreground">
               {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0, \\"C_in\\": 0}": {"S": 0, "C_out": 0},
@@ -343,11 +346,11 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
             </p>
           </details>
 
-          <div className="bg-amber-50/50 border border-amber-200/60 p-4 rounded-lg">
+          <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 p-4">
             <p className="text-[13px] font-semibold text-amber-900">
               Important:
             </p>
-            <ul className="list-disc list-inside text-[13px] text-amber-800 mt-2">
+            <ul className="mt-2 list-inside list-disc text-[13px] text-amber-800">
               <li>Config and Solution files must be valid JSON</li>
               <li>Instructions file must be LaTeX format</li>
               <li>Sample solution must pass all test cases</li>
@@ -360,58 +363,58 @@ Note: Use LaTeX syntax for all formatting. Math expressions use single \$ for in
             </ul>
           </div>
 
-          <details className="border border-border p-4 rounded-lg bg-card">
-            <summary className="font-medium cursor-pointer text-foreground text-[13px]">
+          <details className="rounded-lg border border-border bg-card p-4">
+            <summary className="cursor-pointer text-[13px] font-medium text-foreground">
               Python Tests File (optional)
             </summary>
-            <div className="mt-3 text-[12px] text-foreground/80 mb-3 space-y-2 bg-black/10 p-3 rounded-lg">
+            <div className="my-3 space-y-2 rounded-lg bg-black/10 p-3 text-[12px] text-foreground/80">
               <p className="font-semibold">Available in test code:</p>
-              <ul className="list-disc list-inside space-y-1">
+              <ul className="list-inside list-disc space-y-1">
                 <li>
-                  <code className="bg-black/20 px-1 rounded">solution</code> -
+                  <code className="rounded bg-black/20 px-1">solution</code> -
                   Full circuit dict: placedComponents, wires, inputs, outputs,
                   totalCost
                 </li>
                 <li>
-                  <code className="bg-black/20 px-1 rounded">circuit</code> -
+                  <code className="rounded bg-black/20 px-1">circuit</code> -
                   Same as solution
                 </li>
                 <li>
-                  <code className="bg-black/20 px-1 rounded">
+                  <code className="rounded bg-black/20 px-1">
                     placed_components
                   </code>{' '}
                   - Component list
                 </li>
                 <li>
-                  <code className="bg-black/20 px-1 rounded">wires</code> - Wire
+                  <code className="rounded bg-black/20 px-1">wires</code> - Wire
                   connections
                 </li>
               </ul>
-              <p className="font-semibold mt-2">Test Rules:</p>
-              <ul className="list-disc list-inside space-y-1">
+              <p className="mt-2 font-semibold">Test Rules:</p>
+              <ul className="list-inside list-disc space-y-1">
                 <li>
                   <strong>REQUIRED:</strong> Define{' '}
-                  <code className="bg-black/20 px-1 rounded">
+                  <code className="rounded bg-black/20 px-1">
                     def run_tests(solution):
                   </code>{' '}
                   function
                 </li>
                 <li>
                   Call your individual test functions from{' '}
-                  <code className="bg-black/20 px-1 rounded">run_tests()</code>
+                  <code className="rounded bg-black/20 px-1">run_tests()</code>
                 </li>
                 <li>No return statements needed</li>
                 <li>
                   Use{' '}
-                  <code className="bg-black/20 px-1 rounded">
-                    raise Exception("message")
+                  <code className="rounded bg-black/20 px-1">
+                    raise Exception(&quot;message&quot;)
                   </code>{' '}
                   to fail
                 </li>
                 <li>Silent pass on success (no error raised)</li>
               </ul>
             </div>
-            <pre className="p-3 bg-black/20 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+            <pre className="overflow-x-auto rounded-lg bg-black/20 p-3 font-mono text-[11px] text-foreground">
               {`# Define individual test functions
 def test_uses_xor():
     """Check solution uses at least one XOR gate"""
@@ -445,13 +448,13 @@ def run_tests(solution):
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-6 bg-card p-6 rounded-xl border border-border"
+        className="space-y-6 rounded-xl border border-border bg-card p-6"
       >
         {/* Difficulty selector */}
-        <div className="flex flex-col">
-          <label className="text-[13px] font-medium text-foreground mb-2">
+        <label className="flex flex-col">
+          <span className="mb-2 text-[13px] font-medium text-foreground">
             Difficulty
-          </label>
+          </span>
           <StyledSelect
             aria-label="Difficulty"
             className="w-48"
@@ -459,12 +462,15 @@ def run_tests(solution):
             onValueChange={(v) => setDifficulty(v)}
             options={DIFFICULTY_OPTIONS}
           />
-        </div>
+        </label>
 
         {requiredFiles.map((req) => (
           <div key={req.key} className="flex flex-col">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-[13px] font-medium text-foreground">
+            <div className="mb-2 flex items-center justify-between">
+              <label
+                htmlFor={`upload-file-${req.key}`}
+                className="text-[13px] font-medium text-foreground"
+              >
                 {req.label}
               </label>
               <button
@@ -472,20 +478,20 @@ def run_tests(solution):
                 onClick={() =>
                   setExpandedFormat(expandedFormat === req.key ? null : req.key)
                 }
-                className="text-[11px] px-3 py-1 bg-secondary hover:bg-secondary/80 rounded-md transition-colors text-foreground"
+                className="rounded-md bg-secondary px-3 py-1 text-[11px] text-foreground transition-colors hover:bg-secondary/80"
               >
                 {expandedFormat === req.key ? 'Hide Format' : 'Show Format'}
               </button>
             </div>
 
             {expandedFormat === req.key && (
-              <div className="mb-3 p-3 bg-secondary/50 rounded-lg border border-border text-[13px]">
+              <div className="mb-3 rounded-lg border border-border bg-secondary/50 p-3 text-[13px]">
                 {req.key === 'config' && (
                   <div>
-                    <p className="font-medium text-[13px] text-foreground mb-2">
+                    <p className="mb-2 text-[13px] font-medium text-foreground">
                       Configuration JSON Format:
                     </p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+                    <pre className="overflow-x-auto rounded-lg bg-secondary/50 p-2 font-mono text-[11px] text-foreground">
                       {`{
   "puzzle": {
     "name": "...",
@@ -513,10 +519,10 @@ def run_tests(solution):
                 )}
                 {req.key === 'solution' && (
                   <div>
-                    <p className="font-medium text-[13px] text-foreground mb-2">
+                    <p className="mb-2 text-[13px] font-medium text-foreground">
                       Solution JSON Format:
                     </p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+                    <pre className="overflow-x-auto rounded-lg bg-secondary/50 p-2 font-mono text-[11px] text-foreground">
                       {`{
   "eval_map": {
     "{\\"A\\": 0, \\"B\\": 0}": {"S": 0},
@@ -532,10 +538,10 @@ def run_tests(solution):
                 )}
                 {req.key === 'instructions' && (
                   <div>
-                    <p className="font-medium text-[13px] text-foreground mb-2">
+                    <p className="mb-2 text-[13px] font-medium text-foreground">
                       Instructions LaTeX Format:
                     </p>
-                    <pre className="bg-secondary/50 p-2 rounded-lg text-[11px] text-foreground overflow-x-auto font-mono">
+                    <pre className="overflow-x-auto rounded-lg bg-secondary/50 p-2 font-mono text-[11px] text-foreground">
                       {`\\section*{Puzzle Name}
 \\subsection*{Objective}
 Design a circuit that...
@@ -563,13 +569,14 @@ Use $...$ for math: $C_{out}$`}
             )}
 
             <input
+              id={`upload-file-${req.key}`}
               type="file"
               accept={req.ext}
               onChange={(e) => handleFileChange(req.key, e)}
-              className="border border-border p-2 rounded-lg text-[13px] text-foreground"
+              className="rounded-lg border border-border p-2 text-[13px] text-foreground"
             />
             {files[req.key] && !files[req.key]!.name.endsWith(req.ext) && (
-              <span className="text-destructive text-[13px]">
+              <span className="text-[13px] text-destructive">
                 Invalid extension. Must be {req.ext}
               </span>
             )}
@@ -578,14 +585,18 @@ Use $...$ for math: $C_{out}$`}
 
         {optionalFiles.map((opt) => (
           <div key={opt.key} className="flex flex-col">
-            <label className="text-[13px] font-medium text-foreground mb-2">
+            <label
+              htmlFor={`upload-file-${opt.key}`}
+              className="mb-2 text-[13px] font-medium text-foreground"
+            >
               {opt.label}
             </label>
             <input
+              id={`upload-file-${opt.key}`}
               type="file"
               accept={opt.ext}
               onChange={(e) => handleFileChange(opt.key, e)}
-              className="border border-border p-2 rounded-lg text-[13px] text-foreground"
+              className="rounded-lg border border-border p-2 text-[13px] text-foreground"
             />
             {files[opt.key] && (
               <p className="mt-1 inline-flex items-center gap-1.5 text-[12px] text-green-600">
@@ -594,7 +605,7 @@ Use $...$ for math: $C_{out}$`}
               </p>
             )}
             {files[opt.key] && !files[opt.key]!.name.endsWith(opt.ext) && (
-              <span className="text-destructive text-[13px]">
+              <span className="text-[13px] text-destructive">
                 Invalid extension. Must be {opt.ext}
               </span>
             )}
@@ -605,10 +616,10 @@ Use $...$ for math: $C_{out}$`}
           <button
             type="submit"
             disabled={!isFormValid || status === 'uploading'}
-            className={`w-full p-3 font-medium text-[13px] rounded-lg transition-colors ${
+            className={`w-full rounded-lg p-3 text-[13px] font-medium transition-colors ${
               isFormValid
                 ? 'bg-foreground text-background hover:bg-foreground/90'
-                : 'bg-secondary text-muted-foreground cursor-not-allowed'
+                : 'cursor-not-allowed bg-secondary text-muted-foreground'
             }`}
           >
             {status === 'uploading' ? 'Uploading...' : 'Upload to Database'}
@@ -617,7 +628,7 @@ Use $...$ for math: $C_{out}$`}
 
         {message && (
           <div
-            className={`p-4 rounded-lg text-[13px] ${status === 'success' ? 'bg-emerald-50/50 border border-emerald-200/60 text-emerald-700' : 'bg-red-50/50 border border-red-200/60 text-red-700'}`}
+            className={`rounded-lg p-4 text-[13px] ${status === 'success' ? 'border border-emerald-200/60 bg-emerald-50/50 text-emerald-700' : 'border border-red-200/60 bg-red-50/50 text-red-700'}`}
           >
             {message}
           </div>

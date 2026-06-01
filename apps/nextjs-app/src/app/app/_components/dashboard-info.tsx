@@ -25,7 +25,7 @@ export const DashboardInfo = () => {
       {/* Only show this if user is NOT admin */}
       {!isAdmin && (
         <>
-          <p className="font-medium text-[13px] text-foreground">
+          <p className="text-[13px] font-medium text-foreground">
             In this application you can:
           </p>
           <ul className="my-4 list-inside list-disc text-[13px] text-muted-foreground">

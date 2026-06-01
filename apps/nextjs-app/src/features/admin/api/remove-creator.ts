@@ -1,9 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { getUsersQueryOptions } from '@/features/users/api/get-users';
 import { api } from '@/lib/api-client';
 import { MutationConfig } from '@/lib/react-query';
-
-import { getUsersQueryOptions } from '@/features/users/api/get-users';
 
 export type RemoveCreatorDTO = {
   targetUserId: number;
@@ -32,12 +31,20 @@ export type ConfirmRemoveCreatorResponse = {
   published_affected: number;
 };
 
-export const removeCreator = ({ targetUserId }: RemoveCreatorDTO): Promise<RemoveCreatorResponse> => {
+export const removeCreator = ({
+  targetUserId,
+}: RemoveCreatorDTO): Promise<RemoveCreatorResponse> => {
   return api.post('/admin/remove-creator', { target_user_id: targetUserId });
 };
 
-export const confirmRemoveCreator = ({ targetUserId, action }: ConfirmRemoveCreatorDTO): Promise<ConfirmRemoveCreatorResponse> => {
-  return api.post('/admin/confirm-remove-creator', { target_user_id: targetUserId, action });
+export const confirmRemoveCreator = ({
+  targetUserId,
+  action,
+}: ConfirmRemoveCreatorDTO): Promise<ConfirmRemoveCreatorResponse> => {
+  return api.post('/admin/confirm-remove-creator', {
+    target_user_id: targetUserId,
+    action,
+  });
 };
 
 type UseRemoveCreatorOptions = {

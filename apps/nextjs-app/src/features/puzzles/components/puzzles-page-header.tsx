@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { Sparkles, Zap } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 type PuzzlesPageHeaderProps = {
   tutorialSlot?: ReactNode;
@@ -31,6 +31,8 @@ export const PuzzlesPageHeader = ({ tutorialSlot }: PuzzlesPageHeaderProps) => {
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Wire up logic gates, crack the riddles, and climb the leaderboard.
+          </p>
+          <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Pick a puzzle below and start building.
           </p>
         </div>

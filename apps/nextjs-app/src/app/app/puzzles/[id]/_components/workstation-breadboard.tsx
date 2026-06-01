@@ -129,7 +129,9 @@ export const Breadboard = ({
   return (
     <div className="flex flex-col gap-2">
       <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-subtle backdrop-blur-sm">
-        <div className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">Breadboard</div>
+        <div className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+          Breadboard
+        </div>
         <div className="text-[11px] text-muted-foreground">
           Pins in the same row are inherently connected. Click two pins to add a
           wire.

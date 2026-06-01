@@ -100,7 +100,12 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     ctx.lineWidth = 0.8;
     ctx.beginPath();
     ctx.moveTo(-1, -10);
-    ctx.quadraticCurveTo(-3 + antennaWiggle * 0.5, -12, -4 + antennaWiggle, -14);
+    ctx.quadraticCurveTo(
+      -3 + antennaWiggle * 0.5,
+      -12,
+      -4 + antennaWiggle,
+      -14,
+    );
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(1, -10);
@@ -113,28 +118,38 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     legOffsets.forEach((offset, idx) => {
       // Each leg has different phase for realistic gait pattern
       const legPhaseOffset = (idx * Math.PI * 2) / 3; // 120° phase offset between legs
-      
+
       // Left legs
       const leftPhase = (legPhase + legPhaseOffset) % (Math.PI * 2);
       // Create smooth leg motion: swing forward (0-π), then back (π-2π)
       const leftLegBend = Math.sin(leftPhase) * 3;
       const leftLegHeight = Math.cos(leftPhase * 0.5) * 1.5;
-      
+
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(-6, offset + leftLegHeight);
-      ctx.quadraticCurveTo(-9 + leftLegBend, offset + 2 + leftLegHeight, -8, offset + 4 + leftLegHeight);
+      ctx.quadraticCurveTo(
+        -9 + leftLegBend,
+        offset + 2 + leftLegHeight,
+        -8,
+        offset + 4 + leftLegHeight,
+      );
       ctx.stroke();
 
       // Right legs
       const rightPhase = (legPhase + legPhaseOffset + Math.PI) % (Math.PI * 2);
       const rightLegBend = Math.sin(rightPhase) * 3;
       const rightLegHeight = Math.cos(rightPhase * 0.5) * 1.5;
-      
+
       ctx.beginPath();
       ctx.moveTo(6, offset + rightLegHeight);
-      ctx.quadraticCurveTo(9 - rightLegBend, offset + 2 + rightLegHeight, 8, offset + 4 + rightLegHeight);
+      ctx.quadraticCurveTo(
+        9 - rightLegBend,
+        offset + 2 + rightLegHeight,
+        8,
+        offset + 4 + rightLegHeight,
+      );
       ctx.stroke();
     });
 
@@ -187,7 +202,9 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
           }
         }
 
-        const forwardLimits = limits.filter((limit) => Number.isFinite(limit) && limit > 0);
+        const forwardLimits = limits.filter(
+          (limit) => Number.isFinite(limit) && limit > 0,
+        );
         if (forwardLimits.length === 0) return 0;
         return Math.max(0, Math.min(...forwardLimits));
       };
@@ -216,7 +233,10 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
           : normalize(previousDirection + Math.PI);
       }
 
-      const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+      const totalWeight = candidates.reduce(
+        (sum, candidate) => sum + candidate.weight,
+        0,
+      );
       let roll = Math.random() * totalWeight;
       for (const candidate of candidates) {
         roll -= candidate.weight;
@@ -226,7 +246,6 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       }
 
       return candidates[candidates.length - 1].angle;
-
     };
 
     const getRandomWalkDurationMs = () => {
@@ -292,7 +311,8 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-      state.currentRotation = state.turnStartRotation + angleDiff * easedProgress;
+      state.currentRotation =
+        state.turnStartRotation + angleDiff * easedProgress;
 
       if (progress >= 1) {
         state.currentRotation = state.targetRotation;
@@ -328,7 +348,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
     // Calculate walking progress for smooth animations
     const distanceTraveled = (state.x + state.y) * 0.5;
     const legPhase = (distanceTraveled * 0.15) % (Math.PI * 2);
-    
+
     // Add subtle vertical bobbing based on walking (makes it feel alive)
     const bobHeight = Math.sin(legPhase) * 1.5;
 
@@ -347,7 +367,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
       const rect = button.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.height;
-      
+
       // Initialize bug position to center
       bugStateRef.current.x = canvas.width / 2;
       bugStateRef.current.y = canvas.height / 2;
@@ -364,6 +384,9 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
+    // animate reads refs only and never needs to re-run; mount-only intent is
+    // intentional. containerRef is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -372,7 +395,10 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
 
     const handlePointerEnter = () => {
       bugStateRef.current.targetSpeed = 1.5;
-      bugStateRef.current.burstTime = Math.max(bugStateRef.current.burstTime, 250);
+      bugStateRef.current.burstTime = Math.max(
+        bugStateRef.current.burstTime,
+        250,
+      );
     };
 
     const handlePointerLeave = () => {
@@ -398,7 +424,7 @@ export const ZigzagBugCanvas = ({ containerRef }: ZigzagBugCanvasProps) => {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 w-full h-full"
+      className="pointer-events-none absolute inset-0 size-full"
       style={{ borderRadius: 'inherit' }}
     />
   );

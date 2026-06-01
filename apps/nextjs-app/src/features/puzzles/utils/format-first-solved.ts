@@ -1,4 +1,6 @@
-export function formatFirstSolved(dateString: string | null | undefined): string {
+export function formatFirstSolved(
+  dateString: string | null | undefined,
+): string {
   if (!dateString) return '—';
 
   const date = new Date(dateString);

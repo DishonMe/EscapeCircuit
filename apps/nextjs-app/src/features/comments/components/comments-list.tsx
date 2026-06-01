@@ -53,7 +53,7 @@ export const CommentsList = ({ discussionId }: CommentsListProps) => {
           <li
             aria-label={`comment-${comment.body}-${index}`}
             key={comment.id || index}
-            className="w-full bg-card p-4 rounded-xl border border-border"
+            className="w-full rounded-xl border border-border bg-card p-4"
           >
             <div className="flex justify-between">
               <div>
