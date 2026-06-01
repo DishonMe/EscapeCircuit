@@ -7,6 +7,10 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { useLeaderboard } from '@/features/puzzles/api/get-leaderboard';
 import { useUser } from '@/lib/auth';
 
+import {
+  formatLeaderboardCost,
+  formatLeaderboardTime,
+} from '../lib/leaderboard-format';
 import { formatFirstSolved } from '../utils/format-first-solved';
 
 const MEDAL_LABELS: Record<number, string> = {
@@ -29,25 +33,15 @@ const RANK_STYLES: Record<number, string> = {
   3: 'bg-gradient-to-r from-amber-600 to-orange-400 text-amber-950 shadow-md shadow-orange-200/50',
 };
 
-const formatTime = (seconds: number) => {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m < 60) return `${m}m ${s}s`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return `${h}h ${rm}m ${s}s`;
-};
-
 const getMetricDisplay = (
   entry: any,
   type: 'time' | 'cost' | 'first_solved',
 ) => {
   if (type === 'time') {
-    return formatTime(entry.best_time);
+    return formatLeaderboardTime(entry.best_time);
   }
   if (type === 'cost') {
-    return `${entry.best_cost} cost`;
+    return formatLeaderboardCost(entry.best_cost);
   }
   return formatFirstSolved(entry.first_solved_at);
 };

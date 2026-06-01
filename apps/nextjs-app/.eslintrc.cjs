@@ -49,6 +49,7 @@ module.exports = {
             'workstation-debugger-button',
             'workstation-instructions-button',
             'workstation-sandbox-toggle',
+            'workstation-creator-comment-button',
             'puzzle-filters-button',
             'puzzle-instructions-button',
             'puzzle-sort-dropdown',
