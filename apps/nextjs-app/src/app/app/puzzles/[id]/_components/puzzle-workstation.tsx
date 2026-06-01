@@ -8,6 +8,8 @@ import {
   CircleAlert,
   CircuitBoard,
   Medal,
+  StepBack,
+  StepForward,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -32,6 +34,7 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
 import { workstationTourSteps, debuggerTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
@@ -44,7 +47,7 @@ import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-dr
 import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
 import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
-import { useAudio } from '@/hooks/useAudio';
+import { useAudio } from '@/hooks/use-audio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
 import { CircuitComponent, CircuitSolution, Wire } from '@/types/api';
@@ -309,6 +312,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<
     string | null
   >(null);
+
+  const debuggerButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Clue-penalty state (server is the source of truth — these mirror what /attempts/start
   // and /clue tell us, so a refresh hydrates back to a consistent UI).
