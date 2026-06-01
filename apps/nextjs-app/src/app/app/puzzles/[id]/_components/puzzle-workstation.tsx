@@ -1346,6 +1346,17 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
     return outputBits;
   }, [debugSnapshot, debugStepIndex, placed]);
 
+  // Computed before the early returns below so this hook is always called in
+  // the same order (react-hooks/rules-of-hooks).
+  const effectiveSteps = useMemo(() => {
+    if (!puzzle?.creatorComment?.trim()) {
+      return workstationTourSteps.filter(
+        (step) => step.target !== '.workstation-creator-comment-button',
+      );
+    }
+    return workstationTourSteps;
+  }, [puzzle?.creatorComment]);
+
   if (puzzleQuery.isLoading) {
     return <div className="text-[13px] text-muted-foreground">Loading…</div>;
   }
@@ -1568,8 +1579,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
       setBoardFeedback('idle');
 
       // Extract first failed test from details array if present
-      let firstFailedTest: { inputs: Record<string, any>; expected: Record<string, any>; actual: Record<string, any> } | undefined;
-      if (!res.solved && (res as any).details && Array.isArray((res as any).details) && (res as any).details.length > 0) {
+      let firstFailedTest:
+        | {
+            inputs: Record<string, any>;
+            expected: Record<string, any>;
+            actual: Record<string, any>;
+          }
+        | undefined;
+      if (
+        !res.solved &&
+        (res as any).details &&
+        Array.isArray((res as any).details) &&
+        (res as any).details.length > 0
+      ) {
         const firstDetail = (res as any).details[0];
         if (firstDetail.inputs && firstDetail.expected && firstDetail.actual) {
           firstFailedTest = {
@@ -1903,15 +1925,6 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   };
 
   const visibleBasics = basicComponents;
-
-  const effectiveSteps = useMemo(() => {
-    if (!puzzle?.creatorComment?.trim()) {
-      return workstationTourSteps.filter(
-        (step) => step.target !== '.workstation-creator-comment-button'
-      );
-    }
-    return workstationTourSteps;
-  }, [puzzle?.creatorComment]);
 
   return (
     <>
@@ -2275,7 +2288,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       size="sm"
                       variant="ghost"
                       onClick={() => setHighlightedWireIds(new Set())}
-                      className="text-[10px] text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 px-1.5 py-0.5 rounded transition-colors"
+                      className="rounded px-1.5 py-0.5 text-[10px] text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
                       title="Clear wire highlights"
                     >
                       Clear
@@ -2357,9 +2370,22 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                       return (
                         <li
                           key={w.id}
+                          // The row is a keyboard-operable shortcut to
+                          // highlight the wire (tabIndex + onKeyDown below);
+                          // the list-item-specific role rule is the only
+                          // objection, so it is suppressed for this element.
+                          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role
+                          role="button"
+                          tabIndex={0}
                           onClick={() => {
                             // Highlight this wire on the grid
                             setHighlightedWireIds(new Set([w.id]));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setHighlightedWireIds(new Set([w.id]));
+                            }
                           }}
                           className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/40 px-2.5 py-2 transition-all hover:border-border hover:bg-secondary/70"
                         >
@@ -2842,41 +2868,52 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                     wiring/components.
                   </p>
                   {postCheck.open && postCheck.firstFailedTest && (
-                    <div className="mt-4 p-3 bg-secondary/50 rounded-lg border border-border space-y-2">
-                      <p className="text-[12px] font-semibold text-foreground uppercase tracking-wide">
+                    <div className="mt-4 space-y-2 rounded-lg border border-border bg-secondary/50 p-3">
+                      <p className="text-[12px] font-semibold uppercase tracking-wide text-foreground">
                         Failed on:
                       </p>
-                      <div className="text-[12px] space-y-2">
+                      <div className="space-y-2 text-[12px]">
                         <div>
-                          <p className="font-medium text-foreground mb-1">Inputs:</p>
-                          <div className="pl-3 space-y-0.5">
-                            {Object.entries(postCheck.firstFailedTest.inputs).map(
-                              ([key, val]) => (
-                                <p key={key} className="font-mono text-muted-foreground">
-                                  {key}: <span className="text-foreground">{val}</span>
-                                </p>
-                              ),
-                            )}
+                          <p className="mb-1 font-medium text-foreground">
+                            Inputs:
+                          </p>
+                          <div className="space-y-0.5 pl-3">
+                            {Object.entries(
+                              postCheck.firstFailedTest.inputs,
+                            ).map(([key, val]) => (
+                              <p
+                                key={key}
+                                className="font-mono text-muted-foreground"
+                              >
+                                {key}:{' '}
+                                <span className="text-foreground">{val}</span>
+                              </p>
+                            ))}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="font-medium text-foreground mb-1">
+                            <p className="mb-1 font-medium text-foreground">
                               Expected:
                             </p>
-                            <div className="pl-3 space-y-0.5">
+                            <div className="space-y-0.5 pl-3">
                               {Object.entries(
                                 postCheck.firstFailedTest.expected,
                               ).map(([key, val]) => (
-                                <p key={key} className="font-mono text-green-600">
+                                <p
+                                  key={key}
+                                  className="font-mono text-green-600"
+                                >
                                   {key}: {val}
                                 </p>
                               ))}
                             </div>
                           </div>
                           <div>
-                            <p className="font-medium text-foreground mb-1">Got:</p>
-                            <div className="pl-3 space-y-0.5">
+                            <p className="mb-1 font-medium text-foreground">
+                              Got:
+                            </p>
+                            <div className="space-y-0.5 pl-3">
                               {Object.entries(
                                 postCheck.firstFailedTest.actual,
                               ).map(([key, val]) => (

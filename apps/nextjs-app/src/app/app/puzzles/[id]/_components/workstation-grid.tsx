@@ -6,6 +6,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -383,7 +384,9 @@ export const WorkstationGrid = ({
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        WORKSTATION_CLIPBOARD_STORAGE_KEY,
+      );
       if (!raw) return;
 
       const parsed = JSON.parse(raw) as ClipboardPayload;
@@ -400,69 +403,73 @@ export const WorkstationGrid = ({
     }
   }, []);
 
-  const persistClipboardPayload = useCallback(async (payload: ClipboardPayload) => {
-    setClipboard(payload);
-
-    try {
-      window.localStorage.setItem(
-        WORKSTATION_CLIPBOARD_STORAGE_KEY,
-        JSON.stringify(payload),
-      );
-    } catch {
-      // ignore storage failures
-    }
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(JSON.stringify(payload));
-      }
-    } catch {
-      // ignore clipboard write failures
-    }
-  }, []);
-
-  const readClipboardPayload = useCallback(async (): Promise<ClipboardPayload | null> => {
-    const parsePayload = (raw: string | null): ClipboardPayload | null => {
-      if (!raw) return null;
+  const persistClipboardPayload = useCallback(
+    async (payload: ClipboardPayload) => {
+      setClipboard(payload);
 
       try {
-        const parsed = JSON.parse(raw) as ClipboardPayload;
-        if (
-          parsed &&
-          parsed.version === 1 &&
-          Array.isArray(parsed.components) &&
-          Array.isArray(parsed.wires)
-        ) {
-          return parsed;
+        window.localStorage.setItem(
+          WORKSTATION_CLIPBOARD_STORAGE_KEY,
+          JSON.stringify(payload),
+        );
+      } catch {
+        // ignore storage failures
+      }
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(JSON.stringify(payload));
         }
+      } catch {
+        // ignore clipboard write failures
+      }
+    },
+    [],
+  );
+
+  const readClipboardPayload =
+    useCallback(async (): Promise<ClipboardPayload | null> => {
+      const parsePayload = (raw: string | null): ClipboardPayload | null => {
+        if (!raw) return null;
+
+        try {
+          const parsed = JSON.parse(raw) as ClipboardPayload;
+          if (
+            parsed &&
+            parsed.version === 1 &&
+            Array.isArray(parsed.components) &&
+            Array.isArray(parsed.wires)
+          ) {
+            return parsed;
+          }
+        } catch {
+          return null;
+        }
+
+        return null;
+      };
+
+      try {
+        const systemText = navigator.clipboard
+          ? await navigator.clipboard.readText()
+          : '';
+        const fromSystem = parsePayload(systemText);
+        if (fromSystem) return fromSystem;
+      } catch {
+        // ignore clipboard read failures
+      }
+
+      const fromState = clipboard;
+      if (fromState) return fromState;
+
+      try {
+        return parsePayload(
+          window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
+        );
       } catch {
         return null;
       }
-
-      return null;
-    };
-
-    try {
-      const systemText = navigator.clipboard
-        ? await navigator.clipboard.readText()
-        : '';
-      const fromSystem = parsePayload(systemText);
-      if (fromSystem) return fromSystem;
-    } catch {
-      // ignore clipboard read failures
-    }
-
-    const fromState = clipboard;
-    if (fromState) return fromState;
-
-    try {
-      return parsePayload(
-        window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
-      );
-    } catch {
-      return null;
-    }
-  }, [clipboard]);
+    }, [clipboard]);
 
   const copySelectionToClipboard = useCallback(async () => {
     if (
@@ -491,7 +498,14 @@ export const WorkstationGrid = ({
     };
 
     await persistClipboardPayload(payload);
-  }, [catalog, persistClipboardPayload, placed, puzzleId, selectedEntity, wires]);
+  }, [
+    catalog,
+    persistClipboardPayload,
+    placed,
+    puzzleId,
+    selectedEntity,
+    wires,
+  ]);
 
   const pasteFromClipboard = useCallback(async () => {
     const payload = await readClipboardPayload();
@@ -2035,10 +2049,18 @@ export const WorkstationGrid = ({
                 </Button>
               ) : (
                 <>
-                  <Button size="sm" variant="outline" onClick={onDebuggerStepPrev}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepPrev}
+                  >
                     ◄ Previous Step
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onDebuggerStepNext}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepNext}
+                  >
                     Next Step ►
                   </Button>
                   <Button
@@ -2048,7 +2070,11 @@ export const WorkstationGrid = ({
                   >
                     Full Debugger Report
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onExitInlineDebugger}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onExitInlineDebugger}
+                  >
                     Exit Debugger
                   </Button>
                 </>
@@ -2294,7 +2320,7 @@ export const WorkstationGrid = ({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="size-8 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 setZoom((z) => Math.min(z * 1.15, 3));
@@ -2306,7 +2332,7 @@ export const WorkstationGrid = ({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="size-8 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 setZoom((z) => Math.max(z / 1.15, minZoom));
@@ -2857,7 +2883,7 @@ export const WorkstationGrid = ({
               >
                 {/* Selected Action Buttons: Delete (Outside) */}
                 {isSelected && !isDragging && (
-                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1 items-center">
+                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
                       <button
@@ -2894,7 +2920,7 @@ export const WorkstationGrid = ({
                       </button>
                     )}
                     {/* Component Name Label */}
-                    <span className="ml-1 text-xs font-medium text-foreground bg-card/90 px-2 py-1 rounded shadow-sm ring-1 ring-border whitespace-nowrap">
+                    <span className="ml-1 whitespace-nowrap rounded bg-card/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-border">
                       {def.label}
                     </span>
                   </div>

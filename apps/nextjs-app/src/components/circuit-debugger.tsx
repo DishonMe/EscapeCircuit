@@ -412,26 +412,26 @@ export function CircuitDebugger({
                         placeholder="e.g., 01010 or 0,1,0,1,0"
                         className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       />
-                      {parseSequenceBits(sequenceInputs[inputName] || '').length >
-                      0 ? (
+                      {parseSequenceBits(sequenceInputs[inputName] || '')
+                        .length > 0 ? (
                         <div
                           className="mt-1.5 flex flex-wrap items-center gap-1"
                           title={`Current step ${sequenceStepIndex + 1}`}
                         >
-                          {parseSequenceBits(sequenceInputs[inputName] || '').map(
-                            (bit, index) => (
-                              <span
-                                key={`${inputName}-bit-${index}`}
-                                className={`inline-flex h-5 w-5 items-center justify-center rounded border text-[11px] font-semibold ${
-                                  index === sequenceStepIndex
-                                    ? 'border-emerald-500 bg-emerald-500 text-white'
-                                    : 'border-border bg-card text-foreground'
-                                }`}
-                              >
-                                {bit}
-                              </span>
-                            ),
-                          )}
+                          {parseSequenceBits(
+                            sequenceInputs[inputName] || '',
+                          ).map((bit, index) => (
+                            <span
+                              key={`${inputName}-bit-${index}`}
+                              className={`inline-flex size-5 items-center justify-center rounded border text-[11px] font-semibold ${
+                                index === sequenceStepIndex
+                                  ? 'border-emerald-500 bg-emerald-500 text-white'
+                                  : 'border-border bg-card text-foreground'
+                              }`}
+                            >
+                              {bit}
+                            </span>
+                          ))}
                         </div>
                       ) : null}
                       <p className="mt-1 text-[11px] text-muted-foreground">
