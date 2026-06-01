@@ -70,7 +70,7 @@ export const PuzzlesPagination = ({
   const pageList = buildPageList(page, totalPages);
 
   return (
-    <div className="mt-6 flex items-center justify-between gap-4 flex-wrap">
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
       {/* Result summary */}
       <span className="font-mono text-[12px] text-muted-foreground">
         {summary}
@@ -95,7 +95,7 @@ export const PuzzlesPagination = ({
             return (
               <span
                 key={`${item}-${idx}`}
-                className="inline-flex size-8 items-center justify-center text-[13px] text-muted-foreground select-none"
+                className="inline-flex size-8 select-none items-center justify-center text-[13px] text-muted-foreground"
                 aria-hidden
               >
                 &hellip;

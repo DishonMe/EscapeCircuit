@@ -62,13 +62,13 @@ export const ConfirmationDialog = ({
             {' '}
             {icon === 'danger' && (
               <CircleAlert
-                className="size-6 text-destructive animate-[pulse_1.2s_ease-in-out_2]"
+                className="size-6 animate-[pulse_1.2s_ease-in-out_2] text-destructive"
                 aria-hidden="true"
               />
             )}
             {icon === 'info' && (
               <Info
-                className="size-6 text-foreground animate-[bounce_0.9s_ease-in-out_2]"
+                className="size-6 animate-[bounce_0.9s_ease-in-out_2] text-foreground"
                 aria-hidden="true"
               />
             )}

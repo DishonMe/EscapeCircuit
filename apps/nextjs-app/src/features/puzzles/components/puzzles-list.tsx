@@ -34,30 +34,7 @@ import {
 } from './puzzles-skeleton';
 import { PuzzlesToolbar } from './puzzles-toolbar';
 
-export const puzzlesTourSteps = [
-  {
-    target: '.puzzle-instructions-button',
-    content:
-      'Open the instructions to understand the puzzle goal, constraints, and any hints before you start solving.',
-    scrollIntoView: true,
-    scrollTarget: '.puzzle-card-action',
-  },
-  {
-    target: '.dialog-close-button',
-    content:
-      'Use the Close button to exit the instructions and return to the puzzle list.',
-    placement: 'bottom',
-  },
-  {
-    target: '.puzzle-card-action',
-    content: 'Click to start solving!',
-  },
-  {
-    target: '.puzzle-filters-button',
-    content: 'You may filter by Puzzle Name, Creator, Difficulty, and more!',
-    disableBeacon: true,
-  },
-];
+export { browsePuzzlesTourSteps as puzzlesTourSteps } from '@/config/tour-steps';
 
 export const PuzzlesList = () => {
   // ── Dialog open-state ──────────────────────────────────────────────
@@ -373,7 +350,6 @@ export const PuzzlesList = () => {
           }}
         />
       )}
-
     </>
   );
 };

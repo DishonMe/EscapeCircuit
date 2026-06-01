@@ -764,25 +764,14 @@ class PuzzleService:
                     shared_arsenal_components = self.arsenal_service.get_arsenal_pieces_by_ids(allowed_ids)
 
                 # Solver personal arsenal is controlled by allow_arsenal.
-                # For admins: include all available arsenal to support viewing any user's submitted solutions.
+                # Both admin and non-admin solvers see only their own arsenal in the
+                # workstation palette. The dedicated admin user-profile dialog remains
+                # the place to inspect another user's arsenal.
                 if user_id and getattr(p, "allow_arsenal", True):
                     allowed_gates_set = {g.value for g in p.default_gate_set} if p.default_gate_set else set()
-                    if is_admin:
-                        # Admin viewing: get all users' arsenal (filtered by allowed gates for this puzzle)
-                        # This allows admins to view solutions that used any user's arsenal pieces
-                        try:
-                            all_arsenal = self.arsenal_service.get_all_arsenal_filtered_by_gates(allowed_gates_set)
-                            solver_arsenal_components = all_arsenal if all_arsenal else []
-                        except Exception:
-                            # Fallback to current user's arsenal if all_arsenal method not available
-                            solver_arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
-                                user_id, allowed_gates_set
-                            )
-                    else:
-                        # Regular user: only their own arsenal
-                        solver_arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
-                            user_id, allowed_gates_set
-                        )
+                    solver_arsenal_components = self.arsenal_service.get_user_arsenal_filtered_by_gates(
+                        user_id, allowed_gates_set
+                    )
 
             shared_arsenal_components = _dedupe_components(shared_arsenal_components)
             solver_arsenal_components = _dedupe_components(solver_arsenal_components)

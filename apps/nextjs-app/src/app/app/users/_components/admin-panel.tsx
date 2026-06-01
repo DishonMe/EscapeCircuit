@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Users,
   Gamepad2,
@@ -11,19 +10,25 @@ import {
   CheckSquare,
   type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 
 import { PageHero } from '@/components/ui/page-hero/page-hero';
-import { UsersList } from '@/features/users/components/users-list';
 import { AdminPuzzlesList } from '@/features/admin/components/admin-puzzles-list';
 import { AuditLogList } from '@/features/admin/components/audit-log-list';
+import { AuthAttemptsList } from '@/features/admin/components/auth-attempts-list';
 import { ReportsList } from '@/features/admin/components/reports-list';
 import { SolvingAttemptsList } from '@/features/admin/components/solving-attempts-list';
-import { AuthAttemptsList } from '@/features/admin/components/auth-attempts-list';
+import { UsersList } from '@/features/users/components/users-list';
 import { cn } from '@/utils/cn';
 
 type Tab = 'users' | 'puzzles' | 'attempts' | 'auth' | 'audit' | 'reports';
 
-const tabs: { id: Tab; label: string; icon: LucideIcon; description: string }[] = [
+const tabs: {
+  id: Tab;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+}[] = [
   {
     id: 'users',
     label: 'Users',

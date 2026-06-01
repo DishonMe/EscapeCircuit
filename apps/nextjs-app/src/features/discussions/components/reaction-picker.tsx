@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { SmilePlus } from 'lucide-react';
+import { useState } from 'react';
 
 import { ReactionCount, ReactionType } from '@/types/api';
 import { cn } from '@/utils/cn';
@@ -67,6 +67,7 @@ export const ReactionPicker = ({
 
         {showPicker && (
           <>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- invisible click-outside backdrop; Escape key handled by the picker itself. */}
             <div
               className="fixed inset-0 z-10"
               onClick={() => setShowPicker(false)}

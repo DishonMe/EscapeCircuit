@@ -1,6 +1,7 @@
 'use client';
 
 import { Spinner } from '@/components/ui/spinner';
+
 import { useAuditLog } from '../api/get-audit-log';
 
 const formatAuditDate = (dateStr: string) => {

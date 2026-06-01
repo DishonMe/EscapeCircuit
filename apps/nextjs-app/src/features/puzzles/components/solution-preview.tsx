@@ -2,9 +2,14 @@
 
 import type { ReactNode } from 'react';
 
-import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import type { ComponentDef, PlacedGridComponent } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+/* eslint-disable import/no-restricted-paths -- shared workstation primitives currently live under app/; extracting them is a separate refactor. */
 import { extractVisualStyleFromComponentLike } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
+import { WorkstationGrid } from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import type {
+  ComponentDef,
+  PlacedGridComponent,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
+/* eslint-enable import/no-restricted-paths */
 import type { CircuitComponent, Puzzle, Wire } from '@/types/api';
 
 type SolutionPreviewStructure = {
@@ -167,7 +172,9 @@ const normalizeWire = (wire: any, index: number): Wire | null => {
   ).trim();
   if (!fromComponentId || !toComponentId) return null;
 
-  const fromPin = Number.isFinite(Number(fromObj.pinIndex ?? wire?.fromPinIndex))
+  const fromPin = Number.isFinite(
+    Number(fromObj.pinIndex ?? wire?.fromPinIndex),
+  )
     ? Number(fromObj.pinIndex ?? wire?.fromPinIndex)
     : 0;
   const toPin = Number.isFinite(Number(toObj.pinIndex ?? wire?.toPinIndex))
@@ -189,7 +196,9 @@ const normalizeWire = (wire: any, index: number): Wire | null => {
   };
 };
 
-const parseSolution = (payload: Record<string, any> | null): SolutionPreviewStructure => {
+const parseSolution = (
+  payload: Record<string, any> | null,
+): SolutionPreviewStructure => {
   if (!payload) {
     return { placed: [], wires: [], totalCost: 0 };
   }
@@ -228,10 +237,13 @@ const parseSolution = (payload: Record<string, any> | null): SolutionPreviewStru
     : 0;
 
   const placed = rawPlaced
-    .map((component: any, index: number) => normalizePlacedComponent(component, index))
+    .map((component: any, index: number) =>
+      normalizePlacedComponent(component, index),
+    )
     .filter(
-      (component: PlacedGridComponent | null): component is PlacedGridComponent =>
-        component !== null,
+      (
+        component: PlacedGridComponent | null,
+      ): component is PlacedGridComponent => component !== null,
     );
 
   const wires = rawWires
@@ -294,8 +306,12 @@ const buildCatalog = (
       const anyKnown = known as any;
       const numInputs = Number((known as any).num_inputs ?? 1);
       const numOutputs = Number((known as any).num_outputs ?? 1);
-      const safeInputs = Number.isFinite(numInputs) ? Math.max(0, numInputs) : 1;
-      const safeOutputs = Number.isFinite(numOutputs) ? Math.max(0, numOutputs) : 1;
+      const safeInputs = Number.isFinite(numInputs)
+        ? Math.max(0, numInputs)
+        : 1;
+      const safeOutputs = Number.isFinite(numOutputs)
+        ? Math.max(0, numOutputs)
+        : 1;
       const height = Math.max(1, safeInputs, safeOutputs);
 
       const ports: ComponentDef['ports'] = [];
@@ -316,7 +332,12 @@ const buildCatalog = (
 
       catalog[component.componentId] = {
         id: component.componentId,
-        label: String(anyKnown.name ?? anyKnown.type ?? anyKnown.id ?? component.componentId),
+        label: String(
+          anyKnown.name ??
+            anyKnown.type ??
+            anyKnown.id ??
+            component.componentId,
+        ),
         cost: known.cost,
         size: { w: 3, h: height },
         ports,
@@ -370,12 +391,16 @@ export function SolutionPreview({
   const hasRenderableCircuit = placed.length > 0 || wires.length > 0;
 
   const inputLabels =
-    puzzle && Array.isArray((puzzle as any).inputs) && (puzzle as any).inputs.length > 0
+    puzzle &&
+    Array.isArray((puzzle as any).inputs) &&
+    (puzzle as any).inputs.length > 0
       ? (puzzle as any).inputs.map((input: any) => String(input))
       : inferredLabels.inputs;
 
   const outputLabels =
-    puzzle && Array.isArray((puzzle as any).outputs) && (puzzle as any).outputs.length > 0
+    puzzle &&
+    Array.isArray((puzzle as any).outputs) &&
+    (puzzle as any).outputs.length > 0
       ? (puzzle as any).outputs.map((output: any) => String(output))
       : inferredLabels.outputs;
 
@@ -411,48 +436,61 @@ export function SolutionPreview({
   return (
     <div className="space-y-4">
       {title || !puzzle ? (
-        <div className="bg-foreground/5 border border-border/40 rounded-lg p-3">
+        <div className="rounded-lg border border-border/40 bg-foreground/5 p-3">
           <p className="text-sm text-foreground">
             {title ?? 'Solution Preview'}
           </p>
-          {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
+          {description ? (
+            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          ) : null}
           {!puzzle ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              {loadingMessage ?? 'Puzzle context is unavailable, so this preview is using the saved circuit snapshot only.'}
+              {loadingMessage ??
+                'Puzzle context is unavailable, so this preview is using the saved circuit snapshot only.'}
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Inputs</p>
-          <p className="text-lg font-semibold text-foreground">{inputLabels.length}</p>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Inputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {inputLabels.length}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Outputs</p>
-          <p className="text-lg font-semibold text-foreground">{outputLabels.length}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Outputs</p>
+          <p className="text-lg font-semibold text-foreground">
+            {outputLabels.length}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Components</p>
-          <p className="text-lg font-semibold text-foreground">{placed.length}</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Components</p>
+          <p className="text-lg font-semibold text-foreground">
+            {placed.length}
+          </p>
         </div>
-        <div className="bg-secondary/40 p-3 rounded-lg border border-border/60">
-          <p className="text-xs text-foreground/70 mb-1">Cost</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+          <p className="mb-1 text-xs text-foreground/70">Cost</p>
           <p className="text-lg font-semibold text-foreground">{totalCost}</p>
         </div>
       </div>
 
       {!hasRenderableCircuit && (
         <div className="rounded-lg border border-amber-300/60 bg-amber-50/50 p-3 text-[12px] text-amber-900">
-          Solution payload was found but no circuit nodes/wires could be parsed for rendering.
+          Solution payload was found but no circuit nodes/wires could be parsed
+          for rendering.
           <div className="mt-1 text-[11px] text-amber-800/90">
             Keys: {Object.keys(payloadObject || {}).join(', ') || 'none'}
           </div>
         </div>
       )}
 
-      <div className="border border-border/60 rounded-lg bg-background overflow-hidden relative" style={{ height: '500px' }}>
+      <div
+        className="relative overflow-hidden rounded-lg border border-border/60 bg-background"
+        style={{ height: '500px' }}
+      >
         <style>{`
           [data-preview-mode="true"] button[title*="Delete"],
           [data-preview-mode="true"] button[title*="Cancel wiring"],
@@ -491,14 +529,26 @@ export function SolutionPreview({
       </div>
 
       {placed.length > 0 && (
-        <div className="bg-secondary/30 rounded-lg p-3 border border-border/60">
-          <p className="text-xs font-semibold text-foreground/70 mb-2">Components Used:</p>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground/70">
+            Components Used:
+          </p>
           <div className="flex flex-wrap gap-2">
             {placed
-              .filter((component, index, array) => array.findIndex((entry) => entry.componentId === component.componentId) === index)
+              .filter(
+                (component, index, array) =>
+                  array.findIndex(
+                    (entry) => entry.componentId === component.componentId,
+                  ) === index,
+              )
               .map((component) => (
-                <div key={component.componentId} className="flex items-center gap-2 text-xs">
-                  <span className="text-foreground/70">{component.componentId}</span>
+                <div
+                  key={component.componentId}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <span className="text-foreground/70">
+                    {component.componentId}
+                  </span>
                 </div>
               ))}
           </div>

@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
 import { Info, CircleAlert, CircleX, CircleCheck } from 'lucide-react';
+import { useEffect } from 'react';
 
 const icons = {
   info: <Info className="size-6 text-foreground" aria-hidden="true" />,
-  success: <CircleCheck className="size-6 text-emerald-600" aria-hidden="true" />,
-  warning: (
-    <CircleAlert className="size-6 text-amber-500" aria-hidden="true" />
+  success: (
+    <CircleCheck className="size-6 text-emerald-600" aria-hidden="true" />
   ),
+  warning: <CircleAlert className="size-6 text-amber-500" aria-hidden="true" />,
   error: <CircleX className="size-6 text-destructive" aria-hidden="true" />,
 };
 
@@ -38,13 +38,15 @@ export const Notification = ({
 
   return (
     <div className="flex w-full flex-col items-center space-y-4 sm:items-end">
-      <div className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-xl bg-card shadow-elevated border border-border">
+      <div className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
         <div className="p-4" role="alert" aria-label={title}>
           <div className="flex items-start">
             <div className="shrink-0">{icons[type]}</div>
             <div className="ml-3 w-0 flex-1 pt-0.5">
               <p className="text-[13px] font-medium text-foreground">{title}</p>
-              <p className="mt-1 text-[13px] text-muted-foreground">{message}</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {message}
+              </p>
             </div>
             <div className="ml-4 flex shrink-0">
               <button

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Sparkles, Star } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -14,9 +14,9 @@ import {
 } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
 
-import { useRatePuzzle } from '../api/rate-puzzle';
 import { useDeleteRating } from '../api/delete-rating';
 import { usePuzzleRatings } from '../api/get-puzzle-ratings';
+import { useRatePuzzle } from '../api/rate-puzzle';
 
 type RatingDialogProps = {
   puzzleId: string;
@@ -36,21 +36,19 @@ const StarInput = ({
 }) => {
   const [hover, setHover] = useState(0);
 
-  // This will show the hover number if you are hovering, 
+  // This will show the hover number if you are hovering,
   // or the saved/existing value if you are not.
   const displayValue = hover || value;
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[13px] font-medium text-foreground">
-        {label}
-      </span>
+      <span className="text-[13px] font-medium text-foreground">{label}</span>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
-            className="transition-transform hover:scale-110 active:scale-95 focus:outline-none"
+            className="transition-transform hover:scale-110 focus:outline-none active:scale-95"
             onMouseEnter={() => setHover(star)}
             onMouseLeave={() => setHover(0)}
             onClick={() => onChange(star)}
@@ -156,7 +154,7 @@ export const RatingDialog = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-5 text-amber-500 animate-[bounce_0.9s_ease-in-out_2]" />
+            <Sparkles className="size-5 animate-[bounce_0.9s_ease-in-out_2] text-amber-500" />
             {existingRating ? 'Update Your Rating' : 'Rate This Puzzle'}
           </DialogTitle>
           <DialogDescription>

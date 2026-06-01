@@ -585,9 +585,12 @@ def build_puzzle_router(puzzle_service: PuzzleService, solving_service: SolvingS
             raise HTTPException(status_code=400, detail=str(e))
 
     @router.post("/{puzzle_id}/attempts/start")
-    def start_attempt(puzzle_id: int, token: str = Depends(verify_token)):
+    def start_attempt(puzzle_id: int, restart: bool = False, token: str = Depends(verify_token)):
+        # `restart=true` is used by the workstation's "Solve again" flow to force a new
+        # attempt even if an open one exists. Default behavior (idempotent reuse plus
+        # automatic stale close) is unchanged when `restart` is omitted.
         try:
-            return solving_service.start_attempt(token, puzzle_id)
+            return solving_service.start_attempt(token, puzzle_id, restart=restart)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
 

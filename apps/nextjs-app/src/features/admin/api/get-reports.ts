@@ -33,10 +33,7 @@ type UseReportsOptions = {
   queryConfig?: QueryConfig<typeof getReportsQueryOptions>;
 };
 
-export const useReports = ({
-  status,
-  queryConfig,
-}: UseReportsOptions = {}) => {
+export const useReports = ({ status, queryConfig }: UseReportsOptions = {}) => {
   return useQuery({
     ...getReportsQueryOptions(status),
     ...queryConfig,

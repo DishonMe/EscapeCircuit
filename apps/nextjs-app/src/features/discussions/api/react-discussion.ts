@@ -46,7 +46,8 @@ export const useReactToDiscussion = ({
     onMutate: async ({ reactionType }) => {
       const queryKey = getDiscussionQueryOptions(discussionId).queryKey;
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<DiscussionWithReplies>(queryKey);
+      const previous =
+        queryClient.getQueryData<DiscussionWithReplies>(queryKey);
 
       if (previous?.engagement) {
         const eng = previous.engagement;
@@ -58,9 +59,7 @@ export const useReactToDiscussion = ({
           : [...eng.user_reactions, rt];
 
         const newReactions = eng.reactions.map((r) =>
-          r.type === rt
-            ? { ...r, count: r.count + (isActive ? -1 : 1) }
-            : r,
+          r.type === rt ? { ...r, count: r.count + (isActive ? -1 : 1) } : r,
         );
         // Add new reaction type if it wasn't in the list
         if (!isActive && !eng.reactions.some((r) => r.type === rt)) {

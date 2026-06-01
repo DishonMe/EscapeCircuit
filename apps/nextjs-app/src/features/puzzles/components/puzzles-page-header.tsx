@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { Sparkles, Zap } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 type PuzzlesPageHeaderProps = {
   tutorialSlot?: ReactNode;

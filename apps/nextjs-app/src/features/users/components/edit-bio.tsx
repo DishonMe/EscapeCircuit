@@ -1,14 +1,14 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Edit2 } from 'lucide-react';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Form, FormDrawer, Textarea } from '@/components/ui/form';
 import { useNotifications } from '@/components/ui/notifications';
-import { useUser } from '@/lib/auth';
-import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import { useUser } from '@/lib/auth';
 import { MutationConfig } from '@/lib/react-query';
 
 const editBioSchema = z.object({
@@ -25,9 +25,7 @@ type UseUpdateBioOptions = {
   mutationConfig?: MutationConfig<typeof updateBio>;
 };
 
-const useUpdateBio = ({
-  mutationConfig,
-}: UseUpdateBioOptions = {}) => {
+const useUpdateBio = ({ mutationConfig }: UseUpdateBioOptions = {}) => {
   const queryClient = useQueryClient();
   const { onSuccess, ...restConfig } = mutationConfig || {};
 
@@ -57,7 +55,7 @@ export const EditBio = () => {
           type: 'error',
           title: 'Failed to update bio',
         });
-      }
+      },
     },
   });
 

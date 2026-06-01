@@ -125,6 +125,172 @@ class TestSolvingServiceStartAttempt:
         with pytest.raises(ValidationError):
             self.service.start_attempt("invalid_token", 1)
 
+    def test_stale_threshold_for_timed_puzzle_uses_4x_time_limit(self):
+        # 60-second puzzle → threshold is 4 minutes, not 24h.
+        assert SolvingService._stale_open_attempt_threshold_seconds(60) == 240
+
+    def test_stale_threshold_caps_at_24h_for_very_long_puzzles(self):
+        # time_limit_seconds * 4 would exceed 24h → cap at 24h.
+        assert SolvingService._stale_open_attempt_threshold_seconds(10 * 3600) == 24 * 3600
+
+    def test_stale_threshold_for_no_limit_puzzle_is_24h(self):
+        assert SolvingService._stale_open_attempt_threshold_seconds(None) == 24 * 3600
+        assert SolvingService._stale_open_attempt_threshold_seconds(0) == 24 * 3600
+
+    def _build_existing_attempt(self, started_at):
+        """Build a Mock SolveAttempt with a controllable started_at."""
+        existing = Mock(spec=SolveAttempt)
+        existing.id = 7
+        existing.puzzle_id = 1
+        existing.user_id = 1
+        existing.started_at = started_at
+        existing.to_dict.return_value = {
+            "id": 7,
+            "puzzle_id": 1,
+            "user_id": 1,
+            "started_at": started_at.isoformat() if started_at else None,
+        }
+        return existing
+
+    def test_start_attempt_reuses_recent_open_attempt(self):
+        from Backend.DomainLayer.Utils import utcnow
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        recent = self._build_existing_attempt(utcnow())
+        self.mock_solve_repo.get_open_attempt.return_value = recent
+
+        result = self.service.start_attempt("valid_token", 1)
+
+        # Idempotent reuse — no new attempt created, stale-close NOT invoked.
+        self.mock_solve_repo.abandon_stale_attempt.assert_not_called()
+        self.mock_solve_repo.create_attempt.assert_not_called()
+        assert result["id"] == 7
+
+    def test_start_attempt_abandons_stale_open_attempt(self):
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        self.mock_auth.require_user_id.return_value = 1
+        # 60-second puzzle → threshold is 240s. Make the attempt 10 minutes old.
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        stale = self._build_existing_attempt(utcnow() - timedelta(minutes=10))
+        self.mock_solve_repo.get_open_attempt.return_value = stale
+
+        fresh = Mock(spec=SolveAttempt)
+        fresh.id = 99
+        fresh.puzzle_id = 1
+        fresh.user_id = 1
+        fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = fresh
+
+        result = self.service.start_attempt("valid_token", 1)
+
+        self.mock_solve_repo.abandon_stale_attempt.assert_called_once_with(7)
+        self.mock_solve_repo.create_attempt.assert_called_once()
+        assert result["id"] == 99
+
+    def test_start_attempt_raises_when_stale_close_did_not_take(self):
+        """If abandon_stale_attempt fails to flip submitted_at, refuse to open a
+        replacement so we never leave two open attempts for the same user/puzzle."""
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        stale = self._build_existing_attempt(utcnow() - timedelta(minutes=10))
+        self.mock_solve_repo.get_open_attempt.return_value = stale
+        # Simulate abandon_stale_attempt running but the row remaining unchanged
+        # (still open). The service must abort, NOT create a new attempt.
+        not_actually_closed = Mock(spec=SolveAttempt)
+        not_actually_closed.id = 7
+        not_actually_closed.submitted_at = None
+        self.mock_solve_repo.get_attempt_by_id.return_value = not_actually_closed
+
+        with pytest.raises(ValidationError) as exc_info:
+            self.service.start_attempt("valid_token", 1)
+        assert "Failed to close stale attempt" in str(exc_info.value)
+        self.mock_solve_repo.create_attempt.assert_not_called()
+
+    def test_start_attempt_reads_open_attempt_inside_transaction(self):
+        """The get_open_attempt call must happen inside the BEGIN IMMEDIATE
+        transaction so two racing start_attempt calls serialize on the SQLite
+        write lock. The second call must re-fetch the open attempt and observe
+        whatever the first call wrote, instead of acting on a stale read."""
+        from contextlib import contextmanager
+        from Backend.DomainLayer.Utils import utcnow
+        from datetime import timedelta
+
+        # Patch transaction so we can observe whether the body runs INSIDE it.
+        in_tx = []
+        original_transaction_module = __import__(
+            'Backend.ServiceLayer.SolvingService', fromlist=['transaction']
+        )
+
+        @contextmanager
+        def tracking_tx(conn):
+            in_tx.append(True)
+            try:
+                yield conn
+            finally:
+                in_tx.append(False)
+
+        with patch.object(original_transaction_module, 'transaction', tracking_tx):
+            self.mock_auth.require_user_id.return_value = 1
+            puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                            status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+            self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+            # get_open_attempt must only be invoked while in_tx is True.
+            def assert_in_tx(*_args, **_kwargs):
+                assert in_tx and in_tx[-1] is True, (
+                    "get_open_attempt was called OUTSIDE the transaction — "
+                    "this is the concurrency race the fix is meant to prevent"
+                )
+                return None
+
+            self.mock_solve_repo.get_open_attempt.side_effect = assert_in_tx
+
+            fresh = Mock(spec=SolveAttempt)
+            fresh.id = 99
+            fresh.puzzle_id = 1
+            fresh.user_id = 1
+            fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+            self.mock_solve_repo.create_attempt.return_value = fresh
+
+            self.service.start_attempt("valid_token", 1)
+            self.mock_solve_repo.get_open_attempt.assert_called_once()
+
+    def test_start_attempt_with_restart_closes_open_attempt_regardless_of_age(self):
+        from Backend.DomainLayer.Utils import utcnow
+        self.mock_auth.require_user_id.return_value = 1
+        puzzle = Puzzle(id=1, name="Test", creator_user_id=2,
+                        status=PuzzleStatus.PUBLISHED, time_limit_seconds=60)
+        self.mock_puzzle_repo.get_by_id.return_value = puzzle
+
+        # Recent attempt — would normally be reused, but restart=True forces close.
+        recent = self._build_existing_attempt(utcnow())
+        self.mock_solve_repo.get_open_attempt.return_value = recent
+
+        fresh = Mock(spec=SolveAttempt)
+        fresh.id = 99
+        fresh.puzzle_id = 1
+        fresh.user_id = 1
+        fresh.to_dict.return_value = {"id": 99, "puzzle_id": 1, "user_id": 1}
+        self.mock_solve_repo.create_attempt.return_value = fresh
+
+        result = self.service.start_attempt("valid_token", 1, restart=True)
+
+        self.mock_solve_repo.abandon_stale_attempt.assert_called_once_with(7)
+        self.mock_solve_repo.create_attempt.assert_called_once()
+        assert result["id"] == 99
+
 
 class TestSolvingServiceSubmitSolution:
     def setup_method(self):

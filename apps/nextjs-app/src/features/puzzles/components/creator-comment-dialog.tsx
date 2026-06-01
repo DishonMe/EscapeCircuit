@@ -47,7 +47,7 @@ export const CreatorCommentDialog = ({
           {showLink && puzzle ? (
             <Link
               href={`/app/puzzles/${puzzle.id}`}
-              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background hover:bg-foreground/90 transition-colors"
+              className="rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90"
             >
               Go to puzzle
             </Link>

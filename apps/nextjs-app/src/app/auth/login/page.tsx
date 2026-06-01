@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleLogin } from '@react-oauth/google';
+import { useState } from 'react';
 
+import { CircuitBackground } from '@/components/ui/circuit-background/circuit-background';
 import { useNavigationLoading } from '@/components/ui/navigation-loading/navigation-loading';
 import { useNotifications } from '@/components/ui/notifications';
-import { CircuitBackground } from '@/components/ui/circuit-background/CircuitBackground';
 import { paths } from '@/config/paths';
 import { useGoogleLogin, useLogin } from '@/lib/auth';
 
@@ -51,7 +51,9 @@ export default function LoginPage() {
   const googleLogin = useGoogleLogin({
     onSuccess: handleAuthSuccess,
     onError: (googleError: any) => {
-      const message = googleError?.message || 'Could not authenticate with Google. Please try again.';
+      const message =
+        googleError?.message ||
+        'Could not authenticate with Google. Please try again.';
       setError(message);
       addNotification({
         type: 'error',
@@ -65,7 +67,9 @@ export default function LoginPage() {
         name: data.name,
         token: data.token,
       });
-      router.push(`${paths.auth.completeGoogle.getHref()}?${params.toString()}`);
+      router.push(
+        `${paths.auth.completeGoogle.getHref()}?${params.toString()}`,
+      );
     },
   });
 
@@ -93,7 +97,8 @@ export default function LoginPage() {
         style={{
           width: 500,
           height: 500,
-          background: 'radial-gradient(circle, rgba(56,189,248,0.08) 0%, transparent 70%)',
+          background:
+            'radial-gradient(circle, rgba(56,189,248,0.08) 0%, transparent 70%)',
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
@@ -101,7 +106,7 @@ export default function LoginPage() {
       />
 
       <div
-        className="pointer-events-none absolute h-[560px] w-[560px] rounded-full"
+        className="pointer-events-none absolute size-[560px] rounded-full"
         style={{
           top: '50%',
           left: '50%',
@@ -114,13 +119,14 @@ export default function LoginPage() {
       />
 
       <div
-        className="pointer-events-none absolute h-[500px] w-[500px] rounded-full"
+        className="pointer-events-none absolute size-[500px] rounded-full"
         style={{
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
           border: '1px solid rgba(56,189,248,0.14)',
-          boxShadow: '0 0 40px rgba(56,189,248,0.14), inset 0 0 25px rgba(56,189,248,0.08)',
+          boxShadow:
+            '0 0 40px rgba(56,189,248,0.14), inset 0 0 25px rgba(56,189,248,0.08)',
           animation: 'flow-orbit-rev 20s ease-in-out infinite',
         }}
       />
@@ -144,7 +150,7 @@ export default function LoginPage() {
         />
 
         <div
-          className="pointer-events-none absolute left-[30px] right-[30px] top-[-1px] h-px"
+          className="pointer-events-none absolute inset-x-[30px] -top-px h-px"
           style={{
             background:
               'linear-gradient(90deg, transparent, rgba(56,189,248,0.5), transparent)',
@@ -159,7 +165,7 @@ export default function LoginPage() {
         ].map((pos, i) => (
           <span
             key={i}
-            className="absolute h-1 w-1 rounded-full"
+            className="absolute size-1 rounded-full"
             style={{
               ...pos,
               background: 'rgba(56,189,248,0.5)',
@@ -181,10 +187,42 @@ export default function LoginPage() {
           >
             <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
               <circle cx="14" cy="14" r="3" fill="#38bdf8" />
-              <line x1="14" y1="4" x2="14" y2="10" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="14" y1="18" x2="14" y2="24" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="4" y1="14" x2="10" y2="14" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="18" y1="14" x2="24" y2="14" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" />
+              <line
+                x1="14"
+                y1="4"
+                x2="14"
+                y2="10"
+                stroke="#38bdf8"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="14"
+                y1="18"
+                x2="14"
+                y2="24"
+                stroke="#f97316"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="4"
+                y1="14"
+                x2="10"
+                y2="14"
+                stroke="#22c55e"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="18"
+                y1="14"
+                x2="24"
+                y2="14"
+                stroke="#a855f7"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
               <circle cx="14" cy="4" r="1.5" fill="rgba(56,189,248,0.4)" />
               <circle cx="14" cy="24" r="1.5" fill="rgba(249,115,22,0.4)" />
               <circle cx="4" cy="14" r="1.5" fill="rgba(34,197,94,0.4)" />
@@ -193,29 +231,42 @@ export default function LoginPage() {
           </div>
           <span
             className="text-[15px] tracking-[0.08em]"
-            style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.9)' }}
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              color: 'rgba(56,189,248,0.9)',
+            }}
           >
             ESCAPECIRCUIT
           </span>
         </div>
 
-        <h1 className="mb-1 text-center text-[22px] font-semibold text-slate-50">Welcome back</h1>
-        <p className="mb-8 text-center text-[13px]" style={{ color: 'rgba(148,163,184,0.7)' }}>
+        <h1 className="mb-1 text-center text-[22px] font-semibold text-slate-50">
+          Welcome back
+        </h1>
+        <p
+          className="mb-8 text-center text-[13px]"
+          style={{ color: 'rgba(148,163,184,0.7)' }}
+        >
           Log in to resume your circuits
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
             <label
-              className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
-              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.6)' }}
+              htmlFor="login-username"
+              className="mb-1.5 block text-[11px] uppercase tracking-widest"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                color: 'rgba(56,189,248,0.6)',
+              }}
             >
               Email or Username
             </label>
             <input
+              id="login-username"
               type="text"
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value)}
               placeholder="your_handle or you@example.com"
               autoComplete="username"
               className="w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-400/30"
@@ -223,11 +274,11 @@ export default function LoginPage() {
                 background: 'rgba(255,255,255,0.04)',
                 borderColor: 'rgba(56,189,248,0.15)',
               }}
-              onFocus={e => {
+              onFocus={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(56,189,248,0.5)';
                 e.currentTarget.style.background = 'rgba(56,189,248,0.04)';
               }}
-              onBlur={e => {
+              onBlur={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(56,189,248,0.15)';
                 e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
               }}
@@ -236,15 +287,20 @@ export default function LoginPage() {
 
           <div>
             <label
-              className="mb-1.5 block text-[11px] uppercase tracking-[0.1em]"
-              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(56,189,248,0.6)' }}
+              htmlFor="login-password"
+              className="mb-1.5 block text-[11px] uppercase tracking-widest"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                color: 'rgba(56,189,248,0.6)',
+              }}
             >
               Password
             </label>
             <input
+              id="login-password"
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••"
               autoComplete="current-password"
               className="w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-400/30"
@@ -252,11 +308,11 @@ export default function LoginPage() {
                 background: 'rgba(255,255,255,0.04)',
                 borderColor: 'rgba(56,189,248,0.15)',
               }}
-              onFocus={e => {
+              onFocus={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(56,189,248,0.5)';
                 e.currentTarget.style.background = 'rgba(56,189,248,0.04)';
               }}
-              onBlur={e => {
+              onBlur={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(56,189,248,0.15)';
                 e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
               }}
@@ -284,11 +340,11 @@ export default function LoginPage() {
               background: 'rgba(56,189,248,0.12)',
               borderColor: 'rgba(56,189,248,0.35)',
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(56,189,248,0.2)';
               e.currentTarget.style.borderColor = 'rgba(56,189,248,0.6)';
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
               e.currentTarget.style.borderColor = 'rgba(56,189,248,0.35)';
             }}
@@ -300,19 +356,28 @@ export default function LoginPage() {
         {isGoogleLoginEnabled && (
           <>
             <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
+              <div
+                className="h-px flex-1"
+                style={{ background: 'rgba(56,189,248,0.1)' }}
+              />
               <span
                 className="text-[11px] tracking-wider"
-                style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(148,163,184,0.4)' }}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  color: 'rgba(148,163,184,0.4)',
+                }}
               >
                 or
               </span>
-              <div className="h-px flex-1" style={{ background: 'rgba(56,189,248,0.1)' }} />
+              <div
+                className="h-px flex-1"
+                style={{ background: 'rgba(56,189,248,0.1)' }}
+              />
             </div>
 
             <div className="flex justify-center">
               <GoogleLogin
-                onSuccess={credentialResponse => {
+                onSuccess={(credentialResponse) => {
                   const credential = credentialResponse.credential;
                   if (credential) {
                     setError('');
@@ -333,22 +398,24 @@ export default function LoginPage() {
                 text="signin_with"
                 size="large"
                 width="240"
-                locale="en"
               />
             </div>
           </>
         )}
 
-        <p className="mt-6 text-center text-[13px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
+        <p
+          className="mt-6 text-center text-[13px]"
+          style={{ color: 'rgba(148,163,184,0.5)' }}
+        >
           No account?{' '}
           <Link
             href={paths.auth.register.getHref()}
             className="transition-colors"
             style={{ color: 'rgba(56,189,248,0.8)' }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               e.currentTarget.style.color = 'rgba(56,189,248,1)';
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.color = 'rgba(56,189,248,0.8)';
             }}
           >

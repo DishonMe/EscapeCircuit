@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+
 import { useNotifications } from '@/components/ui/notifications';
 
 /**

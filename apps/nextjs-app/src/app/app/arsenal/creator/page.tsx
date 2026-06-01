@@ -1,38 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { useNotifications } from '@/components/ui/notifications';
-import { StyledSelect } from '@/components/ui/styled-select/styled-select';
-import { paths } from '@/config/paths';
-
-const INPUT_COUNT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({
-  value: n,
-  label: String(n),
-}));
-const OUTPUT_COUNT_OPTIONS = [1, 2, 3].map((n) => ({
-  value: n,
-  label: String(n),
-}));
-import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
-import { CircuitComponent, Wire } from '@/types/api';
-import {
-  WorkstationGrid,
-  type ComponentDef,
-  type PlacedGridComponent,
-  type SelectedComponentState,
-} from '@/app/app/puzzles/[id]/_components/workstation-grid';
-import { WorkstationMenu } from '@/app/app/puzzles/[id]/_components/workstation-menu';
 import {
   LogicNode,
   type LogicNodeDefinition,
@@ -43,7 +14,39 @@ import {
   DEFAULT_PIECE_VISUAL_STYLE,
   extractVisualStyleFromComponentLike,
 } from '@/app/app/puzzles/[id]/_components/piece-visual-style';
-import dynamic from 'next/dynamic';
+import {
+  WorkstationGrid,
+  type ComponentDef,
+  type PlacedGridComponent,
+  type SelectedComponentState,
+} from '@/app/app/puzzles/[id]/_components/workstation-grid';
+import { WorkstationMenu } from '@/app/app/puzzles/[id]/_components/workstation-menu';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useNotifications } from '@/components/ui/notifications';
+import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
+import { StyledSelect } from '@/components/ui/styled-select/styled-select';
+import { paths } from '@/config/paths';
+import { arsenalCreatorTourSteps } from '@/config/tour-steps';
+import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
+import { findUnconnectedPorts } from '@/features/arsenal/lib/validate-connections';
+import { CircuitComponent, Wire } from '@/types/api';
+
+const INPUT_COUNT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({
+  value: n,
+  label: String(n),
+}));
+const OUTPUT_COUNT_OPTIONS = [1, 2, 3].map((n) => ({
+  value: n,
+  label: String(n),
+}));
 const CircuitDebugger = dynamic(
   () =>
     import('@/components/circuit-debugger').then((mod) => ({
@@ -107,13 +110,15 @@ const buildPiecePreviewNode = ({
   }
 
   if (safeInputs !== safeOutputs && safeInputs > 0 && safeOutputs > 0) {
-    const lowerKind: 'input' | 'output' = safeInputs < safeOutputs ? 'input' : 'output';
+    const lowerKind: 'input' | 'output' =
+      safeInputs < safeOutputs ? 'input' : 'output';
     const lowerPorts = ports
       .filter((port) => port.kind === lowerKind)
       .sort((a, b) => a.offset.row - b.offset.row);
 
     lowerPorts.forEach((port, index) => {
-      const distributedRow = -0.5 + ((index + 1) * height) / (lowerPorts.length + 1);
+      const distributedRow =
+        -0.5 + ((index + 1) * height) / (lowerPorts.length + 1);
       port.offset = {
         row: distributedRow,
         col: port.offset.col,
@@ -137,12 +142,18 @@ export default function ArsenalCreatorPage() {
   const [numOutputs, setNumOutputs] = useState(1);
   const [pieceName, setPieceName] = useState('');
   const [pieceDescription, setPieceDescription] = useState('');
-  const [pieceVisualStyle, setPieceVisualStyle] = useState<Required<LogicNodeVisualStyle>>(
-    DEFAULT_PIECE_VISUAL_STYLE,
-  );
+  const [pieceVisualStyle, setPieceVisualStyle] = useState<
+    Required<LogicNodeVisualStyle>
+  >(DEFAULT_PIECE_VISUAL_STYLE);
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ open: false });
+  // When non-null, the dialog renders a warning step listing the unwired ports
+  // and replaces the Save button with Cancel / Save anyway.
+  const [unwiredWarning, setUnwiredWarning] = useState<{
+    unconnectedInputs: string[];
+    unconnectedOutputs: string[];
+  } | null>(null);
 
   const [placed, setPlaced] = useState<PlacedGridComponent[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
@@ -175,7 +186,13 @@ export default function ArsenalCreatorPage() {
       numOutputs,
       visualStyle: hasCustomPieceVisualStyle ? pieceVisualStyle : undefined,
     });
-  }, [pieceName, numInputs, numOutputs, hasCustomPieceVisualStyle, pieceVisualStyle]);
+  }, [
+    pieceName,
+    numInputs,
+    numOutputs,
+    hasCustomPieceVisualStyle,
+    pieceVisualStyle,
+  ]);
 
   // Convert arsenal pieces to CircuitComponent format
   const arsenalComponents = useMemo(() => {
@@ -330,7 +347,6 @@ export default function ArsenalCreatorPage() {
       const isArsenal = (def as any).is_arsenal === true;
       const visualStyle = extractVisualStyleFromComponentLike(def);
 
-
       let size: { w: number; h: number };
       let ports: Array<{
         id: string;
@@ -419,34 +435,8 @@ export default function ArsenalCreatorPage() {
     return { gates, usedArsenalPieceIds };
   }, [placed, componentCatalog]);
 
-  const handleSave = async () => {
-    if (!pieceName.trim()) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Please enter a piece name',
-      });
-      return;
-    }
-
-    if (!pieceDescription.trim()) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'A description is required for Arsenal components.',
-      });
-      return;
-    }
-
-    if (placed.length === 0) {
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Please add at least one component to your circuit',
-      });
-      return;
-    }
-
+  const proceedToSave = async () => {
+    setUnwiredWarning(null);
     setSaveState({ open: true, saving: true });
 
     try {
@@ -499,19 +489,68 @@ export default function ArsenalCreatorPage() {
     }
   };
 
+  const handleSave = async () => {
+    if (!pieceName.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Please enter a piece name',
+      });
+      return;
+    }
+
+    if (!pieceDescription.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'A description is required for Arsenal components.',
+      });
+      return;
+    }
+
+    if (placed.length === 0) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Please add at least one component to your circuit',
+      });
+      return;
+    }
+
+    // Warn before saving if any declared input/output is left unwired.
+    // The user can still proceed via the warning's "Save anyway" action.
+    const unconnected = findUnconnectedPorts(inputs, outputs, wires);
+    if (
+      unconnected.unconnectedInputs.length > 0 ||
+      unconnected.unconnectedOutputs.length > 0
+    ) {
+      setUnwiredWarning(unconnected);
+      return;
+    }
+
+    await proceedToSave();
+  };
+
   const handlePlacedChange = useCallback((newPlaced: PlacedGridComponent[]) => {
     setPlaced(newPlaced);
   }, []);
 
   return (
-    <div className="flex flex-col h-full gap-2">
+    <div className="flex h-full flex-col gap-2">
+      <PageTourLauncher
+        tourName="arsenal-creator"
+        pageTitle="Arsenal Creator"
+        pageDescription="Walk through declaring inputs/outputs, dragging gates onto the grid, wiring them up, and saving your piece."
+        steps={arsenalCreatorTourSteps}
+        side="right"
+      />
       {/* Header + Compact Config Bar */}
-      <div className="flex flex-wrap items-center gap-4 px-6 pt-3 pb-1">
+      <div className="flex flex-wrap items-center gap-4 px-6 pb-1 pt-3">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           Create Arsenal Piece
         </h1>
 
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
+        <div className="tour-creator-io-config flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
           <span className="text-[12px] font-medium text-muted-foreground">
             Inputs
           </span>
@@ -534,7 +573,7 @@ export default function ArsenalCreatorPage() {
           />
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
+        <div className="tour-creator-cost flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px]">
           <span className="text-muted-foreground">
             Components:{' '}
             <span className="font-medium text-foreground">{placed.length}</span>
@@ -561,6 +600,7 @@ export default function ArsenalCreatorPage() {
             onClick={() => setShowNameDialog(true)}
             disabled={placed.length === 0}
             size="sm"
+            className="tour-creator-save"
           >
             Save Piece
           </Button>
@@ -578,40 +618,47 @@ export default function ArsenalCreatorPage() {
 
       {/* Workstation - Main grid layout (stretches full remaining height) */}
       <div className="flex min-h-[calc(100vh-9rem)] flex-1 gap-4 px-6 pb-3">
-        <WorkstationMenu
-          basic={BASIC_COMPONENTS}
-          custom={[]}
-          sharedArsenal={[]}
-          solverArsenal={arsenalComponents}
-          allowArsenal={true}
-          filteredBasicTypes={[]}
-          selectedComponentId={
-            selectedComponent.mode === 'placing'
-              ? selectedComponent.componentId
-              : undefined
-          }
-          onSelectComponent={(componentId) =>
-            setSelectedComponent({ mode: 'placing', componentId, rotation: 0 })
-          }
-          onDragStart={setDraggedPaletteComponentId}
-          onDragEnd={() => setDraggedPaletteComponentId(null)}
-        />
+        <div className="tour-creator-palette">
+          <WorkstationMenu
+            basic={BASIC_COMPONENTS}
+            custom={[]}
+            sharedArsenal={[]}
+            solverArsenal={arsenalComponents}
+            allowArsenal={true}
+            filteredBasicTypes={[]}
+            selectedComponentId={
+              selectedComponent.mode === 'placing'
+                ? selectedComponent.componentId
+                : undefined
+            }
+            onSelectComponent={(componentId) =>
+              setSelectedComponent({
+                mode: 'placing',
+                componentId,
+                rotation: 0,
+              })
+            }
+            onDragStart={setDraggedPaletteComponentId}
+            onDragEnd={() => setDraggedPaletteComponentId(null)}
+          />
+        </div>
 
-        <WorkstationGrid
-          puzzleId="arsenal-creator"
-          inputs={inputs}
-          outputs={outputs}
-          catalog={uiCatalog}
-          placed={placed}
-          wires={wires}
-          selectedComponent={selectedComponent}
-          onSelectedComponentChange={setSelectedComponent}
-          onPlacedChange={handlePlacedChange}
-          onWiresChange={setWires}
-          draggedPaletteComponentId={draggedPaletteComponentId}
-          viewportClassName="h-full"
-          emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
-        />
+        <div className="tour-creator-grid flex-1">
+          <WorkstationGrid
+            puzzleId="arsenal-creator"
+            inputs={inputs}
+            outputs={outputs}
+            catalog={uiCatalog}
+            placed={placed}
+            wires={wires}
+            selectedComponent={selectedComponent}
+            onSelectedComponentChange={setSelectedComponent}
+            onPlacedChange={handlePlacedChange}
+            onWiresChange={setWires}
+            draggedPaletteComponentId={draggedPaletteComponentId}
+            emptyHoleClassName="size-2 bg-muted-foreground/35 hover:bg-muted-foreground/60"
+          />
+        </div>
       </div>
 
       {/* Save Dialog */}
@@ -624,17 +671,39 @@ export default function ArsenalCreatorPage() {
             </DialogDescription>
           </DialogHeader>
 
+          <div className="mb-3 rounded-md border border-border/60 bg-muted/40 p-3 text-[12px] leading-5 text-muted-foreground">
+            <p className="font-medium text-foreground">A few things to know</p>
+            <ul className="mt-1 list-disc pl-4">
+              <li>
+                The name must be unique across your arsenal — you can rename
+                later.
+              </li>
+              <li>
+                Visual styling (color, surface, edges) can be tweaked here and
+                changed any time from the arsenal list.
+              </li>
+              <li>
+                If any declared input or output is left unwired, you&apos;ll see
+                a warning before the piece is saved.
+              </li>
+            </ul>
+          </div>
+
           <div className="space-y-4">
             <div>
-              <label className="text-[13px] font-medium text-foreground block mb-2">
+              <label
+                htmlFor="arsenal-piece-name"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Piece Name
               </label>
               <input
+                id="arsenal-piece-name"
                 type="text"
                 value={pieceName}
                 onChange={(e: any) => setPieceName(e.target.value)}
                 placeholder="Enter piece name (must be unique)"
-                className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e: any) => {
                   if (
                     e.key === 'Enter' &&
@@ -647,44 +716,59 @@ export default function ArsenalCreatorPage() {
             </div>
 
             <div>
-              <label className="text-[13px] font-medium text-foreground block mb-2">
+              <label
+                htmlFor="arsenal-piece-description"
+                className="mb-2 block text-[13px] font-medium text-foreground"
+              >
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
+                id="arsenal-piece-description"
                 value={pieceDescription}
                 onChange={(e: any) => setPieceDescription(e.target.value)}
                 placeholder="Describe what this component does and how it works..."
-                className="w-full border border-border rounded-lg bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none h-20"
+                className="h-20 w-full resize-none rounded-lg border border-border bg-transparent p-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
               />
               {!pieceDescription.trim() && (
-                <p className="text-[11px] text-red-600 mt-1">
+                <p className="mt-1 text-[11px] text-red-600">
                   A description is required for Arsenal components.
                 </p>
               )}
             </div>
 
             <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
-              <p className="mb-2 text-[13px] font-medium text-foreground">Piece Preview</p>
+              <p className="mb-2 text-[13px] font-medium text-foreground">
+                Piece Preview
+              </p>
               <div className="rounded-md border border-border/60 bg-background/80 p-4">
                 <div className="flex items-center justify-center">
-                  <LogicNode node={saveDialogPreviewNode} cellPx={22} portPx={8} />
+                  <LogicNode
+                    node={saveDialogPreviewNode}
+                    cellPx={22}
+                    portPx={8}
+                  />
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-foreground/80">
                   <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Name:</span> {saveDialogPreviewNode.label}
+                    <span className="text-foreground/60">Name:</span>{' '}
+                    {saveDialogPreviewNode.label}
                   </div>
                   <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Inputs:</span> {numInputs}
+                    <span className="text-foreground/60">Inputs:</span>{' '}
+                    {numInputs}
                   </div>
                   <div className="rounded border border-border/50 bg-card px-2 py-1">
-                    <span className="text-foreground/60">Outputs:</span> {numOutputs}
+                    <span className="text-foreground/60">Outputs:</span>{' '}
+                    {numOutputs}
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="rounded-lg border border-border/70 bg-secondary/30 p-3">
-              <p className="mb-2 text-[13px] font-medium text-foreground">Piece Look</p>
+              <p className="mb-2 text-[13px] font-medium text-foreground">
+                Piece Look
+              </p>
               <div className="grid grid-cols-2 gap-2 text-[12px]">
                 <label className="flex flex-col gap-1 text-muted-foreground">
                   Accent
@@ -700,7 +784,9 @@ export default function ArsenalCreatorPage() {
                       }
                       className="h-8 w-10 cursor-pointer rounded border border-border bg-card p-1"
                     />
-                    <span className="font-mono text-[11px] text-foreground">{pieceVisualStyle.accentColor}</span>
+                    <span className="font-mono text-[11px] text-foreground">
+                      {pieceVisualStyle.accentColor}
+                    </span>
                   </div>
                 </label>
 
@@ -720,7 +806,9 @@ export default function ArsenalCreatorPage() {
                     }
                     className="h-8"
                   />
-                  <span className="text-[11px] text-foreground/75">{pieceVisualStyle.roundness} / 10</span>
+                  <span className="text-[11px] text-foreground/75">
+                    {pieceVisualStyle.roundness} / 10
+                  </span>
                 </label>
 
                 <label className="flex flex-col gap-1 text-muted-foreground">
@@ -781,7 +869,7 @@ export default function ArsenalCreatorPage() {
               </div>
             </div>
 
-            <div className="bg-secondary/50 p-3 rounded-lg text-[13px] space-y-1">
+            <div className="space-y-1 rounded-lg bg-secondary/50 p-3 text-[13px]">
               <p>
                 <span className="text-muted-foreground">Inputs:</span>{' '}
                 {numInputs}
@@ -801,27 +889,75 @@ export default function ArsenalCreatorPage() {
             </div>
           </div>
 
+          {unwiredWarning ? (
+            <div className="mt-2 rounded-md border border-amber-200/70 bg-amber-50/60 p-3 text-[13px] text-amber-900">
+              <p className="font-semibold">Some ports are not wired</p>
+              <p className="mt-1 text-amber-900/80">
+                The piece will still save, but unwired ports will read as
+                constant inputs / unused outputs at evaluation time.
+              </p>
+              {unwiredWarning.unconnectedInputs.length > 0 ? (
+                <p className="mt-2">
+                  <span className="font-medium">Unwired inputs: </span>
+                  {unwiredWarning.unconnectedInputs.join(', ')}
+                </p>
+              ) : null}
+              {unwiredWarning.unconnectedOutputs.length > 0 ? (
+                <p className="mt-1">
+                  <span className="font-medium">Unwired outputs: </span>
+                  {unwiredWarning.unconnectedOutputs.join(', ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowNameDialog(false);
-                setSaveState({ open: false });
-              }}
-              disabled={saveState.open && saveState.saving}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={
-                (saveState.open && saveState.saving) ||
-                !pieceName.trim() ||
-                !pieceDescription.trim()
-              }
-            >
-              {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
-            </Button>
+            {unwiredWarning ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setUnwiredWarning(null)}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (saveState.open && saveState.saving) return;
+                    void proceedToSave();
+                  }}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  {saveState.open && saveState.saving
+                    ? 'Saving...'
+                    : 'Save anyway'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowNameDialog(false);
+                    setSaveState({ open: false });
+                    setUnwiredWarning(null);
+                  }}
+                  disabled={saveState.open && saveState.saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={
+                    (saveState.open && saveState.saving) ||
+                    !pieceName.trim() ||
+                    !pieceDescription.trim()
+                  }
+                >
+                  {saveState.open && saveState.saving ? 'Saving...' : 'Save'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

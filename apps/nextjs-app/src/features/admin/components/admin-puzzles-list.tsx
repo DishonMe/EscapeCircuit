@@ -1,19 +1,24 @@
 'use client';
 
+import {
+  Filter,
+  X,
+  AlertTriangle,
+  Eye,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import { useState, useEffect, ChangeEvent } from 'react';
-import { Filter, X, AlertTriangle, Eye, ArrowUp, ArrowDown } from 'lucide-react';
 
+// eslint-disable-next-line import/no-restricted-paths -- shared puzzle preview dialog currently lives under app/; extracting it is a separate refactor.
+import { PuzzleViewDialog } from '@/app/app/my-puzzles/_components/puzzle-view-dialog';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { Table } from '@/components/ui/table';
 import { formatDate } from '@/utils/format';
-import { PuzzleViewDialog } from '@/app/app/my-puzzles/_components/puzzle-view-dialog';
 
-import {
-  useAdminPuzzles,
-  AdminPuzzleFilters,
-} from '../api/get-admin-puzzles';
+import { useAdminPuzzles, AdminPuzzleFilters } from '../api/get-admin-puzzles';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -98,9 +103,7 @@ export const AdminPuzzlesList = () => {
             field: 'name',
             Cell({ entry }: { entry: any }) {
               return (
-                <span className="font-medium">
-                  {entry.name || entry.title}
-                </span>
+                <span className="font-medium">{entry.name || entry.title}</span>
               );
             },
           },
@@ -116,7 +119,7 @@ export const AdminPuzzlesList = () => {
                     : 'text-foreground/80 bg-secondary';
               return (
                 <span
-                  className={`capitalize rounded-lg px-2 py-0.5 text-[11px] font-medium ${color}`}
+                  className={`rounded-lg px-2 py-0.5 text-[11px] font-medium capitalize ${color}`}
                 >
                   {entry.status}
                 </span>
@@ -127,9 +130,7 @@ export const AdminPuzzlesList = () => {
             title: 'Creator',
             field: 'creator' as any,
             Cell({ entry }: { entry: any }) {
-              return (
-                <span>{entry.creator?.username || 'Unknown'}</span>
-              );
+              return <span>{entry.creator?.username || 'Unknown'}</span>;
             },
           },
           {
@@ -167,9 +168,7 @@ export const AdminPuzzlesList = () => {
                 <span>
                   {ts
                     ? formatDate(
-                        typeof ts === 'string'
-                          ? new Date(ts).getTime()
-                          : ts,
+                        typeof ts === 'string' ? new Date(ts).getTime() : ts,
                       )
                     : '-'}
                 </span>
@@ -229,15 +228,14 @@ export const AdminPuzzlesList = () => {
           className="gap-2"
         >
           <Filter className="size-4" />
-          Filters{' '}
-          {activeFilterCount > 0 && `(${activeFilterCount})`}
+          Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
         </Button>
         {activeFilterCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClearFilters}
-            className="text-muted-foreground text-[13px]"
+            className="text-[13px] text-muted-foreground"
           >
             <X className="size-4" />
             Clear
@@ -247,13 +245,13 @@ export const AdminPuzzlesList = () => {
 
       {/* Filter Panel — always visible when toggled */}
       {showFilters && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+        <div className="space-y-5 rounded-xl border border-border bg-card p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
             {/* Name Search */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Name
-              </label>
+              </span>
               <input
                 type="text"
                 placeholder="Search puzzle name..."
@@ -266,13 +264,13 @@ export const AdminPuzzlesList = () => {
                   })
                 }
               />
-            </div>
+            </label>
 
             {/* Creator Username */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Creator
-              </label>
+              </span>
               <input
                 type="text"
                 placeholder="Search by creator username..."
@@ -285,13 +283,13 @@ export const AdminPuzzlesList = () => {
                   })
                 }
               />
-            </div>
+            </label>
 
             {/* Status */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Status
-              </label>
+              </span>
               <StyledSelect
                 aria-label="Status"
                 value={filters.status || ''}
@@ -303,13 +301,13 @@ export const AdminPuzzlesList = () => {
                 }
                 options={STATUS_OPTIONS}
               />
-            </div>
+            </label>
 
             {/* Order By */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Order By
-              </label>
+              </span>
               <StyledSelect
                 aria-label="Order by"
                 value={filters.orderBy || 'created_at'}
@@ -318,18 +316,19 @@ export const AdminPuzzlesList = () => {
                 }
                 options={PUZZLE_ORDER_BY_OPTIONS}
               />
-            </div>
+            </label>
 
             {/* Direction */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="flex flex-col">
+              <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Direction
-              </label>
+              </span>
               <button
                 type="button"
                 onClick={() => {
                   const currentDirection = filters.orderDirection || 'DESC';
-                  const newDirection = currentDirection === 'ASC' ? 'DESC' : 'ASC';
+                  const newDirection =
+                    currentDirection === 'ASC' ? 'DESC' : 'ASC';
                   setFilters({
                     ...filters,
                     orderDirection: newDirection as any,
@@ -349,7 +348,7 @@ export const AdminPuzzlesList = () => {
                   </>
                 )}
               </button>
-            </div>
+            </label>
           </div>
         </div>
       )}

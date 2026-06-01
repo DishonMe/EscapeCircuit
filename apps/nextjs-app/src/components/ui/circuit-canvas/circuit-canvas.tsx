@@ -34,7 +34,10 @@ interface CircuitCanvasProps {
   opacity?: number;
 }
 
-export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCanvasProps) {
+export default function CircuitCanvas({
+  className = '',
+  opacity = 1,
+}: CircuitCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const stateRef = useRef<{
@@ -81,7 +84,11 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
           .slice(0, 2);
 
         near.forEach(({ j }) => {
-          if (!edges.find(e => (e.a === i && e.b === j) || (e.a === j && e.b === i))) {
+          if (
+            !edges.find(
+              (e) => (e.a === i && e.b === j) || (e.a === j && e.b === i),
+            )
+          ) {
             edges.push({ a: i, b: j, style: Math.random() > 0.5 ? 'H' : 'V' });
           }
         });
@@ -94,13 +101,24 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
       const a = nodes[edge.a];
       const b = nodes[edge.b];
       return edge.style === 'H'
-        ? [{ x: a.x, y: a.y }, { x: b.x, y: a.y }, { x: b.x, y: b.y }]
-        : [{ x: a.x, y: a.y }, { x: a.x, y: b.y }, { x: b.x, y: b.y }];
+        ? [
+            { x: a.x, y: a.y },
+            { x: b.x, y: a.y },
+            { x: b.x, y: b.y },
+          ]
+        : [
+            { x: a.x, y: a.y },
+            { x: a.x, y: b.y },
+            { x: b.x, y: b.y },
+          ];
     }
 
     function lerpAlongPath(pts: Point[], t: number): Point {
-      const total = pts.reduce((s, p, i) =>
-        i === 0 ? 0 : s + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y), 0);
+      const total = pts.reduce(
+        (s, p, i) =>
+          i === 0 ? 0 : s + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y),
+        0,
+      );
       let target = t * total;
       for (let i = 1; i < pts.length; i++) {
         const dx = pts[i].x - pts[i - 1].x;
@@ -122,9 +140,10 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
         edge,
         t: 0,
         speed: rnd(0.005, 0.014),
-        color: Math.random() > 0.35
-          ? 'rgba(99,179,237,0.75)'
-          : 'rgba(104,211,145,0.75)',
+        color:
+          Math.random() > 0.35
+            ? 'rgba(99,179,237,0.75)'
+            : 'rgba(104,211,145,0.75)',
       });
     }
 
@@ -157,11 +176,11 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
       context.clearRect(0, 0, W, H);
 
       // Draw edges
-      edges.forEach(edge => {
+      edges.forEach((edge) => {
         const pts = getPathPoints(nodes, edge);
         context.beginPath();
         context.moveTo(pts[0].x, pts[0].y);
-        pts.slice(1).forEach(pt => context.lineTo(pt.x, pt.y));
+        pts.slice(1).forEach((pt) => context.lineTo(pt.x, pt.y));
         context.strokeStyle = 'rgba(100,140,200,0.08)';
         context.lineWidth = 0.8;
         context.stroke();
@@ -188,7 +207,7 @@ export default function CircuitCanvas({ className = '', opacity = 1 }: CircuitCa
       }
 
       // Draw nodes
-      nodes.forEach(n => {
+      nodes.forEach((n) => {
         n.phase += n.speed;
         const alpha = n.hot ? 0.4 + 0.6 * Math.sin(n.phase) : 0.15;
 

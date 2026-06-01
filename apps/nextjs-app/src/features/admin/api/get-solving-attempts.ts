@@ -33,7 +33,9 @@ export const getSolvingAttempts = (
   });
 };
 
-export const getSolvingAttemptsQueryOptions = (filters: SolvingAttemptsFilters = {}) => {
+export const getSolvingAttemptsQueryOptions = (
+  filters: SolvingAttemptsFilters = {},
+) => {
   return queryOptions({
     queryKey: ['admin-solving-attempts', filters],
     queryFn: () => getSolvingAttempts(filters),
@@ -45,7 +47,10 @@ type UseSolvingAttemptsOptions = {
   queryConfig?: QueryConfig<typeof getSolvingAttemptsQueryOptions>;
 };
 
-export const useSolvingAttempts = ({ filters = {}, queryConfig }: UseSolvingAttemptsOptions = {}) => {
+export const useSolvingAttempts = ({
+  filters = {},
+  queryConfig,
+}: UseSolvingAttemptsOptions = {}) => {
   return useQuery({
     ...getSolvingAttemptsQueryOptions(filters),
     ...queryConfig,

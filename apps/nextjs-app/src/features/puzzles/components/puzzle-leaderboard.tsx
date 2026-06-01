@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { Medal, Trophy } from 'lucide-react';
+import { useState } from 'react';
+
+import { InfoPopup } from '@/components/ui/info-popup';
 import { useLeaderboard } from '@/features/puzzles/api/get-leaderboard';
 import { useUser } from '@/lib/auth';
-import { InfoPopup } from '@/components/ui/info-popup';
 
 import { formatFirstSolved } from '../utils/format-first-solved';
 
@@ -75,30 +76,30 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setLeaderboardType('time')}
-          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
+          className={`rounded px-3 py-2 text-[13px] font-medium transition-colors ${
             leaderboardType === 'time'
-              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
-              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+              ? 'bg-gray-50 text-black dark:bg-gray-600 dark:text-black'
+              : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
           }`}
         >
           Fastest Time
         </button>
         <button
           onClick={() => setLeaderboardType('cost')}
-          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
+          className={`rounded px-3 py-2 text-[13px] font-medium transition-colors ${
             leaderboardType === 'cost'
-              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
-              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+              ? 'bg-gray-50 text-black dark:bg-gray-600 dark:text-black'
+              : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
           }`}
         >
           Lowest Cost
         </button>
         <button
           onClick={() => setLeaderboardType('first_solved')}
-          className={`px-3 py-2 text-[13px] font-medium transition-colors rounded ${
+          className={`rounded px-3 py-2 text-[13px] font-medium transition-colors ${
             leaderboardType === 'first_solved'
-              ? 'text-black dark:text-black bg-gray-50 dark:bg-gray-600'
-              : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+              ? 'bg-gray-50 text-black dark:bg-gray-600 dark:text-black'
+              : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
           }`}
         >
           First Solved
@@ -124,12 +125,12 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                 <div className="mb-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                   2nd
                 </div>
-                <div className="h-16 w-full rounded-t-lg bg-gradient-to-t from-slate-300 to-slate-200 flex items-end justify-center pb-1">
-                  <span className="text-[10px] font-bold text-slate-700 truncate px-1">
+                <div className="flex h-16 w-full items-end justify-center rounded-t-lg bg-gradient-to-t from-slate-300 to-slate-200 pb-1">
+                  <span className="truncate px-1 text-[10px] font-bold text-slate-700">
                     {entries[1].username}
                   </span>
                 </div>
-                <div className="w-full rounded-b bg-slate-400/20 px-1 py-0.5 text-center text-[10px] font-semibold text-muted-foreground tabular-nums">
+                <div className="w-full rounded-b bg-slate-400/20 px-1 py-0.5 text-center text-[10px] font-semibold tabular-nums text-muted-foreground">
                   {getMetricDisplay(entries[1], leaderboardType)}
                 </div>
               </div>
@@ -138,12 +139,12 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                 <div className="mb-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                   1st
                 </div>
-                <div className="h-24 w-full rounded-t-lg bg-gradient-to-t from-amber-400 to-yellow-200 flex items-end justify-center pb-1 shadow-lg shadow-amber-200/40">
-                  <span className="text-[11px] font-bold text-amber-900 truncate px-1">
+                <div className="flex h-24 w-full items-end justify-center rounded-t-lg bg-gradient-to-t from-amber-400 to-yellow-200 pb-1 shadow-lg shadow-amber-200/40">
+                  <span className="truncate px-1 text-[11px] font-bold text-amber-900">
                     {entries[0].username}
                   </span>
                 </div>
-                <div className="w-full rounded-b bg-amber-400/20 px-1 py-0.5 text-center text-[10px] font-bold text-amber-700 tabular-nums">
+                <div className="w-full rounded-b bg-amber-400/20 px-1 py-0.5 text-center text-[10px] font-bold tabular-nums text-amber-700">
                   {getMetricDisplay(entries[0], leaderboardType)}
                 </div>
               </div>
@@ -152,12 +153,12 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
                 <div className="mb-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
                   3rd
                 </div>
-                <div className="h-12 w-full rounded-t-lg bg-gradient-to-t from-orange-400 to-amber-200 flex items-end justify-center pb-1">
-                  <span className="text-[10px] font-bold text-orange-900 truncate px-1">
+                <div className="flex h-12 w-full items-end justify-center rounded-t-lg bg-gradient-to-t from-orange-400 to-amber-200 pb-1">
+                  <span className="truncate px-1 text-[10px] font-bold text-orange-900">
                     {entries[2].username}
                   </span>
                 </div>
-                <div className="w-full rounded-b bg-orange-400/20 px-1 py-0.5 text-center text-[10px] font-semibold text-muted-foreground tabular-nums">
+                <div className="w-full rounded-b bg-orange-400/20 px-1 py-0.5 text-center text-[10px] font-semibold tabular-nums text-muted-foreground">
                   {getMetricDisplay(entries[2], leaderboardType)}
                 </div>
               </div>
@@ -236,7 +237,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               <>
                 Ranked by fastest solve time
                 <InfoPopup>
-                  <p className="font-medium text-foreground mb-1">
+                  <p className="mb-1 font-medium text-foreground">
                     Leaderboard & Medals
                   </p>
                   <p>
@@ -260,7 +261,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               <>
                 Ranked by lowest cost solution
                 <InfoPopup>
-                  <p className="font-medium text-foreground mb-1">
+                  <p className="mb-1 font-medium text-foreground">
                     Leaderboard & Medals
                   </p>
                   <p>
@@ -284,7 +285,7 @@ export const PuzzleLeaderboard = ({ puzzleId }: { puzzleId: string }) => {
               <>
                 Ranked by first successful solve
                 <InfoPopup>
-                  <p className="font-medium text-foreground mb-1">
+                  <p className="mb-1 font-medium text-foreground">
                     Leaderboard & Medals
                   </p>
                   <p>

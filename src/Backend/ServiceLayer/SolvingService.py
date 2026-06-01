@@ -60,7 +60,20 @@ class SolvingService:
     def xp(self):
         return self.xp_service
 
-    def start_attempt(self, token: str, puzzle_id: int) -> Dict[str, Any]:
+    @staticmethod
+    def _stale_open_attempt_threshold_seconds(time_limit_seconds: Optional[int]) -> int:
+        """Max age (in seconds) of an open attempt before start_attempt treats it as
+        abandoned and opens a fresh one. Tight bound for short puzzles, hard cap of 24h.
+
+        - timed puzzles: min(24h, time_limit_seconds * 4)
+        - no-limit puzzles: 24h
+        """
+        day = 24 * 3600
+        if time_limit_seconds and int(time_limit_seconds) > 0:
+            return min(day, int(time_limit_seconds) * 4)
+        return day
+
+    def start_attempt(self, token: str, puzzle_id: int, restart: bool = False) -> Dict[str, Any]:
         user_id = self.auth.require_user_id(token)
         p = self.puzzle_repo.get_by_id(int(puzzle_id))
         if not p:
@@ -75,21 +88,51 @@ class SolvingService:
         if p.status != PuzzleStatus.PUBLISHED and creator_id != int(user_id):
             raise ValidationError("puzzle not published")
 
-        # Idempotency: reuse an existing open attempt so a refresh doesn't strand
-        # accumulated clue requests against a freshly created attempt id.
-        existing = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
-        if isinstance(existing, SolveAttempt):
-            attempt_obj = existing
-        else:
-            try:
-                attempt = SolveAttempt(id=1, puzzle_id=int(puzzle_id), user_id=int(user_id))
-                attempt_obj = self.solve_repo.create_attempt(attempt)
-            except Exception:
-                # Race condition: another request created it simultaneously
-                attempt_obj = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
-                if not attempt_obj:
-                    raise ValidationError("Failed to create solve attempt. Please try again.")
-            self.conn.commit()
+        # Concurrency-safe reuse / stale-close / open-fresh, all inside a
+        # single BEGIN IMMEDIATE transaction so two racing start_attempt calls
+        # serialize and the second one observes the first one's writes (the
+        # fresh open attempt) before deciding what to do.
+        with transaction(self.conn):
+            existing = self.solve_repo.get_open_attempt(int(user_id), int(puzzle_id))
+            should_abandon = False
+            if isinstance(existing, SolveAttempt):
+                if restart:
+                    should_abandon = True
+                else:
+                    try:
+                        started_at = existing.started_at
+                        if started_at is not None:
+                            age_seconds = (utcnow() - started_at).total_seconds()
+                            threshold_seconds = self._stale_open_attempt_threshold_seconds(
+                                getattr(p, "time_limit_seconds", None)
+                            )
+                            if age_seconds > threshold_seconds:
+                                should_abandon = True
+                    except Exception:
+                        # Defensive: if we can't compute the age, treat it as reusable.
+                        should_abandon = False
+
+                if should_abandon:
+                    stale_id = int(existing.id)
+                    self.solve_repo.abandon_stale_attempt(stale_id)
+                    closed = self.solve_repo.get_attempt_by_id(stale_id)
+                    if closed is None or closed.submitted_at is None:
+                        raise ValidationError(
+                            "Failed to close stale attempt; refusing to start a new one."
+                        )
+                    new_attempt = SolveAttempt(
+                        id=1, puzzle_id=int(puzzle_id), user_id=int(user_id)
+                    )
+                    attempt_obj = self.solve_repo.create_attempt(new_attempt)
+                else:
+                    # Recent open attempt — idempotent reuse so a refresh doesn't
+                    # strand accumulated clue requests against a fresh attempt id.
+                    attempt_obj = existing
+            else:
+                new_attempt = SolveAttempt(
+                    id=1, puzzle_id=int(puzzle_id), user_id=int(user_id)
+                )
+                attempt_obj = self.solve_repo.create_attempt(new_attempt)
 
         result = attempt_obj.to_dict() if hasattr(attempt_obj, 'to_dict') else dict(attempt_obj)
         if 'puzzle_id' not in result: result['puzzle_id'] = int(puzzle_id)

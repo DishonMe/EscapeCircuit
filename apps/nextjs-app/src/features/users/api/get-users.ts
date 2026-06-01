@@ -18,21 +18,24 @@ export interface UserFilters {
   offset?: number;
 }
 
-export const getUsers = (filters: UserFilters = {}): Promise<{
+export const getUsers = (
+  filters: UserFilters = {},
+): Promise<{
   data: User[];
   total: number;
   limit: number;
   offset: number;
 }> => {
   const params: Record<string, any> = {};
-  
+
   if (filters.usernameSearch) params.username_search = filters.usernameSearch;
   if (filters.role) params.role = filters.role;
   if (filters.dateFrom) params.date_from = filters.dateFrom;
   if (filters.dateTo) params.date_to = filters.dateTo;
   if (filters.minLevel !== undefined) params.min_level = filters.minLevel;
   if (filters.maxLevel !== undefined) params.max_level = filters.maxLevel;
-  if (filters.experienceLevel) params.experience_level = filters.experienceLevel;
+  if (filters.experienceLevel)
+    params.experience_level = filters.experienceLevel;
   if (filters.orderBy) params.order_by = filters.orderBy;
   if (filters.orderDirection) params.order_direction = filters.orderDirection;
   if (filters.limit) params.limit = filters.limit;
@@ -53,7 +56,10 @@ type UseUsersOptions = {
   queryConfig?: QueryConfig<typeof getUsersQueryOptions>;
 };
 
-export const useUsers = ({ filters = {}, queryConfig }: UseUsersOptions = {}) => {
+export const useUsers = ({
+  filters = {},
+  queryConfig,
+}: UseUsersOptions = {}) => {
   return useQuery({
     ...getUsersQueryOptions(filters),
     ...queryConfig,

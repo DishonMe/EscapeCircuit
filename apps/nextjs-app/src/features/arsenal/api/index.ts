@@ -1,4 +1,9 @@
-import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
 import { QueryConfig } from '@/lib/react-query';
@@ -27,7 +32,7 @@ export interface ArsenalPiece {
 
 export interface SaveArsenalPiecePayload {
   name: string;
-  description?: string;  // Description for the Arsenal component
+  description?: string; // Description for the Arsenal component
   num_inputs: number;
   num_outputs: number;
   structure_json: string;
@@ -53,7 +58,9 @@ export const getMyArsenalQueryOptions = () => {
   });
 };
 
-export const useMyArsenal = (config?: QueryConfig<typeof getMyArsenalQueryOptions>) => {
+export const useMyArsenal = (
+  config?: QueryConfig<typeof getMyArsenalQueryOptions>,
+) => {
   return useQuery({
     ...getMyArsenalQueryOptions(),
     ...config,
@@ -64,7 +71,9 @@ export const getArsenalPiece = (pieceId: number): Promise<ArsenalPiece> => {
   return api.get(`/arsenal/${pieceId}`);
 };
 
-export const deleteArsenalPiece = (pieceId: number): Promise<{ ok: boolean }> => {
+export const deleteArsenalPiece = (
+  pieceId: number,
+): Promise<{ ok: boolean }> => {
   return api.delete(`/arsenal/${pieceId}`);
 };
 

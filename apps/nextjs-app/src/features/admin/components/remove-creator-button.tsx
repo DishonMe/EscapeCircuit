@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/dialog';
 import { useNotifications } from '@/components/ui/notifications';
@@ -28,7 +29,9 @@ export const RemoveCreatorButton = ({
 }: RemoveCreatorButtonProps) => {
   const { addNotification } = useNotifications();
   const [step, setStep] = useState<Step>('closed');
-  const [puzzlesData, setPuzzlesData] = useState<RemoveCreatorResponse | null>(null);
+  const [puzzlesData, setPuzzlesData] = useState<RemoveCreatorResponse | null>(
+    null,
+  );
 
   const initialMutation = useRemoveCreator({
     mutationConfig: {
@@ -65,7 +68,12 @@ export const RemoveCreatorButton = ({
   const confirmMutation = useConfirmRemoveCreator({
     mutationConfig: {
       onSuccess: (data: ConfirmRemoveCreatorResponse) => {
-        const actionText = data.action === 'delete' ? 'deleted' : data.action === 'unpublish' ? 'unpublished' : 'left published';
+        const actionText =
+          data.action === 'delete'
+            ? 'deleted'
+            : data.action === 'unpublish'
+              ? 'unpublished'
+              : 'left published';
         addNotification({
           type: 'success',
           title: `Creator role removed from ${username}`,
@@ -107,7 +115,11 @@ export const RemoveCreatorButton = ({
       {step === 'initial' && (
         <ConfirmationDialog
           icon="danger"
-          title={isPendingRemoval ? 'Cancel Creator Invitation' : 'Remove Creator Role'}
+          title={
+            isPendingRemoval
+              ? 'Cancel Creator Invitation'
+              : 'Remove Creator Role'
+          }
           body={bodyText}
           triggerButton={
             <Button variant="destructive" size="sm">
@@ -140,14 +152,17 @@ export const RemoveCreatorButton = ({
       {/* Dialog for choosing action on published puzzles */}
       {step === 'action_selection' && puzzlesData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="rounded-lg border border-border bg-card p-6 shadow-lg max-w-md w-full mx-4">
-            <h2 className="text-lg font-semibold mb-4">Handle Published Puzzles</h2>
-            
+          <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
+            <h2 className="mb-4 text-lg font-semibold">
+              Handle Published Puzzles
+            </h2>
+
             <div className="mb-6 space-y-2">
               <p className="text-sm text-muted-foreground">
-                {username} has {puzzlesData.published_count} published puzzle(s):
+                {username} has {puzzlesData.published_count} published
+                puzzle(s):
               </p>
-              <ul className="text-sm space-y-1 max-h-32 overflow-y-auto">
+              <ul className="max-h-32 space-y-1 overflow-y-auto text-sm">
                 {puzzlesData.published_puzzles?.map((puzzle) => (
                   <li key={puzzle.id} className="text-muted-foreground">
                     • {puzzle.name}
@@ -156,7 +171,9 @@ export const RemoveCreatorButton = ({
               </ul>
             </div>
 
-            <p className="text-sm font-medium mb-4">What would you like to do with these puzzles?</p>
+            <p className="mb-4 text-sm font-medium">
+              What would you like to do with these puzzles?
+            </p>
 
             <div className="space-y-2">
               <Button
@@ -165,7 +182,9 @@ export const RemoveCreatorButton = ({
                 onClick={() => handleConfirmAction('leave')}
                 disabled={confirmMutation.isPending}
               >
-                {confirmMutation.isPending ? <Spinner className="mr-2" /> : null}
+                {confirmMutation.isPending ? (
+                  <Spinner className="mr-2" />
+                ) : null}
                 Leave Published (No changes)
               </Button>
               <Button
@@ -174,7 +193,9 @@ export const RemoveCreatorButton = ({
                 onClick={() => handleConfirmAction('unpublish')}
                 disabled={confirmMutation.isPending}
               >
-                {confirmMutation.isPending ? <Spinner className="mr-2" /> : null}
+                {confirmMutation.isPending ? (
+                  <Spinner className="mr-2" />
+                ) : null}
                 Unpublish All
               </Button>
               <Button
@@ -183,14 +204,16 @@ export const RemoveCreatorButton = ({
                 onClick={() => handleConfirmAction('delete')}
                 disabled={confirmMutation.isPending}
               >
-                {confirmMutation.isPending ? <Spinner className="mr-2" /> : null}
+                {confirmMutation.isPending ? (
+                  <Spinner className="mr-2" />
+                ) : null}
                 Delete All
               </Button>
             </div>
 
             <Button
               variant="ghost"
-              className="w-full mt-3"
+              className="mt-3 w-full"
               onClick={handleCancel}
               disabled={confirmMutation.isPending}
             >

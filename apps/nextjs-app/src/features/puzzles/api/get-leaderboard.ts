@@ -19,20 +19,20 @@ export type LeaderboardResponse = {
 
 export const getLeaderboard = ({
   puzzleId,
-  type = "time",
+  type = 'time',
 }: {
   puzzleId: string;
-  type?: "time" | "cost" | "first_solved";
+  type?: 'time' | 'cost' | 'first_solved';
 }): Promise<LeaderboardResponse> => {
   return api.get(`/puzzles/${puzzleId}/leaderboard?type=${type}`);
 };
 
 export const getLeaderboardQueryOptions = ({
   puzzleId,
-  type = "time",
+  type = 'time',
 }: {
   puzzleId: string;
-  type?: "time" | "cost" | "first_solved";
+  type?: 'time' | 'cost' | 'first_solved';
 }) => {
   return queryOptions({
     queryKey: ['leaderboard', { puzzleId, type }],
@@ -42,11 +42,15 @@ export const getLeaderboardQueryOptions = ({
 
 type UseLeaderboardOptions = {
   puzzleId: string;
-  type?: "time" | "cost" | "first_solved";
+  type?: 'time' | 'cost' | 'first_solved';
   config?: QueryConfig<typeof getLeaderboardQueryOptions>;
 };
 
-export const useLeaderboard = ({ puzzleId, type = "time", config }: UseLeaderboardOptions) => {
+export const useLeaderboard = ({
+  puzzleId,
+  type = 'time',
+  config,
+}: UseLeaderboardOptions) => {
   return useQuery({
     ...getLeaderboardQueryOptions({ puzzleId, type }),
     ...config,
