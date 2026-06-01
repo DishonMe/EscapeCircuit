@@ -2805,7 +2805,7 @@ export const WorkstationGrid = ({
               <div key={id}>
                 {debuggerActive ? (
                   <div
-                    className="pointer-events-auto absolute z-30 flex items-center gap-1"
+                    className="pointer-events-auto absolute z-30 flex items-center gap-1 debugger-sequence-inputs"
                     style={{
                       left: pt.x,
                       top: pt.y,

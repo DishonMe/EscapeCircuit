@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/lib/auth';
 import { Sparkles } from 'lucide-react';
 
-const ALL_TUTORIALS = ['browse-puzzles', 'solving-page', 'arsenal', 'my-puzzles', 'arsenal-creator'];
+const ALL_TUTORIALS = ['browse-puzzles', 'solving-page', 'arsenal', 'my-puzzles', 'arsenal-creator', 'create-puzzle', 'debugger'];
 
 /**
  * Get list of tutorials that haven't been completed yet
@@ -96,6 +96,8 @@ export const TutorialSuggestionHandler = () => {
         targetPath = '/app/my-puzzles?startTutorial=true';
       } else if (nextTutorial === 'arsenal-creator') {
         targetPath = '/app/arsenal/creator?startTutorial=true';
+      } else if (nextTutorial === 'create-puzzle') {
+        targetPath = '/app/create-puzzle?startTutorial=true';
       }
     } else {
       targetPath = '/app/puzzles?startTutorial=true';

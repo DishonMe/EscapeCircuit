@@ -36,7 +36,7 @@ import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
 import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
-import { workstationTourSteps } from '@/config/tour-steps';
+import { workstationTourSteps, debuggerTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
@@ -1991,6 +1991,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="debugger-step-controls"
                     onClick={onDebuggerStepPrev}
                   >
                     <StepBack className="mr-1 size-4" />
@@ -1999,14 +2000,26 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="debugger-step-controls debugger-next-step-button"
                     onClick={onDebuggerStepNext}
                   >
                     <StepForward className="mr-1 size-4" />
                     Next Step
                   </Button>
+                  <PageTourLauncher
+                    tourName="debugger"
+                    pageTitle="Debugger"
+                    pageDescription="Learn how to step through circuits or view the full report."
+                    steps={debuggerTourSteps}
+                    floating={false}
+                    inlineLabel="Debugger Tutorial"
+                    buttonClassName="h-9 px-3 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs"
+                    onTourFinished={() => completeTutorial('debugger')}
+                  />
                   <Button
                     variant="outline"
                     size="sm"
+                    className="debugger-full-report-button"
                     onClick={() => setShowDebugger(true)}
                   >
                     View Full Debugger Report
@@ -2014,6 +2027,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="debugger-exit-button"
                     onClick={exitInlineDebugger}
                   >
                     Exit Debugger
