@@ -47,6 +47,10 @@ class SetRoleReq(BaseModel):
     role: str  # "admin"/"creator"/"solver"
 
 
+class CompleteTutorialReq(BaseModel):
+    tutorial_name: str
+
+
 def build_user_router(user_service: UserService, notification_service: NotificationService = None) -> APIRouter:
     router = APIRouter(prefix="/users", tags=["users"])
 
@@ -94,6 +98,20 @@ def build_user_router(user_service: UserService, notification_service: Notificat
             return user_service.me(token)
         except ValidationError as e:
             raise HTTPException(status_code=401, detail=str(e))
+
+    @router.post("/me/complete-tutorial")
+    def complete_tutorial(req: CompleteTutorialReq, token: str = Depends(verify_token)):
+        try:
+            print(f"[UserController] complete_tutorial endpoint called with tutorial_name: {req.tutorial_name}")
+            result = user_service.complete_tutorial(token, req.tutorial_name)
+            print(f"[UserController] complete_tutorial result: {result}")
+            return result
+        except ValidationError as e:
+            print(f"[UserController] ValidationError: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"[UserController] Unexpected error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("")
     def list_users(

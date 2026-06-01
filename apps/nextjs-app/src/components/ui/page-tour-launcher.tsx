@@ -30,6 +30,10 @@ type PageTourLauncherProps = {
   floating?: boolean;
   /** Label shown next to the icon when rendered inline. */
   inlineLabel?: string;
+  /** Callback when the tutorial is finished (not skipped). */
+  onTourFinished?: () => void;
+  /** Automatically start the tour when the component mounts. */
+  autoStart?: boolean;
 };
 
 function TourTooltip({
@@ -137,6 +141,8 @@ export function PageTourLauncher({
   scrollOffset = 140,
   floating = true,
   inlineLabel = 'Tutorial',
+  onTourFinished,
+  autoStart = false,
 }: PageTourLauncherProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [runTour, setRunTour] = useState(false);
@@ -218,6 +224,16 @@ export function PageTourLauncher({
     window.setTimeout(() => setRunTour(true), 500);
   };
 
+  // Auto-start the tour if autoStart prop is true
+  useEffect(() => {
+    if (autoStart) {
+      // Delay slightly to ensure all elements are rendered
+      setTimeout(() => {
+        handleStartTour();
+      }, 100);
+    }
+  }, [autoStart]);
+
   const handleTourCallback = (data: any) => {
     const { status, index, type, step } = data;
 
@@ -253,6 +269,12 @@ export function PageTourLauncher({
 
     if (status === 'finished' || status === 'skipped') {
       setRunTour(false);
+      console.log(`[PageTourLauncher] Tour '${tourName}' finished with status: ${status}`);
+      if (status === 'finished' && onTourFinished) {
+        console.log(`[PageTourLauncher] Tour '${tourName}' FINISHED - calling onTourFinished callback NOW`);
+        console.trace('[PageTourLauncher] Callback stack trace:');
+        onTourFinished();
+      }
     }
   };
 

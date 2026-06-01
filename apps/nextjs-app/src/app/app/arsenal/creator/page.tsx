@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -36,6 +36,7 @@ import { StyledSelect } from '@/components/ui/styled-select/styled-select';
 import { paths } from '@/config/paths';
 import { arsenalCreatorTourSteps } from '@/config/tour-steps';
 import { useSaveArsenalPiece, useMyArsenal } from '@/features/arsenal/api';
+import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
 import { findUnconnectedPorts } from '@/features/arsenal/lib/validate-connections';
 import { CircuitComponent, Wire } from '@/types/api';
 
@@ -136,7 +137,10 @@ const buildPiecePreviewNode = ({
 
 export default function ArsenalCreatorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoStartTutorial = searchParams.get('startTutorial') === 'true';
   const { addNotification } = useNotifications();
+  const { mutate: completeTutorial } = useCompleteTutorial({});
 
   const [numInputs, setNumInputs] = useState(2);
   const [numOutputs, setNumOutputs] = useState(1);
@@ -167,6 +171,10 @@ export default function ArsenalCreatorPage() {
 
   const saveArsenalMutation = useSaveArsenalPiece();
   const { data: myArsenalData } = useMyArsenal();
+
+  const handleTourFinished = useCallback(() => {
+    completeTutorial('arsenal-creator');
+  }, [completeTutorial]);
 
   const hasCustomPieceVisualStyle = useMemo(() => {
     return (
@@ -543,6 +551,8 @@ export default function ArsenalCreatorPage() {
         pageDescription="Walk through declaring inputs/outputs, dragging gates onto the grid, wiring them up, and saving your piece."
         steps={arsenalCreatorTourSteps}
         side="right"
+        autoStart={autoStartTutorial}
+        onTourFinished={handleTourFinished}
       />
       {/* Header + Compact Config Bar */}
       <div className="flex flex-wrap items-center gap-4 px-6 pb-1 pt-3">

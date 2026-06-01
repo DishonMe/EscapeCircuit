@@ -99,7 +99,7 @@ export const PuzzleActionCluster = ({
 
         <button
           type="button"
-          className={cn(iconButtonClass)}
+          className={cn(iconButtonClass, 'puzzle-leaderboard-button')}
           aria-label="Leaderboard"
           onClick={onLeaderboard}
         >
@@ -170,7 +170,7 @@ export const PuzzleActionCluster = ({
           )}
 
           <DropdownMenuItem
-            className="flex cursor-pointer items-center gap-2"
+            className="puzzle-leaderboard-button flex cursor-pointer items-center gap-2"
             onSelect={onLeaderboard}
           >
             <Trophy className="size-4" aria-hidden />

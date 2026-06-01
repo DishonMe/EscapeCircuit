@@ -261,6 +261,48 @@ class UserService:
 
         return d
 
+    def complete_tutorial(self, session_token: str, tutorial_name: str) -> dict:
+        """Mark a specific tutorial as completed and award 10 XP if not already completed.
+        
+        Args:
+            session_token: The user's session token
+            tutorial_name: The name of the tutorial (e.g., 'browse-puzzles', 'arsenal')
+            
+        Returns:
+            Dictionary with ok status and updated user data
+        """
+        user_id = self.auth.require_user_id(session_token)
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValidationError("user not found")
+        
+        print(f"DEBUG: complete_tutorial called for user_id={user_id}, tutorial_name='{tutorial_name}'")
+        print(f"DEBUG: current tutorials_completed='{user.tutorials_completed}'")
+        
+        # Only award XP if this specific tutorial hasn't been completed yet
+        if not self.user_repo.has_completed_tutorial(user_id, tutorial_name):
+            print(f"DEBUG: Tutorial '{tutorial_name}' not yet completed, awarding 10 XP")
+            tutorial_xp = 10
+            self.user_repo.increment_xp(user_id, tutorial_xp)
+            self.user_repo.complete_tutorial(user_id, tutorial_name)
+            self.user_repo.conn.commit()
+            print(f"DEBUG: Committed changes to database")
+        else:
+            print(f"DEBUG: Tutorial '{tutorial_name}' already completed, skipping")
+        
+        # Fetch updated user data
+        updated_user = self.user_repo.get_by_id(user_id)
+        if not updated_user:
+            raise ValidationError("user not found after update")
+        
+        print(f"DEBUG: Updated user tutorials_completed='{updated_user.tutorials_completed}'")
+        
+        d = updated_user.to_dict()
+        d["level"] = self.xp.calculate_level(updated_user.xp)
+        d["is_experienced"] = self.xp.is_experienced(updated_user.xp)
+        
+        return {"ok": True, "user": d}
+
     def list_users(
         self,
         session_token: str,

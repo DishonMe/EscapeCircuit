@@ -64,73 +64,75 @@ export const PuzzleCard = ({
         variant="stripe"
       />
 
-      {/* Top row: difficulty pill + solved count + save */}
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'shrink-0 rounded border px-2 py-0.5 text-xs',
-              getDifficultyClass(puzzle.difficulty),
-            )}
-          >
-            {puzzle.difficulty.charAt(0) +
-              puzzle.difficulty.slice(1).toLowerCase()}
-          </span>
-          <div className="flex items-center gap-1 font-mono text-[12px] text-muted-foreground">
-            <Users className="size-3" aria-hidden />
-            <span>{puzzle.solvedCount ?? 0}</span>
+      <div className="puzzle-info-section flex flex-col">
+        {/* Top row: difficulty pill + solved count + save */}
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'shrink-0 rounded border px-2 py-0.5 text-xs',
+                getDifficultyClass(puzzle.difficulty),
+              )}
+            >
+              {puzzle.difficulty.charAt(0) +
+                puzzle.difficulty.slice(1).toLowerCase()}
+            </span>
+            <div className="flex items-center gap-1 font-mono text-[12px] text-muted-foreground">
+              <Users className="size-3" aria-hidden />
+              <span>{puzzle.solvedCount ?? 0}</span>
+            </div>
+          </div>
+
+          {/* Save button — relative z-10 so it sits above the stretched-link overlay */}
+          <div className="relative z-10">
+            <button
+              type="button"
+              className={cn(
+                'puzzle-save-button',
+                'inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground',
+                'transition-colors hover:bg-secondary hover:text-foreground',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                isSaving && 'pointer-events-none opacity-50',
+              )}
+              aria-label={puzzle.is_saved ? 'Unsave puzzle' : 'Save puzzle'}
+              onClick={() => onSave(puzzle.id)}
+              disabled={isSaving}
+            >
+              <Bookmark
+                className={cn(
+                  'size-4',
+                  puzzle.is_saved && 'fill-current text-primary',
+                )}
+                aria-hidden
+              />
+            </button>
           </div>
         </div>
 
-        {/* Save button — relative z-10 so it sits above the stretched-link overlay */}
-        <div className="relative z-10">
-          <button
-            type="button"
-            className={cn(
-              'puzzle-save-button',
-              'inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground',
-              'transition-colors hover:bg-secondary hover:text-foreground',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              isSaving && 'pointer-events-none opacity-50',
-            )}
-            aria-label={puzzle.is_saved ? 'Unsave puzzle' : 'Save puzzle'}
-            onClick={() => onSave(puzzle.id)}
-            disabled={isSaving}
-          >
-            <Bookmark
-              className={cn(
-                'size-4',
-                puzzle.is_saved && 'fill-current text-primary',
-              )}
-              aria-hidden
-            />
-          </button>
-        </div>
+        {/* Title — stretched-link anchor. The Link is NOT positioned, so the ::after
+            positions against the card's relative root and covers the whole card.
+            Sibling controls with `relative z-10` paint above the overlay. */}
+        <Link
+          href={href}
+          className={cn(
+            'line-clamp-2 text-[15px] font-medium leading-snug tracking-tight',
+            'text-foreground hover:underline',
+            "after:absolute after:inset-0 after:content-['']",
+          )}
+        >
+          {puzzle.title}
+        </Link>
+
+        {/* Creator subtitle */}
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          by {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
+        </p>
+
+        {/* Description (2-line clamp; min-h preserves vertical rhythm even when absent) */}
+        <p className="mt-1.5 line-clamp-2 min-h-[2.6em] text-[13px] text-muted-foreground">
+          {puzzle.description || '\u00A0'}
+        </p>
       </div>
-
-      {/* Title — stretched-link anchor. The Link is NOT positioned, so the ::after
-          positions against the card's relative root and covers the whole card.
-          Sibling controls with `relative z-10` paint above the overlay. */}
-      <Link
-        href={href}
-        className={cn(
-          'line-clamp-2 text-[15px] font-medium leading-snug tracking-tight',
-          'text-foreground hover:underline',
-          "after:absolute after:inset-0 after:content-['']",
-        )}
-      >
-        {puzzle.title}
-      </Link>
-
-      {/* Creator subtitle */}
-      <p className="mt-1 text-[12.5px] text-muted-foreground">
-        by {puzzle.creator ? puzzle.creator.username : 'Anonymous'}
-      </p>
-
-      {/* Description (2-line clamp; min-h preserves vertical rhythm even when absent) */}
-      <p className="mt-1.5 line-clamp-2 min-h-[2.6em] text-[13px] text-muted-foreground">
-        {puzzle.description || '\u00A0'}
-      </p>
 
       {/* Stats row */}
       <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[12px] font-semibold text-emerald-400">

@@ -19,6 +19,7 @@ class User:
     avatar_name: str = "Dinosaur"
     avatar_color: str = "#38bdf8"
     created_at: datetime = field(default_factory=utcnow)
+    tutorials_completed: str = ""  # Comma-separated list of completed tutorial names
     # Admin-set overrides for puzzle capacity (None = use level-based default)
     max_published_puzzles: Optional[int] = None
     max_unpublished_puzzles: Optional[int] = None
@@ -97,6 +98,7 @@ class User:
             "avatar_name": self.avatar_name,
             "avatar_color": self.avatar_color,
             "is_discussion_banned": self.is_discussion_banned,
+            "tutorials_completed": self.tutorials_completed,
             "created_at": self.created_at.isoformat(),
             "createdAt": int(self.created_at.timestamp() * 1000),
             "max_published_override": self.max_published_puzzles,
@@ -119,6 +121,7 @@ class User:
             avatar_name=d.get("avatar_name", "Dinosaur"),
             avatar_color=d.get("avatar_color", "#38bdf8"),
             created_at=datetime.fromisoformat(d["created_at"]) if "created_at" in d else utcnow(),
+            tutorials_completed=d.get("tutorials_completed", ""),
             max_published_puzzles=d.get("max_published_puzzles"),
             max_unpublished_puzzles=d.get("max_unpublished_puzzles"),
         )

@@ -8,6 +8,8 @@ import {
   CircleAlert,
   CircuitBoard,
   Medal,
+  StepBack,
+  StepForward,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -32,8 +34,9 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { useNotifications } from '@/components/ui/notifications';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { PuzzleXPBar } from '@/components/ui/puzzle-xp-bar';
+import { ZigzagBugCanvas } from '@/components/ui/zigzag-bug-canvas';
 import { paths } from '@/config/paths';
-import { workstationTourSteps } from '@/config/tour-steps';
+import { workstationTourSteps, debuggerTourSteps } from '@/config/tour-steps';
 import { useSettings } from '@/context/settings-context';
 import { usePuzzle } from '@/features/puzzles/api/get-puzzle';
 import { startPuzzleAttempt } from '@/features/puzzles/api/start-attempt';
@@ -43,6 +46,7 @@ import { PuzzleLeaderboard } from '@/features/puzzles/components/puzzle-leaderbo
 import { useWorkstationDraft } from '@/features/puzzles/hooks/use-workstation-draft';
 import { isPlausibleStartedAt } from '@/features/puzzles/lib/timer';
 import { RatingDialog } from '@/features/ratings/components/rating-dialog';
+import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
 import { useAudio } from '@/hooks/use-audio';
 import { api } from '@/lib/api-client';
 import { useUser } from '@/lib/auth';
@@ -219,6 +223,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const queryClient = useQueryClient();
   const { playError, playSuccess } = useAudio();
   const { visualEffectsEnabled } = useSettings();
+  const { mutate: completeTutorial } = useCompleteTutorial({});
 
   const puzzleQuery = usePuzzle({ id: puzzleId });
   const puzzle = puzzleQuery.data;
@@ -307,6 +312,8 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
   const [inspectingSandboxPlacedId, setInspectingSandboxPlacedId] = useState<
     string | null
   >(null);
+
+  const debuggerButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Clue-penalty state (server is the source of truth — these mirror what /attempts/start
   // and /clue tell us, so a refresh hydrates back to a consistent UI).
@@ -1934,6 +1941,7 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
         pageDescription="Learn where the workspace controls live, how to test a solution, and where to inspect puzzle instructions. You can reopen this guide any time from the ? button."
         steps={effectiveSteps}
         side="left"
+        onTourFinished={() => completeTutorial('solving-page')}
       />
       <div className="flex w-full flex-col gap-3">
         {visualEffectsEnabled &&
@@ -2051,6 +2059,67 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
                   }
                 />
               ) : null}
+              {!isInlineDebugger ? (
+                <div className="relative">
+                  <Button
+                    ref={debuggerButtonRef}
+                    variant="outline"
+                    size="sm"
+                    className="workstation-debugger-button relative overflow-hidden"
+                    onClick={enterInlineDebugger}
+                  >
+                    <ZigzagBugCanvas containerRef={debuggerButtonRef} />
+                    Debugger
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="debugger-step-controls"
+                    onClick={onDebuggerStepPrev}
+                  >
+                    <StepBack className="mr-1 size-4" />
+                    Previous Step
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="debugger-step-controls debugger-next-step-button"
+                    onClick={onDebuggerStepNext}
+                  >
+                    <StepForward className="mr-1 size-4" />
+                    Next Step
+                  </Button>
+                  <PageTourLauncher
+                    tourName="debugger"
+                    pageTitle="Debugger"
+                    pageDescription="Learn how to step through circuits or view the full report."
+                    steps={debuggerTourSteps}
+                    floating={false}
+                    inlineLabel="Debugger Tutorial"
+                    buttonClassName="h-9 px-3 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs"
+                    onTourFinished={() => completeTutorial('debugger')}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="debugger-full-report-button"
+                    onClick={() => setShowDebugger(true)}
+                  >
+                    View Full Debugger Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="debugger-exit-button"
+                    onClick={exitInlineDebugger}
+                  >
+                    Exit Debugger
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -2058,7 +2127,10 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               >
                 Leaderboard
               </Button>
-              {puzzle?.creatorComment?.trim() && (
+              {!!(
+                (puzzle?.creatorComment && puzzle.creatorComment !== 'null' && puzzle.creatorComment !== 'None' && puzzle.creatorComment.trim()) ||
+                ((puzzle as any)?.creator_comment && (puzzle as any).creator_comment !== 'null' && (puzzle as any).creator_comment !== 'None' && typeof (puzzle as any).creator_comment === 'string' && (puzzle as any).creator_comment.trim())
+              ) && (
                 <Button
                   variant="outline"
                   size="sm"

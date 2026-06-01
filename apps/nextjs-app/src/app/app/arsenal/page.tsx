@@ -1,8 +1,8 @@
 'use client';
 
 import { Swords, Plus, HelpCircle, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 
 import {
   LogicNode,
@@ -41,6 +41,7 @@ import {
   useUpdateArsenalPiece,
   ArsenalPiece,
 } from '@/features/arsenal/api';
+import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
 import { useUser } from '@/lib/auth';
 import type { Wire } from '@/types/api';
 import { cn } from '@/utils/cn';
@@ -163,12 +164,15 @@ const getPiecePortCounts = (
 
 export default function ArsenalPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoStartTutorial = searchParams.get('startTutorial') === 'true';
   const user = useUser();
   const { addNotification } = useNotifications();
   const { data: arsenal, isLoading } = useMyArsenal();
   const deleteArsenalMutation = useDeleteArsenalPiece();
   const renameArsenalMutation = useRenameArsenalPiece();
   const updateArsenalPieceMutation = useUpdateArsenalPiece();
+  const { mutate: completeTutorial } = useCompleteTutorial({});
 
   const [selectedPiece, setSelectedPiece] = useState<ArsenalPiece | null>(null);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -182,6 +186,10 @@ export default function ArsenalPage() {
   >(DEFAULT_PIECE_VISUAL_STYLE);
   const [showEmptyTourDialog, setShowEmptyTourDialog] = useState(false);
   const [highlightCreate, setHighlightCreate] = useState(false);
+
+  const handleTourFinished = useCallback(() => {
+    completeTutorial('arsenal');
+  }, [completeTutorial]);
 
   const handleDelete = async (piece: ArsenalPiece) => {
     const confirmed = window.confirm(
@@ -344,28 +352,16 @@ export default function ArsenalPage() {
         }
         rightSlot={
           <div className="flex flex-col items-stretch gap-3 sm:items-end">
-            {pieces.length === 0 ? (
-              <button
-                type="button"
-                onClick={() => setShowEmptyTourDialog(true)}
-                aria-label="Start My Arsenal tutorial"
-                className="group inline-flex h-auto items-center gap-2 rounded-full border border-border/70 bg-card/70 px-4 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/10 hover:shadow-md"
-              >
-                <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors group-hover:bg-primary/25">
-                  <HelpCircle className="size-4" />
-                </span>
-                Take a tour
-              </button>
-            ) : (
-              <PageTourLauncher
-                tourName="arsenal"
-                pageTitle="My Arsenal"
-                pageDescription="Explore your saved custom pieces, preview them, and manage actions like rename or delete."
-                steps={arsenalTourSteps}
-                floating={false}
-                inlineLabel="Take a tour"
-              />
-            )}
+            <PageTourLauncher
+              tourName="arsenal"
+              pageTitle="My Arsenal"
+              pageDescription="Explore your saved custom pieces, preview them, and manage actions like rename or delete."
+              steps={arsenalTourSteps}
+              floating={false}
+              inlineLabel="Take a tour"
+              autoStart={autoStartTutorial}
+              onTourFinished={handleTourFinished}
+            />
             <button
               type="button"
               onClick={() => router.push(paths.app.arsenal.creator.getHref())}
