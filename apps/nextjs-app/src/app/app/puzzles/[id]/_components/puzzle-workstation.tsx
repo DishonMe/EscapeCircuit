@@ -2027,19 +2027,19 @@ export const PuzzleWorkstation = ({ puzzleId }: { puzzleId: string }) => {
               >
                 Leaderboard
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!puzzle?.creatorComment?.trim()}
-                title={
-                  puzzle?.creatorComment?.trim()
-                    ? 'View creator comment'
-                    : 'No creator comment available'
-                }
-                onClick={() => setShowCreatorComment(true)}
-              >
-                Creator Comment
-              </Button>
+              {!!(
+                (puzzle?.creatorComment && puzzle.creatorComment !== 'null' && puzzle.creatorComment !== 'None' && puzzle.creatorComment.trim()) ||
+                ((puzzle as any)?.creator_comment && (puzzle as any).creator_comment !== 'null' && (puzzle as any).creator_comment !== 'None' && typeof (puzzle as any).creator_comment === 'string' && (puzzle as any).creator_comment.trim())
+              ) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="View creator comment"
+                  onClick={() => setShowCreatorComment(true)}
+                >
+                  Creator Comment
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
