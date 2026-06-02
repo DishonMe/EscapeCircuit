@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import MarkdownIt from 'markdown-it';
 import markdownItKatex from 'markdown-it-katex';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 
 import 'katex/dist/katex.min.css';
@@ -36,6 +36,7 @@ import { InfoPopup } from '@/components/ui/info-popup';
 import { PageTourLauncher } from '@/components/ui/page-tour-launcher';
 import { createPuzzleTourSteps } from '@/config/tour-steps';
 import { useMyArsenal } from '@/features/arsenal/api';
+import { useCompleteTutorial } from '@/features/users/api/complete-tutorial';
 import type { Wire } from '@/types/api';
 import { AUTH_TOKEN_COOKIE_NAME } from '@/utils/auth-constants';
 
@@ -530,7 +531,14 @@ const InstructionsPreview = ({ latex }: { latex: string }) => {
 export default function CreatePuzzleForm() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoStartTutorial = searchParams.get('startTutorial') === 'true';
+  const { mutate: completeTutorial } = useCompleteTutorial({});
   const { data: myArsenalData } = useMyArsenal();
+
+  const handleTourFinished = useCallback(() => {
+    completeTutorial('create-puzzle');
+  }, [completeTutorial]);
   const [activeTab, setActiveTab] = useState<TabName>('basic');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState<'submit' | 'cancel' | null>(
@@ -1929,6 +1937,8 @@ export default function CreatePuzzleForm() {
         pageDescription="Learn the tabs and controls for building, testing, documenting, and publishing your puzzle."
         steps={createPuzzleTourSteps}
         side="left"
+        autoStart={autoStartTutorial}
+        onTourFinished={handleTourFinished}
       />
       <div className="mx-auto max-w-6xl p-8">
         <h1 className="mb-6 text-3xl font-semibold">Create New Puzzle</h1>
@@ -1957,9 +1967,13 @@ export default function CreatePuzzleForm() {
                       ? 'create-puzzle-custom-pieces-tab'
                       : tab === 'instructions'
                         ? 'create-puzzle-instructions-tab'
-                        : tab === 'solution'
-                          ? 'create-puzzle-solution-tab'
-                          : ''
+                        : tab === 'python-tests'
+                          ? 'create-puzzle-python-tests-tab'
+                          : tab === 'initial-board'
+                            ? 'create-puzzle-initial-board-tab'
+                            : tab === 'solution'
+                              ? 'create-puzzle-solution-tab'
+                              : ''
               } ${
                 activeTab === tab
                   ? 'border-b-2 border-foreground text-foreground'

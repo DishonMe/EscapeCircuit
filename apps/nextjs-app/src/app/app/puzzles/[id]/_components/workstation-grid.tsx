@@ -6,6 +6,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { RippleEffect } from '@/components/ripple-effect';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/components/ui/notifications';
@@ -383,7 +384,9 @@ export const WorkstationGrid = ({
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        WORKSTATION_CLIPBOARD_STORAGE_KEY,
+      );
       if (!raw) return;
 
       const parsed = JSON.parse(raw) as ClipboardPayload;
@@ -400,69 +403,73 @@ export const WorkstationGrid = ({
     }
   }, []);
 
-  const persistClipboardPayload = useCallback(async (payload: ClipboardPayload) => {
-    setClipboard(payload);
-
-    try {
-      window.localStorage.setItem(
-        WORKSTATION_CLIPBOARD_STORAGE_KEY,
-        JSON.stringify(payload),
-      );
-    } catch {
-      // ignore storage failures
-    }
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(JSON.stringify(payload));
-      }
-    } catch {
-      // ignore clipboard write failures
-    }
-  }, []);
-
-  const readClipboardPayload = useCallback(async (): Promise<ClipboardPayload | null> => {
-    const parsePayload = (raw: string | null): ClipboardPayload | null => {
-      if (!raw) return null;
+  const persistClipboardPayload = useCallback(
+    async (payload: ClipboardPayload) => {
+      setClipboard(payload);
 
       try {
-        const parsed = JSON.parse(raw) as ClipboardPayload;
-        if (
-          parsed &&
-          parsed.version === 1 &&
-          Array.isArray(parsed.components) &&
-          Array.isArray(parsed.wires)
-        ) {
-          return parsed;
+        window.localStorage.setItem(
+          WORKSTATION_CLIPBOARD_STORAGE_KEY,
+          JSON.stringify(payload),
+        );
+      } catch {
+        // ignore storage failures
+      }
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(JSON.stringify(payload));
         }
+      } catch {
+        // ignore clipboard write failures
+      }
+    },
+    [],
+  );
+
+  const readClipboardPayload =
+    useCallback(async (): Promise<ClipboardPayload | null> => {
+      const parsePayload = (raw: string | null): ClipboardPayload | null => {
+        if (!raw) return null;
+
+        try {
+          const parsed = JSON.parse(raw) as ClipboardPayload;
+          if (
+            parsed &&
+            parsed.version === 1 &&
+            Array.isArray(parsed.components) &&
+            Array.isArray(parsed.wires)
+          ) {
+            return parsed;
+          }
+        } catch {
+          return null;
+        }
+
+        return null;
+      };
+
+      try {
+        const systemText = navigator.clipboard
+          ? await navigator.clipboard.readText()
+          : '';
+        const fromSystem = parsePayload(systemText);
+        if (fromSystem) return fromSystem;
+      } catch {
+        // ignore clipboard read failures
+      }
+
+      const fromState = clipboard;
+      if (fromState) return fromState;
+
+      try {
+        return parsePayload(
+          window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
+        );
       } catch {
         return null;
       }
-
-      return null;
-    };
-
-    try {
-      const systemText = navigator.clipboard
-        ? await navigator.clipboard.readText()
-        : '';
-      const fromSystem = parsePayload(systemText);
-      if (fromSystem) return fromSystem;
-    } catch {
-      // ignore clipboard read failures
-    }
-
-    const fromState = clipboard;
-    if (fromState) return fromState;
-
-    try {
-      return parsePayload(
-        window.localStorage.getItem(WORKSTATION_CLIPBOARD_STORAGE_KEY),
-      );
-    } catch {
-      return null;
-    }
-  }, [clipboard]);
+    }, [clipboard]);
 
   const copySelectionToClipboard = useCallback(async () => {
     if (
@@ -491,7 +498,14 @@ export const WorkstationGrid = ({
     };
 
     await persistClipboardPayload(payload);
-  }, [catalog, persistClipboardPayload, placed, puzzleId, selectedEntity, wires]);
+  }, [
+    catalog,
+    persistClipboardPayload,
+    placed,
+    puzzleId,
+    selectedEntity,
+    wires,
+  ]);
 
   const pasteFromClipboard = useCallback(async () => {
     const payload = await readClipboardPayload();
@@ -944,38 +958,46 @@ export const WorkstationGrid = ({
       return fit;
     };
 
-    const calculatePan = (fit: number, containerWidth: number) => {
-      // Inputs are at column -1. We want to position them with a visible left margin.
-      // Formula: screen_x = pan.x + (col + 0.5) * CELL_PX * fit
-      // To place col -1 at ~15% from left (leaving room for input labels):
-      const targetScreenX = containerWidth * 0.15;
-      const panX = targetScreenX - -0.5 * CELL_PX * fit;
-      // Pan Y: center vertically
-      const panY = 2 * CELL_PX * fit;
+    const calculatePan = (currentZoom: number, containerWidth: number, containerHeight: number) => {
+      const panX = containerWidth / 2 - (gridCols / 2) * CELL_PX * currentZoom;
+      const panY = containerHeight / 2 - (gridRows / 2) * CELL_PX * currentZoom;
       return { x: panX, y: panY };
     };
 
     const raw = shouldPersistZoom
       ? window.localStorage.getItem(STORAGE_KEY)
       : null;
+    
+    let activeZoom = 1;
+    const fit = updateFit();
     if (!raw) {
-      const fit = updateFit();
-      setZoom(fit);
-      const pan = calculatePan(fit, el.getBoundingClientRect().width);
-      setPan(pan);
+      activeZoom = fit;
+      setZoom(activeZoom);
     } else {
-      const fit = updateFit();
-      setZoom((prev) => Math.max(prev, fit));
-      const pan = calculatePan(fit, el.getBoundingClientRect().width);
-      setPan(pan);
+      try {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.zoom === 'number') {
+          activeZoom = Math.max(parsed.zoom, fit);
+        } else {
+          activeZoom = fit;
+        }
+      } catch {
+        activeZoom = fit;
+      }
+      setZoom(activeZoom);
     }
 
+    const rect = el.getBoundingClientRect();
+    setPan(calculatePan(activeZoom, rect.width, rect.height));
+
     const ro = new ResizeObserver(() => {
-      const fit = updateFit();
-      setZoom((prev) => Math.max(prev, fit));
-      const rect = el.getBoundingClientRect();
-      const pan = calculatePan(fit, rect.width);
-      setPan(pan);
+      const newFit = updateFit();
+      setZoom((prev) => {
+        const nextZoom = Math.max(prev, newFit);
+        const newRect = el.getBoundingClientRect();
+        setPan(calculatePan(nextZoom, newRect.width, newRect.height));
+        return nextZoom;
+      });
     });
     ro.observe(el);
 
@@ -1168,10 +1190,18 @@ export const WorkstationGrid = ({
       const gridWidthPx = (gridCols + 1) * CELL_PX * nextZoom;
       const gridHeightPx = (gridRows + 1) * CELL_PX * nextZoom;
 
-      const minPanX = Math.min(0, rect.width - gridWidthPx);
-      const maxPanX = Math.max(0, rect.width - gridWidthPx) + 50;
-      const minPanY = Math.min(0, rect.height - gridHeightPx);
-      const maxPanY = Math.max(0, rect.height - gridHeightPx) + 20;
+      const paddingX = 250;
+      const paddingY = 150;
+
+      const limitX1 = paddingX;
+      const limitX2 = rect.width - gridWidthPx - paddingX;
+      const minPanX = Math.min(limitX1, limitX2);
+      const maxPanX = Math.max(limitX1, limitX2);
+
+      const limitY1 = paddingY;
+      const limitY2 = rect.height - gridHeightPx - paddingY;
+      const minPanY = Math.min(limitY1, limitY2);
+      const maxPanY = Math.max(limitY1, limitY2);
 
       return {
         x: clamp(nextPan.x, minPanX, maxPanX),
@@ -1438,6 +1468,22 @@ export const WorkstationGrid = ({
           w.to.pinIndex === toPinIndex,
       )
     ) {
+      return;
+    }
+
+    // Check that the input doesn't already have a wire connected to it
+    if (
+      wires.some(
+        (w) =>
+          w.to.componentId === to.ownerId &&
+          w.to.pinIndex === toPinIndex,
+      )
+    ) {
+      notifications.addNotification({
+        type: 'warning',
+        title: 'Invalid wire',
+        message: 'An input can only have one wire connected to it.',
+      });
       return;
     }
 
@@ -2035,10 +2081,18 @@ export const WorkstationGrid = ({
                 </Button>
               ) : (
                 <>
-                  <Button size="sm" variant="outline" onClick={onDebuggerStepPrev}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepPrev}
+                  >
                     ◄ Previous Step
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onDebuggerStepNext}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDebuggerStepNext}
+                  >
                     Next Step ►
                   </Button>
                   <Button
@@ -2048,7 +2102,11 @@ export const WorkstationGrid = ({
                   >
                     Full Debugger Report
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onExitInlineDebugger}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onExitInlineDebugger}
+                  >
                     Exit Debugger
                   </Button>
                 </>
@@ -2294,7 +2352,7 @@ export const WorkstationGrid = ({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="size-8 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 setZoom((z) => Math.min(z * 1.15, 3));
@@ -2306,7 +2364,7 @@ export const WorkstationGrid = ({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="size-8 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 setZoom((z) => Math.max(z / 1.15, minZoom));
@@ -2857,7 +2915,7 @@ export const WorkstationGrid = ({
               >
                 {/* Selected Action Buttons: Delete (Outside) */}
                 {isSelected && !isDragging && (
-                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 gap-1 items-center">
+                  <div className="absolute -top-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1">
                     {/* Delete Button */}
                     {(!p.isLocked || isEditMode) && (
                       <button
@@ -2894,7 +2952,7 @@ export const WorkstationGrid = ({
                       </button>
                     )}
                     {/* Component Name Label */}
-                    <span className="ml-1 text-xs font-medium text-foreground bg-card/90 px-2 py-1 rounded shadow-sm ring-1 ring-border whitespace-nowrap">
+                    <span className="ml-1 whitespace-nowrap rounded bg-card/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-border">
                       {def.label}
                     </span>
                   </div>
@@ -3051,11 +3109,12 @@ export const WorkstationGrid = ({
               <div key={id}>
                 {debuggerActive ? (
                   <div
-                    className="pointer-events-auto absolute z-30 flex items-center gap-1"
+                    className="pointer-events-auto absolute z-30 flex items-center gap-1 debugger-sequence-inputs"
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-102%, -165%)',
+                      transform: `translate(-102%, -165%) scale(${zoom})`,
+                      transformOrigin: 'right bottom',
                     }}
                   >
                     <div
@@ -3099,7 +3158,8 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-102%, -105%)',
+                      transform: `translate(-102%, -105%) scale(${zoom})`,
+                      transformOrigin: 'right bottom',
                     }}
                     title={`Step ${debuggerStepIndex + 1} highlighted in sequence`}
                   >
@@ -3130,7 +3190,8 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
+                    transform: `translate(-100%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px)) scale(${zoom})`,
+                    transformOrigin: 'right center',
                     animationDelay: `${Math.min(inputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}
@@ -3183,7 +3244,8 @@ export const WorkstationGrid = ({
                     style={{
                       left: pt.x,
                       top: pt.y,
-                      transform: 'translate(-140%, -50%)',
+                      transform: `translate(-140%, -50%) scale(${zoom})`,
+                      transformOrigin: 'right center',
                     }}
                   >
                     <div
@@ -3204,7 +3266,8 @@ export const WorkstationGrid = ({
                   style={{
                     left: pt.x,
                     top: pt.y,
-                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px))`,
+                    transform: `translate(0%, calc(-50% + ${PUZZLE_IO_Y_OFFSET_PX}px)) scale(${zoom})`,
+                    transformOrigin: 'left center',
                     animationDelay: `${Math.min(outputIndex, 8) * 110}ms`,
                     animationFillMode: 'both',
                   }}

@@ -1,19 +1,34 @@
 import { Step } from 'react-joyride';
 
-// `react-joyride`'s Step type doesn't include `title`, but the underlying
-// tooltip API forwards it through. Cast to a permissive type so our custom
-// TourTooltip can render `step.title` for richer headers.
-type TourStep = Step & { title?: string };
+type TourStep = Step & { 
+  title?: string;
+  scrollIntoView?: boolean;
+  scrollTarget?: string;
+  before?: () => Promise<void> | void;
+};
+
+const switchToTab = (tabClass: string) => {
+  return () =>
+    new Promise<void>((resolve) => {
+      const tab = document.querySelector(tabClass) as HTMLElement | null;
+      if (tab) {
+        tab.click();
+        setTimeout(resolve, 150);
+      } else {
+        resolve();
+      }
+    });
+};
 
 /**
  * Browse Puzzles Tour - /app/puzzles
  */
 export const browsePuzzlesTourSteps: TourStep[] = [
   {
-    title: 'Filter the gallery',
-    target: '.puzzle-filters-button',
+    title: 'At a Glance',
+    target: '.puzzle-info-section',
     content:
-      'Hunt for the right puzzle by difficulty, fun, clarity, or solve status. Try opening it now and slide a filter to see how the list reshuffles.',
+      'Check out the puzzle difficulty, title, and description to find the perfect challenge.',
     placement: 'bottom',
   },
   {
@@ -31,18 +46,25 @@ export const browsePuzzlesTourSteps: TourStep[] = [
     placement: 'bottom',
   },
   {
-    title: 'Sort to taste',
-    target: '.puzzle-sort-dropdown',
-    content:
-      'Sort by creation date, difficulty, fun, or clarity. A great way to surface puzzles that match your current mood.',
-    placement: 'bottom',
-  },
-  {
     title: 'Jump into the Workstation',
     target: '.puzzle-card-action',
     content:
       'Click Solve Puzzle to enter the Workstation — that is where you wire your gates, run tests, and earn XP.',
     placement: 'left',
+  },
+  {
+    title: 'Filter the gallery',
+    target: '.puzzle-filters-button',
+    content:
+      'Hunt for the right puzzle by difficulty, fun, clarity, or solve status. Try opening it now and slide a filter to see how the list reshuffles.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Sort to taste',
+    target: '.puzzle-sort-dropdown',
+    content:
+      'Sort by creation date, difficulty, fun, or clarity. A great way to surface puzzles that match your current mood.',
+    placement: 'bottom',
   },
   {
     title: 'Bookmark for later',
@@ -56,6 +78,13 @@ export const browsePuzzlesTourSteps: TourStep[] = [
     target: '.puzzle-rating-section',
     content:
       'After you spend real time on a puzzle, rate it. Creators get feedback, and other players find the gems.',
+    placement: 'top',
+  },
+  {
+    title: 'View Leaderboard',
+    target: '.puzzle-leaderboard-button',
+    content:
+      'See how your solution stacks up against other players. Compete for the fastest time or the most efficient circuit.',
     placement: 'top',
   },
 ];
@@ -120,32 +149,44 @@ export const workstationTourSteps: TourStep[] = [
  */
 export const createPuzzleTourSteps: TourStep[] = [
   {
-    title: 'Start with the basics',
+    title: 'Basic Information',
     target: '.create-puzzle-basic-tab',
     content:
-      'Name your puzzle, write a hook, and pick a difficulty. Set a gate budget or cycle limit here if you want a tight challenge.',
+      'Start by naming your puzzle, adding a description, and setting the difficulty level.',
     placement: 'bottom',
+    before: switchToTab('.create-puzzle-basic-tab'),
   },
   {
-    title: 'Build the reference solution',
-    target: '.create-puzzle-solution-tab',
+    title: 'Budget and Constraints',
+    target: '#cp-field-budget',
     content:
-      'Wire the correct circuit yourself. You can also lock in a starter board that solvers must build around.',
+      'Set a maximum gate budget to challenge your solvers. You can also define cycle constraints and per-component limits.',
     placement: 'bottom',
+    before: switchToTab('.create-puzzle-basic-tab'),
   },
   {
     title: 'Define what "correct" means',
     target: '.create-puzzle-test-cases-tab',
     content:
-      'List the input/expected-output cases your puzzle grades against — or wire up Python tests for stream-based puzzles.',
+      'This is where you list the test cases your puzzle grades against to check the logic.',
     placement: 'bottom',
+    before: switchToTab('.create-puzzle-test-cases-tab'),
   },
   {
-    title: 'Brief your solvers',
-    target: '.create-puzzle-instructions-tab',
+    title: 'Test Case Types',
+    target: '#cp-field-11',
     content:
-      'Write the puzzle story in Markdown. LaTeX math is supported, so go ahead with the equations.',
+      'Choose Blackbox for standard inputs/expected-outputs, or Stream for sequential multi-tick arrays.',
     placement: 'bottom',
+    before: switchToTab('.create-puzzle-test-cases-tab'),
+  },
+  {
+    title: 'Python Tests (Advanced)',
+    target: '.create-puzzle-python-tests-tab',
+    content:
+      'For complex stream-based puzzles, you can wire up custom Python verification scripts instead of manual test cases.',
+    placement: 'bottom',
+    before: switchToTab('.create-puzzle-python-tests-tab'),
   },
   {
     title: 'Add custom pieces',
@@ -153,6 +194,31 @@ export const createPuzzleTourSteps: TourStep[] = [
     content:
       'Optionally bake in puzzle-specific sub-circuits — handy when you want to scope the gate set or hint at structure.',
     placement: 'bottom',
+    before: switchToTab('.create-puzzle-custom-pieces-tab'),
+  },
+  {
+    title: 'Brief your solvers',
+    target: '.create-puzzle-instructions-tab',
+    content:
+      'Write the puzzle story in Markdown. LaTeX math is supported, so go ahead with the equations.',
+    placement: 'bottom',
+    before: switchToTab('.create-puzzle-instructions-tab'),
+  },
+  {
+    title: 'Initial Board setup',
+    target: '.create-puzzle-initial-board-tab',
+    content:
+      'Place locked components and wires on the board to force solvers to build around your starter layout.',
+    placement: 'bottom',
+    before: switchToTab('.create-puzzle-initial-board-tab'),
+  },
+  {
+    title: 'Build the reference solution',
+    target: '.create-puzzle-solution-tab',
+    content:
+      'Wire the correct circuit yourself to prove it is solvable. This also determines the "Creator Budget" score to beat.',
+    placement: 'bottom',
+    before: switchToTab('.create-puzzle-solution-tab'),
   },
   {
     title: 'Ship it',
@@ -160,6 +226,7 @@ export const createPuzzleTourSteps: TourStep[] = [
     content:
       'Publish when ready or keep it as a draft and iterate. You can come back to tune anything later.',
     placement: 'top',
+    before: switchToTab('.create-puzzle-basic-tab'),
   },
 ];
 
@@ -276,6 +343,54 @@ export const profileTourSteps: TourStep[] = [
     target: '.tour-profile-medals',
     content:
       'Every gold, silver, and bronze you earn is collected here. Tap one to revisit the puzzle behind it.',
+    placement: 'bottom',
+  },
+];
+
+/**
+ * Debugger Tour - /app/puzzles/[id]
+ */
+export const debuggerTourSteps: TourStep[] = [
+  {
+    title: 'Inline Debugger Mode',
+    target: '.debugger-step-controls',
+    content:
+      'Welcome to the Debugger! This tool helps you inspect exactly how signals flow through your circuit to easily find bugs and trace logic.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Combinatorial vs Sequential',
+    target: '.debugger-next-step-button',
+    content:
+      'For regular Combinatorial circuits, the debugger simply calculates the single steady state. For Sequential circuits (with D-Flip-Flops), the circuit evolves over time, and you can use the Next and Previous buttons to move through time tick by tick.',
+    placement: 'bottom',
+  },
+  {
+    title: 'Input Sequences',
+    target: '.debugger-sequence-inputs',
+    content:
+      'When debugging sequential puzzles, you can define exactly what signals enter the circuit over time. Edit the sequence strings (like "10110") next to each input pin, then click "Refresh Debug" to simulate that timeline.',
+    placement: 'top',
+  },
+  {
+    title: 'Live Port Inspection',
+    target: '.workstation-grid',
+    content:
+      'As you step through time, notice the small numbers floating near every input and output port on your gates. They update in real-time to show you the exact bit value (0 or 1) flowing through that wire at that moment.',
+    placement: 'center',
+  },
+  {
+    title: 'Full Debugger Report',
+    target: '.debugger-full-report-button',
+    content:
+      "If stepping manually isn't enough, click here to open a comprehensive truth-table. For regular circuits, it shows all possible input combinations. For sequential circuits, it shows the state of every gate across every tick in your sequence.",
+    placement: 'bottom',
+  },
+  {
+    title: 'Exit Debugger',
+    target: '.debugger-exit-button',
+    content:
+      'When you are done analyzing and ready to make changes, click Exit Debugger to return to the normal workstation building mode.',
     placement: 'bottom',
   },
 ];

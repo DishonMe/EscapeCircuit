@@ -614,46 +614,51 @@ export const WorkstationMenu = ({
           </DialogHeader>
           {viewingTruthTableData ? (
             <div className="space-y-3">
-              <p className="text-sm text-foreground leading-relaxed">
-                The truth table below demonstrates the gate's logic, showing the relationship between its inputs and resulting outputs.
+              <p className="text-sm leading-relaxed text-foreground">
+                The truth table below demonstrates the gate&apos;s logic,
+                showing the relationship between its inputs and resulting
+                outputs.
               </p>
               <div className="overflow-hidden rounded-lg border border-border/60">
-              <table className="w-full text-[13px] text-foreground">
-                <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
-                  <tr>
-                    {viewingTruthTableData.inputs.map((i: string) => (
-                      <th key={i} className="px-3 py-2 text-center">
-                        {i}
-                      </th>
-                    ))}
-                    {viewingTruthTableData.outputs.map((o: string) => (
-                      <th
-                        key={o}
-                        className="border-l border-border px-3 py-2 text-center"
-                      >
-                        {o}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {viewingTruthTableData.rows.map(
-                    (row: string[], idx: number) => (
-                      <tr key={idx} className="divide-x divide-border bg-card">
-                        {row.map((cell: string, cIdx: number) => (
-                          <td
-                            key={cIdx}
-                            className="px-3 py-2 text-center text-foreground"
-                          >
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ),
-                  )}
-                </tbody>
-              </table>
-            </div>
+                <table className="w-full text-[13px] text-foreground">
+                  <thead className="bg-secondary text-[11px] font-medium uppercase text-foreground">
+                    <tr>
+                      {viewingTruthTableData.inputs.map((i: string) => (
+                        <th key={i} className="px-3 py-2 text-center">
+                          {i}
+                        </th>
+                      ))}
+                      {viewingTruthTableData.outputs.map((o: string) => (
+                        <th
+                          key={o}
+                          className="border-l border-border px-3 py-2 text-center"
+                        >
+                          {o}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {viewingTruthTableData.rows.map(
+                      (row: string[], idx: number) => (
+                        <tr
+                          key={idx}
+                          className="divide-x divide-border bg-card"
+                        >
+                          {row.map((cell: string, cIdx: number) => (
+                            <td
+                              key={cIdx}
+                              className="px-3 py-2 text-center text-foreground"
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-[13px] text-muted-foreground">
