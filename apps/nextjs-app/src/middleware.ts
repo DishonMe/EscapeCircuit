@@ -13,6 +13,7 @@ export function middleware(request: NextRequest) {
   // Public routes that don't require authentication (can be accessed without login)
   const publicRoutes = [
     '/',
+    '/portfolio',
     '/auth/login',
     '/auth/register',
     '/auth/complete-google',
@@ -69,6 +70,6 @@ export const config = {
     // - _next/image/* (image optimization files)
     // - favicon.ico (favicon file)
     // - Static file extensions (svg, png, jpg, ico, mp3, wav, etc.)
-    '/((?!api|server|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|robots\\.txt)$).*)',
+    '/((?!api|server|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|txt|pdf|mp4|robots\\.txt)$).*)',
   ],
 };
