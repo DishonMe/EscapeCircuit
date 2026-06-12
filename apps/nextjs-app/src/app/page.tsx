@@ -79,6 +79,22 @@ export default function HomePage() {
             </Link>
           </div>
 
+          {/* Project Day link */}
+          <div className="mt-7 animate-fade-up [animation-delay:520ms]">
+            <Link
+              href="/portfolio"
+              className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-[rgba(180,205,240,0.55)] underline-offset-4 transition-colors hover:text-[#e8eeff] hover:underline"
+            >
+              🎓 Project Day page
+              <span
+                className="inline-block transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              >
+                →
+              </span>
+            </Link>
+          </div>
+
           {/* Scroll hint */}
           <div className="mt-11 animate-fade-up [animation-delay:600ms]">
             <div className="inline-flex flex-col items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-[rgba(150,175,220,0.4)]">
