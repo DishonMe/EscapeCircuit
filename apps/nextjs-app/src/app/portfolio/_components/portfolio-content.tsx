@@ -30,7 +30,7 @@ const GITHUB_URL = 'https://github.com/DishonMe/EscapeCircuit';
 
 const NAV_LINKS = [
   { href: '#about', label: 'About' },
-  { href: '#demo', label: 'Demo' },
+  { href: '#demo', label: 'Video' },
   { href: '#manual', label: 'Manual' },
   { href: '#docs', label: 'Docs' },
   { href: '#team', label: 'Team' },
@@ -402,11 +402,10 @@ export default function PortfolioContent() {
         {/* ── DEMO VIDEO ── */}
         <section id="demo" className="scroll-mt-16 bg-[#0a1020] px-6 py-[72px]">
           <div className="mx-auto max-w-4xl">
-            <SectionLabel>Demo</SectionLabel>
+            <SectionLabel>Promo video</SectionLabel>
             <SectionHeading>See it in action</SectionHeading>
             <p className="mx-auto mb-10 max-w-md text-center text-[14px] leading-relaxed">
-              A short walkthrough of EscapeCircuit, from placing your first gate
-              to solving full sequential circuits.
+              A short promotional video introducing EscapeCircuit.
             </p>
 
             <div className="overflow-hidden rounded-[18px] border border-[rgba(99,179,237,0.18)] bg-[#0d1528] shadow-2xl shadow-black/40">
@@ -424,17 +423,17 @@ export default function PortfolioContent() {
                   aria-hidden="true"
                 />
                 <span className="ml-3 text-[11px] font-semibold tracking-wider text-[rgba(150,175,220,0.5)]">
-                  escapecircuit/demo.mp4
+                  escapecircuit/promo.mp4
                 </span>
               </div>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- no caption track exists for the demo video */}
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- no caption track exists for the promo video */}
               <video
                 className="aspect-video w-full bg-black"
                 src="/portfolio/escapecircuit-promo.mp4"
                 poster="/portfolio/promo-poster.png"
                 controls
                 preload="none"
-                aria-label="EscapeCircuit demo video"
+                aria-label="EscapeCircuit promotional video"
               >
                 Your browser does not support the video tag.
               </video>
